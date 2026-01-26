@@ -1,0 +1,165 @@
+// This is your Prisma schema file, // learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./knowledge-base.db"
+}
+
+// 用户表
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String   @map("hashedPassword")
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 关联关系
+  documents Document[]
+  settings  Setting[]
+  backups   Backup[]
+  
+  @@map("users")
+}
+
+// 文档表
+model Document {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  type      String   @default("document")
+  fileType  String?  // .md, .pdf, .docx, .txt
+  metadata  Json?    // 文档元数据
+  userId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 关联关系
+  user        User?            @relation(fields: [userId], references: [id])
+  tags        DocumentTag[]
+  entities    DocumentEntity[]
+  searchItems SearchHistory[]
+  
+  @@map("documents")
+}
+
+// 标签表
+model Tag {
+  id          String        @id @default(uuid())
+  name        String        @unique
+  color       String        @default("#999999")
+  description String?
+  documentTag DocumentTag[]
+  
+  @@map("tags")
+}
+
+// 文档标签关联表
+model DocumentTag {
+  documentId String
+  tagId      String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@id([documentId, tagId])
+  @@map("document_tags")
+}
+
+// 实体表
+model Entity {
+  id          String          @id @default(uuid())
+  name        String
+  type        String          @default("concept")
+  description String?
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  // 关联关系
+  relationsAsSource EntityRelation[] @relation("SourceEntity")
+  relationsAsTarget EntityRelation[] @relation("TargetEntity")
+  documentEntities  DocumentEntity[]
+  
+  @@map("entities")
+}
+
+// 实体关系表
+model EntityRelation {
+  id          String    @id @default(uuid())
+  sourceId    String
+  targetId    String
+  type        String    @default("association")
+  strength    Float     @default(0.5) // 0-1之间的关系强度
+  description String?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // 外键
+  source      Entity    @relation("SourceEntity", fields: [sourceId], references: [id], onDelete: Cascade)
+  target      Entity    @relation("TargetEntity", fields: [targetId], references: [id], onDelete: Cascade)
+  
+  @@map("entity_relations")
+}
+
+// 文档实体关联表
+model DocumentEntity {
+  documentId String
+  entityId   String
+  score      Float     @default(0.5) // 实体在文档中的相关度
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  entity     Entity    @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  
+  @@id([documentId, entityId])
+  @@map("document_entities")
+}
+
+// 搜索历史表
+model SearchHistory {
+  id          String   @id @default(uuid())
+  query       String
+  documentId  String?
+  userId      String?
+  score       Float?   // 搜索结果的相关度
+  createdAt   DateTime @default(now())
+  
+  // 关联关系
+  document    Document? @relation(fields: [documentId], references: [id])
+  user        User?     @relation(fields: [userId], references: [id])
+  
+  @@map("search_history")
+}
+
+// 备份表
+model Backup {
+  id          String   @id @default(uuid())
+  filePath    String
+  size        Int
+  description String?
+  userId      String?
+  createdAt   DateTime @default(now())
+  
+  // 关联关系
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  @@map("backups")
+}
+
+// 设置表
+model Setting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  userId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // 关联关系
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  @@map("settings")
+}

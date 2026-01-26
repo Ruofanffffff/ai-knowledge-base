@@ -1,0 +1,31 @@
+{
+  "recommendations": [
+    {
+      "text": "React是什么"
+    },
+    {
+      "text": "SQLite使用指南"
+    },
+    {
+      "text": "语义搜索原理"
+    },
+    {
+      "text": "个人知识库需求"
+    },
+    {
+      "text": "AI内涝决策系统"
+    },
+    {
+      "text": "医院检验数据平台"
+    },
+    {
+      "text": "本地模型训练"
+    },
+    {
+      "text": "智能搜索推荐"
+    }
+  ],
+  "docCount": 13,
+  "docHash": "e2e0e243d1e802aa7578d153541cf0de",
+  "timestamp": "2026-01-25T15:13:22.091Z"
+}
