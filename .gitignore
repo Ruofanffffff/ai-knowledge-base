@@ -42,3 +42,6 @@ uploads/
 
 # 数据文件
 data/documents.json
+data/categories.json
+data/users.db
+data/*.db

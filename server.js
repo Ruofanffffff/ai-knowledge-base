@@ -10,6 +10,21 @@ require('dotenv').config();
 const app = express();
 const PORT = 3000;
 
+// 初始化用户认证服务
+const { initAuthService, authMiddleware } = require('./services/authService');
+const { initStatsService } = require('./services/statsService');
+const authRoutes = require('./routes/authRoutes');
+const userCenterRoutes = require('./routes/userCenterRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const { initDatabase } = require('./database/initUserDB');
+
+initAuthService();
+initStatsService();
+const userDb = initDatabase();
+const authRouter = authRoutes.initAuthRoutes();
+const userCenterRouter = userCenterRoutes.initUserCenterRoutes();
+const adminRouter = adminRoutes.initAdminRoutes();
+
 // Ollama配置
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api';
 
@@ -78,30 +93,78 @@ function saveDocuments(documents) {
 }
 
 // 从文件加载分类数据
-function loadCategories() {
-  try {
-    if (fs.existsSync(CATEGORIES_FILE)) {
-      const data = fs.readFileSync(CATEGORIES_FILE, 'utf8');
-      const categoriesData = JSON.parse(data);
-      return categoriesData.categories || [];
-    }
-  } catch (error) {
-    console.error('Error loading categories:', error);
-  }
-  return null;
+function loadCategories(userId) {
+  return new Promise((resolve, reject) => {
+    userDb.all(
+      'SELECT * FROM categories WHERE user_id = ? ORDER BY created_at ASC',
+      [userId],
+      (err, rows) => {
+        if (err) {
+          console.error('Error loading categories from database:', err);
+          return reject(err);
+        }
+        
+        if (!rows || rows.length === 0) {
+          return resolve(null);
+        }
+        
+        const categories = rows.map(row => ({
+          id: row.category_id,
+          name: row.name,
+          description: row.description,
+          color: row.color,
+          documentIds: row.document_ids ? JSON.parse(row.document_ids) : [],
+          documentCount: row.document_count
+        }));
+        
+        resolve(categories);
+      }
+    );
+  });
 }
 
-// 保存分类数据到文件
-function saveCategories(categories) {
-  try {
-    const data = {
-      categories: categories,
-      timestamp: new Date().toISOString()
-    };
-    fs.writeFileSync(CATEGORIES_FILE, JSON.stringify(data, null, 2), 'utf8');
-  } catch (error) {
-    console.error('Error saving categories:', error);
-  }
+function saveCategories(userId, categories) {
+  return new Promise((resolve, reject) => {
+    userDb.serialize(() => {
+      userDb.run('DELETE FROM categories WHERE user_id = ?', [userId], (err) => {
+        if (err) {
+          console.error('Error deleting old categories:', err);
+          return reject(err);
+        }
+        
+        const stmt = userDb.prepare(`
+          INSERT INTO categories (user_id, category_id, name, description, color, document_ids, document_count)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        let completed = 0;
+        const total = categories.length;
+        
+        categories.forEach(category => {
+          const documentIdsJson = JSON.stringify(category.documentIds || []);
+          stmt.run(
+            [userId, category.id, category.name, category.description, category.color, documentIdsJson, category.documentCount],
+            (err) => {
+              if (err) {
+                console.error('Error saving category:', err);
+              }
+              completed++;
+              
+              if (completed === total) {
+                stmt.finalize();
+                resolve();
+              }
+            }
+          );
+        });
+        
+        if (total === 0) {
+          stmt.finalize();
+          resolve();
+        }
+      });
+    });
+  });
 }
 
 // 从文件加载推荐缓存
@@ -367,17 +430,7 @@ if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
   fs.mkdirSync(path.join(__dirname, 'uploads'), { recursive: true });
 }
 
-// 静态文件服务
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// 提供client目录下的静态文件服务（用于React应用）
-app.use(express.static(path.join(__dirname, 'client')));
-
-// 提供根目录下的静态文件服务
-app.use(express.static(path.join(__dirname)));
-
-// 根路径路由
+// 根路径路由（必须在静态文件中间件之前）
 app.get('/', (req, res) => {
   try {
     const htmlPath = path.join(__dirname, 'index-simple.html');
@@ -402,10 +455,29 @@ app.get('/', (req, res) => {
   }
 });
 
+// 静态文件服务
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// 提供client目录下的静态文件服务（用于React应用）
+app.use(express.static(path.join(__dirname, 'client')));
+
+// 提供根目录下的静态文件服务
+app.use(express.static(path.join(__dirname)));
+
 // API路由
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
+
+// 认证路由
+app.use('/api/auth', authRouter);
+
+// 用户中心路由
+app.use('/api/user', userCenterRouter);
+
+// 管理员路由
+app.use('/api/admin', adminRouter);
 
 const mockTags = [
   { id: '1', name: '前端', color: '#1890ff', description: '前端开发相关内容' },
@@ -416,96 +488,178 @@ const mockTags = [
 ];
 
 // 文档相关路由
-app.get('/api/documents', (req, res) => {
+app.get('/api/documents', authMiddleware, (req, res) => {
   try {
-    res.json(mockDocuments);
+    const userId = req.userId;
+    userDb.all('SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC', [userId], (err, rows) => {
+      if (err) {
+        console.error('Error fetching documents:', err);
+        return res.status(500).json({ error: 'Failed to fetch documents' });
+      }
+      
+      const documents = rows.map(row => ({
+        id: row.id.toString(),
+        title: row.title,
+        content: row.content,
+        type: row.type,
+        fileType: row.file_type,
+        metadata: row.metadata ? JSON.parse(row.metadata) : {},
+        tags: row.tags ? JSON.parse(row.tags) : [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+      
+      res.json(documents);
+    });
   } catch (error) {
     console.error('Error fetching documents:', error);
     res.status(500).json({ error: 'Failed to fetch documents' });
   }
 });
 
-app.get('/api/documents/:id', (req, res) => {
+app.get('/api/documents/:id', authMiddleware, (req, res) => {
   try {
     const { id } = req.params;
-    const documents = loadDocuments();
-    const document = documents.find(doc => doc.id === id);
-    if (!document) {
-      return res.status(404).json({ error: 'Document not found' });
-    }
-    res.json(document);
+    const userId = req.userId;
+    
+    userDb.get('SELECT * FROM documents WHERE id = ? AND user_id = ?', [id, userId], (err, row) => {
+      if (err) {
+        console.error('Error fetching document:', err);
+        return res.status(500).json({ error: 'Failed to fetch document' });
+      }
+      
+      if (!row) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      
+      const document = {
+        id: row.id.toString(),
+        title: row.title,
+        content: row.content,
+        type: row.type,
+        fileType: row.file_type,
+        metadata: row.metadata ? JSON.parse(row.metadata) : {},
+        tags: row.tags ? JSON.parse(row.tags) : [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      };
+      
+      res.json(document);
+    });
   } catch (error) {
     console.error('Error fetching document:', error);
     res.status(500).json({ error: 'Failed to fetch document' });
   }
 });
 
-app.post('/api/documents', (req, res) => {
+app.post('/api/documents', authMiddleware, (req, res) => {
   try {
+    const userId = req.userId;
     const { title, content, type, fileType, metadata, tags } = req.body;
-    const newDocument = {
-      id: Date.now().toString(),
-      title,
-      content,
-      type: type || 'document',
-      fileType: fileType || '.md',
-      metadata: metadata || {},
-      tags: tags || [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    mockDocuments.push(newDocument);
     
-    console.log('创建新文档:', newDocument);
-    console.log('当前文档总数:', mockDocuments.length);
+    const metadataStr = metadata ? JSON.stringify(metadata) : null;
+    const tagsStr = tags ? JSON.stringify(tags) : null;
     
-    // 保存到文件
-    saveDocuments(mockDocuments);
-    
-    // 验证文件保存
-    const savedDocs = loadDocuments();
-    console.log('从文件读取的文档数量:', savedDocs.length);
-    
-    res.status(201).json(newDocument);
+    userDb.run(
+      `INSERT INTO documents (user_id, title, content, type, file_type, metadata, tags) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [userId, title, content, type || 'document', fileType || '.md', metadataStr, tagsStr],
+      function(err) {
+        if (err) {
+          console.error('Error creating document:', err);
+          return res.status(500).json({ error: 'Failed to create document' });
+        }
+        
+        const newDocument = {
+          id: this.lastID.toString(),
+          title,
+          content,
+          type: type || 'document',
+          fileType: fileType || '.md',
+          metadata: metadata || {},
+          tags: tags || [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        console.log('创建新文档:', newDocument);
+        res.json(newDocument);
+      }
+    );
   } catch (error) {
     console.error('Error creating document:', error);
     res.status(500).json({ error: 'Failed to create document' });
   }
 });
 
-app.put('/api/documents/:id', (req, res) => {
+app.put('/api/documents/:id', authMiddleware, (req, res) => {
   try {
+    const userId = req.userId;
     const { id } = req.params;
-    const { title, content, type, fileType, metadata } = req.body;
-    const documentIndex = mockDocuments.findIndex(doc => doc.id === id);
-    if (documentIndex === -1) {
-      return res.status(404).json({ error: 'Document not found' });
-    }
-    mockDocuments[documentIndex] = {
-      ...mockDocuments[documentIndex],
-      title,
-      content,
-      type,
-      fileType,
-      metadata,
-      updatedAt: new Date().toISOString()
-    };
-    res.json(mockDocuments[documentIndex]);
+    const { title, content, type, fileType, metadata, tags } = req.body;
+    
+    const metadataStr = metadata ? JSON.stringify(metadata) : null;
+    const tagsStr = tags ? JSON.stringify(tags) : null;
+    
+    userDb.run(
+      `UPDATE documents 
+       SET title = ?, content = ?, type = ?, file_type = ?, metadata = ?, tags = ?, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = ? AND user_id = ?`,
+      [title, content, type, fileType, metadataStr, tagsStr, id, userId],
+      function(err) {
+        if (err) {
+          console.error('Error updating document:', err);
+          return res.status(500).json({ error: 'Failed to update document' });
+        }
+        
+        if (this.changes === 0) {
+          return res.status(404).json({ error: 'Document not found' });
+        }
+        
+        userDb.get('SELECT * FROM documents WHERE id = ?', [id], (err, row) => {
+          if (err || !row) {
+            return res.status(500).json({ error: 'Failed to fetch updated document' });
+          }
+          
+          const document = {
+            id: row.id.toString(),
+            title: row.title,
+            content: row.content,
+            type: row.type,
+            fileType: row.file_type,
+            metadata: row.metadata ? JSON.parse(row.metadata) : {},
+            tags: row.tags ? JSON.parse(row.tags) : [],
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+          };
+          
+          res.json(document);
+        });
+      }
+    );
   } catch (error) {
     console.error('Error updating document:', error);
     res.status(500).json({ error: 'Failed to update document' });
   }
 });
 
-app.delete('/api/documents/:id', (req, res) => {
+app.delete('/api/documents/:id', authMiddleware, (req, res) => {
   try {
+    const userId = req.userId;
     const { id } = req.params;
-    const documentIndex = mockDocuments.findIndex(doc => doc.id === id);
-    if (documentIndex === -1) {
-      return res.status(404).json({ error: 'Document not found' });
-    }
-    mockDocuments.splice(documentIndex, 1);
-    res.json({ message: 'Document deleted successfully' });
+    
+    userDb.run('DELETE FROM documents WHERE id = ? AND user_id = ?', [id, userId], function(err) {
+      if (err) {
+        console.error('Error deleting document:', err);
+        return res.status(500).json({ error: 'Failed to delete document' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      
+      res.json({ message: 'Document deleted successfully' });
+    });
   } catch (error) {
     console.error('Error deleting document:', error);
     res.status(500).json({ error: 'Failed to delete document' });
@@ -1010,13 +1164,15 @@ app.get('/api/ai/models', async (req, res) => {
 });
 
 // AI文档总结API
-app.post('/api/ai/summarize', async (req, res) => {
+app.post('/api/ai/summarize', authMiddleware, async (req, res) => {
   try {
     const { content, model, documentId } = req.body;
+    const userId = req.userId;
     
     console.log('收到AI总结请求');
     console.log('模型:', model);
     console.log('文档ID:', documentId);
+    console.log('用户ID:', userId);
     console.log('内容长度:', content ? content.length : 0);
     
     if (!content) {
@@ -1123,21 +1279,44 @@ ${content}
       
       // 如果有文档ID，保存总结到文档
       if (documentId) {
-        const documents = loadDocuments();
-        const docIndex = documents.findIndex(doc => doc.id === documentId);
-        
-        if (docIndex !== -1) {
-          // 初始化总结数组
-          if (!documents[docIndex].summaries) {
-            documents[docIndex].summaries = [];
+        userDb.get('SELECT * FROM documents WHERE id = ? AND user_id = ?', [documentId, userId], (err, row) => {
+          if (err) {
+            console.error('Error fetching document:', err);
+            return res.json({ 
+              success: true,
+              summary,
+              analysis,
+              model,
+              timestamp: new Date().toISOString(),
+              summaryVersion
+            });
+          }
+          
+          if (!row) {
+            console.log('Document not found or does not belong to user');
+            return res.json({ 
+              success: true,
+              summary,
+              analysis,
+              model,
+              timestamp: new Date().toISOString(),
+              summaryVersion
+            });
+          }
+          
+          let summaries = [];
+          try {
+            summaries = row.summaries ? JSON.parse(row.summaries) : [];
+          } catch (e) {
+            console.error('Error parsing summaries:', e);
           }
           
           // 检查是否已有相同模型的总结
-          const existingIndex = documents[docIndex].summaries.findIndex(s => s.model === model);
+          const existingIndex = summaries.findIndex(s => s.model === model);
           
           if (existingIndex !== -1) {
             // 已有相同模型的总结，需要对比
-            const oldSummary = documents[docIndex].summaries[existingIndex];
+            const oldSummary = summaries[existingIndex];
             return res.json({
               success: true,
               summary,
@@ -1150,12 +1329,20 @@ ${content}
             });
           } else {
             // 新模型的总结，直接保存
-            documents[docIndex].summaries.push(summaryVersion);
-            // 设置为当前使用的总结
-            documents[docIndex].currentSummary = summaryVersion;
-            saveDocuments(documents);
+            summaries.push(summaryVersion);
+            const summariesJson = JSON.stringify(summaries);
+            
+            userDb.run(
+              'UPDATE documents SET summaries = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+              [summariesJson, documentId, userId],
+              (err) => {
+                if (err) {
+                  console.error('Error saving summary:', err);
+                }
+              }
+            );
           }
-        }
+        });
       }
       
       res.json({ 
@@ -1188,9 +1375,10 @@ ${content}
 });
 
 // 保存选中的总结版本
-app.post('/api/ai/summary/select', (req, res) => {
+app.post('/api/ai/summary/select', authMiddleware, (req, res) => {
   try {
     const { documentId, summaryId } = req.body;
+    const userId = req.userId;
     
     if (!documentId || !summaryId) {
       return res.status(400).json({
@@ -1199,40 +1387,65 @@ app.post('/api/ai/summary/select', (req, res) => {
       });
     }
     
-    const documents = loadDocuments();
-    const docIndex = documents.findIndex(doc => doc.id === documentId);
+    userDb.get('SELECT * FROM documents WHERE id = ? AND user_id = ?', [documentId, userId], (err, row) => {
+      if (err) {
+        console.error('Error fetching document:', err);
+        return res.status(500).json({
+          success: false,
+          error: 'Database error'
+        });
+      }
+      
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          error: 'Document not found'
+        });
+      }
+      
+      let summaries = [];
+      try {
+        summaries = row.summaries ? JSON.parse(row.summaries) : [];
+      } catch (e) {
+        console.error('Error parsing summaries:', e);
+      }
+      
+      if (!summaries || summaries.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'No summaries found for this document'
+        });
+      }
+      
+      const selectedSummary = summaries.find(s => s.id === summaryId);
     
-    if (docIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        error: 'Document not found'
-      });
-    }
-    
-    if (!documents[docIndex].summaries) {
-      return res.status(404).json({
-        success: false,
-        error: 'No summaries found for this document'
-      });
-    }
-    
-    // 找到选中的总结版本
-    const selectedSummary = documents[docIndex].summaries.find(s => s.id === summaryId);
-    
-    if (!selectedSummary) {
-      return res.status(404).json({
-        success: false,
-        error: 'Summary version not found'
-      });
-    }
-    
-    // 设置为当前使用的总结
-    documents[docIndex].currentSummary = selectedSummary;
-    saveDocuments(documents);
-    
-    res.json({
-      success: true,
-      message: 'Summary selected successfully'
+      if (!selectedSummary) {
+        return res.status(404).json({
+          success: false,
+          error: 'Summary version not found'
+        });
+      }
+      
+      const summariesJson = JSON.stringify(summaries);
+      
+      userDb.run(
+        'UPDATE documents SET summaries = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+        [summariesJson, documentId, userId],
+        (err) => {
+          if (err) {
+            console.error('Error updating current summary:', err);
+            return res.status(500).json({
+              success: false,
+              error: 'Database error'
+            });
+          }
+          
+          res.json({
+            success: true,
+            message: 'Summary selected successfully'
+          });
+        }
+      );
     });
   } catch (error) {
     console.error('Failed to select summary:', error);
@@ -1537,33 +1750,54 @@ ${documentsText}
 });
 
 // AI自动分类API
-app.post('/api/ai/classify', async (req, res) => {
+app.post('/api/ai/classify', authMiddleware, async (req, res) => {
   try {
     const { model = 'deepseek-chat' } = req.body;
+    const userId = req.userId;
     
     console.log('收到AI分类请求');
     console.log('使用模型:', model);
+    console.log('用户ID:', userId);
     
-    const documents = loadDocuments();
+    userDb.all('SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC', [userId], async (err, rows) => {
+      if (err) {
+        console.error('Error fetching documents:', err);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to fetch documents'
+        });
+      }
+      
+      const documents = rows.map(row => ({
+        id: row.id.toString(),
+        title: row.title,
+        content: row.content,
+        type: row.type,
+        fileType: row.file_type,
+        metadata: row.metadata ? JSON.parse(row.metadata) : {},
+        tags: row.tags ? JSON.parse(row.tags) : [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+      
+      console.log('加载到的文档数量:', documents.length);
+      console.log('文档列表:', documents.map(doc => ({ id: doc.id, title: doc.title, contentLength: doc.content?.length || 0 })));
+      
+      if (documents.length === 0) {
+        return res.json({
+          success: true,
+          categories: [],
+          message: '暂无文档需要分类'
+        });
+      }
+      
+      const documentsText = documents.map(doc => 
+        `文档ID: ${doc.id}\n标题: ${doc.title}\n内容: ${doc.content.substring(0, 500)}`
+      ).join('\n\n');
     
-    console.log('加载到的文档数量:', documents.length);
-    console.log('文档列表:', documents.map(doc => ({ id: doc.id, title: doc.title, contentLength: doc.content?.length || 0 })));
-    
-    if (documents.length === 0) {
-      return res.json({
-        success: true,
-        categories: [],
-        message: '暂无文档需要分类'
-      });
-    }
-    
-    const documentsText = documents.map(doc => 
-      `文档ID: ${doc.id}\n标题: ${doc.title}\n内容: ${doc.content.substring(0, 500)}`
-    ).join('\n\n');
-    
-    console.log('发送给AI的文档文本长度:', documentsText.length);
-    
-    const prompt = `请分析以下文档，将它们分为合理的类别。
+      console.log('发送给AI的文档文本长度:', documentsText.length);
+      
+      const prompt = `请分析以下文档，将它们分为合理的类别。
 
 ${documentsText}
 
@@ -1588,144 +1822,150 @@ ${documentsText}
 }
 
 请只返回JSON，不要包含其他文字说明。`;
-    
-    let classificationResult;
-    let usedModel = model;
-    
-    if (LOCAL_MODELS.includes(model)) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 300000);
+      
+      let classificationResult;
+      let usedModel = model;
       
       try {
-        const ollamaResponse = await fetch(`${OLLAMA_API_URL}/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: model,
-            prompt: prompt,
-            stream: false,
-            options: {
-              temperature: 0.3,
-              top_p: 0.9,
-              num_ctx: 4096
+        if (LOCAL_MODELS.includes(model)) {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 300000);
+          
+          try {
+            const ollamaResponse = await fetch(`${OLLAMA_API_URL}/generate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: model,
+                prompt: prompt,
+                stream: false,
+                options: {
+                  temperature: 0.3,
+                  top_p: 0.9,
+                  num_ctx: 4096
+                }
+              }),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeout);
+            
+            if (!ollamaResponse.ok) {
+              throw new Error(`Ollama API error: ${ollamaResponse.status}`);
             }
-          }),
-          signal: controller.signal
+            
+            const ollamaData = await ollamaResponse.json();
+            classificationResult = ollamaData.response;
+          } catch (error) {
+            clearTimeout(timeout);
+            throw error;
+          }
+        } else {
+          console.log('使用云端模型进行分类:', model);
+          
+          // 获取所有可用的云端模型
+          const cloudModels = Object.keys(CLOUD_MODELS);
+          const cloudModelsWithKeys = cloudModels.filter(modelKey => {
+            const config = CLOUD_MODELS[modelKey];
+            return config && config.apiKey && config.apiKey.length > 0;
+          });
+          
+          if (cloudModelsWithKeys.length === 0) {
+            throw new Error('没有可用的云端模型，请配置API密钥');
+          }
+          
+          console.log('可用的云端模型:', cloudModelsWithKeys);
+          
+          // 如果用户指定的模型在可用列表中，优先使用，否则使用第一个可用模型
+          let modelsToTry = [];
+          if (cloudModelsWithKeys.includes(model)) {
+            modelsToTry = [model, ...cloudModelsWithKeys.filter(m => m !== model)];
+          } else {
+            modelsToTry = cloudModelsWithKeys;
+          }
+          
+          console.log('尝试模型顺序:', modelsToTry);
+          
+          // 依次尝试每个云端模型，直到成功
+          for (const modelToTry of modelsToTry) {
+            try {
+              console.log(`尝试使用模型: ${modelToTry}`);
+              classificationResult = await callCloudModel(modelToTry, prompt);
+              usedModel = modelToTry;
+              console.log(`模型 ${modelToTry} 调用成功`);
+              break;
+            } catch (error) {
+              console.error(`模型 ${modelToTry} 调用失败:`, error.message);
+              if (modelToTry === modelsToTry[modelsToTry.length - 1]) {
+                throw new Error(`所有云端模型调用失败，最后错误: ${error.message}`);
+              }
+              console.log(`尝试下一个模型...`);
+            }
+          }
+        }
+        
+        console.log('AI分类原始结果:', classificationResult);
+        console.log('分类结果长度:', classificationResult ? classificationResult.length : 0);
+        console.log('实际使用的模型:', usedModel);
+        
+        let categories;
+        try {
+          const jsonMatch = classificationResult.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            categories = JSON.parse(jsonMatch[0]);
+          } else {
+            categories = JSON.parse(classificationResult);
+          }
+        } catch (parseError) {
+          console.error('解析分类结果失败:', parseError);
+          categories = generateDefaultCategories(documents);
+        }
+        
+        if (!categories.categories || !Array.isArray(categories.categories)) {
+          categories = generateDefaultCategories(documents);
+        }
+        
+        const categoriesWithDocuments = categories.categories.map(category => {
+          const categoryDocs = category.documentIds
+            ? documents.filter(doc => category.documentIds.includes(doc.id))
+            : [];
+          
+          return {
+            ...category,
+            documentCount: categoryDocs.length,
+            sampleDocuments: categoryDocs.slice(0, 3).map(doc => ({
+              id: doc.id,
+              title: doc.title,
+              fileType: doc.fileType
+            }))
+          };
         });
         
-        clearTimeout(timeout);
+        await saveCategories(userId, categoriesWithDocuments);
         
-        if (!ollamaResponse.ok) {
-          throw new Error(`Ollama API error: ${ollamaResponse.status}`);
-        }
-        
-        const ollamaData = await ollamaResponse.json();
-        classificationResult = ollamaData.response;
+        res.json({
+          success: true,
+          categories: categoriesWithDocuments,
+          model: usedModel,
+          timestamp: new Date().toISOString()
+        });
       } catch (error) {
-        clearTimeout(timeout);
-        throw error;
+        console.error('AI分类失败:', error);
+        const defaultCategories = generateDefaultCategories(documents);
+        
+        res.json({
+          success: true,
+          categories: defaultCategories,
+          message: 'AI分类失败，使用默认分类',
+          error: error.message
+        });
       }
-    } else {
-      console.log('使用云端模型进行分类:', model);
-      
-      // 获取所有可用的云端模型
-      const cloudModels = Object.keys(CLOUD_MODELS);
-      const cloudModelsWithKeys = cloudModels.filter(modelKey => {
-        const config = CLOUD_MODELS[modelKey];
-        return config && config.apiKey && config.apiKey.length > 0;
-      });
-      
-      if (cloudModelsWithKeys.length === 0) {
-        throw new Error('没有可用的云端模型，请配置API密钥');
-      }
-      
-      console.log('可用的云端模型:', cloudModelsWithKeys);
-      
-      // 如果用户指定的模型在可用列表中，优先使用，否则使用第一个可用模型
-      let modelsToTry = [];
-      if (cloudModelsWithKeys.includes(model)) {
-        modelsToTry = [model, ...cloudModelsWithKeys.filter(m => m !== model)];
-      } else {
-        modelsToTry = cloudModelsWithKeys;
-      }
-      
-      console.log('尝试模型顺序:', modelsToTry);
-      
-      // 依次尝试每个云端模型，直到成功
-      for (const modelToTry of modelsToTry) {
-        try {
-          console.log(`尝试使用模型: ${modelToTry}`);
-          classificationResult = await callCloudModel(modelToTry, prompt);
-          usedModel = modelToTry;
-          console.log(`模型 ${modelToTry} 调用成功`);
-          break;
-        } catch (error) {
-          console.error(`模型 ${modelToTry} 调用失败:`, error.message);
-          if (modelToTry === modelsToTry[modelsToTry.length - 1]) {
-            throw new Error(`所有云端模型调用失败，最后错误: ${error.message}`);
-          }
-          console.log(`尝试下一个模型...`);
-        }
-      }
-    }
-    
-    console.log('AI分类原始结果:', classificationResult);
-    console.log('分类结果长度:', classificationResult ? classificationResult.length : 0);
-    console.log('实际使用的模型:', usedModel);
-    
-    let categories;
-    try {
-      const jsonMatch = classificationResult.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        categories = JSON.parse(jsonMatch[0]);
-      } else {
-        categories = JSON.parse(classificationResult);
-      }
-    } catch (parseError) {
-      console.error('解析分类结果失败:', parseError);
-      categories = generateDefaultCategories(documents);
-    }
-    
-    if (!categories.categories || !Array.isArray(categories.categories)) {
-      categories = generateDefaultCategories(documents);
-    }
-    
-    const categoriesWithDocuments = categories.categories.map(category => {
-      const categoryDocs = category.documentIds
-        ? documents.filter(doc => category.documentIds.includes(doc.id))
-        : [];
-      
-      return {
-        ...category,
-        documentCount: categoryDocs.length,
-        sampleDocuments: categoryDocs.slice(0, 3).map(doc => ({
-          id: doc.id,
-          title: doc.title,
-          fileType: doc.fileType
-        }))
-      };
     });
-    
-    // 保存分类结果到文件
-    saveCategories(categoriesWithDocuments);
-    
-    res.json({
-      success: true,
-      categories: categoriesWithDocuments,
-      model: usedModel,
-      timestamp: new Date().toISOString()
-    });
-    
   } catch (error) {
-    console.error('AI分类失败:', error);
-    const documents = loadDocuments();
-    const defaultCategories = generateDefaultCategories(documents);
-    
-    res.json({
-      success: true,
-      categories: defaultCategories,
-      message: 'AI分类失败，使用默认分类',
-      error: error.message
+    console.error('AI分类错误:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'AI分类失败'
     });
   }
 });
@@ -1758,38 +1998,61 @@ function generateDefaultCategories(documents) {
   });
 }
 
-app.get('/api/categories', (req, res) => {
+app.get('/api/categories', authMiddleware, async (req, res) => {
   try {
-    const documents = loadDocuments();
-    const savedCategories = loadCategories();
+    const userId = req.userId;
     
-    if (savedCategories && savedCategories.length > 0) {
-      const cachedDocCount = savedCategories.reduce((total, cat) => total + cat.documentCount, 0);
-      
-      if (cachedDocCount === documents.length) {
-        res.json({
-          success: true,
-          categories: savedCategories,
-          fromCache: true
+    userDb.all('SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC', [userId], async (err, rows) => {
+      if (err) {
+        console.error('Error fetching documents:', err);
+        return res.status(500).json({
+          success: false,
+          error: err.message
         });
+      }
+      
+      const documents = rows.map(row => ({
+        id: row.id.toString(),
+        title: row.title,
+        content: row.content,
+        type: row.type,
+        fileType: row.file_type,
+        metadata: row.metadata ? JSON.parse(row.metadata) : {},
+        tags: row.tags ? JSON.parse(row.tags) : [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+      
+      const savedCategories = await loadCategories(userId);
+      
+      if (savedCategories && savedCategories.length > 0) {
+        const cachedDocCount = savedCategories.reduce((total, cat) => total + cat.documentCount, 0);
+        
+        if (cachedDocCount === documents.length) {
+          res.json({
+            success: true,
+            categories: savedCategories,
+            fromCache: true
+          });
+        } else {
+          const defaultCategories = generateDefaultCategories(documents);
+          await saveCategories(userId, defaultCategories);
+          res.json({
+            success: true,
+            categories: defaultCategories,
+            fromCache: false
+          });
+        }
       } else {
         const defaultCategories = generateDefaultCategories(documents);
-        saveCategories(defaultCategories);
+        await saveCategories(userId, defaultCategories);
         res.json({
           success: true,
           categories: defaultCategories,
           fromCache: false
         });
       }
-    } else {
-      const defaultCategories = generateDefaultCategories(documents);
-      saveCategories(defaultCategories);
-      res.json({
-        success: true,
-        categories: defaultCategories,
-        fromCache: false
-      });
-    }
+    });
   } catch (error) {
     console.error('获取分类失败:', error);
     res.status(500).json({
@@ -1799,23 +2062,51 @@ app.get('/api/categories', (req, res) => {
   }
 });
 
-app.get('/api/categories/:id/documents', (req, res) => {
+app.get('/api/categories/:id/documents', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const documents = loadDocuments();
+    const userId = req.userId;
     
-    let filteredDocuments;
-    
-    if (id === 'all') {
-      filteredDocuments = documents;
-    } else {
-      filteredDocuments = documents.filter(doc => doc.category === id);
-    }
-    
-    res.json({
-      success: true,
-      documents: filteredDocuments,
-      total: filteredDocuments.length
+    userDb.all('SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC', [userId], async (err, rows) => {
+      if (err) {
+        console.error('Error fetching documents:', err);
+        return res.status(500).json({
+          success: false,
+          error: err.message
+        });
+      }
+      
+      const documents = rows.map(row => ({
+        id: row.id.toString(),
+        title: row.title,
+        content: row.content,
+        type: row.type,
+        fileType: row.file_type,
+        metadata: row.metadata ? JSON.parse(row.metadata) : {},
+        tags: row.tags ? JSON.parse(row.tags) : [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+      
+      let filteredDocuments;
+      
+      if (id === 'all') {
+        filteredDocuments = documents;
+      } else {
+        const savedCategories = await loadCategories(userId);
+        const category = savedCategories.find(cat => cat.id === id);
+        if (category && category.documentIds) {
+          filteredDocuments = documents.filter(doc => category.documentIds.includes(doc.id));
+        } else {
+          filteredDocuments = [];
+        }
+      }
+      
+      res.json({
+        success: true,
+        documents: filteredDocuments,
+        total: filteredDocuments.length
+      });
     });
   } catch (error) {
     console.error('获取分类文档失败:', error);
@@ -2076,6 +2367,29 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://localhost:${PORT}`);
   console.log('Available APIs:');
   console.log('- GET /api/health - 健康检查');
+  console.log('- POST /api/auth/register - 用户注册');
+  console.log('- POST /api/auth/login - 用户登录');
+  console.log('- POST /api/auth/refresh - 刷新令牌');
+  console.log('- POST /api/auth/logout - 用户登出');
+  console.log('- GET /api/auth/me - 获取当前用户信息');
+  console.log('- GET /api/user/stats/overview - 获取用户统计概览');
+  console.log('- GET /api/user/stats/token-usage - 获取token使用记录');
+  console.log('- GET /api/user/models - 获取用户模型列表');
+  console.log('- POST /api/user/models - 创建用户模型');
+  console.log('- PUT /api/user/models/:id - 更新用户模型');
+  console.log('- DELETE /api/user/models/:id - 删除用户模型');
+  console.log('- GET /api/user/agents - 获取智能体列表');
+  console.log('- POST /api/user/agents - 创建智能体');
+  console.log('- PUT /api/user/agents/:id - 更新智能体');
+  console.log('- DELETE /api/user/agents/:id - 删除智能体');
+  console.log('- GET /api/user/agents/public - 获取公开智能体');
+  console.log('- GET /api/admin/users - 获取用户列表（管理员）');
+  console.log('- GET /api/admin/users/:id - 获取用户详情（管理员）');
+  console.log('- PUT /api/admin/users/:id/status - 更新用户状态（管理员）');
+  console.log('- PUT /api/admin/users/:id/role - 更新用户角色（管理员）');
+  console.log('- GET /api/admin/stats/overview - 获取系统统计（管理员）');
+  console.log('- GET /api/admin/stats/users - 获取用户增长统计（管理员）');
+  console.log('- GET /api/admin/stats/tokens - 获取token使用统计（管理员）');
   console.log('- GET /api/documents - 获取文档列表');
   console.log('- GET /api/documents/:id - 获取单个文档');
   console.log('- POST /api/documents - 创建文档');

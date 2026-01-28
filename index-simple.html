@@ -114,6 +114,71 @@
             background: rgba(0, 137, 255, 0.06);
         }
         
+        .login-page {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0, 137, 255, 0.05) 0%, rgba(255, 107, 157, 0.05) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        
+        .login-page-container {
+            width: 100%;
+            max-width: 450px;
+            padding: 40px;
+        }
+        
+        .login-page-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .login-page-header .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .login-page-header .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #0089ff 0%, #4a90e2 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0, 137, 255, 0.2);
+        }
+        
+        .login-page-header .logo-text {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #4a90e2 0%, #ff6b9d 50%, #9b59b6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .login-page-content {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        
         .main-container {
             max-width: 1400px;
             margin: 0 auto;
@@ -832,6 +897,200 @@
             color: white;
         }
         
+        .login-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            background: #f5f5f5;
+            padding: 4px;
+            border-radius: 8px;
+        }
+        
+        .login-tab {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #86909c;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .login-tab.active {
+            background: white;
+            color: #0089ff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .login-form {
+            margin-bottom: 20px;
+        }
+        
+        .code-input-group {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .code-input-group input {
+            flex: 1;
+        }
+        
+        .btn-send-code {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, rgba(0, 137, 255, 0.1), rgba(74, 144, 226, 0.1));
+            color: #0089ff;
+            border: 2px solid transparent;
+            border-image: linear-gradient(135deg, rgba(0, 137, 255, 0.3), rgba(74, 144, 226, 0.3)) 1;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(0, 137, 255, 0.08);
+        }
+        
+        .btn-send-code:hover {
+            background: linear-gradient(135deg, rgba(0, 137, 255, 0.2), rgba(74, 144, 226, 0.2));
+            border: 2px solid transparent;
+            border-image: linear-gradient(135deg, rgba(0, 137, 255, 0.5), rgba(74, 144, 226, 0.5)) 1;
+            box-shadow: 0 4px 12px rgba(0, 137, 255, 0.15);
+            transform: translateY(-1px);
+        }
+        
+        .btn-send-code:disabled {
+            background: rgba(200, 200, 200, 0.1);
+            color: #ccc;
+            border: 2px solid transparent;
+            border-image: linear-gradient(135deg, rgba(200, 200, 200, 0.2), rgba(200, 200, 200, 0.2)) 1;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .login-divider {
+            display: flex;
+            align-items: center;
+            margin: 24px 0;
+            color: #86909c;
+            font-size: 14px;
+        }
+        
+        .login-divider::before,
+        .login-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e8e8e8;
+        }
+        
+        .login-divider span {
+            padding: 0 16px;
+        }
+        
+        .wechat-login {
+            margin-bottom: 24px;
+        }
+        
+        .btn-wechat-login {
+            width: 100%;
+            padding: 12px 20px;
+            background: #07c160;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-wechat-login:hover {
+            background: #06ad56;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3);
+        }
+        
+        .btn-login-submit, .btn-register-submit {
+            width: 100%;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #0089ff 0%, #4a90e2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        
+        .btn-login-submit:hover, .btn-register-submit:hover {
+            background: linear-gradient(135deg, #0077e6 0%, #3d7bc2 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 137, 255, 0.3);
+        }
+        
+        .login-footer {
+            text-align: center;
+            font-size: 14px;
+            color: #86909c;
+        }
+        
+        .login-footer a {
+            color: #0089ff;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .login-footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .login-page-content input[type="tel"],
+        .login-page-content input[type="email"],
+        .login-page-content input[type="password"],
+        .login-page-content input[type="text"] {
+            width: 100%;
+            padding: 14px 18px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 0, 0, 0.04);
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            color: #1f2329;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+        
+        .login-page-content input[type="tel"]:focus,
+        .login-page-content input[type="email"]:focus,
+        .login-page-content input[type="password"]:focus,
+        .login-page-content input[type="text"]:focus {
+            outline: none;
+            border: 2px solid transparent;
+            border-image: linear-gradient(135deg, rgba(0, 137, 255, 0.6), rgba(74, 144, 226, 0.6)) 1;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 4px 16px rgba(0, 137, 255, 0.15), 0 0 0 4px rgba(0, 137, 255, 0.08);
+        }
+        
+        .login-page-content input[type="tel"]::placeholder,
+        .login-page-content input[type="email"]::placeholder,
+        .login-page-content input[type="password"]::placeholder,
+        .login-page-content input[type="text"]::placeholder {
+            color: #bfbfbf;
+        }
+        
         .form-group {
             margin-bottom: 28px;
         }
@@ -847,8 +1106,8 @@
         .form-input {
             width: 100%;
             padding: 14px 18px;
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(0, 0, 0, 0.08);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 0, 0, 0.04);
             border-radius: 12px;
             font-size: 15px;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -856,13 +1115,15 @@
             color: #1f2329;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
         
         .form-input:focus {
             outline: none;
-            border-color: #0089ff;
-            box-shadow: 0 0 0 3px rgba(0, 137, 255, 0.15);
-            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid transparent;
+            border-image: linear-gradient(135deg, rgba(0, 137, 255, 0.6), rgba(74, 144, 226, 0.6)) 1;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 4px 16px rgba(0, 137, 255, 0.15), 0 0 0 4px rgba(0, 137, 255, 0.08);
         }
         
         .form-input::placeholder {
@@ -1552,6 +1813,312 @@
             }
         }
         
+        .user-center-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .user-info-card {
+            background: linear-gradient(135deg, rgba(0, 137, 255, 0.05) 0%, rgba(255, 107, 157, 0.05) 100%);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            border: 1px solid rgba(0, 137, 255, 0.1);
+        }
+        
+        .user-avatar {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #0089ff 0%, #ff6b9d 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(0, 137, 255, 0.2);
+        }
+        
+        .user-details {
+            flex: 1;
+        }
+        
+        .user-details h3 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1f2329;
+        }
+        
+        .user-email {
+            font-size: 14px;
+            color: #86909c;
+            margin-bottom: 12px;
+        }
+        
+        .user-role-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: linear-gradient(135deg, #0089ff 0%, #4a90e2 100%);
+            color: white;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .user-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn-login, .btn-logout {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-login {
+            background: linear-gradient(135deg, #0089ff 0%, #4a90e2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 137, 255, 0.2);
+        }
+        
+        .btn-login:hover {
+            background: linear-gradient(135deg, #0077e6 0%, #3d7bc2 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 137, 255, 0.3);
+        }
+        
+        .btn-logout {
+            background: #f5f5f5;
+            color: #1f2329;
+        }
+        
+        .btn-logout:hover {
+            background: #e8e8e8;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: white;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border: 1px solid #f0f0f0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+        
+        .stat-icon {
+            font-size: 36px;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(0, 137, 255, 0.1) 0%, rgba(255, 107, 157, 0.1) 100%);
+            border-radius: 12px;
+        }
+        
+        .stat-content {
+            flex: 1;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2329;
+            margin-bottom: 4px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #86909c;
+        }
+        
+        .token-usage-section, .models-section, .agents-section {
+            background: white;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid #f0f0f0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+        
+        .section-subtitle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .section-subtitle h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2329;
+        }
+        
+        .time-filter {
+            padding: 8px 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+            color: #1f2329;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .time-filter:hover {
+            border-color: #0089ff;
+        }
+        
+        .token-usage-chart {
+            min-height: 300px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .chart-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 260px;
+            color: #86909c;
+            font-size: 14px;
+        }
+        
+        .btn-add {
+            padding: 8px 20px;
+            background: linear-gradient(135deg, #0089ff 0%, #4a90e2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 137, 255, 0.2);
+        }
+        
+        .btn-add:hover {
+            background: linear-gradient(135deg, #0077e6 0%, #3d7bc2 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 137, 255, 0.3);
+        }
+        
+        .models-grid, .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .model-card, .agent-card {
+            background: linear-gradient(135deg, rgba(0, 137, 255, 0.03) 0%, rgba(255, 107, 157, 0.03) 100%);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid rgba(0, 137, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .model-card:hover, .agent-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2329;
+            margin-bottom: 8px;
+        }
+        
+        .card-description {
+            font-size: 14px;
+            color: #86909c;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        
+        .card-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: #999;
+        }
+        
+        .card-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        
+        .btn-card-action {
+            padding: 6px 12px;
+            border: 1px solid #e0e0e0;
+            background: white;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-card-action:hover {
+            border-color: #0089ff;
+            color: #0089ff;
+        }
+        
+        .btn-card-action.delete:hover {
+            border-color: #ff4d4f;
+            color: #ff4d4f;
+        }
+        
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            color: #86909c;
+            font-size: 14px;
+        }
+        
         .footer {
             padding: 40px 20px;
             text-align: center;
@@ -1743,6 +2310,468 @@
             transition: width 0.3s ease;
         }
         
+        /* 管理后台样式 */
+        #admin-section {
+            background: transparent;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            border-radius: 0;
+            padding: 0;
+            box-shadow: none;
+            margin-bottom: 0;
+            border: none;
+        }
+        
+        .admin-hero {
+            text-align: center;
+            padding: 60px 20px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-radius: 24px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 2px 0 rgba(255, 255, 255, 0.1);
+        }
+        
+        .admin-container {
+            padding: 0;
+        }
+        
+        .admin-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            padding: 0 20px;
+        }
+        
+        .admin-tab {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 12px;
+        }
+        
+        .admin-tab:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .admin-tab.active {
+            color: #fff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: rgba(102, 126, 234, 0.5);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .admin-tab-content {
+            display: none;
+            padding: 0 20px;
+        }
+        
+        .admin-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .admin-stat-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        .admin-stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border-color: rgba(102, 126, 234, 0.4);
+        }
+        
+        .admin-stat-icon {
+            font-size: 36px;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+        }
+        
+        .admin-stat-content {
+            flex: 1;
+        }
+        
+        .admin-stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+        
+        .admin-stat-label {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .admin-models-container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        
+        .admin-model-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        
+        .admin-section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+        
+        .admin-models-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        
+        .admin-model-card {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        .admin-model-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border-color: rgba(102, 126, 234, 0.4);
+        }
+        
+        .admin-model-card.configured {
+            border-color: rgba(102, 126, 234, 0.5);
+            background: rgba(102, 126, 234, 0.1);
+        }
+        
+        .admin-model-card.unconfigured {
+            opacity: 0.7;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .admin-model-icon {
+            font-size: 28px;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+        }
+        
+        .admin-model-info {
+            flex: 1;
+        }
+        
+        .admin-model-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+        
+        .admin-model-provider {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 4px;
+        }
+        
+        .admin-model-status {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .admin-models-summary {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+        }
+        
+        .admin-users-container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        
+        .admin-users-header {
+            margin-bottom: 24px;
+        }
+        
+        .admin-search-box {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .admin-search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        
+        .admin-search-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .admin-search-input:focus {
+            border-color: rgba(102, 126, 234, 0.6);
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .admin-filter-select {
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .admin-filter-select:focus {
+            border-color: rgba(102, 126, 234, 0.6);
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .admin-filter-select:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.35);
+        }
+        
+        .admin-filter-select option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+        
+        .admin-users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .admin-user-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        .admin-user-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+        
+        .admin-user-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .admin-user-avatar {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .admin-user-info {
+            flex: 1;
+        }
+        
+        .admin-user-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+        
+        .admin-user-email {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .admin-user-role {
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .admin-user-role.admin {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .admin-user-role.user {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .admin-user-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .admin-user-stat {
+            text-align: center;
+        }
+        
+        .admin-user-stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+        
+        .admin-user-stat-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .admin-user-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .admin-user-action-btn {
+            flex: 1;
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .admin-user-action-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .admin-pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .pagination-btn {
+            padding: 10px 18px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .pagination-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .pagination-info {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+        }
+        
         /* 响应式设计 */
         @media (max-width: 768px) {
             .hero-title {
@@ -1765,7 +2794,7 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
-    <nav class="navbar">
+    <nav class="navbar" id="main-navbar">
         <div class="navbar-content">
             <div class="logo">
                 <div class="logo-icon">AI</div>
@@ -1775,11 +2804,89 @@
                 <a href="#" class="nav-link active" onclick="showSection('ai-search')">AI搜索</a>
                 <a href="#" class="nav-link" onclick="showSection('documents')">文档管理</a>
                 <a href="#" class="nav-link" onclick="showSection('graph')">知识图谱</a>
+                <a href="#" class="nav-link" onclick="showSection('user-center')">用户中心</a>
+                <a href="#" class="nav-link" id="admin-link" onclick="showSection('admin')" style="display: none;">管理后台</a>
             </div>
         </div>
     </nav>
 
-    <div class="main-container">
+    <div id="login-page" class="login-page" style="display: none;">
+        <div class="login-page-container">
+            <div class="login-page-header">
+                <div class="logo">
+                    <div class="logo-icon">AI</div>
+                    <div class="logo-text">AI时代的知识库</div>
+                </div>
+            </div>
+            
+            <div class="login-page-content">
+                <div class="login-tabs">
+                        <button class="login-tab active" data-tab="phone" onclick="switchLoginTab('phone')">手机号登录</button>
+                        <button class="login-tab" data-tab="email" onclick="switchLoginTab('email')">邮箱登录</button>
+                        <button class="login-tab" data-tab="username" onclick="switchLoginTab('username')">账户名登录</button>
+                    </div>
+                    
+                    <div class="login-form" id="phone-login-form">
+                        <div class="form-group">
+                            <label>手机号</label>
+                            <input type="tel" id="login-phone" placeholder="请输入手机号" maxlength="11">
+                        </div>
+                        <div class="form-group">
+                            <label>验证码</label>
+                            <div class="code-input-group">
+                                <input type="text" id="login-phone-code" placeholder="请输入验证码" maxlength="6">
+                                <button class="btn-send-code" onclick="sendPhoneCode()">发送验证码</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="login-form" id="email-login-form" style="display: none;">
+                        <div class="form-group">
+                            <label>邮箱</label>
+                            <input type="email" id="login-email" placeholder="请输入邮箱">
+                        </div>
+                        <div class="form-group">
+                            <label>密码</label>
+                            <input type="password" id="login-email-password" placeholder="请输入密码">
+                        </div>
+                    </div>
+                    
+                    <div class="login-form" id="username-login-form" style="display: none;">
+                        <div class="form-group">
+                            <label>账户名</label>
+                            <input type="text" id="login-username" placeholder="请输入账户名">
+                        </div>
+                        <div class="form-group">
+                            <label>密码</label>
+                            <input type="password" id="login-username-password" placeholder="请输入密码">
+                        </div>
+                    </div>
+                
+                <div class="login-divider">
+                    <span>或</span>
+                </div>
+                
+                <div class="wechat-login">
+                    <button class="btn-wechat-login" onclick="wechatLogin()">
+                        <svg width="20" height="20" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                            <path fill="currentColor" d="M664.5 533.5c-8.8 0-16-7.2-16-16s7.2-16 16-16c8.8 0 16 7.2 16 16s-7.2 16-16 16zm-205 0c-8.8 0-16-7.2-16-16s7.2-16 16-16c8.8 0 16 7.2 16 16s-7.2 16-16 16zm410.8-105.2c-4.4-25.4-11.6-49.6-21.3-72.4-15.6-36.8-38.2-69.8-66.9-98.1-28.7-28.3-61.7-50.6-98.5-65.9-36.8-15.3-76.2-23.1-117.4-23.1-41.2 0-80.6 7.8-117.4 23.1-36.8 15.3-69.8 37.6-98.5 65.9-28.7 28.3-51.3 61.3-66.9 98.1-9.7 22.8-16.9 47-21.3 72.4-4.4 25.4-6.6 51.6-6.6 78.5 0 26.9 2.2 53.1 6.6 78.5 4.4 25.4 11.6 49.6 21.3 72.4 15.6 36.8 38.2 69.8 66.9 98.1 28.7 28.3 61.7 50.6 98.5 65.9 36.8 15.3 76.2 23.1 117.4 23.1 41.2 0 80.6-7.8 117.4-23.1 36.8-15.3 69.8-37.6 98.5-65.9 28.7-28.3 51.3-61.3 66.9-98.1 9.7-22.8 16.9-47 21.3-72.4 4.4-25.4 6.6-51.6 6.6-78.5 0-26.9-2.2-53.1-6.6-78.5zM416 640c-114.7 0-208-93.3-208-208s93.3-208 208-208 208 93.3 208 208-93.3 208-208 208zm0-373.3c-90.9 0-165.3 74.4-165.3 165.3s74.4 165.3 165.3 165.3 165.3-74.4 165.3-165.3-74.4-165.3-165.3-165.3z"/>
+                            <path fill="currentColor" d="M725.3 672c-79.5 0-144-64.5-144-144s64.5-144 144-144 144 64.5 144 144-64.5 144-144 144zm0-256c-61.9 0-112 50.1-112 112s50.1 112 112 112 112-50.1 112-112-50.1-112-112-112z"/>
+                        </svg>
+                        微信扫码登录
+                    </button>
+                </div>
+                
+                <button class="btn-login-submit" onclick="handleLogin()">登录</button>
+                
+                <div class="login-footer">
+                    <span>还没有账号？</span>
+                    <a href="#" onclick="showRegisterModal()">立即注册</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container" id="main-app-container" style="display: none;">
         <div class="hero-section">
             <h1 class="hero-title">光锥AI知识库</h1>
             <p class="hero-subtitle">统一存储 · 智能检索 · 知识关联 · AI驱动</p>
@@ -1945,6 +3052,228 @@
             <div class="knowledge-graph-container" id="graph-container"></div>
         </div>
 
+        <div id="user-center-section" class="content-section" style="display: none;">
+            <div class="section-header">
+                <h2 class="section-title">用户中心</h2>
+            </div>
+            
+            <div class="user-center-container">
+                <div class="user-info-card">
+                    <div class="user-avatar">
+                        <span id="user-avatar-text">U</span>
+                    </div>
+                    <div class="user-details">
+                        <h3 id="user-name">未登录</h3>
+                        <p id="user-email" class="user-email">请登录以使用完整功能</p>
+                        <div class="user-role-badge" id="user-role" style="display: none;">普通用户</div>
+                    </div>
+                    <div class="user-actions">
+                        <button class="btn-login" id="btn-login" onclick="showLoginModal()">登录</button>
+                        <button class="btn-logout" id="btn-logout" onclick="logout()" style="display: none;">退出登录</button>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-total-tokens">0</div>
+                            <div class="stat-label">总Token消耗</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📝</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-doc-count">0</div>
+                            <div class="stat-label">文档数量</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🤖</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-model-count">0</div>
+                            <div class="stat-label">自定义模型</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🧠</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-agent-count">0</div>
+                            <div class="stat-label">智能体数量</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="token-usage-section">
+                    <div class="section-subtitle">
+                        <h3>Token使用记录</h3>
+                        <select class="time-filter" id="token-time-filter" onchange="loadTokenUsage()">
+                            <option value="7">最近7天</option>
+                            <option value="30">最近30天</option>
+                            <option value="90">最近90天</option>
+                        </select>
+                    </div>
+                    <div class="token-usage-chart" id="token-usage-chart">
+                        <div class="chart-placeholder">加载中...</div>
+                    </div>
+                </div>
+
+                <div class="models-section">
+                    <div class="section-subtitle">
+                        <h3>我的模型</h3>
+                        <button class="btn-add" onclick="showAddModelModal()">+ 添加模型</button>
+                    </div>
+                    <div class="models-grid" id="models-grid">
+                        <div class="empty-state">暂无自定义模型</div>
+                    </div>
+                </div>
+
+                <div class="agents-section">
+                    <div class="section-subtitle">
+                        <h3>我的智能体</h3>
+                        <button class="btn-add" onclick="showAddAgentModal()">+ 创建智能体</button>
+                    </div>
+                    <div class="agents-grid" id="agents-grid">
+                        <div class="empty-state">暂无智能体</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="admin-section" class="content-section" style="display: none;">
+            <div class="admin-hero">
+                <div class="hero-content">
+                    <p class="hero-desc"><span id="admin-typewriter-text"></span><span class="cursor">|</span></p>
+                </div>
+            </div>
+            
+            <div class="admin-container">
+                <div class="admin-tabs">
+                    <button class="admin-tab active" onclick="switchAdminTab('overview')">系统概览</button>
+                    <button class="admin-tab" onclick="switchAdminTab('models')">模型管理</button>
+                    <button class="admin-tab" onclick="switchAdminTab('users')">用户管理</button>
+                </div>
+                
+                <div id="admin-overview-tab" class="admin-tab-content">
+                    <div class="admin-stats-grid">
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">👥</div>
+                            <div class="admin-stat-content">
+                                <div class="admin-stat-value" id="admin-total-users">0</div>
+                                <div class="admin-stat-label">总用户数</div>
+                            </div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">✅</div>
+                            <div class="admin-stat-content">
+                                <div class="admin-stat-value" id="admin-active-users">0</div>
+                                <div class="admin-stat-label">活跃用户</div>
+                            </div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">🔧</div>
+                            <div class="admin-stat-content">
+                                <div class="admin-stat-value" id="admin-admin-users">0</div>
+                                <div class="admin-stat-label">管理员</div>
+                            </div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">🆕</div>
+                            <div class="admin-stat-content">
+                                <div class="admin-stat-value" id="admin-new-users">0</div>
+                                <div class="admin-stat-label">本周新增</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="admin-stats-grid">
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">🪙</div>
+                            <div class="admin-stat-content">
+                                <div class="admin-stat-value" id="admin-total-tokens">0</div>
+                                <div class="admin-stat-label">总Token消耗</div>
+                            </div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">📝</div>
+                            <div class="admin-stat-content">
+                                <div class="admin-stat-value" id="admin-total-requests">0</div>
+                                <div class="admin-stat-label">总请求数</div>
+                            </div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">💰</div>
+                            <div class="admin-stat-content">
+                                <div class="admin-stat-value" id="admin-total-cost">0.00</div>
+                                <div class="admin-stat-label">总成本(元)</div>
+                            </div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">📄</div>
+                            <div class="admin-stat-content">
+                                <div class="admin-stat-value" id="admin-total-docs">0</div>
+                                <div class="admin-stat-label">总文档数</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="admin-models-tab" class="admin-tab-content" style="display: none;">
+                    <div class="admin-models-container">
+                        <div class="admin-model-section">
+                            <h3 class="admin-section-title">本地模型</h3>
+                            <div class="admin-models-grid" id="admin-local-models">
+                                <div class="loading-indicator">加载中...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="admin-model-section">
+                            <h3 class="admin-section-title">云端模型</h3>
+                            <div class="admin-models-grid" id="admin-cloud-models">
+                                <div class="loading-indicator">加载中...</div>
+                            </div>
+                            <div class="admin-models-summary">
+                                <p>已配置: <strong id="admin-configured-count">0</strong> / <span id="admin-total-cloud-count">0</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="admin-users-tab" class="admin-tab-content" style="display: none;">
+                    <div class="admin-users-container">
+                        <div class="admin-users-header">
+                            <div class="admin-search-box">
+                                <input type="text" class="admin-search-input" id="admin-user-search" placeholder="搜索用户..." onkeyup="filterAdminUsers()">
+                                <select class="admin-filter-select" id="admin-user-filter" onchange="filterAdminUsers()">
+                                    <option value="">全部状态</option>
+                                    <option value="active">活跃</option>
+                                    <option value="disabled">禁用</option>
+                                    <option value="suspended">暂停</option>
+                                </select>
+                                <select class="admin-filter-select" id="admin-role-filter" onchange="filterAdminUsers()">
+                                    <option value="">全部角色</option>
+                                    <option value="admin">管理员</option>
+                                    <option value="user">普通用户</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="admin-users-grid" id="admin-users-grid">
+                            <div class="loading-indicator">加载中...</div>
+                        </div>
+                        
+                        <div class="admin-pagination" id="admin-pagination">
+                            <button class="pagination-btn" onclick="loadAdminUsers(1)">首页</button>
+                            <button class="pagination-btn" onclick="loadAdminUsers(-1)">上一页</button>
+                            <span class="pagination-info" id="admin-page-info">第 1 页</span>
+                            <button class="pagination-btn" onclick="loadAdminUsers(1)">下一页</button>
+                            <button class="pagination-btn" onclick="loadAdminUsers('last')">末页</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="footer">
         <div class="footer-content">
             <p>© 2026 个人智能知识库 - 本地优先的AI知识管理工具</p>
@@ -1987,6 +3316,105 @@
                         </div>
                         <div class="web-sources-grid" id="modal-web-sources-grid"></div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="login-modal" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 class="modal-title">用户登录</h3>
+                <button class="close-btn" onclick="closeLoginModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="login-tabs">
+                    <button class="login-tab active" data-tab="phone" onclick="switchLoginTab('phone')">手机号登录</button>
+                    <button class="login-tab" data-tab="email" onclick="switchLoginTab('email')">邮箱登录</button>
+                </div>
+                
+                <div class="login-form" id="phone-login-form">
+                    <div class="form-group">
+                        <label>手机号</label>
+                        <input type="tel" id="login-phone" placeholder="请输入手机号" maxlength="11">
+                    </div>
+                    <div class="form-group">
+                        <label>验证码</label>
+                        <div class="code-input-group">
+                            <input type="text" id="login-phone-code" placeholder="请输入验证码" maxlength="6">
+                            <button class="btn-send-code" onclick="sendPhoneCode()">发送验证码</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="login-form" id="email-login-form" style="display: none;">
+                    <div class="form-group">
+                        <label>邮箱</label>
+                        <input type="email" id="login-email" placeholder="请输入邮箱">
+                    </div>
+                    <div class="form-group">
+                        <label>密码</label>
+                        <input type="password" id="login-password" placeholder="请输入密码">
+                    </div>
+                </div>
+                
+                <div class="login-divider">
+                    <span>或</span>
+                </div>
+                
+                <div class="wechat-login">
+                    <button class="btn-wechat-login" onclick="wechatLogin()">
+                        <svg width="20" height="20" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                            <path fill="currentColor" d="M664.5 533.5c-8.8 0-16-7.2-16-16s7.2-16 16-16c8.8 0 16 7.2 16 16s-7.2 16-16 16zm-205 0c-8.8 0-16-7.2-16-16s7.2-16 16-16c8.8 0 16 7.2 16 16s-7.2 16-16 16zm410.8-105.2c-4.4-25.4-11.6-49.6-21.3-72.4-15.6-36.8-38.2-69.8-66.9-98.1-28.7-28.3-61.7-50.6-98.5-65.9-36.8-15.3-76.2-23.1-117.4-23.1-41.2 0-80.6 7.8-117.4 23.1-36.8 15.3-69.8 37.6-98.5 65.9-28.7 28.3-51.3 61.3-66.9 98.1-9.7 22.8-16.9 47-21.3 72.4-4.4 25.4-6.6 51.6-6.6 78.5 0 26.9 2.2 53.1 6.6 78.5 4.4 25.4 11.6 49.6 21.3 72.4 15.6 36.8 38.2 69.8 66.9 98.1 28.7 28.3 61.7 50.6 98.5 65.9 36.8 15.3 76.2 23.1 117.4 23.1 41.2 0 80.6-7.8 117.4-23.1 36.8-15.3 69.8-37.6 98.5-65.9 28.7-28.3 51.3-61.3 66.9-98.1 9.7-22.8 16.9-47 21.3-72.4 4.4-25.4 6.6-51.6 6.6-78.5 0-26.9-2.2-53.1-6.6-78.5zM416 640c-114.7 0-208-93.3-208-208s93.3-208 208-208 208 93.3 208 208-93.3 208-208 208zm0-373.3c-90.9 0-165.3 74.4-165.3 165.3s74.4 165.3 165.3 165.3 165.3-74.4 165.3-165.3-74.4-165.3-165.3-165.3z"/>
+                            <path fill="currentColor" d="M725.3 672c-79.5 0-144-64.5-144-144s64.5-144 144-144 144 64.5 144 144-64.5 144-144 144zm0-256c-61.9 0-112 50.1-112 112s50.1 112 112 112 112-50.1 112-112-50.1-112-112-112z"/>
+                        </svg>
+                        微信扫码登录
+                    </button>
+                </div>
+                
+                <button class="btn-login-submit" onclick="handleLogin()">登录</button>
+                
+                <div class="login-footer">
+                    <span>还没有账号？</span>
+                    <a href="#" onclick="showRegisterModal()">立即注册</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="register-modal" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 class="modal-title">用户注册</h3>
+                <button class="close-btn" onclick="closeRegisterModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" class="form-input" id="register-username" placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label>手机号（选填）</label>
+                    <input type="tel" class="form-input" id="register-phone" placeholder="请输入手机号" maxlength="11">
+                </div>
+                <div class="form-group">
+                    <label>邮箱（选填）</label>
+                    <input type="email" class="form-input" id="register-email" placeholder="请输入邮箱">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" class="form-input" id="register-password" placeholder="请输入密码（至少6位）">
+                </div>
+                <div class="form-group">
+                    <label>确认密码</label>
+                    <input type="password" class="form-input" id="register-confirm-password" placeholder="请再次输入密码">
+                </div>
+                
+                <button class="btn-register-submit" onclick="handleRegister()">注册</button>
+                
+                <div class="login-footer">
+                    <span>已有账号？</span>
+                    <a href="#" onclick="showLoginModal()">立即登录</a>
                 </div>
             </div>
         </div>
@@ -2050,14 +3478,47 @@
         const API_BASE = window.location.origin + '/api';
         let currentDoc = null;
 
+        function authenticatedFetch(url, options = {}) {
+            const headers = options.headers || {};
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            options.headers = headers;
+            return fetch(url, options);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
-            initializePage();
+            checkAuthAndInit();
         });
+
+        async function checkAuthAndInit() {
+            const isAuthenticated = await checkAuth();
+            
+            if (isAuthenticated) {
+                showMainApp();
+            } else {
+                showLoginPage();
+            }
+        }
+
+        function showLoginPage() {
+            document.getElementById('login-page').style.display = 'flex';
+            document.getElementById('main-app-container').style.display = 'none';
+            document.getElementById('main-navbar').style.display = 'none';
+        }
+
+        function showMainApp() {
+            document.getElementById('login-page').style.display = 'none';
+            document.getElementById('main-app-container').style.display = 'block';
+            document.getElementById('main-navbar').style.display = 'block';
+            initializePage();
+        }
 
         function initializePage() {
             document.getElementById('ai-search-section').style.display = 'block';
             document.getElementById('documents-section').style.display = 'none';
             document.getElementById('graph-section').style.display = 'none';
+            document.getElementById('user-center-section').style.display = 'none';
             document.getElementById('document-viewer').classList.remove('active');
             document.querySelector('.hero-section').style.display = 'none';
             checkHealth();
@@ -2083,11 +3544,15 @@
 
         async function getDocuments() {
             try {
-                const response = await fetch(`${API_BASE}/documents`);
-                const documents = await response.json();
+                const response = await authenticatedFetch(`${API_BASE}/documents`);
                 
-                document.getElementById('doc-count').innerHTML = `文档数量：${documents.length}`;
-                generateSearchRecommendations(documents);
+                if (response.ok) {
+                    const documents = await response.json();
+                    document.getElementById('doc-count').innerHTML = `文档数量：${documents.length}`;
+                    generateSearchRecommendations(documents);
+                } else {
+                    console.error('获取文档失败:', response.status);
+                }
             } catch (error) {
                 console.error('获取文档失败:', error);
             }
@@ -2107,7 +3572,7 @@
             }
             
             try {
-                const response = await fetch(`${API_BASE}/ai/recommendations`);
+                const response = await authenticatedFetch(`${API_BASE}/ai/recommendations`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -2119,7 +3584,7 @@
                             </div>
                         `;
                         
-                        const generateResponse = await fetch(`${API_BASE}/ai/recommendations`, {
+                        const generateResponse = await authenticatedFetch(`${API_BASE}/ai/recommendations`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ model: 'deepseek-chat' })
@@ -2218,7 +3683,7 @@
                     </div>
                 `;
                 
-                const response = await fetch(`${API_BASE}/ai/classify`, {
+                const response = await authenticatedFetch(`${API_BASE}/ai/classify`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ model: 'deepseek-chat' })
@@ -2275,7 +3740,7 @@
                     </div>
                 `;
                 
-                const response = await fetch(`${API_BASE}/categories`);
+                const response = await authenticatedFetch(`${API_BASE}/categories`);
                 const result = await response.json();
                 
                 if (result.success && result.categories && result.categories.length > 0) {
@@ -2386,7 +3851,7 @@
                 let filteredDocuments;
                 
                 if (category.documentIds && category.documentIds.length > 0) {
-                    const allDocuments = await fetch(`${API_BASE}/documents`).then(r => r.json());
+                    const allDocuments = await authenticatedFetch(`${API_BASE}/documents`).then(r => r.json());
                     filteredDocuments = allDocuments.filter(doc => category.documentIds.includes(doc.id));
                 } else {
                     filteredDocuments = [];
@@ -2445,7 +3910,7 @@
 
         async function viewDocument(docId) {
             try {
-                const response = await fetch(`${API_BASE}/documents/${docId}`);
+                const response = await authenticatedFetch(`${API_BASE}/documents/${docId}`);
                 const doc = await response.json();
                 currentDoc = doc;
                 
@@ -2682,7 +4147,7 @@
                         
                         // 如果选择了新版本，需要更新文档的summaries数组
                         if (version === 'new') {
-                            const documents = await fetch(`${API_BASE}/documents`).then(r => r.json());
+                            const documents = await authenticatedFetch(`${API_BASE}/documents`).then(r => r.json());
                             const docIndex = documents.findIndex(doc => doc.id === currentDoc.id);
                             if (docIndex !== -1) {
                                 const summaryIndex = documents[docIndex].summaries.findIndex(s => s.model === newSummary.model);
@@ -2826,6 +4291,8 @@
                 document.getElementById('ai-search-section').style.display = 'block';
                 document.getElementById('documents-section').style.display = 'none';
                 document.getElementById('graph-section').style.display = 'none';
+                document.getElementById('user-center-section').style.display = 'none';
+                document.getElementById('admin-section').style.display = 'none';
                 document.getElementById('document-viewer').classList.remove('active');
                 document.querySelector('.hero-section').style.display = 'none';
                 startTypewriter();
@@ -2833,6 +4300,8 @@
                 document.getElementById('ai-search-section').style.display = 'none';
                 document.getElementById('documents-section').style.display = 'block';
                 document.getElementById('graph-section').style.display = 'none';
+                document.getElementById('user-center-section').style.display = 'none';
+                document.getElementById('admin-section').style.display = 'none';
                 document.getElementById('document-viewer').classList.remove('active');
                 document.querySelector('.hero-section').style.display = 'none';
                 loadCategories();
@@ -2841,9 +4310,32 @@
                 document.getElementById('ai-search-section').style.display = 'none';
                 document.getElementById('documents-section').style.display = 'none';
                 document.getElementById('graph-section').style.display = 'block';
+                document.getElementById('user-center-section').style.display = 'none';
+                document.getElementById('admin-section').style.display = 'none';
                 document.getElementById('document-viewer').classList.remove('active');
                 document.querySelector('.hero-section').style.display = 'none';
                 drawKnowledgeGraph();
+            } else if (section === 'user-center') {
+                document.getElementById('ai-search-section').style.display = 'none';
+                document.getElementById('documents-section').style.display = 'none';
+                document.getElementById('graph-section').style.display = 'none';
+                document.getElementById('user-center-section').style.display = 'block';
+                document.getElementById('admin-section').style.display = 'none';
+                document.getElementById('document-viewer').classList.remove('active');
+                document.querySelector('.hero-section').style.display = 'none';
+                if (currentUser) {
+                    loadUserCenterData();
+                }
+            } else if (section === 'admin') {
+                document.getElementById('ai-search-section').style.display = 'none';
+                document.getElementById('documents-section').style.display = 'none';
+                document.getElementById('graph-section').style.display = 'none';
+                document.getElementById('user-center-section').style.display = 'none';
+                document.getElementById('admin-section').style.display = 'block';
+                document.getElementById('document-viewer').classList.remove('active');
+                document.querySelector('.hero-section').style.display = 'none';
+                loadAdminOverview();
+                startAdminTypewriter();
             }
         }
 
@@ -2879,7 +4371,7 @@
             modalWebSourcesSection.style.display = 'none';
             
             try {
-                const response = await fetch(`${API_BASE}/ai/search`, {
+                const response = await authenticatedFetch(`${API_BASE}/ai/search`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query })
@@ -2955,7 +4447,7 @@
             const content = `问题：${currentSearchQuery}\n\nAI回答：\n${currentSearchResult.answer}\n\n知识库来源：\n${currentSearchResult.sources.map(s => `- ${s.title}`).join('\n')}\n\n联网搜索来源：\n${currentSearchResult.webSources.map(s => `- ${s.title}\n  ${s.url}`).join('\n')}`;
             
             try {
-                const response = await fetch(`${API_BASE}/documents`, {
+                const response = await authenticatedFetch(`${API_BASE}/documents`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2981,7 +4473,7 @@
                     await loadCategories();
                     
                     try {
-                        await fetch(`${API_BASE}/ai/classify`, {
+                        await authenticatedFetch(`${API_BASE}/ai/classify`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ model: 'deepseek-chat' })
@@ -2992,7 +4484,7 @@
                     }
                     
                     try {
-                        await fetch(`${API_BASE}/knowledge-graph`, {
+                        await authenticatedFetch(`${API_BASE}/knowledge-graph`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ model: 'deepseek-chat' })
@@ -3085,6 +4577,39 @@
             typeChar();
         }
         
+        const adminTypewriterText = '基于您的管理权限，系统将为您提供全面的数据洞察';
+        let adminTypewriterIndex = 0;
+        let adminTypewriterTimeout = null;
+        
+        function startAdminTypewriter() {
+            if (adminTypewriterTimeout) {
+                clearTimeout(adminTypewriterTimeout);
+            }
+            
+            const typewriterElement = document.getElementById('admin-typewriter-text');
+            const cursorElement = document.querySelector('#admin-section .cursor');
+            
+            if (!typewriterElement || !cursorElement) {
+                return;
+            }
+            
+            typewriterElement.textContent = '';
+            cursorElement.style.display = 'inline-block';
+            adminTypewriterIndex = 0;
+            
+            function typeChar() {
+                if (adminTypewriterIndex < adminTypewriterText.length) {
+                    typewriterElement.textContent += adminTypewriterText.charAt(adminTypewriterIndex);
+                    adminTypewriterIndex++;
+                    adminTypewriterTimeout = setTimeout(typeChar, 80);
+                } else {
+                    cursorElement.style.display = 'none';
+                }
+            }
+            
+            typeChar();
+        }
+        
         function quickSearch(query) {
             document.getElementById('ai-search-input').value = query;
             performAISearch();
@@ -3117,7 +4642,7 @@
             const tags = document.getElementById('doc-tags').value.split(',').map(t => t.trim()).filter(t => t);
             
             try {
-                const response = await fetch(`${API_BASE}/documents`, {
+                const response = await authenticatedFetch(`${API_BASE}/documents`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ title, content, tags, fileType: format })
@@ -3126,7 +4651,7 @@
                 if (response.ok) {
                     closeCreateModal();
                     await performAIClassify();
-                    const documents = await (await fetch(`${API_BASE}/documents`)).json();
+                    const documents = await (await authenticatedFetch(`${API_BASE}/documents`)).json();
                     await generateSearchRecommendations(documents);
                     await invalidateKnowledgeGraph();
                     alert('文档创建成功！');
@@ -3146,7 +4671,7 @@
             formData.append('file', document.getElementById('file-upload').files[0]);
             
             try {
-                const response = await fetch(`${API_BASE}/upload`, {
+                const response = await authenticatedFetch(`${API_BASE}/upload`, {
                     method: 'POST',
                     body: formData
                 });
@@ -3154,7 +4679,7 @@
                 if (response.ok) {
                     closeUploadModal();
                     await performAIClassify();
-                    const documents = await (await fetch(`${API_BASE}/documents`)).json();
+                    const documents = await (await authenticatedFetch(`${API_BASE}/documents`)).json();
                     await generateSearchRecommendations(documents);
                     await invalidateKnowledgeGraph();
                     alert('文档上传成功！');
@@ -3169,7 +4694,7 @@
         
         async function invalidateKnowledgeGraph() {
             try {
-                await fetch(`${API_BASE}/knowledge-graph`);
+                await authenticatedFetch(`${API_BASE}/knowledge-graph`);
             } catch (error) {
                 console.error('使知识图谱缓存失效失败:', error);
             }
@@ -3188,7 +4713,7 @@
                     </div>
                 `;
                 
-                const response = await fetch(`${API_BASE}/knowledge-graph`);
+                const response = await authenticatedFetch(`${API_BASE}/knowledge-graph`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -3202,7 +4727,7 @@
                             </div>
                         `;
                         
-                        const generateResponse = await fetch(`${API_BASE}/knowledge-graph`, {
+                        const generateResponse = await authenticatedFetch(`${API_BASE}/knowledge-graph`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ model: 'deepseek-chat' })
@@ -3474,6 +4999,699 @@
                     .call(zoom.transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
             }, 100);
         }
+
+        let currentUser = null;
+        let authToken = localStorage.getItem('authToken');
+
+        async function checkAuth() {
+            if (!authToken) {
+                updateUIForUnauthenticated();
+                return false;
+            }
+
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data.user;
+                    updateUIForAuthenticated();
+                    loadUserCenterData();
+                    return true;
+                } else {
+                    localStorage.removeItem('authToken');
+                    authToken = null;
+                    updateUIForUnauthenticated();
+                    return false;
+                }
+            } catch (error) {
+                console.error('检查认证状态失败:', error);
+                updateUIForUnauthenticated();
+                return false;
+            }
+        }
+
+        function updateUIForAuthenticated() {
+            document.getElementById('user-name').textContent = currentUser.username;
+            document.getElementById('user-email').textContent = currentUser.email || currentUser.phone;
+            document.getElementById('user-avatar-text').textContent = currentUser.username.charAt(0).toUpperCase();
+            
+            if (currentUser.role === 'admin') {
+                document.getElementById('user-role').textContent = '管理员';
+                document.getElementById('user-role').style.display = 'inline-block';
+                document.getElementById('admin-link').style.display = 'block';
+            } else {
+                document.getElementById('admin-link').style.display = 'none';
+            }
+            
+            document.getElementById('btn-login').style.display = 'none';
+            document.getElementById('btn-logout').style.display = 'block';
+        }
+
+        function updateUIForUnauthenticated() {
+            document.getElementById('user-name').textContent = '未登录';
+            document.getElementById('user-email').textContent = '请登录以使用完整功能';
+            document.getElementById('user-avatar-text').textContent = 'U';
+            document.getElementById('user-role').style.display = 'none';
+            document.getElementById('btn-login').style.display = 'block';
+            document.getElementById('btn-logout').style.display = 'none';
+            
+            document.getElementById('stat-total-tokens').textContent = '0';
+            document.getElementById('stat-doc-count').textContent = '0';
+            document.getElementById('stat-model-count').textContent = '0';
+            document.getElementById('stat-agent-count').textContent = '0';
+        }
+
+        async function loadUserCenterData() {
+            if (!currentUser) return;
+
+            try {
+                const statsResponse = await fetch('/api/user/stats/overview', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (statsResponse.ok) {
+                    const stats = await statsResponse.json();
+                    document.getElementById('stat-total-tokens').textContent = formatNumber(stats.totalTokens || 0);
+                    document.getElementById('stat-doc-count').textContent = formatNumber(stats.documentCount || 0);
+                    document.getElementById('stat-model-count').textContent = formatNumber(stats.modelCount || 0);
+                    document.getElementById('stat-agent-count').textContent = formatNumber(stats.agentCount || 0);
+                }
+
+                loadTokenUsage();
+                loadUserModels();
+                loadUserAgents();
+            } catch (error) {
+                console.error('加载用户中心数据失败:', error);
+            }
+        }
+
+        async function loadTokenUsage() {
+            if (!currentUser) return;
+
+            const days = document.getElementById('token-time-filter').value;
+            const chartContainer = document.getElementById('token-usage-chart');
+
+            try {
+                const response = await fetch(`/api/user/stats/token-usage?days=${days}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    renderTokenChart(data.usage);
+                } else {
+                    chartContainer.innerHTML = '<div class="chart-placeholder">加载失败</div>';
+                }
+            } catch (error) {
+                console.error('加载Token使用记录失败:', error);
+                chartContainer.innerHTML = '<div class="chart-placeholder">加载失败</div>';
+            }
+        }
+
+        function renderTokenChart(usageData) {
+            const chartContainer = document.getElementById('token-usage-chart');
+            
+            if (!usageData || usageData.length === 0) {
+                chartContainer.innerHTML = '<div class="chart-placeholder">暂无数据</div>';
+                return;
+            }
+
+            const maxTokens = Math.max(...usageData.map(d => d.tokens));
+            const chartHeight = 200;
+            const barWidth = 40;
+            const gap = 20;
+            const totalWidth = usageData.length * (barWidth + gap);
+
+            let html = `
+                <div style="display: flex; align-items: flex-end; justify-content: center; height: ${chartHeight}px; padding: 20px; overflow-x: auto;">
+            `;
+
+            usageData.forEach((item, index) => {
+                const height = (item.tokens / maxTokens) * (chartHeight - 40);
+                const date = new Date(item.date);
+                const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+
+                html += `
+                    <div style="display: flex; flex-direction: column; align-items: center; margin: 0 ${gap / 2}px;">
+                        <div style="font-size: 12px; color: #86909c; margin-bottom: 8px;">${formatNumber(item.tokens)}</div>
+                        <div style="width: ${barWidth}px; height: ${height}px; background: linear-gradient(135deg, #0089ff 0%, #4a90e2 100%); border-radius: 4px 4px 0 0; transition: all 0.3s ease;" 
+                             onmouseover="this.style.transform='scaleY(1.05)'" 
+                             onmouseout="this.style.transform='scaleY(1)'"></div>
+                        <div style="font-size: 12px; color: #86909c; margin-top: 8px;">${dateStr}</div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            chartContainer.innerHTML = html;
+        }
+
+        async function loadUserModels() {
+            if (!currentUser) return;
+
+            const grid = document.getElementById('models-grid');
+
+            try {
+                const response = await fetch('/api/user/models', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.models && data.models.length > 0) {
+                        grid.innerHTML = data.models.map(model => `
+                            <div class="model-card">
+                                <div class="card-header">
+                                    <div class="card-title">${model.name}</div>
+                                </div>
+                                <div class="card-description">${model.description || '暂无描述'}</div>
+                                <div class="card-meta">
+                                    <span>模型: ${model.modelName}</span>
+                                    <span>温度: ${model.temperature}</span>
+                                </div>
+                                <div class="card-actions">
+                                    <button class="btn-card-action" onclick="editModel('${model.id}')">编辑</button>
+                                    <button class="btn-card-action delete" onclick="deleteModel('${model.id}')">删除</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        grid.innerHTML = '<div class="empty-state">暂无自定义模型</div>';
+                    }
+                } else {
+                    grid.innerHTML = '<div class="empty-state">加载失败</div>';
+                }
+            } catch (error) {
+                console.error('加载模型失败:', error);
+                grid.innerHTML = '<div class="empty-state">加载失败</div>';
+            }
+        }
+
+        async function loadUserAgents() {
+            if (!currentUser) return;
+
+            const grid = document.getElementById('agents-grid');
+
+            try {
+                const response = await fetch('/api/user/agents', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.agents && data.agents.length > 0) {
+                        grid.innerHTML = data.agents.map(agent => `
+                            <div class="agent-card">
+                                <div class="card-header">
+                                    <div class="card-title">${agent.name}</div>
+                                    ${agent.isPublic ? '<span style="background: #52c41a; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">公开</span>' : ''}
+                                </div>
+                                <div class="card-description">${agent.description || '暂无描述'}</div>
+                                <div class="card-meta">
+                                    <span>模型: ${agent.modelName}</span>
+                                    <span>调用: ${agent.callCount || 0}</span>
+                                </div>
+                                <div class="card-actions">
+                                    <button class="btn-card-action" onclick="editAgent('${agent.id}')">编辑</button>
+                                    <button class="btn-card-action delete" onclick="deleteAgent('${agent.id}')">删除</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        grid.innerHTML = '<div class="empty-state">暂无智能体</div>';
+                    }
+                } else {
+                    grid.innerHTML = '<div class="empty-state">加载失败</div>';
+                }
+            } catch (error) {
+                console.error('加载智能体失败:', error);
+                grid.innerHTML = '<div class="empty-state">加载失败</div>';
+            }
+        }
+
+        function showLoginModal() {
+            document.getElementById('login-modal').classList.add('active');
+        }
+
+        function closeLoginModal() {
+            document.getElementById('login-modal').classList.remove('active');
+        }
+
+        function showRegisterModal() {
+            closeLoginModal();
+            document.getElementById('register-modal').classList.add('active');
+        }
+
+        function closeRegisterModal() {
+            document.getElementById('register-modal').classList.remove('active');
+        }
+
+        function switchLoginTab(tab) {
+            document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.login-tab[data-tab="${tab}"]`).classList.add('active');
+
+            document.getElementById('phone-login-form').style.display = 'none';
+            document.getElementById('email-login-form').style.display = 'none';
+            document.getElementById('username-login-form').style.display = 'none';
+
+            if (tab === 'phone') {
+                document.getElementById('phone-login-form').style.display = 'block';
+            } else if (tab === 'email') {
+                document.getElementById('email-login-form').style.display = 'block';
+            } else if (tab === 'username') {
+                document.getElementById('username-login-form').style.display = 'block';
+            }
+        }
+
+        async function handleLogin() {
+            const activeTab = document.querySelector('.login-tab.active').dataset.tab;
+
+            try {
+                let loginData;
+                if (activeTab === 'phone') {
+                    const phone = document.getElementById('login-phone').value;
+                    const code = document.getElementById('login-phone-code').value;
+
+                    if (!phone || !code) {
+                        alert('请填写完整信息');
+                        return;
+                    }
+
+                    loginData = { phone, code, loginType: 'phone' };
+                } else if (activeTab === 'email') {
+                    const email = document.getElementById('login-email').value;
+                    const password = document.getElementById('login-email-password').value;
+
+                    if (!email || !password) {
+                        alert('请填写完整信息');
+                        return;
+                    }
+
+                    loginData = { email, password, loginType: 'email' };
+                } else if (activeTab === 'username') {
+                    const username = document.getElementById('login-username').value;
+                    const password = document.getElementById('login-username-password').value;
+
+                    if (!username || !password) {
+                        alert('请填写完整信息');
+                        return;
+                    }
+
+                    loginData = { username, password, loginType: 'username' };
+                }
+
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(loginData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.data.accessToken;
+                    localStorage.setItem('authToken', authToken);
+                    currentUser = data.data.user;
+                    cachedCategories = null;
+                    showMainApp();
+                    updateUIForAuthenticated();
+                    loadUserCenterData();
+                } else {
+                    alert(data.error || '登录失败');
+                }
+            } catch (error) {
+                console.error('登录失败:', error);
+                alert('登录失败，请稍后重试');
+            }
+        }
+
+        async function handleRegister() {
+            const username = document.getElementById('register-username').value;
+            const phone = document.getElementById('register-phone').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const confirmPassword = document.getElementById('register-confirm-password').value;
+
+            if (!username || !password || !confirmPassword) {
+                alert('请填写完整信息');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                alert('两次输入的密码不一致');
+                return;
+            }
+
+            if (password.length < 6) {
+                alert('密码长度至少为6位');
+                return;
+            }
+
+            if (!phone && !email) {
+                alert('请至少提供手机号或邮箱');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, phone, email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    closeRegisterModal();
+                } else {
+                    alert(data.error || '注册失败');
+                }
+            } catch (error) {
+                console.error('注册失败:', error);
+                alert('注册失败，请稍后重试');
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+            } catch (error) {
+                console.error('登出请求失败:', error);
+            }
+
+            localStorage.removeItem('authToken');
+            authToken = null;
+            currentUser = null;
+            cachedCategories = null;
+            updateUIForUnauthenticated();
+            showLoginPage();
+        }
+
+        function sendPhoneCode() {
+            const phone = document.getElementById('login-phone').value;
+
+            if (!phone) {
+                alert('请输入手机号');
+                return;
+            }
+
+            if (!/^1[3-9]\d{9}$/.test(phone)) {
+                alert('手机号格式不正确');
+                return;
+            }
+
+            alert('验证码功能需要接入短信服务，当前为演示模式，验证码为：123456');
+        }
+
+        function wechatLogin() {
+            alert('微信扫码登录功能需要接入微信开放平台，当前为演示模式');
+        }
+
+        function showAddModelModal() {
+            alert('添加模型功能开发中...');
+        }
+
+        function showAddAgentModal() {
+            alert('创建智能体功能开发中...');
+        }
+
+        function editModel(id) {
+            alert('编辑模型功能开发中...');
+        }
+
+        function deleteModel(id) {
+            if (confirm('确定要删除这个模型吗？')) {
+                alert('删除模型功能开发中...');
+            }
+        }
+
+        function editAgent(id) {
+            alert('编辑智能体功能开发中...');
+        }
+
+        function deleteAgent(id) {
+            if (confirm('确定要删除这个智能体吗？')) {
+                alert('删除智能体功能开发中...');
+            }
+        }
+
+        function formatNumber(num) {
+            if (num >= 10000) {
+                return (num / 10000).toFixed(1) + '万';
+            }
+            return num.toString();
+        }
+
+        let adminCurrentPage = 1;
+        let adminTotalPages = 1;
+        let adminUsersData = [];
+        let adminFilteredUsers = [];
+
+        async function loadAdminOverview() {
+            try {
+                const response = await authenticatedFetch('/api/admin/overview');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const data = result.data;
+                    
+                    document.getElementById('admin-total-users').textContent = data.users.total;
+                    document.getElementById('admin-active-users').textContent = data.users.active;
+                    document.getElementById('admin-admin-users').textContent = data.users.admin;
+                    document.getElementById('admin-new-users').textContent = data.users.newThisWeek;
+                    
+                    document.getElementById('admin-total-tokens').textContent = formatNumber(data.tokens.total);
+                    document.getElementById('admin-total-requests').textContent = formatNumber(data.tokens.totalRequests);
+                    document.getElementById('admin-total-cost').textContent = data.tokens.totalCost.toFixed(2);
+                    document.getElementById('admin-total-docs').textContent = formatNumber(data.documents.total);
+                }
+            } catch (error) {
+                console.error('加载系统概览失败:', error);
+            }
+        }
+
+        async function loadAdminModels() {
+            try {
+                const response = await authenticatedFetch('/api/admin/models');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const data = result.data;
+                    
+                    const localModelsContainer = document.getElementById('admin-local-models');
+                    localModelsContainer.innerHTML = data.local.available.map(model => `
+                        <div class="admin-model-card">
+                            <div class="admin-model-icon">💻</div>
+                            <div class="admin-model-info">
+                                <div class="admin-model-name">${model}</div>
+                                <div class="admin-model-status">可用</div>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    const cloudModelsContainer = document.getElementById('admin-cloud-models');
+                    cloudModelsContainer.innerHTML = data.cloud.models.map(model => `
+                        <div class="admin-model-card ${model.configured ? 'configured' : 'unconfigured'}">
+                            <div class="admin-model-icon">${model.configured ? '☁️' : '🔒'}</div>
+                            <div class="admin-model-info">
+                                <div class="admin-model-name">${model.name}</div>
+                                <div class="admin-model-provider">${model.provider}</div>
+                                <div class="admin-model-status">${model.configured ? '已配置' : '未配置'}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    document.getElementById('admin-configured-count').textContent = data.cloud.configured_count;
+                    document.getElementById('admin-total-cloud-count').textContent = data.cloud.total_count;
+                }
+            } catch (error) {
+                console.error('加载模型信息失败:', error);
+            }
+        }
+
+        async function loadAdminUsers(page = 1) {
+            try {
+                if (page === 'last') {
+                    page = adminTotalPages;
+                } else if (page === -1) {
+                    page = Math.max(1, adminCurrentPage - 1);
+                } else if (page === 1 && adminCurrentPage > 1) {
+                    page = adminCurrentPage + 1;
+                }
+                
+                const response = await authenticatedFetch(`/api/admin/users?page=${page}&limit=10`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    adminUsersData = result.data.users;
+                    adminFilteredUsers = [...adminUsersData];
+                    adminTotalPages = result.data.totalPages;
+                    adminCurrentPage = page;
+                    
+                    renderAdminUsers();
+                    updateAdminPagination();
+                }
+            } catch (error) {
+                console.error('加载用户数据失败:', error);
+            }
+        }
+
+        function renderAdminUsers() {
+            const usersGrid = document.getElementById('admin-users-grid');
+            
+            if (adminFilteredUsers.length === 0) {
+                usersGrid.innerHTML = '<div class="no-data">暂无用户数据</div>';
+                return;
+            }
+            
+            usersGrid.innerHTML = adminFilteredUsers.map(user => `
+                <div class="admin-user-card">
+                    <div class="admin-user-header">
+                        <div class="admin-user-avatar">
+                            ${user.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="admin-user-info">
+                            <div class="admin-user-name">${user.username}</div>
+                            <div class="admin-user-email">${user.email || user.phone || '未设置联系方式'}</div>
+                        </div>
+                        <div class="admin-user-role ${user.role === 'admin' ? 'admin' : 'user'}">
+                            ${user.role === 'admin' ? '管理员' : '普通用户'}
+                        </div>
+                    </div>
+                    <div class="admin-user-stats">
+                        <div class="admin-user-stat">
+                            <div class="admin-user-stat-value">${formatNumber(user.document_count || 0)}</div>
+                            <div class="admin-user-stat-label">文档数</div>
+                        </div>
+                        <div class="admin-user-stat">
+                            <div class="admin-user-stat-value">${formatNumber(user.token_usage || 0)}</div>
+                            <div class="admin-user-stat-label">Token用量</div>
+                        </div>
+                        <div class="admin-user-stat">
+                            <div class="admin-user-stat-value">${user.status === 'active' ? '活跃' : user.status === 'disabled' ? '禁用' : '暂停'}</div>
+                            <div class="admin-user-stat-label">状态</div>
+                        </div>
+                    </div>
+                    <div class="admin-user-actions">
+                        <button class="admin-user-action-btn" onclick="viewUserDetails('${user.id}')">查看详情</button>
+                        ${user.role !== 'admin' ? `
+                            <button class="admin-user-action-btn" onclick="toggleUserStatus('${user.id}')">${user.status === 'active' ? '禁用' : '启用'}</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateAdminPagination() {
+            document.getElementById('admin-page-info').textContent = `第 ${adminCurrentPage} / ${adminTotalPages} 页`;
+        }
+
+        function filterAdminUsers() {
+            const searchTerm = document.getElementById('admin-user-search').value.toLowerCase();
+            const statusFilter = document.getElementById('admin-user-filter').value;
+            const roleFilter = document.getElementById('admin-role-filter').value;
+            
+            adminFilteredUsers = adminUsersData.filter(user => {
+                const matchesSearch = !searchTerm || 
+                    user.username.toLowerCase().includes(searchTerm) ||
+                    (user.email && user.email.toLowerCase().includes(searchTerm)) ||
+                    (user.phone && user.phone.includes(searchTerm));
+                
+                const matchesStatus = !statusFilter || user.status === statusFilter;
+                const matchesRole = !roleFilter || user.role === roleFilter;
+                
+                return matchesSearch && matchesStatus && matchesRole;
+            });
+            
+            renderAdminUsers();
+        }
+
+        function switchAdminTab(tab) {
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.admin-tab-content').forEach(c => c.style.display = 'none');
+            
+            event.target.classList.add('active');
+            
+            if (tab === 'overview') {
+                document.getElementById('admin-overview-tab').style.display = 'block';
+                loadAdminOverview();
+            } else if (tab === 'models') {
+                document.getElementById('admin-models-tab').style.display = 'block';
+                loadAdminModels();
+            } else if (tab === 'users') {
+                document.getElementById('admin-users-tab').style.display = 'block';
+                loadAdminUsers(1);
+            }
+        }
+
+        async function viewUserDetails(userId) {
+            try {
+                const response = await authenticatedFetch(`/api/admin/users/${userId}/stats`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    const data = result.data;
+                    alert(`用户详情:\n\n文档数: ${data.documents.document_count}\n本周新增文档: ${data.documents.new_documents_week}\n总Token消耗: ${formatNumber(data.tokens.total_tokens)}\n本周Token: ${formatNumber(data.tokens.tokens_week)}\n本月Token: ${formatNumber(data.tokens.tokens_month)}\n总请求数: ${formatNumber(data.tokens.total_requests)}\n总成本: ¥${data.tokens.total_cost.toFixed(2)}`);
+                }
+            } catch (error) {
+                console.error('获取用户详情失败:', error);
+                alert('获取用户详情失败');
+            }
+        }
+
+        async function toggleUserStatus(userId) {
+            try {
+                const user = adminUsersData.find(u => u.id === userId);
+                if (!user) return;
+                
+                const newStatus = user.status === 'active' ? 'disabled' : 'active';
+                
+                const response = await authenticatedFetch(`/api/admin/users/${userId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    user.status = newStatus;
+                    renderAdminUsers();
+                    alert(`用户状态已更新为${newStatus === 'active' ? '启用' : '禁用'}`);
+                } else {
+                    alert(result.error || '更新用户状态失败');
+                }
+            } catch (error) {
+                console.error('更新用户状态失败:', error);
+                alert('更新用户状态失败');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+        });
     </script>
 </body>
 </html>
