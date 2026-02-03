@@ -3563,10 +3563,134 @@
         // 检测是否在Capacitor移动端环境中运行
         const isCapacitor = window.Capacitor && window.Capacitor.isNativePlatform();
         
-        // 设置API_BASE：移动端和桌面应用使用固定地址，Web端使用相对路径
-        const API_BASE = isCapacitor || window.location.protocol === 'file:'
-            ? 'http://192.168.0.119:3000/api' 
-            : window.location.origin + '/api';
+        // 动态发现服务器IP地址
+        async function discoverServerIP() {
+            console.log('开始自动发现服务器IP地址...');
+            
+            // 获取设备当前IP地址段
+            let deviceIP = '';
+            try {
+                // 使用WebRTC获取本地IP地址
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                pc.createDataChannel('');
+                pc.createOffer().then(offer => pc.setLocalDescription(offer));
+                
+                await new Promise((resolve) => {
+                    pc.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            const ipMatch = event.candidate.candidate.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\.[0-9]{1,3}/);
+                            if (ipMatch) {
+                                deviceIP = ipMatch[1];
+                                console.log('检测到设备IP段:', deviceIP);
+                            }
+                            resolve();
+                        }
+                    };
+                    
+                    // 超时处理
+                    setTimeout(resolve, 1000);
+                });
+                
+                pc.close();
+            } catch (error) {
+                console.log('获取设备IP失败，使用默认IP段:', error);
+                deviceIP = '192.168.0'; // 默认IP段
+            }
+            
+            // 扫描可能的服务器IP地址
+            const port = 3000;
+            const maxAttempts = 200; // 最多尝试200个IP，确保覆盖到192.168.0.120
+            const timeout = 500; // 每个IP的超时时间，缩短为500ms以提高扫描速度
+            
+            // 优先尝试常见的服务器IP地址
+            const priorityIPs = [1, 10, 100, 120, 192, 200, 254];
+            
+            // 首先尝试优先IP地址
+            for (const i of priorityIPs) {
+                const ip = `${deviceIP}.${i}`;
+                if (ip === '192.168.0.0' || ip === '192.168.0.255') continue;
+                
+                const testUrl = `http://${ip}:${port}/api/health`;
+                console.log('优先尝试连接:', testUrl);
+                
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), timeout);
+                    
+                    const response = await fetch(testUrl, {
+                        signal: controller.signal,
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (response.ok) {
+                        console.log('找到服务器:', `http://${ip}:${port}/api`);
+                        return `http://${ip}:${port}/api`;
+                    }
+                } catch (error) {
+                    // 连接失败，继续尝试下一个IP
+                }
+            }
+            
+            // 然后尝试其他IP地址
+            for (let i = 1; i <= maxAttempts; i++) {
+                // 跳过已经尝试过的优先IP
+                if (priorityIPs.includes(i)) continue;
+                
+                const ip = `${deviceIP}.${i}`;
+                if (ip === '192.168.0.0' || ip === '192.168.0.255') continue;
+                
+                const testUrl = `http://${ip}:${port}/api/health`;
+                console.log('尝试连接:', testUrl);
+                
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), timeout);
+                    
+                    const response = await fetch(testUrl, {
+                        signal: controller.signal,
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (response.ok) {
+                        console.log('找到服务器:', `http://${ip}:${port}/api`);
+                        return `http://${ip}:${port}/api`;
+                    }
+                } catch (error) {
+                    // 连接失败，继续尝试下一个IP
+                }
+            }
+            
+            console.log('自动发现失败，使用默认地址');
+            return 'http://192.168.0.1:3000/api'; // 默认地址
+        }
+        
+        // 全局API_BASE变量
+        let API_BASE = window.location.origin + '/api';
+        
+        // 初始化API_BASE
+        async function initAPI() {
+            if (isCapacitor || window.location.protocol === 'file:') {
+                // 移动端和桌面应用使用动态发现的地址
+                API_BASE = await discoverServerIP();
+            } else {
+                // Web端使用相对路径
+                API_BASE = window.location.origin + '/api';
+            }
+            console.log('最终API_BASE:', API_BASE);
+        }
+        
+        // 初始化API地址
+        initAPI();
         
         // 检查服务器连接状态
         async function checkServerStatus() {
@@ -3575,13 +3699,35 @@
             
             if (!indicator || !statusText) return;
             
+            console.log('=== 调试信息 ===');
+            console.log('window.Capacitor:', window.Capacitor);
+            console.log('isCapacitor:', isCapacitor);
+            console.log('window.location.protocol:', window.location.protocol);
+            console.log('API_BASE:', API_BASE);
+            console.log('================');
+            
             try {
                 statusText.textContent = '正在检查服务器连接...';
                 indicator.className = 'server-status-indicator checking';
                 
+                // 确保API_BASE已初始化
+                if (!API_BASE || API_BASE === window.location.origin + '/api' && (isCapacitor || window.location.protocol === 'file:')) {
+                    console.log('API_BASE未初始化，重新初始化...');
+                    await initAPI();
+                }
+                
+                console.log('开始请求:', `${API_BASE}/health`);
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
                 const response = await fetch(`${API_BASE}/health`, {
-                    timeout: 5000
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
+                
+                console.log('响应状态:', response.status);
                 
                 if (response.ok) {
                     statusText.textContent = '服务器连接正常';
@@ -3591,6 +3737,7 @@
                     indicator.className = 'server-status-indicator offline';
                 }
             } catch (error) {
+                console.error('连接错误:', error);
                 statusText.textContent = '服务器连接失败';
                 indicator.className = 'server-status-indicator offline';
             }
@@ -3623,13 +3770,22 @@
         let currentUser = null;
         let authToken = localStorage.getItem('authToken');
 
-        function authenticatedFetch(url, options = {}) {
+        async function authenticatedFetch(url, options = {}) {
             const headers = options.headers || {};
             if (authToken) {
                 headers['Authorization'] = `Bearer ${authToken}`;
             }
             options.headers = headers;
-            return fetch(url, options);
+            
+            // 确保API_BASE已初始化
+            if (!API_BASE || API_BASE === window.location.origin + '/api' && (isCapacitor || window.location.protocol === 'file:')) {
+                console.log('API_BASE未初始化，重新初始化...');
+                await initAPI();
+            }
+            
+            // 构建完整的URL
+            const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
+            return fetch(fullUrl, options);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -5165,6 +5321,12 @@
             }
 
             try {
+                // 确保API_BASE已初始化
+                if (!API_BASE || API_BASE === window.location.origin + '/api' && (isCapacitor || window.location.protocol === 'file:')) {
+                    console.log('API_BASE未初始化，重新初始化...');
+                    await initAPI();
+                }
+                
                 const response = await fetch(`${API_BASE}/auth/me`, {
                     headers: {
                         'Authorization': `Bearer ${authToken}`

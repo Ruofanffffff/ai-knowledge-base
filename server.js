@@ -1,11 +1,18 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+// const https = require('https');
+const os = require('os');
 const multer = require('multer');
+const cors = require('cors');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { Document, Packer, Paragraph, TextRun } = require('docx');
 const JSZip = require('jszip');
 require('dotenv').config();
+
+// 导入监控系统
+const { logger, accessLogMiddleware, errorHandlerMiddleware, getLogStatus, cleanOldLogs } = require('./utils/logger');
 
 const app = express();
 const PORT = 3000;
@@ -410,8 +417,15 @@ async function callDeepSeekModel(modelConfig, prompt) {
 }
 
 // 中间件
+app.use(cors({
+  origin: '*',
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// 添加访问日志中间件
+app.use(accessLogMiddleware);
 
 // 文件上传配置
 const storage = multer.diskStorage({
@@ -2357,16 +2371,113 @@ app.get('/api/ai/recommendations', (req, res) => {
   }
 });
 
+// 监控API端点
+app.get('/api/monitoring', (req, res) => {
+  try {
+    const logStatus = getLogStatus();
+    const memoryUsage = process.memoryUsage();
+    const uptime = process.uptime();
+    
+    res.json({
+      success: true,
+      data: {
+        server: {
+          status: 'running',
+          uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.floor(uptime % 60)}s`,
+          memory: {
+            rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
+            heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
+            heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
+            external: `${Math.round(memoryUsage.external / 1024 / 1024)}MB`
+          },
+          nodeVersion: process.version,
+          platform: process.platform,
+          arch: process.arch
+        },
+        logs: logStatus,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Monitoring endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get monitoring data'
+    });
+  }
+});
+
+// 清理日志API
+app.post('/api/monitoring/clean-logs', (req, res) => {
+  try {
+    cleanOldLogs(7); // 清理7天前的日志
+    res.json({
+      success: true,
+      message: 'Logs cleaned successfully'
+    });
+  } catch (error) {
+    console.error('Failed to clean logs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clean logs'
+    });
+  }
+});
+
+// 健康检查（增强版）
+app.get('/api/health', (req, res) => {
+  try {
+    const memoryUsage = process.memoryUsage();
+    
+    res.json({
+      status: 'ok',
+      message: 'Server is running',
+      timestamp: new Date().toISOString(),
+      server: {
+        uptime: process.uptime(),
+        memory: {
+          rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
+          heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server health check failed'
+    });
+  }
+});
+
 // 使用错误处理中间件
 app.use(notFound);
-app.use(errorHandler);
+app.use(errorHandlerMiddleware);
 
-// 启动服务器
-app.listen(PORT, '0.0.0.0', () => {
+// 启动HTTP服务器
+
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'localhost';
+}
+
+const localIP = getLocalIP();
+
+http.createServer(app).listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
   console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is accessible on network: http://${localIP}:${PORT}`);
   console.log('Available APIs:');
   console.log('- GET /api/health - 健康检查');
+  console.log('- GET /api/monitoring - 监控状态');
+  console.log('- POST /api/monitoring/clean-logs - 清理日志');
   console.log('- POST /api/auth/register - 用户注册');
   console.log('- POST /api/auth/login - 用户登录');
   console.log('- POST /api/auth/refresh - 刷新令牌');
@@ -2386,8 +2497,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('- GET /api/admin/users - 获取用户列表（管理员）');
   console.log('- GET /api/admin/users/:id - 获取用户详情（管理员）');
   console.log('- PUT /api/admin/users/:id/status - 更新用户状态（管理员）');
-  console.log('- PUT /api/admin/users/:id/role - 更新用户角色（管理员）');
-  console.log('- GET /api/admin/stats/overview - 获取系统统计（管理员）');
+  console.log('- GET /api/admin/users/:id/role - 更新用户角色（管理员）');
   console.log('- GET /api/admin/stats/users - 获取用户增长统计（管理员）');
   console.log('- GET /api/admin/stats/tokens - 获取token使用统计（管理员）');
   console.log('- GET /api/documents - 获取文档列表');
@@ -2411,7 +2521,7 @@ app.listen(PORT, '0.0.0.0', () => {
   
   console.log('\n=== 网络访问信息 ===');
   console.log(`本地访问: http://localhost:${PORT}`);
-  console.log(`局域网访问: http://0.0.0.0:${PORT}`);
+  console.log(`局域网访问: http://${localIP}:${PORT}`);
   console.log(`请确保防火墙允许端口 ${PORT} 的访问`);
 });
 

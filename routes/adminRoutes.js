@@ -166,74 +166,7 @@ router.put('/users/:id/role', adminMiddleware, async (req, res) => {
   }
 });
 
-router.get('/stats/overview', adminMiddleware, async (req, res) => {
-  try {
-    db.get(
-      `SELECT 
-         COUNT(*) as total_users,
-         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_users,
-         SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) as admin_users,
-         SUM(CASE WHEN created_at >= date('now', '-7 days') THEN 1 ELSE 0 END) as new_users_week
-       FROM users`,
-      [],
-      (err, userStats) => {
-        if (err) {
-          console.error('获取用户统计失败:', err);
-          return res.status(500).json({ success: false, error: err.message });
-        }
-        
-        db.get(
-          `SELECT 
-             SUM(total_tokens_used) as total_tokens,
-             SUM(total_cost) as total_cost,
-             SUM(total_requests) as total_requests
-           FROM user_stats`,
-          [],
-          (err, tokenStats) => {
-            if (err) {
-              console.error('获取token统计失败:', err);
-              return res.status(500).json({ success: false, error: err.message });
-            }
-            
-            db.get(
-              `SELECT COUNT(*) as total FROM documents`,
-              [],
-              (err, docStats) => {
-                if (err) {
-                  console.error('获取文档统计失败:', err);
-                  return res.status(500).json({ success: false, error: err.message });
-                }
-                
-                res.json({
-                  success: true,
-                  data: {
-                    users: {
-                      total: userStats.total_users,
-                      active: userStats.active_users,
-                      admin: userStats.admin_users,
-                      newThisWeek: userStats.new_users_week
-                    },
-                    tokens: {
-                      total: tokenStats.total_tokens || 0,
-                      totalCost: tokenStats.total_cost || 0,
-                      totalRequests: tokenStats.total_requests || 0
-                    },
-                    documents: {
-                      total: docStats.total
-                    }
-                  }
-                });
-              }
-            );
-          }
-        );
-      }
-    );
-  } catch (error) {
-    console.error('获取系统统计失败:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+
 
 router.get('/stats/users', adminMiddleware, async (req, res) => {
   try {
