@@ -33,7 +33,7 @@ model Document {
   content   String
   type      String   @default("document")
   fileType  String?  // .md, .pdf, .docx, .txt
-  metadata  Json?    // 文档元数据
+  metadata  String?  // 文档元数据 (JSON string)
   userId    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -43,6 +43,7 @@ model Document {
   tags        DocumentTag[]
   entities    DocumentEntity[]
   searchItems SearchHistory[]
+  ckbs        CKB[]            // 新增: CKB 关联
   
   @@map("documents")
 }
@@ -75,7 +76,7 @@ model Entity {
   name        String
   type        String          @default("concept")
   description String?
-  metadata    Json?
+  metadata    String?         // JSON string
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   
@@ -95,7 +96,7 @@ model EntityRelation {
   type        String    @default("association")
   strength    Float     @default(0.5) // 0-1之间的关系强度
   description String?
-  metadata    Json?
+  metadata    String?   // JSON string
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   
@@ -129,7 +130,6 @@ model SearchHistory {
   
   // 关联关系
   document    Document? @relation(fields: [documentId], references: [id])
-  user        User?     @relation(fields: [userId], references: [id])
   
   @@map("search_history")
 }
@@ -153,7 +153,7 @@ model Backup {
 model Setting {
   id          String   @id @default(uuid())
   key         String   @unique
-  value       Json
+  value       String   // JSON string
   userId      String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -162,4 +162,240 @@ model Setting {
   user        User?    @relation(fields: [userId], references: [id])
   
   @@map("settings")
+}
+
+
+// ============================================
+// Knowledge Graph Models (Schema-Driven)
+// ============================================
+
+// CKB (Contextual Knowledge Block) 表
+model CKB {
+  id            String   @id @default(uuid())
+  docId         String   @map("doc_id")
+  sourceType    String   @map("source_type")  // word | pdf | excel | image | video
+  sourceMeta    String   @map("source_meta")  // JSON string
+  structure     String                        // JSON string
+  content       String                        // JSON string
+  quality       String                        // JSON string
+  timestamps    String                        // JSON string
+  createdAt     DateTime @default(now()) @map("created_at")
+  
+  document      Document @relation(fields: [docId], references: [id], onDelete: Cascade)
+  
+  @@map("ckb")
+  @@index([docId])
+  @@index([sourceType])
+}
+
+// Schema 表
+model Schema {
+  id                 String   @id @default(uuid())
+  name               String   @unique
+  entityType         String   @map("entity_type")
+  scene              String?                       // 场景分类 (科研/政府, 旅行, 摄影等)
+  coreFields         String   @map("core_fields")  // JSON string
+  threshold          Float
+  relations          String?                       // JSON string
+  exampleDescription String?  @map("example_description")  // 示例描述
+  description        String?                       // Schema 描述
+  version            String
+  active             Boolean  @default(true)       // 是否启用
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  
+  @@map("schemas")
+  @@index([entityType])
+  @@index([scene])
+  @@index([active])
+}
+
+// KG 实体表
+model KGEntity {
+  id            String       @id @default(uuid())
+  type          String
+  canonicalName String       @map("canonical_name")
+  aliases       String?                       // JSON string
+  schemas       String                        // JSON string
+  supportedBy   String       @map("supported_by")  // JSON string
+  attributes    String?                       // JSON string
+  confidence    Float
+  llmEnriched   Boolean      @default(false) @map("llm_enriched")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  
+  relationsAsSource KGRelation[] @relation("SourceEntity")
+  relationsAsTarget KGRelation[] @relation("TargetEntity")
+  
+  @@map("kg_entities")
+  @@index([type])
+  @@index([canonicalName])
+  @@index([confidence])
+}
+
+// KG 关系表
+model KGRelation {
+  id           String   @id @default(uuid())
+  sourceId     String   @map("source_id")
+  targetId     String   @map("target_id")
+  type         String
+  subtype      String?
+  weight       Float?
+  confidence   Float
+  evidenceCkb  String   @map("evidence_ckb")  // JSON string
+  evidenceText String?  @map("evidence_text")
+  metadata     String?                        // JSON string
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  source       KGEntity @relation("SourceEntity", fields: [sourceId], references: [id], onDelete: Cascade)
+  target       KGEntity @relation("TargetEntity", fields: [targetId], references: [id], onDelete: Cascade)
+  
+  @@map("kg_relations")
+  @@index([sourceId])
+  @@index([targetId])
+  @@index([type])
+  @@index([confidence])
+}
+
+// KG Token 使用记录表
+model KGTokenUsage {
+  id           String   @id @default(uuid())
+  module       String
+  ckbId        String?  @map("ckb_id")
+  modelName    String   @map("model_name")
+  inputTokens  Int      @map("input_tokens")
+  outputTokens Int      @map("output_tokens")
+  totalTokens  Int      @map("total_tokens")
+  cost         Float?
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  @@map("kg_token_usage")
+  @@index([module])
+  @@index([createdAt])
+}
+
+// ============================================
+// Document Full Processing Models
+// ============================================
+
+// 文档结构分析表
+model DocumentStructure {
+  id              String   @id @default(uuid())
+  docId           String   @map("doc_id")
+  fileType        String   @map("file_type")
+  totalUnits      Int      @map("total_units")
+  units           String   // JSON string: StructuralUnit[]
+  hierarchy       String   // JSON string: HierarchyTree
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@map("document_structures")
+  @@index([docId])
+}
+
+// 验证报告表
+model ValidationReport {
+  id              String   @id @default(uuid())
+  reportId        String   @unique @map("report_id")
+  docId           String   @map("doc_id")
+  summary         String   // JSON string: ReportSummary
+  structureTree   String   @map("structure_tree")  // JSON string
+  skippedContent  String   @map("skipped_content") // JSON string
+  lowQualityCkbs  String   @map("low_quality_ckbs") // JSON string
+  missingUnits    String   @map("missing_units")    // JSON string
+  recommendations String   // JSON string
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@map("validation_reports")
+  @@index([docId])
+  @@index([reportId])
+}
+
+// 处理监控表
+model ProcessingMonitor {
+  id              String   @id @default(uuid())
+  monitorId       String   @unique @map("monitor_id")
+  docId           String   @map("doc_id")
+  startTime       DateTime @map("start_time")
+  endTime         DateTime? @map("end_time")
+  stages          String   // JSON string: ProcessingStage[]
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@map("processing_monitors")
+  @@index([docId])
+  @@index([monitorId])
+}
+
+// 分段处理表
+model SegmentProcessing {
+  id              String   @id @default(uuid())
+  segmentId       String   @unique @map("segment_id")
+  docId           String   @map("doc_id")
+  segmentIndex    Int      @map("segment_index")
+  totalSegments   Int      @map("total_segments")
+  status          String   // 'pending' | 'processing' | 'completed' | 'failed'
+  errorMessage    String?  @map("error_message")
+  failedAt        DateTime? @map("failed_at")
+  recoveredAt     DateTime? @map("recovered_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@map("segment_processing")
+  @@index([docId])
+  @@index([segmentId])
+  @@index([status])
+}
+
+// 告警表
+model Alert {
+  id              String   @id @default(uuid())
+  alertId         String   @unique @map("alert_id")
+  alertType       String   @map("alert_type")
+  severity        String   // 'info' | 'warning' | 'error' | 'critical'
+  message         String
+  metadata        String   // JSON string
+  triggeredAt     DateTime @map("triggered_at")
+  resolvedAt      DateTime? @map("resolved_at")
+  status          String   // 'active' | 'resolved' | 'ignored'
+  
+  @@map("alerts")
+  @@index([alertType])
+  @@index([severity])
+  @@index([status])
+}
+
+// 过滤规则表
+model FilterRule {
+  id              String   @id @default(uuid())
+  ruleId          String   @unique @map("rule_id")
+  name            String
+  type            String   // 'regex' | 'keyword' | 'length' | 'pattern'
+  pattern         String
+  action          String   // 'skip' | 'mark_low_quality'
+  reason          String
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@map("filter_rules")
+  @@index([ruleId])
+  @@index([enabled])
+}
+
+// 字段分布统计表 (Task 7.13.3)
+// 记录未映射字段的出现频率，用于指导同义词词典扩充
+model FieldDistribution {
+  id           String   @id @default(uuid())
+  fieldName    String   @unique @map("field_name")
+  count        Int      @default(1)
+  lastSeen     DateTime @default(now()) @map("last_seen")
+  schemas      String   // JSON array of schema names where this field appeared
+  fieldType    String?  @map("field_type") // time, location, number, etc.
+  exampleValue String?  @map("example_value")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  @@map("field_distribution")
+  @@index([count])
+  @@index([lastSeen])
+  @@index([fieldType])
 }

@@ -1,0 +1,75 @@
+{
+  "generated_at": "2026-02-02T13:32:54.884Z",
+  "schema_count": 11,
+  "total_fields": 48,
+  "total_variations": 872,
+  "avg_variations_per_field": "18.17",
+  "schemas": [
+    {
+      "name": "地下水位变化事件",
+      "scene": null,
+      "field_count": 5,
+      "variation_count": 22
+    },
+    {
+      "name": "区域实体",
+      "scene": null,
+      "field_count": 3,
+      "variation_count": 35
+    },
+    {
+      "name": "指标实体",
+      "scene": null,
+      "field_count": 3,
+      "variation_count": 29
+    },
+    {
+      "name": "项目实体",
+      "scene": null,
+      "field_count": 5,
+      "variation_count": 53
+    },
+    {
+      "name": "人员实体",
+      "scene": null,
+      "field_count": 4,
+      "variation_count": 54
+    },
+    {
+      "name": "组织实体",
+      "scene": null,
+      "field_count": 3,
+      "variation_count": 35
+    },
+    {
+      "name": "文档实体",
+      "scene": null,
+      "field_count": 4,
+      "variation_count": 50
+    },
+    {
+      "name": "设备实体",
+      "scene": null,
+      "field_count": 4,
+      "variation_count": 41
+    },
+    {
+      "name": "医疗设备采购招标",
+      "scene": null,
+      "field_count": 6,
+      "variation_count": 84
+    },
+    {
+      "name": "旅游目的地推荐",
+      "scene": null,
+      "field_count": 5,
+      "variation_count": 90
+    },
+    {
+      "name": "政府工作报告实体",
+      "scene": null,
+      "field_count": 6,
+      "variation_count": 379
+    }
+  ]
+}

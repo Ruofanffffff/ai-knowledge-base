@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Card, Button, Space, Typography, Input, Slider, Spin } from 'antd'
+import { Card, Button, Space, Typography, Input, Slider, Spin, Tabs } from 'antd'
 import { SearchOutlined, ZoomInOutlined, ZoomOutOutlined, FullscreenOutlined } from '@ant-design/icons'
 import * as d3 from 'd3'
+import SchemaKG from './KnowledgeGraph/SchemaKG'
+import CKBExplorer from './KnowledgeGraph/CKBExplorer'
 
 const { Title, Text } = Typography
 const { Search } = Input
@@ -217,55 +219,77 @@ const KnowledgeGraph: React.FC = () => {
   return (
     <div>
       <Title level={2}>知识图谱</Title>
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Card style={{ width: '100%' }}>
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            <Search
-              placeholder="搜索实体..."
-              allowClear
-              enterButton={<SearchOutlined />}
-              size="middle"
-              onSearch={handleSearch}
-              style={{ width: '100%' }}
-            />
-            
-            <Space style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Space>
-                <Button icon={<ZoomInOutlined />} onClick={handleZoomIn}>放大</Button>
-                <Button icon={<ZoomOutOutlined />} onClick={handleZoomOut}>缩小</Button>
-                <Button icon={<FullscreenOutlined />}>全屏</Button>
+      
+      <Tabs
+        defaultActiveKey="basic"
+        items={[
+          {
+            key: 'basic',
+            label: '基础视图',
+            children: (
+              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                <Card style={{ width: '100%' }}>
+                  <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                    <Search
+                      placeholder="搜索实体..."
+                      allowClear
+                      enterButton={<SearchOutlined />}
+                      size="middle"
+                      onSearch={handleSearch}
+                      style={{ width: '100%' }}
+                    />
+                    
+                    <Space style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Space>
+                        <Button icon={<ZoomInOutlined />} onClick={handleZoomIn}>放大</Button>
+                        <Button icon={<ZoomOutOutlined />} onClick={handleZoomOut}>缩小</Button>
+                        <Button icon={<FullscreenOutlined />}>全屏</Button>
+                      </Space>
+                      <Slider
+                        min={0.1}
+                        max={4}
+                        step={0.1}
+                        value={zoomLevel}
+                        onChange={setZoomLevel}
+                        style={{ width: '30%' }}
+                      />
+                    </Space>
+                  </Space>
+                </Card>
+
+                <Card style={{ width: '100%' }}>
+                  <Spin spinning={isLoading} tip="加载知识图谱中...">
+                    <svg
+                      ref={svgRef}
+                      style={{ width: '100%', height: '600px', border: '1px solid #e8e8e8', borderRadius: '4px' }}
+                    />
+                  </Spin>
+                </Card>
+
+                <Card title="实体类型说明" style={{ width: '100%' }}>
+                  <Space direction="vertical" size="small">
+                    <Text><span style={{ color: d3.schemeCategory10[0], marginRight: '5px' }}>●</span>概念</Text>
+                    <Text><span style={{ color: d3.schemeCategory10[1], marginRight: '5px' }}>●</span>技术</Text>
+                    <Text><span style={{ color: d3.schemeCategory10[2], marginRight: '5px' }}>●</span>项目</Text>
+                    <Text><span style={{ color: d3.schemeCategory10[3], marginRight: '5px' }}>●</span>人物</Text>
+                    <Text><span style={{ color: d3.schemeCategory10[4], marginRight: '5px' }}>●</span>书籍</Text>
+                  </Space>
+                </Card>
               </Space>
-              <Slider
-                min={0.1}
-                max={4}
-                step={0.1}
-                value={zoomLevel}
-                onChange={setZoomLevel}
-                style={{ width: '30%' }}
-              />
-            </Space>
-          </Space>
-        </Card>
-
-        <Card style={{ width: '100%' }}>
-          <Spin spinning={isLoading} tip="加载知识图谱中...">
-            <svg
-              ref={svgRef}
-              style={{ width: '100%', height: '600px', border: '1px solid #e8e8e8', borderRadius: '4px' }}
-            />
-          </Spin>
-        </Card>
-
-        <Card title="实体类型说明" style={{ width: '100%' }}>
-          <Space direction="vertical" size="small">
-            <Text><span style={{ color: d3.schemeCategory10[0], marginRight: '5px' }}>●</span>概念</Text>
-            <Text><span style={{ color: d3.schemeCategory10[1], marginRight: '5px' }}>●</span>技术</Text>
-            <Text><span style={{ color: d3.schemeCategory10[2], marginRight: '5px' }}>●</span>项目</Text>
-            <Text><span style={{ color: d3.schemeCategory10[3], marginRight: '5px' }}>●</span>人物</Text>
-            <Text><span style={{ color: d3.schemeCategory10[4], marginRight: '5px' }}>●</span>书籍</Text>
-          </Space>
-        </Card>
-      </Space>
+            )
+          },
+          {
+            key: 'schema',
+            label: 'Schema 驱动视图',
+            children: <SchemaKG />
+          },
+          {
+            key: 'ckb',
+            label: 'CKB 浏览器',
+            children: <CKBExplorer />
+          }
+        ]}
+      />
     </div>
   )
 }

@@ -1,0 +1,67 @@
+{
+  "defaultStrategies": {
+    "travel": "semantic-only",
+    "medical": "hybrid",
+    "government": "rule-first",
+    "legal": "rule-first",
+    "financial": "hybrid",
+    "general": "rule-first"
+  },
+  "promptBuilders": {
+    "travel": "buildTravelFieldExtractionPrompt",
+    "medical": "buildSemanticFieldExtractionPrompt",
+    "government": "buildFieldExtractionPrompt",
+    "legal": "buildFieldExtractionPrompt",
+    "financial": "buildSemanticFieldExtractionPrompt",
+    "general": "buildFieldExtractionPrompt"
+  },
+  "domainKeywords": {
+    "travel": ["旅游", "景点", "攻略", "目的地", "行程", "导游", "住宿", "交通"],
+    "medical": ["医疗", "病人", "诊断", "治疗", "药物", "症状", "医院", "医生"],
+    "government": ["政府", "政策", "法规", "公告", "通知", "文件", "部门", "机关"],
+    "legal": ["法律", "合同", "诉讼", "判决", "律师", "法院", "条款", "协议"],
+    "financial": ["金融", "投资", "股票", "基金", "银行", "贷款", "利率", "理财"],
+    "general": []
+  },
+  "strategyConfig": {
+    "semantic-only": {
+      "useLLM": true,
+      "useRules": false,
+      "useNER": false,
+      "forceLLM": true,
+      "useSemantic": true,
+      "maxFields": 50,
+      "minConfidence": 0.7
+    },
+    "rule-first": {
+      "useLLM": true,
+      "useRules": true,
+      "useNER": true,
+      "forceLLM": false,
+      "minFieldCount": 3,
+      "minConfidence": 0.7
+    },
+    "llm-first": {
+      "useLLM": true,
+      "useRules": true,
+      "useNER": true,
+      "forceLLM": false,
+      "llmFirst": true,
+      "minConfidence": 0.8
+    },
+    "hybrid": {
+      "useLLM": true,
+      "useRules": true,
+      "useNER": true,
+      "forceLLM": false,
+      "parallel": true,
+      "minConfidence": 0.7
+    }
+  },
+  "performance": {
+    "domainDetectionTimeout": 10,
+    "strategySelectionTimeout": 5,
+    "extractionTimeout": 5000,
+    "maxTokensPerCKB": 2000
+  }
+}

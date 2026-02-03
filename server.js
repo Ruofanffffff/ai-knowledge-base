@@ -7,6 +7,10 @@ const { Document, Packer, Paragraph, TextRun } = require('docx');
 const JSZip = require('jszip');
 require('dotenv').config();
 
+// Import KG module for startup initialization
+const kg = require('./kg');
+const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require('./kg/hooks/document_hooks');
+
 const app = express();
 const PORT = 3000;
 
@@ -479,6 +483,14 @@ app.use('/api/user', userCenterRouter);
 // 管理员路由
 app.use('/api/admin', adminRouter);
 
+// 知识图谱路由
+const knowledgeGraphRoutes = require('./routes/knowledgeGraphRoutes');
+app.use('/api/knowledge-graph', knowledgeGraphRoutes);
+
+// 文档处理路由
+const documentProcessingRoutes = require('./routes/documentProcessingRoutes');
+app.use('/api', documentProcessingRoutes);
+
 const mockTags = [
   { id: '1', name: '前端', color: '#1890ff', description: '前端开发相关内容' },
   { id: '2', name: '后端', color: '#52c41a', description: '后端开发相关内容' },
@@ -583,6 +595,16 @@ app.post('/api/documents', authMiddleware, (req, res) => {
         };
         
         console.log('创建新文档:', newDocument);
+        
+        // 触发知识图谱构建钩子 (异步)
+        onDocumentCreated(newDocument, { async: true, skipIfExists: false })
+          .then(result => {
+            console.log('[KG Hook] 文档创建钩子结果:', result);
+          })
+          .catch(error => {
+            console.error('[KG Hook] 文档创建钩子失败:', error);
+          });
+        
         res.json(newDocument);
       }
     );
@@ -633,6 +655,15 @@ app.put('/api/documents/:id', authMiddleware, (req, res) => {
             updatedAt: row.updated_at
           };
           
+          // 触发知识图谱增量更新钩子 (异步)
+          onDocumentUpdated(document, { async: true, fullRebuild: false })
+            .then(result => {
+              console.log('[KG Hook] 文档更新钩子结果:', result);
+            })
+            .catch(error => {
+              console.error('[KG Hook] 文档更新钩子失败:', error);
+            });
+          
           res.json(document);
         });
       }
@@ -657,6 +688,15 @@ app.delete('/api/documents/:id', authMiddleware, (req, res) => {
       if (this.changes === 0) {
         return res.status(404).json({ error: 'Document not found' });
       }
+      
+      // 触发知识图谱清理钩子 (异步)
+      onDocumentDeleted(id, { async: true })
+        .then(result => {
+          console.log('[KG Hook] 文档删除钩子结果:', result);
+        })
+        .catch(error => {
+          console.error('[KG Hook] 文档删除钩子失败:', error);
+        });
       
       res.json({ message: 'Document deleted successfully' });
     });
@@ -2362,9 +2402,17 @@ app.use(notFound);
 app.use(errorHandler);
 
 // 启动服务器
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
   console.log(`Server is running on http://localhost:${PORT}`);
+  
+  // Initialize KG module (includes schema startup check)
+  try {
+    await kg.initialize();
+  } catch (error) {
+    console.error('KG module initialization failed:', error);
+    console.error('Server will continue, but KG functionality may be limited');
+  }
   console.log('Available APIs:');
   console.log('- GET /api/health - 健康检查');
   console.log('- POST /api/auth/register - 用户注册');
