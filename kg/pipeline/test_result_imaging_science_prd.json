@@ -1,0 +1,3967 @@
+{
+  "documentId": "imaging_science_prd_v1",
+  "documentType": "text",
+  "startTime": 1770112961721,
+  "endTime": 1770112962943,
+  "totalDuration": 1222,
+  "status": "partial",
+  "steps": {
+    "parsing": {
+      "status": "success",
+      "duration": 0,
+      "result": {
+        "ckb_id": "ckb_imaging_science_prd_v1_1770112961722",
+        "doc_id": "imaging_science_prd_v1",
+        "content": {
+          "text": "「影像科学」产品需求文档\n\n\n一、    文档信息\n项目    内容\n产品名称    影像科学\n版本号    V1.0\n状态    开发中\n作者    Johnie\n创建日期    2025年10月\n最近更新    \n更新内容    \n\n二、    背景与目标\n2.1 产品背景\n👉 户的真实不爽点\n作为一个摄影师，拍摄时候会有一个画面，这个画面可能是他曾经在审阅优秀的作品时候见过的内容。然而，优秀摄影师拍摄的作品在摄影前期（拍摄环境、用光、构图、题材、颜色选择等）\n典型问题：我喜欢「滨田英明」的作品（左图），那我如何将我的照片（右图）进行调色，来模仿滨田英明的风格？\n  \n作为新手摄影师，常常遇到的问题很难准确地分析出照片的前期拍摄以及后期的影调与色调关系，导致后期调色总达不到自己想要的效果\n\n👉 他们现在是怎么解决的？\n常见的解决方法是：通过网络搜索（抖音/小红书/或其他站点发布的摄影博客、文章攻略，来学习该摄影师的拍摄和调色手法。或者，直接在网上照搬参数。\n该办法无法做到准确地对症下药，模仿后总觉得很奇怪，无法得到最直接的拍摄与调色的思路\n\n2.2 产品目标\n2.2.1 产品是什么\n产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程系统」，用于拆解、诊断、复现优秀摄影作品的视觉语言，并将其转化为可执行的前期拍摄与后期调色方案。\n核心差异点（与调色App / 滤镜工具区分）\n•    ❌ 不是滤镜\n•    ❌ 不是一键仿色\n•    ✅ 是「为什么这样拍 + 为什么这样调」的系统化解析\n•    ✅ 输出摄影语言 + 色彩语言 + 可执行参数\n2.2.2 产品的方法论\n仿色的本质是：影像意图 → 光影结构 → 色彩策略 → 参数映射\n基于以下模型对产品进行设计：\n1️⃣ 影像意图层（Intent）\n•    这张照片想“安静”还是“张力”？\n•    是日常感，还是仪式感？\n•    是观察者视角，还是参与者视角？\n2️⃣ 光影结构层（Luminance Structure）\n•    高光是否克制？\n•    中灰是否占主导？\n•    阴影是否允许压死？\n3️⃣ 色彩策略层（Color Strategy）\n•    是否存在主色（Dominant Hue）？\n•    是否刻意削弱某一色相？\n•    肤色是否被当作视觉锚点？\n4️⃣ 参数映射层（Parameter Mapping）\n•    Lightroom / PS / 曲线 / 校准\n•    参数只是结果，不是起点\n\n👉 可以带给用户的帮助有哪些？\n通过对比分析两张图的题材、感情色彩、拍摄手法、构图、影调、色调的差别，给予用户：\n    综合建议：综合给出具体分析结果和建议：\n    内容：分析参考图的主题是什么？想表现什么感情色彩（温情？自然？静谧？不做作？高反差？传达了什么生活的奥义？……）？\n    影调：直方图是怎么样的（是什么形状？元素位于直方图的哪个位置，说明什么问题？参考图呈现的照片效果是什么？参考图直方图上有没有缺失？说明了什么问题？结合直方图来分析参考图和用户图的差别）\n    色调：是什么风格的？（淡雅蓝？清新绿？……这些与拍摄的题材有什么关联？和拍摄的元素之间的关系是什么，如，拍摄的大海和蓝天呈现的是淡雅蓝，森林草地呈现的是清新绿，人像中肤色呈现的是淡黄色【给出颜色六位编号】）主要用了哪些色彩，这些色彩怎么进行搭配的？可能使用的设备是什么？这些设备的特色是啥？\n    构图：如何构图的？\n    拍摄及调整建议：结合用户图，给出综合的建议（用户图的主题是什么，是否需要变更，如何变更更好？如何通过后期裁剪、去除无效元素、增加新元素等方法模仿参考图感情色彩和摄影风格？颜色搭配的方案和比例？检测或猜测用户使用的设备是什么（不同设备会有不同的特色，如索尼偏黄、胶片相机有颗粒、尼康色彩丰富饱和度高、佳能柔和等）？用户应该着重怎么进行后期调色（现有颜色的增、减、变化）？\n    构图分析：详细为用户讲解参考图在构图中的优势（焦点的位置、留白的比例、构图的方法），以及对用户图前期拍摄的详细建议（前期应该选择什么天气、什么时间、模特需要怎么穿着、怎么布光、怎么打光、拍摄的地点选择在哪？模特如何摆造型？等）和后期调整的详细建议\n    光影分析：详细在影调和色调上进行讲解。对综合建议中提到的以下内容进行细化：参考图直方图是怎么样的（是什么形状？元素位于直方图的哪个位置，说明什么问题？参考图呈现的照片效果是什么？参考图直方图上有没有缺失？说明了什么问题？结合直方图来分析参考图和用户图的差别）是什么风格的？（淡雅蓝？清新绿？……这些与拍摄的题材有什么关联？和拍摄的元素之间的关系是什么，如，拍摄的大海和蓝天呈现的是淡雅蓝，森林草地呈现的是清新绿，人像中肤色呈现的是淡黄色【给出颜色六位编号】）主要用了哪些色彩，这些色彩怎么进行搭配的？可能使用的设备是什么？这些设备的特色是啥？\n    色彩建议：基于综合建议内容，给出详细的色彩数据，包括：色彩策略（基于参考图，如何调整用户图的色彩方法概述）。色彩的HSL具体数值、高光/中间调/阴影的具体数值、色温色调的具体数值\n    Lightroom调整建议：色彩调整匹配的具体方法：任务关键点、场景类型（用户图目前是什么场景，应该怎么调整）、如何调整光影的策略、如何调整色彩的策略、分析参考图直方图后如何调整直方图的方法、颜色校准的策略、基础面板数值（白平衡数值、基础数值（曝光、对比度、高光、阴影、白色、黑色、鲜艳度、饱和度）、质感数值（纹理、清晰度、去朦胧）、色彩分级数值（高光、中间调、阴影、平衡）、颜色校准数值（红原色、绿原色、蓝原色、阴影）、HSL具体数值、直方图（用户图原直方图叠加目标直方图）、曲线图以及具体数值、局部调整方法（添加蒙版、增加亮度等）、迭代调色（如果用户不满意，可以在此写下建议，然后重新生成）\n    Photoshop工作流：基于综合建议，仍需要PS做的内容，包括但不限于：基础面板调整、色阶调整、曲线调整、可选颜色调整、减淡与加深、氛围与颗粒\n    AI模拟：基于以上建议和方法，使用nano banana，生成一张用户图调整后的参考照片，同时生成可以让LR直接使用的.xmp预设和pdf报告\n1.    产品边界\n本产品定位为一个摄影点评专家和摄影思路生成器，只提供具体前后期的思路和参考数据，准确数据需要用户在LR和PS中进行进一步调整\n\n三、    用户与使用场景\n1.    用户画像\n本产品的用户为：\n    摄影爱好者：摄影风格尚未定型，有自己喜欢的摄影师和摄影风格\n    后期小白：会使用PS或同类调色软件，但是对影调、色调并不专业，对后期调色没思路\n    机构及MSN：需要快速且专业的产出摄影文案，以应对自媒体平台的快速发布需求\n2.    用户角色定义\n角色    描述    典型诉求\n管理员    对系统进行管理和对平台进行运营    新版本发布、功能维护、营销运营\n普通用户    对系统进行初步尝试    系统测试看效果\n个人订阅用户    个人或自媒体人，少量的分析需求    一个月10次以内的分析\n高级订阅用户    企业或机构，大量的分析需求    一个月100次以上的分析\n\n3.    使用场景\n    场景1:旅拍完后，大量的素材在手上，准备开始PS，需要确定风格和调色方法\n    场景2:通过自己的调整后没有达到想要的效果，进一步想要找到不达预期的原因\n    场景3:对摄影师的研究，找到大量的摄影师作品，使用系统进行分析\n\n四、    业务流程\n业务流程如下图所示：\n \n五、    功能需求\n5.1 首页\n \n    中英文切换按钮：默认中文界面，点击后跳转至英文界面\n    登录、申请权限、开启探索按钮：点击均跳转到“登陆”页面\n    观看视频按钮：点击均跳转到演示视频页面并开启播放\n1.    登录页面\n点击email、phone、alipay三个tap可以实现页面切换。\n1.1    邮箱登录页面\n \n1.    如果没有账号，需要点击“申请权限”进行注册，页面参考如下：\n \n2.    输入邮箱和密码（默认支持输入密码）\n3.    点击进入系统\n4.    PS：如果不想输入密码，可以点击“使用验证码登录”，使用验证码登录。页面参考如下：\n \n5.2 核心使用界面\n \n点击“头像”进入如下界面：\n \n其中：\n    身份：用以展示该用户账号的具体信息：\n \n    用户名：点击右侧的齿轮，可以支持编辑\n    电子邮箱：仅支持预览，不支持编辑\n    密码（需要新增前端页面以及前后端开发）：点击右侧“更新按钮”可以进行重置，更新完需要点击红色的“重置密码”按钮。\n    支付宝绑定：仅展示用户已经完成了支付宝绑定操作\n    方案与用量（需要新增前端页面以及前后端开发）：展示用户目前订阅的方案以及使用情况\n \n    账单（需要新增前端页面以及前后端开发）：展示用户目前的支付方式\n \n    银行卡（需要新增前端页面以及前后端开发）：默认第一个为主支付方式（用户可以点击进行变更）点击后右上角会出现“edit”字样，可以支持用户进行编辑；点击移除，可以移除该支付方式\n    Alipay（需要新增前端页面以及前后端开发）：如果不是默认，用户点击卡片，会出现 按钮，点击后可以变为默认支付方式；点击移除，可以移除该支付方式\n    任务日志（需要新增前端页面以及前后端开发）\n \n点击每一个任务，会展示出具体的任务数据，以及生成的报告和文件\n    网络（需要新增前端页面以及前后端开发）\n \n    协议（需要新增前端页面以及前后端开发）\n \n\n核心使用界面需要上传两张照片：\n•    风格参考图（左侧）：为参考图\n•    目标原图（右侧）：为用户图\n \n点击“初始化分析”，会生成初步的评估内容，如下图：\n \n系统会针对参考图和用户图生成两套不同的初步评估内容「⭐️特色功能」，包括：\n    亮度直方图：参考图与用户图各有一张，用于展示目前图像的具体亮度信息\n \n    色彩雷达：基于图像的色彩和亮度，会画在雷达图上。用户使用鼠标移动到图像的任意一个位置，会显示出这个点的具体色彩RGB值。同时，雷达图上也会显示出这个点（方向表示色相，距中心的距离表示饱和度）。优势在于：用户可以很方便查看到图像中对应具体的色彩的值。使用场景如，能看到人物脸部颜色是否准确？\n \n    AI诊断：需要启用AI大模型能力对图像进行更深度的评估，故需要用户点击“启动深度扫描”按钮\n \nAI分析时会展示：\n \n得到结果后会展示：\n \n     多维度展示：在曝光、颜色、构图、感情色彩上让AI进行评分，并且给予对应的评价描述：\n \n     诊断报告：AI阅读并理解该照片的风格，并评价其优劣势\n \n     改进建议：基于判断，AI给出的前后期改进建议\n \n\n     问题定位：AI对于问题的总结\n \n\n    显示曝光图：伪色将亮度映射为颜色，帮助您无需猜测即可判断曝光。\n其中，红色代表过曝；黄色代表接近过曝；粉红代表皮肤颜色；绿色代表中性灰；蓝色代表深度阴影；紫色代表曝光不足已损失细节\n \n点击初始化分析，会得到第一阶段的分析内容。\n5.3 第一阶段主页面\n只有上半部分诊断层的综合审查、构图分析、光影分析三个卡片是亮的；下半部分执行层是灰的\n  \n5.3.1综合审查：用于展示这次对比仿色的综合建议，如下：\n \n页面布局为：\n    左侧：展示两张照片（参考图【左】和用户图【右】），下面有该图的具体评价描述（主题是啥？想表现什么感情色彩（温情？自然？静谧？不做作？高反差？传达了什么生活的奥义？……有什么特色）\n    右侧：展示具体的详细内容，包括：\n    核心策略：给出综合的建议（用户图的主题是什么，是否需要变更，如何变更更好？如何通过后期裁剪、去除无效元素、增加新元素等方法模仿参考图感情色彩和摄影风格？颜色搭配的方案和比例？检测或猜测用户使用的设备是什么（不同设备会有不同的特色，如索尼偏黄、胶片相机有颗粒、尼康色彩丰富饱和度高、佳能柔和等）？用户应该着重怎么进行后期调色（现有颜色的增、减、变化）\n    主要风格流派：照片属于什么类型？\n    流派特色：这种类型流派具有什么特色\n    综合点评：\n    内容上，参考图与用户的主题内容分别是什么？参考图传达的感情色彩是什么，用户图应该怎么向他靠近？\n    影调上，直方图是怎么样的（是什么形状？元素位于直方图的哪个位置，说明什么问题？参考图呈现的照片效果是什么？参考图直方图上有没有缺失？说明了什么问题？结合直方图来分析参考图和用户图的差别）；\n    色调上，是什么风格的？（淡雅蓝？清新绿？……这些与拍摄的题材有什么关联？和拍摄的元素之间的关系是什么，如，拍摄的大海和蓝天呈现的是淡雅蓝，森林草地呈现的是清新绿，人像中肤色呈现的是淡黄色【给出颜色六位编号】）主要用了哪些色彩，这些色彩怎么进行搭配的？可能使用的设备是什么？这些设备的特色是啥？\n    视觉主体分析（点击内容可以在照片上展示具体位置，让用户直观看到）：分析参考图和用户图主体上的特色，包括但不限于主体放在什么位置？怎么使用颜色突出主体？怎么为主体营造出感情色彩？光线、色彩、画面元素如何为主体服务？主体颜色与其他元素颜色之间的关系？针对于用户图如何做？\n    焦点与曝光（点击内容可以在照片上展示具体位置，让用户直观看到）：分析参考图和用户图在焦点与曝光上的特色，包括但不限于焦点放在哪里？构图怎么安排？曝光如何对主体进行加持？针对于用户图如何做？\n    色彩与氛围（点击内容可以在照片上展示具体位置，让用户直观看到）：分析参考图和用户图在色彩与氛围上的特色，包括但不限于使用了哪些颜色？如，人物脸部什么颜色？饱和度如何？明度如何？其余背景和元素使用了哪些颜色？饱和度如何？明度如何？针对于用户图如何做？\n    颜色策略：用户图应该调整哪些颜色，来逼近或者达到目标图的水准。需要具体到分析用户图上每一个元素的颜色分析，以及如何调整\n    参考图优点评估：分析一下参考图在内容、影调、色调上的优点\n    直方图展示与分析：分析参考图与用户图的直方图特点，图中主要的元素（主体、背景、核心元素）在直方图的位置，参考图怎么控制光线，在直方图上如何表达？用户图应该如何调整？\n    可行性评估：用户图调整为参考图是否可行？置信度有多少？有什么限制因素？是否可突破？有什么建议？\n    可行性百分比：\n    限制因素：\n    建议：\n5.3.2 构图分析：用于展示这次对比仿色的构图分析，如下：\n \n    左侧：展示参考图，参考图下有四个按钮（向量、三分法、视觉质量、进入构图诊疗室）\n    向量：点击向量按钮，会在照片上展示叠加图层，用于展示视线路径\n \n    三分法：点击三分法按钮，会在照片上展示叠加图层，将照片拆分为九宫格，用于帮助用户确认构图和焦点\n \n    视觉质量：点击视觉质量按钮，会在照片上展示叠加图层用于标记主体位置\n \n    进入构图诊疗室（以下需要重新设计前端以及交互，并针对前端进行后端开发）：用于指导用户图的构图方法，有如下四个按钮：\n    原图：根据综合点评中的具体构图内容，评价原图的问题，和建议\n \n    智能构图：根据综合点评中的具体构图内容，展示出AI认为的构图内容，并给出具体建议\n \n    拍摄指导：根据综合点评中的具体构图内容，指导用户前期应该如何拍照，以及后期应该如何操作\n \n    后期蒙版：根据综合点评中的具体构图内容，在照片上进行分割，然后给出建议\n建议构图诊疗室不是按钮，而是模式切换：\n•    📐 几何模式（线、面、块）\n•    👁 视觉路径模式（眼动预测）\n•    🎯 主体权重模式（Attention Map）\n•    ✂️ 后期裁剪模拟（AI生成3个候选）\n\n \n    右侧：展示参考图，参考图下有四个按钮（向量、三分法、视觉质量、进入构图诊疗室）\n    结构几何：展示出参考图的构图分类\n    视觉权重：展示出参考图视觉权重分数，主体位置，所占比例，构图的方法以及评价\n    视觉质量：展示出主体的位置构图的方法\n    视觉流路径：告诉用户参考图可以让用户注意力先到哪里，再到哪里，最后到哪里，绘制出视觉路径\n    空间深度：前景是啥？中景是啥？背景是啥？\n    留白：展示出参考图的留白空间百分比是多少？\n\n5.3.3光影分析：用于展示参考图的光影特色分析内容，以及对用户图的调整指导\n页面布局参考如下：\n \n    左侧（需要在前端进行重新设计优化调整，后端需要匹配前端进行开发）：展示一张RGB曲线图，包含：RGB/R/G/B四个曲线，以及曲线上对应的点。需要展示出参考图和用户两张图对应的曲线，通过前端独特的设计，能够直观让用户看出区别\n    右侧：展示具体数据以及描述\n    曝光矩阵：\n    曝光与阴影（点击：展示出曲线的前后变化）：用户图应该如何处理曝光与阴影\n    色温与色调（点击：展示出曲线的前后变化）：用户图应该如何处理色温与色调\n    曲线（点击：展示出曲线的前后变化）：用户图应该如何处理曲线\n    曝光：数值与为什么要这么调的原因描述\n    对比度：数值与为什么要这么调的原因描述\n    高光：数值与为什么要这么调的原因描述\n    阴影：数值与为什么要这么调的原因描述\n    白色：数值与为什么要这么调的原因描述\n    黑色：数值与为什么要这么调的原因描述\n5.4 第二阶段主界面 \n点击页面中“生成执行计划”按钮，可以启动生成第二阶段执行层中三块（色彩分级、Lightroom、Photoshop）内容，如下：\n \n5.4.1 色彩分级：用于展示基于综合建议的色彩怎么调整的具体参数\n \n    主风格回顾：展示参考图是什么风格，是什么流派，务必基于综合建议进行延伸\n    风格总结回顾：展示参考图风格的具体内容，务必基于综合建议进行延伸\n    关键调整策略：展示用户图如何基于综合建议进行调整，务必基于综合建议进行延伸\n    电影级调色：即色彩分级的具体参数\n \n    高光：鼠标移动上去，能显示描述（为什么这么调整）\n    中间调：鼠标移动上去，能显示描述（为什么这么调整）\n    阴影：鼠标移动上去，能显示描述（为什么这么调整）\n    平衡：鼠标移动上去，能显示描述（为什么这么调整）\n    全息HSL矩阵：\n \n    红（色相/饱和度/明度）\n    橙（色相/饱和度/明度）\n    黄（色相/饱和度/明度）\n    绿（色相/饱和度/明度）\n    青（色相/饱和度/明度）\n    蓝（色相/饱和度/明度）\n    紫（色相/饱和度/明度）\n    洋红（色相/饱和度/明度）\n    色彩矩阵\n    色温（数值及为什么这么调的描述）\n    色调（数值及为什么这么调的描述）\n5.4.2 Lightroom:展示基于综合建议后，要把用户图调整为参考图，Lightroom的具体具体调参数据\n \n    色彩匹配协议：具体说明色调和影调的调整方法\n    场景分析（需要前端再看看怎么能让展示更加直观）：\n    场景类型：参考图是什么场景？用户图是什么场景\n    光影策略：基于综合建议，在光影上应该如何调整的具体细节描述，需要与综合建议保持一致\n    光影色彩：基于综合建议，用什么颜色，占比如何，怎么调整\n    动态范围：基于综合建议，直方图具体怎么调整，调整以后会有什么效果\n    校准策略：基于综合建议，颜色校准怎么调整，为什么，调整以后会有什么效果\n    白平衡目标：\n    色温：基于综合建议，数值及为什么这么调整的描述\n    色调，基于综合建议，数值及为什么这么调整的描述\n    影调控制：\n    曝光：基于综合建议，数值及为什么这么调整的描述\n    对比度：基于综合建议，数值及为什么这么调整的描述\n    高光：基于综合建议，数值及为什么这么调整的描述\n    阴影：基于综合建议，数值及为什么这么调整的描述\n    白色：基于综合建议，数值及为什么这么调整的描述\n    黑色：基于综合建议，数值及为什么这么调整的描述\n    质感与氛围：\n    纹理：基于综合建议，数值及为什么这么调整的描述\n    清晰度：基于综合建议，数值及为什么这么调整的描述\n    去朦胧：基于综合建议，数值及为什么这么调整的描述\n    鲜艳度：基于综合建议，数值及为什么这么调整的描述\n    饱和度：基于综合建议，数值及为什么这么调整的描述\n    调色向量：\n    阴影：基于综合建议，数值及为什么这么调整的描述\n    中间调：基于综合建议，数值及为什么这么调整的描述\n    高光：基于综合建议，数值及为什么这么调整的描述\n    平衡：基于综合建议，数值及为什么这么调整的描述\n    相机校准：\n    红原色：基于综合建议，数值及为什么这么调整的描述\n    绿原色：基于综合建议，数值及为什么这么调整的描述\n    蓝原色：基于综合建议，数值及为什么这么调整的描述\n    阴影色调：基于综合建议，数值及为什么这么调整的描述\n    光谱矩阵：\n    红：基于综合建议，数值及为什么这么调整的描述\n    橙：基于综合建议，数值及为什么这么调整的描述\n    黄：基于综合建议，数值及为什么这么调整的描述\n    绿：基于综合建议，数值及为什么这么调整的描述\n    青：基于综合建议，数值及为什么这么调整的描述\n    蓝：基于综合建议，数值及为什么这么调整的描述\n    紫：基于综合建议，数值及为什么这么调整的描述\n    洋红：基于综合建议，数值及为什么这么调整的描述\n    信号监视器：主要用作观察直方图的工具，鼠标移动到不同的位置可以看到具体的数值以及为什么这么调整的描述\n    局部调整：鼠标移动到不同的位置可以看到具体的数值以及为什么这么调整的描述\n    迭代调色（需要前端继续深化设计，把功能和交互细化了）：用户输入他希望更进一步调整的内容，点击后可以刷新以上全部数据；点击“查看历史”可以查看历史的迭代调整数据\n \n5.4.3 Photoshop: 展示基于综合建议调整了lightroom后，要把用户图调整为参考图，Photoshop还需要调整哪些数据（需要判断目前前端展示是否合理？针对于直观和专业展示，还可以有哪些设计性的提升）\nPhotoshop数据不一定必须，是需要根据综合建议来判断，lightroom需要调整哪些，Photoshop需要调整哪些，包括但不限于：\n    复合直方图：主要用作观察直方图的工具，鼠标移动到不同的位置可以看到具体的数值以及为什么这么调整的描述\n    调整堆栈：\n    曝光：\n    对比度：\n    高光：\n    阴影：\n    纹理：\n    去朦胧\n    色阶：调整的具体数值和原因（如需）\n    曲线：调整的具体数值和原因（如需）\n    可选颜色：调整的具体数值和原因（如需）\n    位置与调整的具体数值和原因（如需）\n    位置与调整的具体数值和原因（如需）\n5.5 第三阶段主界面\n需要点击右上角“开启模拟”进入第三阶段。第三阶段主要的目的是生成一张基于第一和第二阶段所有内容调色的参考图，输出原图尺寸\n \n    参考图：使用nano banana根据以上方法生成一个参考图\n    下载资产：\n    lightroom预设，生成一套LR可使用的.xmp文件\n    jsx script，需要深化设计具体功能和交互\n    jason data，生成一套包含所有调整参数的jason文件\n    pdf report，生成一套pdf调整方案模版（需要提前设计好模版）\n\n\n\n",
+          "title": "影像科学产品需求文档"
+        },
+        "quality": {
+          "source_confidence": 0.9
+        },
+        "metadata": {
+          "type": "PRD",
+          "version": "V1.0",
+          "author": "Johnie",
+          "domain": "产品设计",
+          "language": "zh-CN"
+        }
+      },
+      "error": null,
+      "metrics": {
+        "tokenUsage": 0,
+        "apiCalls": 0
+      }
+    },
+    "extraction": {
+      "status": "success",
+      "duration": 8,
+      "result": [
+        {
+          "name": "时间",
+          "value": "2025-10",
+          "type": "time",
+          "confidence": 1,
+          "raw": "2025年10月"
+        },
+        {
+          "name": "数值",
+          "value": "3",
+          "type": "number",
+          "confidence": 1,
+          "raw": "3个"
+        },
+        {
+          "name": "单位",
+          "value": "个",
+          "type": "unit",
+          "confidence": 1,
+          "raw": "3个"
+        },
+        {
+          "name": "指标",
+          "value": "深度",
+          "type": "indicator",
+          "confidence": 0.9,
+          "raw": "深度"
+        },
+        {
+          "name": "指标",
+          "value": "距离",
+          "type": "indicator",
+          "confidence": 0.9,
+          "raw": "距离"
+        },
+        {
+          "name": "项目名称",
+          "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+          "type": "entity",
+          "confidence": 0.85,
+          "raw": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程"
+        },
+        {
+          "name": "区域",
+          "value": "滤镜工具区",
+          "type": "location",
+          "confidence": 0.8,
+          "raw": "滤镜工具区"
+        },
+        {
+          "name": "区域",
+          "value": "观让用户看出区",
+          "type": "location",
+          "confidence": 0.8,
+          "raw": "观让用户看出区"
+        },
+        {
+          "name": "区域",
+          "value": "常遇到的问题很难准确地",
+          "type": "location",
+          "confidence": 0.8,
+          "raw": "常遇到的问题很难准确地"
+        },
+        {
+          "name": "区域",
+          "value": "该办法无法做到准确地",
+          "type": "location",
+          "confidence": 0.8,
+          "raw": "该办法无法做到准确地"
+        },
+        {
+          "name": "区域",
+          "value": "可以带",
+          "type": "location",
+          "confidence": 0.8,
+          "raw": "可以带"
+        },
+        {
+          "name": "区域",
+          "value": "森林草地",
+          "type": "location",
+          "confidence": 0.8,
+          "raw": "森林草地"
+        },
+        {
+          "name": "区域",
+          "value": "光、怎么打光、拍摄的地",
+          "type": "location",
+          "confidence": 0.8,
+          "raw": "光、怎么打光、拍摄的地"
+        },
+        {
+          "name": "区域",
+          "value": "能够直观让用户看出区",
+          "type": "location",
+          "confidence": 0.8,
+          "raw": "能够直观让用户看出区"
+        },
+        {
+          "name": "区域",
+          "value": "够直观让用户看出区",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "够直观让用户看出区"
+        },
+        {
+          "name": "区域",
+          "value": "的拍摄与调色的思路",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "的拍摄与调色的思路"
+        },
+        {
+          "name": "区域",
+          "value": "点评专家和摄影思路",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "点评专家和摄影思路"
+        },
+        {
+          "name": "区域",
+          "value": "供具体前后期的思路",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "供具体前后期的思路"
+        },
+        {
+          "name": "区域",
+          "value": "对后期调色没思路",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "对后期调色没思路"
+        },
+        {
+          "name": "区域",
+          "value": "用于展示视线路",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "用于展示视线路"
+        },
+        {
+          "name": "区域",
+          "value": "视觉路",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "视觉路"
+        },
+        {
+          "name": "区域",
+          "value": "视觉流路",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "视觉流路"
+        },
+        {
+          "name": "区域",
+          "value": "绘制出视觉路",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "绘制出视觉路"
+        },
+        {
+          "name": "区域",
+          "value": "版本号",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "版本号"
+        },
+        {
+          "name": "区域",
+          "value": "给出颜色六位编号",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "给出颜色六位编号"
+        },
+        {
+          "name": "区域",
+          "value": "如果没有账号",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "如果没有账号"
+        },
+        {
+          "name": "区域",
+          "value": "用以展示该用户账号",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "用以展示该用户账号"
+        },
+        {
+          "name": "区域",
+          "value": "进入构图诊疗室",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "进入构图诊疗室"
+        },
+        {
+          "name": "区域",
+          "value": "建议构图诊疗室",
+          "type": "location",
+          "subtype": "administrative",
+          "confidence": 0.8,
+          "raw": "建议构图诊疗室"
+        },
+        {
+          "name": "实体",
+          "value": "企业或机构",
+          "type": "entity",
+          "subtype": "organization",
+          "confidence": 0.75,
+          "raw": "企业或机构"
+        },
+        {
+          "name": "实体",
+          "value": "页面布局",
+          "type": "entity",
+          "subtype": "organization",
+          "confidence": 0.75,
+          "raw": "页面布局"
+        },
+        {
+          "name": "数值",
+          "value": "1.0",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "1.0"
+        },
+        {
+          "name": "数值",
+          "value": "2025",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "2025"
+        },
+        {
+          "name": "数值",
+          "value": "10",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "10"
+        },
+        {
+          "name": "数值",
+          "value": "2.1",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "2.1"
+        },
+        {
+          "name": "数值",
+          "value": "2.2",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "2.2"
+        },
+        {
+          "name": "数值",
+          "value": "1",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "1"
+        },
+        {
+          "name": "数值",
+          "value": "2",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "2"
+        },
+        {
+          "name": "数值",
+          "value": "4",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "4"
+        },
+        {
+          "name": "数值",
+          "value": "1.",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "1."
+        },
+        {
+          "name": "数值",
+          "value": "2.",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "2."
+        },
+        {
+          "name": "数值",
+          "value": "100",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "100"
+        },
+        {
+          "name": "数值",
+          "value": "3.",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "3."
+        },
+        {
+          "name": "数值",
+          "value": "5.1",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "5.1"
+        },
+        {
+          "name": "数值",
+          "value": "1.1",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "1.1"
+        },
+        {
+          "name": "数值",
+          "value": "4.",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "4."
+        },
+        {
+          "name": "数值",
+          "value": "5.2",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "5.2"
+        },
+        {
+          "name": "数值",
+          "value": "5.3",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "5.3"
+        },
+        {
+          "name": "数值",
+          "value": "5.4",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "5.4"
+        },
+        {
+          "name": "数值",
+          "value": "5.5",
+          "type": "number",
+          "confidence": 0.7,
+          "raw": "5.5"
+        },
+        {
+          "name": "实体",
+          "value": "摄影点评专家",
+          "type": "entity",
+          "subtype": "person",
+          "confidence": 0.7,
+          "raw": "摄影点评专家"
+        }
+      ],
+      "error": null,
+      "metrics": {
+        "fieldCount": 51,
+        "usedLLM": true,
+        "belowThreshold": false,
+        "tokenUsage": 0,
+        "apiCalls": 0
+      }
+    },
+    "classification": {
+      "status": "not_started",
+      "duration": 0,
+      "result": null,
+      "error": null,
+      "metrics": {
+        "primaryDomain": "photography",
+        "confidence": 0.438,
+        "allDomains": [
+          {
+            "domain": "photography",
+            "confidence": 0.438
+          },
+          {
+            "domain": "post_processing",
+            "confidence": 0.25
+          },
+          {
+            "domain": "government",
+            "confidence": 0.188
+          }
+        ],
+        "totalSchemas": 267,
+        "filteredSchemas": 175,
+        "filterRate": 0.3445692883895131
+      }
+    },
+    "schemaMatching": {
+      "status": "success",
+      "duration": 19,
+      "result": [
+        {
+          "schema": {
+            "schema_id": "7a940ebe-26ad-4e1e-9b11-d3275887a446",
+            "schema_name": "EITV",
+            "entity_type": "ResearchEntity",
+            "scene": "科研/政府",
+            "core_fields": [
+              {
+                "name": "Entity",
+                "weight": 0.4,
+                "required": true
+              },
+              {
+                "name": "Indicator",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "Time",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "Value",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "Unit",
+                "weight": 0.15,
+                "required": false
+              }
+            ],
+            "threshold": 0.6,
+            "relations": [
+              {
+                "type": "发生于",
+                "target_field": "Time",
+                "direction": "outgoing"
+              }
+            ],
+            "example_description": null,
+            "description": "用于记录某个实体在某个时间点的指标数值，便于统计、趋势分析和图谱构建",
+            "version": "1.0.0",
+            "active": true,
+            "created_at": "2026-02-02T15:22:58.102Z",
+            "updated_at": "2026-02-02T15:22:58.102Z"
+          },
+          "schema_name": "EITV",
+          "completeness": 1,
+          "weightedCompleteness": 1,
+          "mappedFields": 5,
+          "totalFields": 5,
+          "normalizedFields": [
+            {
+              "name": "Time",
+              "originalName": "时间",
+              "standardName": "Time",
+              "value": "2025-10",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "3",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Unit",
+              "originalName": "单位",
+              "standardName": "Unit",
+              "value": "个",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Indicator",
+              "originalName": "指标",
+              "standardName": "Indicator",
+              "value": "深度",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Indicator",
+              "originalName": "指标",
+              "standardName": "Indicator",
+              "value": "距离",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Entity",
+              "originalName": "项目名称",
+              "standardName": "Entity",
+              "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+              "confidence": 0.8,
+              "mappingMethod": "fuzzy_variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Entity",
+              "originalName": "实体",
+              "standardName": "Entity",
+              "value": "企业或机构",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Entity",
+              "originalName": "实体",
+              "standardName": "Entity",
+              "value": "页面布局",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "1.0",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "2025",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "10",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "2.1",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "2.2",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "1",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "2",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "4",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "1.",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "2.",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "100",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "3.",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "5.1",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "1.1",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "4.",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "5.2",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "5.3",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "5.4",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "5.5",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Entity",
+              "originalName": "实体",
+              "standardName": "Entity",
+              "value": "摄影点评专家",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            }
+          ],
+          "threshold": 0.6
+        },
+        {
+          "schema": {
+            "schema_id": "77d07f8c-8be3-4dbb-ad21-029b53ff8111",
+            "schema_name": "Procurement-Project",
+            "entity_type": "GovernmentEntity",
+            "scene": "政府/采购",
+            "core_fields": [
+              {
+                "name": "项目名称",
+                "weight": 0.4,
+                "required": true
+              },
+              {
+                "name": "预算金额",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "建设周期",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "采购人",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "交货地点",
+                "weight": 0.15,
+                "required": false
+              }
+            ],
+            "threshold": 0.6,
+            "relations": [
+              {
+                "type": "涉及人员",
+                "target_field": "采购人",
+                "direction": "outgoing"
+              }
+            ],
+            "example_description": null,
+            "description": "记录政府采购或招标项目的基本信息，包括项目名称、预算、周期、采购方等关键要素",
+            "version": "1.0.0",
+            "active": true,
+            "created_at": "2026-02-02T15:23:08.277Z",
+            "updated_at": "2026-02-02T15:23:08.277Z"
+          },
+          "schema_name": "Procurement-Project",
+          "completeness": 0.2,
+          "weightedCompleteness": 0.4,
+          "mappedFields": 1,
+          "totalFields": 5,
+          "normalizedFields": [
+            {
+              "name": "项目名称",
+              "originalName": "项目名称",
+              "standardName": "项目名称",
+              "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+              "confidence": 1,
+              "mappingMethod": "exact",
+              "source": "extraction"
+            }
+          ],
+          "threshold": 0.6
+        },
+        {
+          "schema": {
+            "schema_id": "e7363536-a3ec-45fe-b630-79438680d162",
+            "schema_name": "Bidding-Document",
+            "entity_type": "GovernmentEntity",
+            "scene": "政府/采购",
+            "core_fields": [
+              {
+                "name": "项目名称",
+                "weight": 0.4,
+                "required": true
+              },
+              {
+                "name": "招标编号",
+                "weight": 0.2,
+                "required": false
+              },
+              {
+                "name": "发布日期",
+                "weight": 0.2,
+                "required": false
+              },
+              {
+                "name": "截止日期",
+                "weight": 0.2,
+                "required": false
+              }
+            ],
+            "threshold": 0.6,
+            "relations": [],
+            "example_description": null,
+            "description": "记录招标文件的基本信息和关键时间节点",
+            "version": "1.0.0",
+            "active": true,
+            "created_at": "2026-02-02T15:23:08.279Z",
+            "updated_at": "2026-02-02T15:23:08.279Z"
+          },
+          "schema_name": "Bidding-Document",
+          "completeness": 0.25,
+          "weightedCompleteness": 0.4,
+          "mappedFields": 1,
+          "totalFields": 4,
+          "normalizedFields": [
+            {
+              "name": "项目名称",
+              "originalName": "项目名称",
+              "standardName": "项目名称",
+              "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+              "confidence": 1,
+              "mappingMethod": "exact",
+              "source": "extraction"
+            }
+          ],
+          "threshold": 0.6
+        },
+        {
+          "schema": {
+            "schema_id": "219116da-cb8e-428c-9afd-f03c5d04a4d1",
+            "schema_name": "PhotographyEntity",
+            "entity_type": "PhotographyEntity",
+            "scene": "摄影",
+            "core_fields": [
+              {
+                "name": "Camera",
+                "weight": 0.3,
+                "required": true,
+                "field_type": "text",
+                "description": "相机型号"
+              },
+              {
+                "name": "Lens",
+                "weight": 0.3,
+                "required": true,
+                "field_type": "text",
+                "description": "镜头型号"
+              },
+              {
+                "name": "ISO",
+                "weight": 0.1,
+                "required": false,
+                "field_type": "number",
+                "description": "ISO感光度"
+              },
+              {
+                "name": "Aperture",
+                "weight": 0.1,
+                "required": false,
+                "field_type": "text",
+                "description": "光圈值"
+              },
+              {
+                "name": "Shutter",
+                "weight": 0.1,
+                "required": false,
+                "field_type": "text",
+                "description": "快门速度"
+              },
+              {
+                "name": "Exposure",
+                "weight": 0.05,
+                "required": false,
+                "field_type": "text",
+                "description": "曝光补偿"
+              },
+              {
+                "name": "Focus",
+                "weight": 0.05,
+                "required": false,
+                "field_type": "text",
+                "description": "对焦模式"
+              }
+            ],
+            "threshold": 0.5,
+            "relations": [
+              {
+                "type": "使用镜头",
+                "target_field": "Lens",
+                "direction": "outgoing"
+              },
+              {
+                "type": "拍摄参数",
+                "target_field": "ISO",
+                "direction": "outgoing"
+              }
+            ],
+            "example_description": null,
+            "description": "摄影实体 - 捕获相机、镜头、拍摄参数等摄影设备和技术信息",
+            "version": "1.0.0",
+            "active": true,
+            "created_at": "2026-02-03T09:51:28.875Z",
+            "updated_at": "2026-02-03T09:51:28.875Z"
+          },
+          "schema_name": "PhotographyEntity",
+          "completeness": 0,
+          "weightedCompleteness": 0,
+          "mappedFields": 0,
+          "totalFields": 7,
+          "normalizedFields": [],
+          "threshold": 0.5
+        },
+        {
+          "schema": {
+            "schema_id": "ae3c249b-dfec-48f4-9aa6-299a1aaa1e11",
+            "schema_name": "政府工作报告实体",
+            "entity_type": "GovernmentReportEntity",
+            "scene": null,
+            "core_fields": [
+              {
+                "name": "项目名称",
+                "weight": 0.3,
+                "required": true
+              },
+              {
+                "name": "区域",
+                "weight": 0.2,
+                "required": false
+              },
+              {
+                "name": "数值",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "单位",
+                "weight": 0.1,
+                "required": false
+              },
+              {
+                "name": "指标",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "时间",
+                "weight": 0.1,
+                "required": false
+              }
+            ],
+            "threshold": 0.6,
+            "relations": [
+              {
+                "type": "位于",
+                "target_field": "区域",
+                "direction": "outgoing"
+              },
+              {
+                "type": "发生于",
+                "target_field": "时间",
+                "direction": "outgoing"
+              },
+              {
+                "type": "涉及指标",
+                "target_field": "指标",
+                "direction": "outgoing"
+              }
+            ],
+            "example_description": null,
+            "description": null,
+            "version": "1.0.0",
+            "active": true,
+            "created_at": "2026-02-02T13:36:02.705Z",
+            "updated_at": "2026-02-02T13:36:02.705Z"
+          },
+          "schema_name": "政府工作报告实体",
+          "completeness": 0,
+          "weightedCompleteness": 0,
+          "mappedFields": 0,
+          "totalFields": 6,
+          "normalizedFields": [],
+          "threshold": 0.6
+        }
+      ],
+      "error": null,
+      "metrics": {
+        "totalSchemas": 175,
+        "triggeredSchemas": 5,
+        "avgCompleteness": 0.36,
+        "bestMatch": {
+          "name": "EITV",
+          "completeness": 1
+        },
+        "tokenUsage": 0,
+        "apiCalls": 0
+      }
+    },
+    "normalization": {
+      "status": "success",
+      "duration": 0,
+      "result": [
+        {
+          "schema": {
+            "schema_id": "7a940ebe-26ad-4e1e-9b11-d3275887a446",
+            "schema_name": "EITV",
+            "entity_type": "ResearchEntity",
+            "scene": "科研/政府",
+            "core_fields": [
+              {
+                "name": "Entity",
+                "weight": 0.4,
+                "required": true
+              },
+              {
+                "name": "Indicator",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "Time",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "Value",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "Unit",
+                "weight": 0.15,
+                "required": false
+              }
+            ],
+            "threshold": 0.6,
+            "relations": [
+              {
+                "type": "发生于",
+                "target_field": "Time",
+                "direction": "outgoing"
+              }
+            ],
+            "example_description": null,
+            "description": "用于记录某个实体在某个时间点的指标数值，便于统计、趋势分析和图谱构建",
+            "version": "1.0.0",
+            "active": true,
+            "created_at": "2026-02-02T15:22:58.102Z",
+            "updated_at": "2026-02-02T15:22:58.102Z"
+          },
+          "fields": [
+            {
+              "name": "Time",
+              "originalName": "时间",
+              "standardName": "Time",
+              "value": "2025-10",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "3",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Unit",
+              "originalName": "单位",
+              "standardName": "Unit",
+              "value": "个",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Indicator",
+              "originalName": "指标",
+              "standardName": "Indicator",
+              "value": "深度",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Indicator",
+              "originalName": "指标",
+              "standardName": "Indicator",
+              "value": "距离",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Entity",
+              "originalName": "项目名称",
+              "standardName": "Entity",
+              "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+              "confidence": 0.8,
+              "mappingMethod": "fuzzy_variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Entity",
+              "originalName": "实体",
+              "standardName": "Entity",
+              "value": "企业或机构",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Entity",
+              "originalName": "实体",
+              "standardName": "Entity",
+              "value": "页面布局",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "1.0",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "2025",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "10",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "2.1",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "2.2",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "1",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "2",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "4",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "1.",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "2.",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "100",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "3.",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "5.1",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "1.1",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "4.",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "5.2",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "5.3",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "5.4",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Value",
+              "originalName": "数值",
+              "standardName": "Value",
+              "value": "5.5",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            },
+            {
+              "name": "Entity",
+              "originalName": "实体",
+              "standardName": "Entity",
+              "value": "摄影点评专家",
+              "confidence": 0.95,
+              "mappingMethod": "variation",
+              "source": "extraction"
+            }
+          ],
+          "successRate": 5.6
+        },
+        {
+          "schema": {
+            "schema_id": "77d07f8c-8be3-4dbb-ad21-029b53ff8111",
+            "schema_name": "Procurement-Project",
+            "entity_type": "GovernmentEntity",
+            "scene": "政府/采购",
+            "core_fields": [
+              {
+                "name": "项目名称",
+                "weight": 0.4,
+                "required": true
+              },
+              {
+                "name": "预算金额",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "建设周期",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "采购人",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "交货地点",
+                "weight": 0.15,
+                "required": false
+              }
+            ],
+            "threshold": 0.6,
+            "relations": [
+              {
+                "type": "涉及人员",
+                "target_field": "采购人",
+                "direction": "outgoing"
+              }
+            ],
+            "example_description": null,
+            "description": "记录政府采购或招标项目的基本信息，包括项目名称、预算、周期、采购方等关键要素",
+            "version": "1.0.0",
+            "active": true,
+            "created_at": "2026-02-02T15:23:08.277Z",
+            "updated_at": "2026-02-02T15:23:08.277Z"
+          },
+          "fields": [
+            {
+              "name": "项目名称",
+              "originalName": "项目名称",
+              "standardName": "项目名称",
+              "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+              "confidence": 1,
+              "mappingMethod": "exact",
+              "source": "extraction"
+            }
+          ],
+          "successRate": 0.2
+        },
+        {
+          "schema": {
+            "schema_id": "e7363536-a3ec-45fe-b630-79438680d162",
+            "schema_name": "Bidding-Document",
+            "entity_type": "GovernmentEntity",
+            "scene": "政府/采购",
+            "core_fields": [
+              {
+                "name": "项目名称",
+                "weight": 0.4,
+                "required": true
+              },
+              {
+                "name": "招标编号",
+                "weight": 0.2,
+                "required": false
+              },
+              {
+                "name": "发布日期",
+                "weight": 0.2,
+                "required": false
+              },
+              {
+                "name": "截止日期",
+                "weight": 0.2,
+                "required": false
+              }
+            ],
+            "threshold": 0.6,
+            "relations": [],
+            "example_description": null,
+            "description": "记录招标文件的基本信息和关键时间节点",
+            "version": "1.0.0",
+            "active": true,
+            "created_at": "2026-02-02T15:23:08.279Z",
+            "updated_at": "2026-02-02T15:23:08.279Z"
+          },
+          "fields": [
+            {
+              "name": "项目名称",
+              "originalName": "项目名称",
+              "standardName": "项目名称",
+              "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+              "confidence": 1,
+              "mappingMethod": "exact",
+              "source": "extraction"
+            }
+          ],
+          "successRate": 0.25
+        },
+        {
+          "schema": {
+            "schema_id": "219116da-cb8e-428c-9afd-f03c5d04a4d1",
+            "schema_name": "PhotographyEntity",
+            "entity_type": "PhotographyEntity",
+            "scene": "摄影",
+            "core_fields": [
+              {
+                "name": "Camera",
+                "weight": 0.3,
+                "required": true,
+                "field_type": "text",
+                "description": "相机型号"
+              },
+              {
+                "name": "Lens",
+                "weight": 0.3,
+                "required": true,
+                "field_type": "text",
+                "description": "镜头型号"
+              },
+              {
+                "name": "ISO",
+                "weight": 0.1,
+                "required": false,
+                "field_type": "number",
+                "description": "ISO感光度"
+              },
+              {
+                "name": "Aperture",
+                "weight": 0.1,
+                "required": false,
+                "field_type": "text",
+                "description": "光圈值"
+              },
+              {
+                "name": "Shutter",
+                "weight": 0.1,
+                "required": false,
+                "field_type": "text",
+                "description": "快门速度"
+              },
+              {
+                "name": "Exposure",
+                "weight": 0.05,
+                "required": false,
+                "field_type": "text",
+                "description": "曝光补偿"
+              },
+              {
+                "name": "Focus",
+                "weight": 0.05,
+                "required": false,
+                "field_type": "text",
+                "description": "对焦模式"
+              }
+            ],
+            "threshold": 0.5,
+            "relations": [
+              {
+                "type": "使用镜头",
+                "target_field": "Lens",
+                "direction": "outgoing"
+              },
+              {
+                "type": "拍摄参数",
+                "target_field": "ISO",
+                "direction": "outgoing"
+              }
+            ],
+            "example_description": null,
+            "description": "摄影实体 - 捕获相机、镜头、拍摄参数等摄影设备和技术信息",
+            "version": "1.0.0",
+            "active": true,
+            "created_at": "2026-02-03T09:51:28.875Z",
+            "updated_at": "2026-02-03T09:51:28.875Z"
+          },
+          "fields": [],
+          "successRate": 0
+        },
+        {
+          "schema": {
+            "schema_id": "ae3c249b-dfec-48f4-9aa6-299a1aaa1e11",
+            "schema_name": "政府工作报告实体",
+            "entity_type": "GovernmentReportEntity",
+            "scene": null,
+            "core_fields": [
+              {
+                "name": "项目名称",
+                "weight": 0.3,
+                "required": true
+              },
+              {
+                "name": "区域",
+                "weight": 0.2,
+                "required": false
+              },
+              {
+                "name": "数值",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "单位",
+                "weight": 0.1,
+                "required": false
+              },
+              {
+                "name": "指标",
+                "weight": 0.15,
+                "required": false
+              },
+              {
+                "name": "时间",
+                "weight": 0.1,
+                "required": false
+              }
+            ],
+            "threshold": 0.6,
+            "relations": [
+              {
+                "type": "位于",
+                "target_field": "区域",
+                "direction": "outgoing"
+              },
+              {
+                "type": "发生于",
+                "target_field": "时间",
+                "direction": "outgoing"
+              },
+              {
+                "type": "涉及指标",
+                "target_field": "指标",
+                "direction": "outgoing"
+              }
+            ],
+            "example_description": null,
+            "description": null,
+            "version": "1.0.0",
+            "active": true,
+            "created_at": "2026-02-02T13:36:02.705Z",
+            "updated_at": "2026-02-02T13:36:02.705Z"
+          },
+          "fields": [],
+          "successRate": 0
+        }
+      ],
+      "error": null,
+      "metrics": {
+        "schemasProcessed": 5,
+        "totalNormalizedFields": 30,
+        "overallSuccessRate": 1.1111111111111112,
+        "schemaMetrics": [
+          {
+            "schemaName": "EITV",
+            "expectedFields": 5,
+            "mappedFields": 28,
+            "successRate": 5.6,
+            "failedFields": []
+          },
+          {
+            "schemaName": "Procurement-Project",
+            "expectedFields": 5,
+            "mappedFields": 1,
+            "successRate": 0.2,
+            "failedFields": [
+              "预算金额",
+              "建设周期",
+              "采购人",
+              "交货地点"
+            ]
+          },
+          {
+            "schemaName": "Bidding-Document",
+            "expectedFields": 4,
+            "mappedFields": 1,
+            "successRate": 0.25,
+            "failedFields": [
+              "招标编号",
+              "发布日期",
+              "截止日期"
+            ]
+          },
+          {
+            "schemaName": "PhotographyEntity",
+            "expectedFields": 7,
+            "mappedFields": 0,
+            "successRate": 0,
+            "failedFields": [
+              "Camera",
+              "Lens",
+              "ISO",
+              "Aperture",
+              "Shutter",
+              "Exposure",
+              "Focus"
+            ]
+          },
+          {
+            "schemaName": "政府工作报告实体",
+            "expectedFields": 6,
+            "mappedFields": 0,
+            "successRate": 0,
+            "failedFields": [
+              "项目名称",
+              "区域",
+              "数值",
+              "单位",
+              "指标",
+              "时间"
+            ]
+          }
+        ],
+        "tokenUsage": 0,
+        "apiCalls": 0
+      }
+    },
+    "entityBuilding": {
+      "status": "success",
+      "duration": 1176,
+      "result": [
+        {
+          "entity_id": "entity_1770112961749_kt4gstmjv",
+          "entity_type": "ResearchEntity",
+          "canonical_name": "摄影点评专家_距离_2025-10",
+          "aliases": [],
+          "schemas": [
+            {
+              "schema_name": "EITV",
+              "confidence": 1
+            }
+          ],
+          "supported_by": [
+            "ckb_imaging_science_prd_v1_1770112961722"
+          ],
+          "attributes": {
+            "Time": "2025-10",
+            "Value": "5.5",
+            "Unit": "个",
+            "Indicator": "距离",
+            "Entity": "摄影点评专家"
+          },
+          "confidence": 1,
+          "llm_enriched": false,
+          "created_at": "2026-02-03T10:02:41.749Z",
+          "updated_at": "2026-02-03T10:02:41.749Z"
+        },
+        {
+          "entity_id": "entity_1770112961749_m8kdl8grs",
+          "entity_type": "GovernmentEntity",
+          "canonical_name": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+          "aliases": [],
+          "schemas": [
+            {
+              "schema_name": "Procurement-Project",
+              "confidence": 0.2
+            }
+          ],
+          "supported_by": [
+            "ckb_imaging_science_prd_v1_1770112961722"
+          ],
+          "attributes": {
+            "项目名称": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程"
+          },
+          "confidence": 0.2,
+          "llm_enriched": false,
+          "created_at": "2026-02-03T10:02:41.749Z",
+          "updated_at": "2026-02-03T10:02:41.749Z"
+        },
+        {
+          "entity_id": "entity_1770112962924_jc73lldz7",
+          "entity_type": "GovernmentEntity",
+          "canonical_name": "影像科学 PhotoScience",
+          "aliases": [
+            "PhotoScience",
+            "影像风格逆向工程系统"
+          ],
+          "schemas": [
+            {
+              "schema_name": "Bidding-Document",
+              "confidence": 0.25
+            }
+          ],
+          "supported_by": [
+            "ckb_imaging_science_prd_v1_1770112961722"
+          ],
+          "attributes": {
+            "项目名称": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程"
+          },
+          "confidence": 0.25,
+          "llm_enriched": true,
+          "created_at": "2026-02-03T10:02:42.924Z",
+          "updated_at": "2026-02-03T10:02:42.924Z"
+        },
+        {
+          "entity_id": "entity_1770112962925_xntrajq8m",
+          "entity_type": "PhotographyEntity",
+          "canonical_name": "PhotographyEntity_1770112962925",
+          "aliases": [],
+          "schemas": [
+            {
+              "schema_name": "PhotographyEntity",
+              "confidence": 0
+            }
+          ],
+          "supported_by": [
+            "ckb_imaging_science_prd_v1_1770112961722"
+          ],
+          "attributes": {},
+          "confidence": 0,
+          "llm_enriched": false,
+          "created_at": "2026-02-03T10:02:42.925Z",
+          "updated_at": "2026-02-03T10:02:42.925Z"
+        },
+        {
+          "entity_id": "entity_1770112962925_ijcj0dpok",
+          "entity_type": "GovernmentReportEntity",
+          "canonical_name": "政府工作报告实体_1770112962925",
+          "aliases": [],
+          "schemas": [
+            {
+              "schema_name": "政府工作报告实体",
+              "confidence": 0
+            }
+          ],
+          "supported_by": [
+            "ckb_imaging_science_prd_v1_1770112961722"
+          ],
+          "attributes": {},
+          "confidence": 0,
+          "llm_enriched": false,
+          "created_at": "2026-02-03T10:02:42.925Z",
+          "updated_at": "2026-02-03T10:02:42.925Z"
+        }
+      ],
+      "error": null,
+      "metrics": {
+        "entityCount": 5,
+        "avgConfidence": 0.29,
+        "avgFieldCoverage": 1.21,
+        "partialEntityCount": 4,
+        "entityMetrics": [
+          {
+            "schemaName": "EITV",
+            "entityId": "entity_1770112961749_kt4gstmjv",
+            "confidence": 1,
+            "fieldCoverage": 5.6,
+            "expectedFields": 5,
+            "actualFields": 28,
+            "isPartial": false
+          },
+          {
+            "schemaName": "Procurement-Project",
+            "entityId": "entity_1770112961749_m8kdl8grs",
+            "confidence": 0.2,
+            "fieldCoverage": 0.2,
+            "expectedFields": 5,
+            "actualFields": 1,
+            "isPartial": true
+          },
+          {
+            "schemaName": "Bidding-Document",
+            "entityId": "entity_1770112962924_jc73lldz7",
+            "confidence": 0.25,
+            "fieldCoverage": 0.25,
+            "expectedFields": 4,
+            "actualFields": 1,
+            "isPartial": true
+          },
+          {
+            "schemaName": "PhotographyEntity",
+            "entityId": "entity_1770112962925_xntrajq8m",
+            "confidence": 0,
+            "fieldCoverage": 0,
+            "expectedFields": 7,
+            "actualFields": 0,
+            "isPartial": true
+          },
+          {
+            "schemaName": "政府工作报告实体",
+            "entityId": "entity_1770112962925_ijcj0dpok",
+            "confidence": 0,
+            "fieldCoverage": 0,
+            "expectedFields": 6,
+            "actualFields": 0,
+            "isPartial": true
+          }
+        ],
+        "tokenUsage": 0,
+        "apiCalls": 1
+      }
+    },
+    "relationExtraction": {
+      "status": "success",
+      "duration": 5,
+      "result": [
+        {
+          "source_id": "entity_1770112961749_kt4gstmjv",
+          "target_id": "entity_1770110861682_yy02az5sv",
+          "type": "builtin",
+          "subtype": "发生于",
+          "confidence": 1,
+          "evidence_ckb": "[\"ckb_imaging_science_prd_v1_1770112961722\"]",
+          "evidence_text": null,
+          "metadata": "{\"schema_name\":\"EITV\",\"target_field\":\"Time\",\"direction\":\"outgoing\"}"
+        }
+      ],
+      "error": null,
+      "metrics": {
+        "relationCount": 1,
+        "builtinCount": 1,
+        "cooccurrenceCount": 0,
+        "semanticCount": 0,
+        "enabledBuilders": 3,
+        "successfulBuilders": 1,
+        "failedBuilders": 2,
+        "builderResults": {
+          "builtin": {
+            "success": true,
+            "count": 1,
+            "error": null
+          },
+          "cooccurrence": {
+            "success": false,
+            "count": 0,
+            "error": "cooccurrenceRelationBuilder.buildRelations is not a function"
+          },
+          "semantic": {
+            "success": false,
+            "count": 0,
+            "error": "semanticRelationBuilder.buildRelations is not a function"
+          }
+        },
+        "tokenUsage": 0,
+        "apiCalls": 0
+      }
+    },
+    "storage": {
+      "status": "success",
+      "duration": 13,
+      "result": {
+        "entityIds": [
+          "entity_1770112961749_kt4gstmjv",
+          "entity_1770112961749_m8kdl8grs",
+          "entity_1770112962924_jc73lldz7",
+          "entity_1770112962925_xntrajq8m",
+          "entity_1770112962925_ijcj0dpok"
+        ],
+        "relationIds": [
+          "abecb019-1840-4e6e-a0cb-d3901062d5a6"
+        ]
+      },
+      "error": null,
+      "metrics": {
+        "storedEntities": 5,
+        "storedRelations": 1,
+        "tokenUsage": 0,
+        "apiCalls": 0
+      }
+    }
+  },
+  "data": {
+    "ckb": {
+      "ckb_id": "ckb_imaging_science_prd_v1_1770112961722",
+      "doc_id": "imaging_science_prd_v1",
+      "content": {
+        "text": "「影像科学」产品需求文档\n\n\n一、    文档信息\n项目    内容\n产品名称    影像科学\n版本号    V1.0\n状态    开发中\n作者    Johnie\n创建日期    2025年10月\n最近更新    \n更新内容    \n\n二、    背景与目标\n2.1 产品背景\n👉 户的真实不爽点\n作为一个摄影师，拍摄时候会有一个画面，这个画面可能是他曾经在审阅优秀的作品时候见过的内容。然而，优秀摄影师拍摄的作品在摄影前期（拍摄环境、用光、构图、题材、颜色选择等）\n典型问题：我喜欢「滨田英明」的作品（左图），那我如何将我的照片（右图）进行调色，来模仿滨田英明的风格？\n  \n作为新手摄影师，常常遇到的问题很难准确地分析出照片的前期拍摄以及后期的影调与色调关系，导致后期调色总达不到自己想要的效果\n\n👉 他们现在是怎么解决的？\n常见的解决方法是：通过网络搜索（抖音/小红书/或其他站点发布的摄影博客、文章攻略，来学习该摄影师的拍摄和调色手法。或者，直接在网上照搬参数。\n该办法无法做到准确地对症下药，模仿后总觉得很奇怪，无法得到最直接的拍摄与调色的思路\n\n2.2 产品目标\n2.2.1 产品是什么\n产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程系统」，用于拆解、诊断、复现优秀摄影作品的视觉语言，并将其转化为可执行的前期拍摄与后期调色方案。\n核心差异点（与调色App / 滤镜工具区分）\n•    ❌ 不是滤镜\n•    ❌ 不是一键仿色\n•    ✅ 是「为什么这样拍 + 为什么这样调」的系统化解析\n•    ✅ 输出摄影语言 + 色彩语言 + 可执行参数\n2.2.2 产品的方法论\n仿色的本质是：影像意图 → 光影结构 → 色彩策略 → 参数映射\n基于以下模型对产品进行设计：\n1️⃣ 影像意图层（Intent）\n•    这张照片想“安静”还是“张力”？\n•    是日常感，还是仪式感？\n•    是观察者视角，还是参与者视角？\n2️⃣ 光影结构层（Luminance Structure）\n•    高光是否克制？\n•    中灰是否占主导？\n•    阴影是否允许压死？\n3️⃣ 色彩策略层（Color Strategy）\n•    是否存在主色（Dominant Hue）？\n•    是否刻意削弱某一色相？\n•    肤色是否被当作视觉锚点？\n4️⃣ 参数映射层（Parameter Mapping）\n•    Lightroom / PS / 曲线 / 校准\n•    参数只是结果，不是起点\n\n👉 可以带给用户的帮助有哪些？\n通过对比分析两张图的题材、感情色彩、拍摄手法、构图、影调、色调的差别，给予用户：\n    综合建议：综合给出具体分析结果和建议：\n    内容：分析参考图的主题是什么？想表现什么感情色彩（温情？自然？静谧？不做作？高反差？传达了什么生活的奥义？……）？\n    影调：直方图是怎么样的（是什么形状？元素位于直方图的哪个位置，说明什么问题？参考图呈现的照片效果是什么？参考图直方图上有没有缺失？说明了什么问题？结合直方图来分析参考图和用户图的差别）\n    色调：是什么风格的？（淡雅蓝？清新绿？……这些与拍摄的题材有什么关联？和拍摄的元素之间的关系是什么，如，拍摄的大海和蓝天呈现的是淡雅蓝，森林草地呈现的是清新绿，人像中肤色呈现的是淡黄色【给出颜色六位编号】）主要用了哪些色彩，这些色彩怎么进行搭配的？可能使用的设备是什么？这些设备的特色是啥？\n    构图：如何构图的？\n    拍摄及调整建议：结合用户图，给出综合的建议（用户图的主题是什么，是否需要变更，如何变更更好？如何通过后期裁剪、去除无效元素、增加新元素等方法模仿参考图感情色彩和摄影风格？颜色搭配的方案和比例？检测或猜测用户使用的设备是什么（不同设备会有不同的特色，如索尼偏黄、胶片相机有颗粒、尼康色彩丰富饱和度高、佳能柔和等）？用户应该着重怎么进行后期调色（现有颜色的增、减、变化）？\n    构图分析：详细为用户讲解参考图在构图中的优势（焦点的位置、留白的比例、构图的方法），以及对用户图前期拍摄的详细建议（前期应该选择什么天气、什么时间、模特需要怎么穿着、怎么布光、怎么打光、拍摄的地点选择在哪？模特如何摆造型？等）和后期调整的详细建议\n    光影分析：详细在影调和色调上进行讲解。对综合建议中提到的以下内容进行细化：参考图直方图是怎么样的（是什么形状？元素位于直方图的哪个位置，说明什么问题？参考图呈现的照片效果是什么？参考图直方图上有没有缺失？说明了什么问题？结合直方图来分析参考图和用户图的差别）是什么风格的？（淡雅蓝？清新绿？……这些与拍摄的题材有什么关联？和拍摄的元素之间的关系是什么，如，拍摄的大海和蓝天呈现的是淡雅蓝，森林草地呈现的是清新绿，人像中肤色呈现的是淡黄色【给出颜色六位编号】）主要用了哪些色彩，这些色彩怎么进行搭配的？可能使用的设备是什么？这些设备的特色是啥？\n    色彩建议：基于综合建议内容，给出详细的色彩数据，包括：色彩策略（基于参考图，如何调整用户图的色彩方法概述）。色彩的HSL具体数值、高光/中间调/阴影的具体数值、色温色调的具体数值\n    Lightroom调整建议：色彩调整匹配的具体方法：任务关键点、场景类型（用户图目前是什么场景，应该怎么调整）、如何调整光影的策略、如何调整色彩的策略、分析参考图直方图后如何调整直方图的方法、颜色校准的策略、基础面板数值（白平衡数值、基础数值（曝光、对比度、高光、阴影、白色、黑色、鲜艳度、饱和度）、质感数值（纹理、清晰度、去朦胧）、色彩分级数值（高光、中间调、阴影、平衡）、颜色校准数值（红原色、绿原色、蓝原色、阴影）、HSL具体数值、直方图（用户图原直方图叠加目标直方图）、曲线图以及具体数值、局部调整方法（添加蒙版、增加亮度等）、迭代调色（如果用户不满意，可以在此写下建议，然后重新生成）\n    Photoshop工作流：基于综合建议，仍需要PS做的内容，包括但不限于：基础面板调整、色阶调整、曲线调整、可选颜色调整、减淡与加深、氛围与颗粒\n    AI模拟：基于以上建议和方法，使用nano banana，生成一张用户图调整后的参考照片，同时生成可以让LR直接使用的.xmp预设和pdf报告\n1.    产品边界\n本产品定位为一个摄影点评专家和摄影思路生成器，只提供具体前后期的思路和参考数据，准确数据需要用户在LR和PS中进行进一步调整\n\n三、    用户与使用场景\n1.    用户画像\n本产品的用户为：\n    摄影爱好者：摄影风格尚未定型，有自己喜欢的摄影师和摄影风格\n    后期小白：会使用PS或同类调色软件，但是对影调、色调并不专业，对后期调色没思路\n    机构及MSN：需要快速且专业的产出摄影文案，以应对自媒体平台的快速发布需求\n2.    用户角色定义\n角色    描述    典型诉求\n管理员    对系统进行管理和对平台进行运营    新版本发布、功能维护、营销运营\n普通用户    对系统进行初步尝试    系统测试看效果\n个人订阅用户    个人或自媒体人，少量的分析需求    一个月10次以内的分析\n高级订阅用户    企业或机构，大量的分析需求    一个月100次以上的分析\n\n3.    使用场景\n    场景1:旅拍完后，大量的素材在手上，准备开始PS，需要确定风格和调色方法\n    场景2:通过自己的调整后没有达到想要的效果，进一步想要找到不达预期的原因\n    场景3:对摄影师的研究，找到大量的摄影师作品，使用系统进行分析\n\n四、    业务流程\n业务流程如下图所示：\n \n五、    功能需求\n5.1 首页\n \n    中英文切换按钮：默认中文界面，点击后跳转至英文界面\n    登录、申请权限、开启探索按钮：点击均跳转到“登陆”页面\n    观看视频按钮：点击均跳转到演示视频页面并开启播放\n1.    登录页面\n点击email、phone、alipay三个tap可以实现页面切换。\n1.1    邮箱登录页面\n \n1.    如果没有账号，需要点击“申请权限”进行注册，页面参考如下：\n \n2.    输入邮箱和密码（默认支持输入密码）\n3.    点击进入系统\n4.    PS：如果不想输入密码，可以点击“使用验证码登录”，使用验证码登录。页面参考如下：\n \n5.2 核心使用界面\n \n点击“头像”进入如下界面：\n \n其中：\n    身份：用以展示该用户账号的具体信息：\n \n    用户名：点击右侧的齿轮，可以支持编辑\n    电子邮箱：仅支持预览，不支持编辑\n    密码（需要新增前端页面以及前后端开发）：点击右侧“更新按钮”可以进行重置，更新完需要点击红色的“重置密码”按钮。\n    支付宝绑定：仅展示用户已经完成了支付宝绑定操作\n    方案与用量（需要新增前端页面以及前后端开发）：展示用户目前订阅的方案以及使用情况\n \n    账单（需要新增前端页面以及前后端开发）：展示用户目前的支付方式\n \n    银行卡（需要新增前端页面以及前后端开发）：默认第一个为主支付方式（用户可以点击进行变更）点击后右上角会出现“edit”字样，可以支持用户进行编辑；点击移除，可以移除该支付方式\n    Alipay（需要新增前端页面以及前后端开发）：如果不是默认，用户点击卡片，会出现 按钮，点击后可以变为默认支付方式；点击移除，可以移除该支付方式\n    任务日志（需要新增前端页面以及前后端开发）\n \n点击每一个任务，会展示出具体的任务数据，以及生成的报告和文件\n    网络（需要新增前端页面以及前后端开发）\n \n    协议（需要新增前端页面以及前后端开发）\n \n\n核心使用界面需要上传两张照片：\n•    风格参考图（左侧）：为参考图\n•    目标原图（右侧）：为用户图\n \n点击“初始化分析”，会生成初步的评估内容，如下图：\n \n系统会针对参考图和用户图生成两套不同的初步评估内容「⭐️特色功能」，包括：\n    亮度直方图：参考图与用户图各有一张，用于展示目前图像的具体亮度信息\n \n    色彩雷达：基于图像的色彩和亮度，会画在雷达图上。用户使用鼠标移动到图像的任意一个位置，会显示出这个点的具体色彩RGB值。同时，雷达图上也会显示出这个点（方向表示色相，距中心的距离表示饱和度）。优势在于：用户可以很方便查看到图像中对应具体的色彩的值。使用场景如，能看到人物脸部颜色是否准确？\n \n    AI诊断：需要启用AI大模型能力对图像进行更深度的评估，故需要用户点击“启动深度扫描”按钮\n \nAI分析时会展示：\n \n得到结果后会展示：\n \n     多维度展示：在曝光、颜色、构图、感情色彩上让AI进行评分，并且给予对应的评价描述：\n \n     诊断报告：AI阅读并理解该照片的风格，并评价其优劣势\n \n     改进建议：基于判断，AI给出的前后期改进建议\n \n\n     问题定位：AI对于问题的总结\n \n\n    显示曝光图：伪色将亮度映射为颜色，帮助您无需猜测即可判断曝光。\n其中，红色代表过曝；黄色代表接近过曝；粉红代表皮肤颜色；绿色代表中性灰；蓝色代表深度阴影；紫色代表曝光不足已损失细节\n \n点击初始化分析，会得到第一阶段的分析内容。\n5.3 第一阶段主页面\n只有上半部分诊断层的综合审查、构图分析、光影分析三个卡片是亮的；下半部分执行层是灰的\n  \n5.3.1综合审查：用于展示这次对比仿色的综合建议，如下：\n \n页面布局为：\n    左侧：展示两张照片（参考图【左】和用户图【右】），下面有该图的具体评价描述（主题是啥？想表现什么感情色彩（温情？自然？静谧？不做作？高反差？传达了什么生活的奥义？……有什么特色）\n    右侧：展示具体的详细内容，包括：\n    核心策略：给出综合的建议（用户图的主题是什么，是否需要变更，如何变更更好？如何通过后期裁剪、去除无效元素、增加新元素等方法模仿参考图感情色彩和摄影风格？颜色搭配的方案和比例？检测或猜测用户使用的设备是什么（不同设备会有不同的特色，如索尼偏黄、胶片相机有颗粒、尼康色彩丰富饱和度高、佳能柔和等）？用户应该着重怎么进行后期调色（现有颜色的增、减、变化）\n    主要风格流派：照片属于什么类型？\n    流派特色：这种类型流派具有什么特色\n    综合点评：\n    内容上，参考图与用户的主题内容分别是什么？参考图传达的感情色彩是什么，用户图应该怎么向他靠近？\n    影调上，直方图是怎么样的（是什么形状？元素位于直方图的哪个位置，说明什么问题？参考图呈现的照片效果是什么？参考图直方图上有没有缺失？说明了什么问题？结合直方图来分析参考图和用户图的差别）；\n    色调上，是什么风格的？（淡雅蓝？清新绿？……这些与拍摄的题材有什么关联？和拍摄的元素之间的关系是什么，如，拍摄的大海和蓝天呈现的是淡雅蓝，森林草地呈现的是清新绿，人像中肤色呈现的是淡黄色【给出颜色六位编号】）主要用了哪些色彩，这些色彩怎么进行搭配的？可能使用的设备是什么？这些设备的特色是啥？\n    视觉主体分析（点击内容可以在照片上展示具体位置，让用户直观看到）：分析参考图和用户图主体上的特色，包括但不限于主体放在什么位置？怎么使用颜色突出主体？怎么为主体营造出感情色彩？光线、色彩、画面元素如何为主体服务？主体颜色与其他元素颜色之间的关系？针对于用户图如何做？\n    焦点与曝光（点击内容可以在照片上展示具体位置，让用户直观看到）：分析参考图和用户图在焦点与曝光上的特色，包括但不限于焦点放在哪里？构图怎么安排？曝光如何对主体进行加持？针对于用户图如何做？\n    色彩与氛围（点击内容可以在照片上展示具体位置，让用户直观看到）：分析参考图和用户图在色彩与氛围上的特色，包括但不限于使用了哪些颜色？如，人物脸部什么颜色？饱和度如何？明度如何？其余背景和元素使用了哪些颜色？饱和度如何？明度如何？针对于用户图如何做？\n    颜色策略：用户图应该调整哪些颜色，来逼近或者达到目标图的水准。需要具体到分析用户图上每一个元素的颜色分析，以及如何调整\n    参考图优点评估：分析一下参考图在内容、影调、色调上的优点\n    直方图展示与分析：分析参考图与用户图的直方图特点，图中主要的元素（主体、背景、核心元素）在直方图的位置，参考图怎么控制光线，在直方图上如何表达？用户图应该如何调整？\n    可行性评估：用户图调整为参考图是否可行？置信度有多少？有什么限制因素？是否可突破？有什么建议？\n    可行性百分比：\n    限制因素：\n    建议：\n5.3.2 构图分析：用于展示这次对比仿色的构图分析，如下：\n \n    左侧：展示参考图，参考图下有四个按钮（向量、三分法、视觉质量、进入构图诊疗室）\n    向量：点击向量按钮，会在照片上展示叠加图层，用于展示视线路径\n \n    三分法：点击三分法按钮，会在照片上展示叠加图层，将照片拆分为九宫格，用于帮助用户确认构图和焦点\n \n    视觉质量：点击视觉质量按钮，会在照片上展示叠加图层用于标记主体位置\n \n    进入构图诊疗室（以下需要重新设计前端以及交互，并针对前端进行后端开发）：用于指导用户图的构图方法，有如下四个按钮：\n    原图：根据综合点评中的具体构图内容，评价原图的问题，和建议\n \n    智能构图：根据综合点评中的具体构图内容，展示出AI认为的构图内容，并给出具体建议\n \n    拍摄指导：根据综合点评中的具体构图内容，指导用户前期应该如何拍照，以及后期应该如何操作\n \n    后期蒙版：根据综合点评中的具体构图内容，在照片上进行分割，然后给出建议\n建议构图诊疗室不是按钮，而是模式切换：\n•    📐 几何模式（线、面、块）\n•    👁 视觉路径模式（眼动预测）\n•    🎯 主体权重模式（Attention Map）\n•    ✂️ 后期裁剪模拟（AI生成3个候选）\n\n \n    右侧：展示参考图，参考图下有四个按钮（向量、三分法、视觉质量、进入构图诊疗室）\n    结构几何：展示出参考图的构图分类\n    视觉权重：展示出参考图视觉权重分数，主体位置，所占比例，构图的方法以及评价\n    视觉质量：展示出主体的位置构图的方法\n    视觉流路径：告诉用户参考图可以让用户注意力先到哪里，再到哪里，最后到哪里，绘制出视觉路径\n    空间深度：前景是啥？中景是啥？背景是啥？\n    留白：展示出参考图的留白空间百分比是多少？\n\n5.3.3光影分析：用于展示参考图的光影特色分析内容，以及对用户图的调整指导\n页面布局参考如下：\n \n    左侧（需要在前端进行重新设计优化调整，后端需要匹配前端进行开发）：展示一张RGB曲线图，包含：RGB/R/G/B四个曲线，以及曲线上对应的点。需要展示出参考图和用户两张图对应的曲线，通过前端独特的设计，能够直观让用户看出区别\n    右侧：展示具体数据以及描述\n    曝光矩阵：\n    曝光与阴影（点击：展示出曲线的前后变化）：用户图应该如何处理曝光与阴影\n    色温与色调（点击：展示出曲线的前后变化）：用户图应该如何处理色温与色调\n    曲线（点击：展示出曲线的前后变化）：用户图应该如何处理曲线\n    曝光：数值与为什么要这么调的原因描述\n    对比度：数值与为什么要这么调的原因描述\n    高光：数值与为什么要这么调的原因描述\n    阴影：数值与为什么要这么调的原因描述\n    白色：数值与为什么要这么调的原因描述\n    黑色：数值与为什么要这么调的原因描述\n5.4 第二阶段主界面 \n点击页面中“生成执行计划”按钮，可以启动生成第二阶段执行层中三块（色彩分级、Lightroom、Photoshop）内容，如下：\n \n5.4.1 色彩分级：用于展示基于综合建议的色彩怎么调整的具体参数\n \n    主风格回顾：展示参考图是什么风格，是什么流派，务必基于综合建议进行延伸\n    风格总结回顾：展示参考图风格的具体内容，务必基于综合建议进行延伸\n    关键调整策略：展示用户图如何基于综合建议进行调整，务必基于综合建议进行延伸\n    电影级调色：即色彩分级的具体参数\n \n    高光：鼠标移动上去，能显示描述（为什么这么调整）\n    中间调：鼠标移动上去，能显示描述（为什么这么调整）\n    阴影：鼠标移动上去，能显示描述（为什么这么调整）\n    平衡：鼠标移动上去，能显示描述（为什么这么调整）\n    全息HSL矩阵：\n \n    红（色相/饱和度/明度）\n    橙（色相/饱和度/明度）\n    黄（色相/饱和度/明度）\n    绿（色相/饱和度/明度）\n    青（色相/饱和度/明度）\n    蓝（色相/饱和度/明度）\n    紫（色相/饱和度/明度）\n    洋红（色相/饱和度/明度）\n    色彩矩阵\n    色温（数值及为什么这么调的描述）\n    色调（数值及为什么这么调的描述）\n5.4.2 Lightroom:展示基于综合建议后，要把用户图调整为参考图，Lightroom的具体具体调参数据\n \n    色彩匹配协议：具体说明色调和影调的调整方法\n    场景分析（需要前端再看看怎么能让展示更加直观）：\n    场景类型：参考图是什么场景？用户图是什么场景\n    光影策略：基于综合建议，在光影上应该如何调整的具体细节描述，需要与综合建议保持一致\n    光影色彩：基于综合建议，用什么颜色，占比如何，怎么调整\n    动态范围：基于综合建议，直方图具体怎么调整，调整以后会有什么效果\n    校准策略：基于综合建议，颜色校准怎么调整，为什么，调整以后会有什么效果\n    白平衡目标：\n    色温：基于综合建议，数值及为什么这么调整的描述\n    色调，基于综合建议，数值及为什么这么调整的描述\n    影调控制：\n    曝光：基于综合建议，数值及为什么这么调整的描述\n    对比度：基于综合建议，数值及为什么这么调整的描述\n    高光：基于综合建议，数值及为什么这么调整的描述\n    阴影：基于综合建议，数值及为什么这么调整的描述\n    白色：基于综合建议，数值及为什么这么调整的描述\n    黑色：基于综合建议，数值及为什么这么调整的描述\n    质感与氛围：\n    纹理：基于综合建议，数值及为什么这么调整的描述\n    清晰度：基于综合建议，数值及为什么这么调整的描述\n    去朦胧：基于综合建议，数值及为什么这么调整的描述\n    鲜艳度：基于综合建议，数值及为什么这么调整的描述\n    饱和度：基于综合建议，数值及为什么这么调整的描述\n    调色向量：\n    阴影：基于综合建议，数值及为什么这么调整的描述\n    中间调：基于综合建议，数值及为什么这么调整的描述\n    高光：基于综合建议，数值及为什么这么调整的描述\n    平衡：基于综合建议，数值及为什么这么调整的描述\n    相机校准：\n    红原色：基于综合建议，数值及为什么这么调整的描述\n    绿原色：基于综合建议，数值及为什么这么调整的描述\n    蓝原色：基于综合建议，数值及为什么这么调整的描述\n    阴影色调：基于综合建议，数值及为什么这么调整的描述\n    光谱矩阵：\n    红：基于综合建议，数值及为什么这么调整的描述\n    橙：基于综合建议，数值及为什么这么调整的描述\n    黄：基于综合建议，数值及为什么这么调整的描述\n    绿：基于综合建议，数值及为什么这么调整的描述\n    青：基于综合建议，数值及为什么这么调整的描述\n    蓝：基于综合建议，数值及为什么这么调整的描述\n    紫：基于综合建议，数值及为什么这么调整的描述\n    洋红：基于综合建议，数值及为什么这么调整的描述\n    信号监视器：主要用作观察直方图的工具，鼠标移动到不同的位置可以看到具体的数值以及为什么这么调整的描述\n    局部调整：鼠标移动到不同的位置可以看到具体的数值以及为什么这么调整的描述\n    迭代调色（需要前端继续深化设计，把功能和交互细化了）：用户输入他希望更进一步调整的内容，点击后可以刷新以上全部数据；点击“查看历史”可以查看历史的迭代调整数据\n \n5.4.3 Photoshop: 展示基于综合建议调整了lightroom后，要把用户图调整为参考图，Photoshop还需要调整哪些数据（需要判断目前前端展示是否合理？针对于直观和专业展示，还可以有哪些设计性的提升）\nPhotoshop数据不一定必须，是需要根据综合建议来判断，lightroom需要调整哪些，Photoshop需要调整哪些，包括但不限于：\n    复合直方图：主要用作观察直方图的工具，鼠标移动到不同的位置可以看到具体的数值以及为什么这么调整的描述\n    调整堆栈：\n    曝光：\n    对比度：\n    高光：\n    阴影：\n    纹理：\n    去朦胧\n    色阶：调整的具体数值和原因（如需）\n    曲线：调整的具体数值和原因（如需）\n    可选颜色：调整的具体数值和原因（如需）\n    位置与调整的具体数值和原因（如需）\n    位置与调整的具体数值和原因（如需）\n5.5 第三阶段主界面\n需要点击右上角“开启模拟”进入第三阶段。第三阶段主要的目的是生成一张基于第一和第二阶段所有内容调色的参考图，输出原图尺寸\n \n    参考图：使用nano banana根据以上方法生成一个参考图\n    下载资产：\n    lightroom预设，生成一套LR可使用的.xmp文件\n    jsx script，需要深化设计具体功能和交互\n    jason data，生成一套包含所有调整参数的jason文件\n    pdf report，生成一套pdf调整方案模版（需要提前设计好模版）\n\n\n\n",
+        "title": "影像科学产品需求文档"
+      },
+      "quality": {
+        "source_confidence": 0.9
+      },
+      "metadata": {
+        "type": "PRD",
+        "version": "V1.0",
+        "author": "Johnie",
+        "domain": "产品设计",
+        "language": "zh-CN"
+      }
+    },
+    "extractedFields": [
+      {
+        "name": "时间",
+        "value": "2025-10",
+        "type": "time",
+        "confidence": 1,
+        "raw": "2025年10月"
+      },
+      {
+        "name": "数值",
+        "value": "3",
+        "type": "number",
+        "confidence": 1,
+        "raw": "3个"
+      },
+      {
+        "name": "单位",
+        "value": "个",
+        "type": "unit",
+        "confidence": 1,
+        "raw": "3个"
+      },
+      {
+        "name": "指标",
+        "value": "深度",
+        "type": "indicator",
+        "confidence": 0.9,
+        "raw": "深度"
+      },
+      {
+        "name": "指标",
+        "value": "距离",
+        "type": "indicator",
+        "confidence": 0.9,
+        "raw": "距离"
+      },
+      {
+        "name": "项目名称",
+        "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+        "type": "entity",
+        "confidence": 0.85,
+        "raw": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程"
+      },
+      {
+        "name": "区域",
+        "value": "滤镜工具区",
+        "type": "location",
+        "confidence": 0.8,
+        "raw": "滤镜工具区"
+      },
+      {
+        "name": "区域",
+        "value": "观让用户看出区",
+        "type": "location",
+        "confidence": 0.8,
+        "raw": "观让用户看出区"
+      },
+      {
+        "name": "区域",
+        "value": "常遇到的问题很难准确地",
+        "type": "location",
+        "confidence": 0.8,
+        "raw": "常遇到的问题很难准确地"
+      },
+      {
+        "name": "区域",
+        "value": "该办法无法做到准确地",
+        "type": "location",
+        "confidence": 0.8,
+        "raw": "该办法无法做到准确地"
+      },
+      {
+        "name": "区域",
+        "value": "可以带",
+        "type": "location",
+        "confidence": 0.8,
+        "raw": "可以带"
+      },
+      {
+        "name": "区域",
+        "value": "森林草地",
+        "type": "location",
+        "confidence": 0.8,
+        "raw": "森林草地"
+      },
+      {
+        "name": "区域",
+        "value": "光、怎么打光、拍摄的地",
+        "type": "location",
+        "confidence": 0.8,
+        "raw": "光、怎么打光、拍摄的地"
+      },
+      {
+        "name": "区域",
+        "value": "能够直观让用户看出区",
+        "type": "location",
+        "confidence": 0.8,
+        "raw": "能够直观让用户看出区"
+      },
+      {
+        "name": "区域",
+        "value": "够直观让用户看出区",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "够直观让用户看出区"
+      },
+      {
+        "name": "区域",
+        "value": "的拍摄与调色的思路",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "的拍摄与调色的思路"
+      },
+      {
+        "name": "区域",
+        "value": "点评专家和摄影思路",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "点评专家和摄影思路"
+      },
+      {
+        "name": "区域",
+        "value": "供具体前后期的思路",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "供具体前后期的思路"
+      },
+      {
+        "name": "区域",
+        "value": "对后期调色没思路",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "对后期调色没思路"
+      },
+      {
+        "name": "区域",
+        "value": "用于展示视线路",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "用于展示视线路"
+      },
+      {
+        "name": "区域",
+        "value": "视觉路",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "视觉路"
+      },
+      {
+        "name": "区域",
+        "value": "视觉流路",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "视觉流路"
+      },
+      {
+        "name": "区域",
+        "value": "绘制出视觉路",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "绘制出视觉路"
+      },
+      {
+        "name": "区域",
+        "value": "版本号",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "版本号"
+      },
+      {
+        "name": "区域",
+        "value": "给出颜色六位编号",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "给出颜色六位编号"
+      },
+      {
+        "name": "区域",
+        "value": "如果没有账号",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "如果没有账号"
+      },
+      {
+        "name": "区域",
+        "value": "用以展示该用户账号",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "用以展示该用户账号"
+      },
+      {
+        "name": "区域",
+        "value": "进入构图诊疗室",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "进入构图诊疗室"
+      },
+      {
+        "name": "区域",
+        "value": "建议构图诊疗室",
+        "type": "location",
+        "subtype": "administrative",
+        "confidence": 0.8,
+        "raw": "建议构图诊疗室"
+      },
+      {
+        "name": "实体",
+        "value": "企业或机构",
+        "type": "entity",
+        "subtype": "organization",
+        "confidence": 0.75,
+        "raw": "企业或机构"
+      },
+      {
+        "name": "实体",
+        "value": "页面布局",
+        "type": "entity",
+        "subtype": "organization",
+        "confidence": 0.75,
+        "raw": "页面布局"
+      },
+      {
+        "name": "数值",
+        "value": "1.0",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "1.0"
+      },
+      {
+        "name": "数值",
+        "value": "2025",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "2025"
+      },
+      {
+        "name": "数值",
+        "value": "10",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "10"
+      },
+      {
+        "name": "数值",
+        "value": "2.1",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "2.1"
+      },
+      {
+        "name": "数值",
+        "value": "2.2",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "2.2"
+      },
+      {
+        "name": "数值",
+        "value": "1",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "1"
+      },
+      {
+        "name": "数值",
+        "value": "2",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "2"
+      },
+      {
+        "name": "数值",
+        "value": "4",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "4"
+      },
+      {
+        "name": "数值",
+        "value": "1.",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "1."
+      },
+      {
+        "name": "数值",
+        "value": "2.",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "2."
+      },
+      {
+        "name": "数值",
+        "value": "100",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "100"
+      },
+      {
+        "name": "数值",
+        "value": "3.",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "3."
+      },
+      {
+        "name": "数值",
+        "value": "5.1",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "5.1"
+      },
+      {
+        "name": "数值",
+        "value": "1.1",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "1.1"
+      },
+      {
+        "name": "数值",
+        "value": "4.",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "4."
+      },
+      {
+        "name": "数值",
+        "value": "5.2",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "5.2"
+      },
+      {
+        "name": "数值",
+        "value": "5.3",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "5.3"
+      },
+      {
+        "name": "数值",
+        "value": "5.4",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "5.4"
+      },
+      {
+        "name": "数值",
+        "value": "5.5",
+        "type": "number",
+        "confidence": 0.7,
+        "raw": "5.5"
+      },
+      {
+        "name": "实体",
+        "value": "摄影点评专家",
+        "type": "entity",
+        "subtype": "person",
+        "confidence": 0.7,
+        "raw": "摄影点评专家"
+      }
+    ],
+    "matchedSchemas": [
+      {
+        "schema": {
+          "schema_id": "7a940ebe-26ad-4e1e-9b11-d3275887a446",
+          "schema_name": "EITV",
+          "entity_type": "ResearchEntity",
+          "scene": "科研/政府",
+          "core_fields": [
+            {
+              "name": "Entity",
+              "weight": 0.4,
+              "required": true
+            },
+            {
+              "name": "Indicator",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "Time",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "Value",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "Unit",
+              "weight": 0.15,
+              "required": false
+            }
+          ],
+          "threshold": 0.6,
+          "relations": [
+            {
+              "type": "发生于",
+              "target_field": "Time",
+              "direction": "outgoing"
+            }
+          ],
+          "example_description": null,
+          "description": "用于记录某个实体在某个时间点的指标数值，便于统计、趋势分析和图谱构建",
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-02T15:22:58.102Z",
+          "updated_at": "2026-02-02T15:22:58.102Z"
+        },
+        "schema_name": "EITV",
+        "completeness": 1,
+        "weightedCompleteness": 1,
+        "mappedFields": 5,
+        "totalFields": 5,
+        "normalizedFields": [
+          {
+            "name": "Time",
+            "originalName": "时间",
+            "standardName": "Time",
+            "value": "2025-10",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "3",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Unit",
+            "originalName": "单位",
+            "standardName": "Unit",
+            "value": "个",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Indicator",
+            "originalName": "指标",
+            "standardName": "Indicator",
+            "value": "深度",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Indicator",
+            "originalName": "指标",
+            "standardName": "Indicator",
+            "value": "距离",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "项目名称",
+            "standardName": "Entity",
+            "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+            "confidence": 0.8,
+            "mappingMethod": "fuzzy_variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "实体",
+            "standardName": "Entity",
+            "value": "企业或机构",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "实体",
+            "standardName": "Entity",
+            "value": "页面布局",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1.0",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2025",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "10",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2.1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2.2",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "4",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "100",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "3.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1.1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "4.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.2",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.3",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.4",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.5",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "实体",
+            "standardName": "Entity",
+            "value": "摄影点评专家",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          }
+        ],
+        "threshold": 0.6
+      },
+      {
+        "schema": {
+          "schema_id": "77d07f8c-8be3-4dbb-ad21-029b53ff8111",
+          "schema_name": "Procurement-Project",
+          "entity_type": "GovernmentEntity",
+          "scene": "政府/采购",
+          "core_fields": [
+            {
+              "name": "项目名称",
+              "weight": 0.4,
+              "required": true
+            },
+            {
+              "name": "预算金额",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "建设周期",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "采购人",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "交货地点",
+              "weight": 0.15,
+              "required": false
+            }
+          ],
+          "threshold": 0.6,
+          "relations": [
+            {
+              "type": "涉及人员",
+              "target_field": "采购人",
+              "direction": "outgoing"
+            }
+          ],
+          "example_description": null,
+          "description": "记录政府采购或招标项目的基本信息，包括项目名称、预算、周期、采购方等关键要素",
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-02T15:23:08.277Z",
+          "updated_at": "2026-02-02T15:23:08.277Z"
+        },
+        "schema_name": "Procurement-Project",
+        "completeness": 0.2,
+        "weightedCompleteness": 0.4,
+        "mappedFields": 1,
+        "totalFields": 5,
+        "normalizedFields": [
+          {
+            "name": "项目名称",
+            "originalName": "项目名称",
+            "standardName": "项目名称",
+            "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+            "confidence": 1,
+            "mappingMethod": "exact",
+            "source": "extraction"
+          }
+        ],
+        "threshold": 0.6
+      },
+      {
+        "schema": {
+          "schema_id": "e7363536-a3ec-45fe-b630-79438680d162",
+          "schema_name": "Bidding-Document",
+          "entity_type": "GovernmentEntity",
+          "scene": "政府/采购",
+          "core_fields": [
+            {
+              "name": "项目名称",
+              "weight": 0.4,
+              "required": true
+            },
+            {
+              "name": "招标编号",
+              "weight": 0.2,
+              "required": false
+            },
+            {
+              "name": "发布日期",
+              "weight": 0.2,
+              "required": false
+            },
+            {
+              "name": "截止日期",
+              "weight": 0.2,
+              "required": false
+            }
+          ],
+          "threshold": 0.6,
+          "relations": [],
+          "example_description": null,
+          "description": "记录招标文件的基本信息和关键时间节点",
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-02T15:23:08.279Z",
+          "updated_at": "2026-02-02T15:23:08.279Z"
+        },
+        "schema_name": "Bidding-Document",
+        "completeness": 0.25,
+        "weightedCompleteness": 0.4,
+        "mappedFields": 1,
+        "totalFields": 4,
+        "normalizedFields": [
+          {
+            "name": "项目名称",
+            "originalName": "项目名称",
+            "standardName": "项目名称",
+            "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+            "confidence": 1,
+            "mappingMethod": "exact",
+            "source": "extraction"
+          }
+        ],
+        "threshold": 0.6
+      },
+      {
+        "schema": {
+          "schema_id": "219116da-cb8e-428c-9afd-f03c5d04a4d1",
+          "schema_name": "PhotographyEntity",
+          "entity_type": "PhotographyEntity",
+          "scene": "摄影",
+          "core_fields": [
+            {
+              "name": "Camera",
+              "weight": 0.3,
+              "required": true,
+              "field_type": "text",
+              "description": "相机型号"
+            },
+            {
+              "name": "Lens",
+              "weight": 0.3,
+              "required": true,
+              "field_type": "text",
+              "description": "镜头型号"
+            },
+            {
+              "name": "ISO",
+              "weight": 0.1,
+              "required": false,
+              "field_type": "number",
+              "description": "ISO感光度"
+            },
+            {
+              "name": "Aperture",
+              "weight": 0.1,
+              "required": false,
+              "field_type": "text",
+              "description": "光圈值"
+            },
+            {
+              "name": "Shutter",
+              "weight": 0.1,
+              "required": false,
+              "field_type": "text",
+              "description": "快门速度"
+            },
+            {
+              "name": "Exposure",
+              "weight": 0.05,
+              "required": false,
+              "field_type": "text",
+              "description": "曝光补偿"
+            },
+            {
+              "name": "Focus",
+              "weight": 0.05,
+              "required": false,
+              "field_type": "text",
+              "description": "对焦模式"
+            }
+          ],
+          "threshold": 0.5,
+          "relations": [
+            {
+              "type": "使用镜头",
+              "target_field": "Lens",
+              "direction": "outgoing"
+            },
+            {
+              "type": "拍摄参数",
+              "target_field": "ISO",
+              "direction": "outgoing"
+            }
+          ],
+          "example_description": null,
+          "description": "摄影实体 - 捕获相机、镜头、拍摄参数等摄影设备和技术信息",
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-03T09:51:28.875Z",
+          "updated_at": "2026-02-03T09:51:28.875Z"
+        },
+        "schema_name": "PhotographyEntity",
+        "completeness": 0,
+        "weightedCompleteness": 0,
+        "mappedFields": 0,
+        "totalFields": 7,
+        "normalizedFields": [],
+        "threshold": 0.5
+      },
+      {
+        "schema": {
+          "schema_id": "ae3c249b-dfec-48f4-9aa6-299a1aaa1e11",
+          "schema_name": "政府工作报告实体",
+          "entity_type": "GovernmentReportEntity",
+          "scene": null,
+          "core_fields": [
+            {
+              "name": "项目名称",
+              "weight": 0.3,
+              "required": true
+            },
+            {
+              "name": "区域",
+              "weight": 0.2,
+              "required": false
+            },
+            {
+              "name": "数值",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "单位",
+              "weight": 0.1,
+              "required": false
+            },
+            {
+              "name": "指标",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "时间",
+              "weight": 0.1,
+              "required": false
+            }
+          ],
+          "threshold": 0.6,
+          "relations": [
+            {
+              "type": "位于",
+              "target_field": "区域",
+              "direction": "outgoing"
+            },
+            {
+              "type": "发生于",
+              "target_field": "时间",
+              "direction": "outgoing"
+            },
+            {
+              "type": "涉及指标",
+              "target_field": "指标",
+              "direction": "outgoing"
+            }
+          ],
+          "example_description": null,
+          "description": null,
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-02T13:36:02.705Z",
+          "updated_at": "2026-02-02T13:36:02.705Z"
+        },
+        "schema_name": "政府工作报告实体",
+        "completeness": 0,
+        "weightedCompleteness": 0,
+        "mappedFields": 0,
+        "totalFields": 6,
+        "normalizedFields": [],
+        "threshold": 0.6
+      }
+    ],
+    "normalizedFields": [
+      {
+        "schema": {
+          "schema_id": "7a940ebe-26ad-4e1e-9b11-d3275887a446",
+          "schema_name": "EITV",
+          "entity_type": "ResearchEntity",
+          "scene": "科研/政府",
+          "core_fields": [
+            {
+              "name": "Entity",
+              "weight": 0.4,
+              "required": true
+            },
+            {
+              "name": "Indicator",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "Time",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "Value",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "Unit",
+              "weight": 0.15,
+              "required": false
+            }
+          ],
+          "threshold": 0.6,
+          "relations": [
+            {
+              "type": "发生于",
+              "target_field": "Time",
+              "direction": "outgoing"
+            }
+          ],
+          "example_description": null,
+          "description": "用于记录某个实体在某个时间点的指标数值，便于统计、趋势分析和图谱构建",
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-02T15:22:58.102Z",
+          "updated_at": "2026-02-02T15:22:58.102Z"
+        },
+        "fields": [
+          {
+            "name": "Time",
+            "originalName": "时间",
+            "standardName": "Time",
+            "value": "2025-10",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "3",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Unit",
+            "originalName": "单位",
+            "standardName": "Unit",
+            "value": "个",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Indicator",
+            "originalName": "指标",
+            "standardName": "Indicator",
+            "value": "深度",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Indicator",
+            "originalName": "指标",
+            "standardName": "Indicator",
+            "value": "距离",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "项目名称",
+            "standardName": "Entity",
+            "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+            "confidence": 0.8,
+            "mappingMethod": "fuzzy_variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "实体",
+            "standardName": "Entity",
+            "value": "企业或机构",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "实体",
+            "standardName": "Entity",
+            "value": "页面布局",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1.0",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2025",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "10",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2.1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2.2",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "4",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "100",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "3.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1.1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "4.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.2",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.3",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.4",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.5",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "实体",
+            "standardName": "Entity",
+            "value": "摄影点评专家",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          }
+        ],
+        "successRate": 5.6
+      },
+      {
+        "schema": {
+          "schema_id": "77d07f8c-8be3-4dbb-ad21-029b53ff8111",
+          "schema_name": "Procurement-Project",
+          "entity_type": "GovernmentEntity",
+          "scene": "政府/采购",
+          "core_fields": [
+            {
+              "name": "项目名称",
+              "weight": 0.4,
+              "required": true
+            },
+            {
+              "name": "预算金额",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "建设周期",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "采购人",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "交货地点",
+              "weight": 0.15,
+              "required": false
+            }
+          ],
+          "threshold": 0.6,
+          "relations": [
+            {
+              "type": "涉及人员",
+              "target_field": "采购人",
+              "direction": "outgoing"
+            }
+          ],
+          "example_description": null,
+          "description": "记录政府采购或招标项目的基本信息，包括项目名称、预算、周期、采购方等关键要素",
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-02T15:23:08.277Z",
+          "updated_at": "2026-02-02T15:23:08.277Z"
+        },
+        "fields": [
+          {
+            "name": "项目名称",
+            "originalName": "项目名称",
+            "standardName": "项目名称",
+            "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+            "confidence": 1,
+            "mappingMethod": "exact",
+            "source": "extraction"
+          }
+        ],
+        "successRate": 0.2
+      },
+      {
+        "schema": {
+          "schema_id": "e7363536-a3ec-45fe-b630-79438680d162",
+          "schema_name": "Bidding-Document",
+          "entity_type": "GovernmentEntity",
+          "scene": "政府/采购",
+          "core_fields": [
+            {
+              "name": "项目名称",
+              "weight": 0.4,
+              "required": true
+            },
+            {
+              "name": "招标编号",
+              "weight": 0.2,
+              "required": false
+            },
+            {
+              "name": "发布日期",
+              "weight": 0.2,
+              "required": false
+            },
+            {
+              "name": "截止日期",
+              "weight": 0.2,
+              "required": false
+            }
+          ],
+          "threshold": 0.6,
+          "relations": [],
+          "example_description": null,
+          "description": "记录招标文件的基本信息和关键时间节点",
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-02T15:23:08.279Z",
+          "updated_at": "2026-02-02T15:23:08.279Z"
+        },
+        "fields": [
+          {
+            "name": "项目名称",
+            "originalName": "项目名称",
+            "standardName": "项目名称",
+            "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+            "confidence": 1,
+            "mappingMethod": "exact",
+            "source": "extraction"
+          }
+        ],
+        "successRate": 0.25
+      },
+      {
+        "schema": {
+          "schema_id": "219116da-cb8e-428c-9afd-f03c5d04a4d1",
+          "schema_name": "PhotographyEntity",
+          "entity_type": "PhotographyEntity",
+          "scene": "摄影",
+          "core_fields": [
+            {
+              "name": "Camera",
+              "weight": 0.3,
+              "required": true,
+              "field_type": "text",
+              "description": "相机型号"
+            },
+            {
+              "name": "Lens",
+              "weight": 0.3,
+              "required": true,
+              "field_type": "text",
+              "description": "镜头型号"
+            },
+            {
+              "name": "ISO",
+              "weight": 0.1,
+              "required": false,
+              "field_type": "number",
+              "description": "ISO感光度"
+            },
+            {
+              "name": "Aperture",
+              "weight": 0.1,
+              "required": false,
+              "field_type": "text",
+              "description": "光圈值"
+            },
+            {
+              "name": "Shutter",
+              "weight": 0.1,
+              "required": false,
+              "field_type": "text",
+              "description": "快门速度"
+            },
+            {
+              "name": "Exposure",
+              "weight": 0.05,
+              "required": false,
+              "field_type": "text",
+              "description": "曝光补偿"
+            },
+            {
+              "name": "Focus",
+              "weight": 0.05,
+              "required": false,
+              "field_type": "text",
+              "description": "对焦模式"
+            }
+          ],
+          "threshold": 0.5,
+          "relations": [
+            {
+              "type": "使用镜头",
+              "target_field": "Lens",
+              "direction": "outgoing"
+            },
+            {
+              "type": "拍摄参数",
+              "target_field": "ISO",
+              "direction": "outgoing"
+            }
+          ],
+          "example_description": null,
+          "description": "摄影实体 - 捕获相机、镜头、拍摄参数等摄影设备和技术信息",
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-03T09:51:28.875Z",
+          "updated_at": "2026-02-03T09:51:28.875Z"
+        },
+        "fields": [],
+        "successRate": 0
+      },
+      {
+        "schema": {
+          "schema_id": "ae3c249b-dfec-48f4-9aa6-299a1aaa1e11",
+          "schema_name": "政府工作报告实体",
+          "entity_type": "GovernmentReportEntity",
+          "scene": null,
+          "core_fields": [
+            {
+              "name": "项目名称",
+              "weight": 0.3,
+              "required": true
+            },
+            {
+              "name": "区域",
+              "weight": 0.2,
+              "required": false
+            },
+            {
+              "name": "数值",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "单位",
+              "weight": 0.1,
+              "required": false
+            },
+            {
+              "name": "指标",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "时间",
+              "weight": 0.1,
+              "required": false
+            }
+          ],
+          "threshold": 0.6,
+          "relations": [
+            {
+              "type": "位于",
+              "target_field": "区域",
+              "direction": "outgoing"
+            },
+            {
+              "type": "发生于",
+              "target_field": "时间",
+              "direction": "outgoing"
+            },
+            {
+              "type": "涉及指标",
+              "target_field": "指标",
+              "direction": "outgoing"
+            }
+          ],
+          "example_description": null,
+          "description": null,
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-02T13:36:02.705Z",
+          "updated_at": "2026-02-02T13:36:02.705Z"
+        },
+        "fields": [],
+        "successRate": 0
+      }
+    ],
+    "entities": [
+      {
+        "entity_id": "entity_1770112961749_kt4gstmjv",
+        "entity_type": "ResearchEntity",
+        "canonical_name": "摄影点评专家_距离_2025-10",
+        "aliases": [],
+        "schemas": [
+          {
+            "schema_name": "EITV",
+            "confidence": 1
+          }
+        ],
+        "supported_by": [
+          "ckb_imaging_science_prd_v1_1770112961722"
+        ],
+        "attributes": {
+          "Time": "2025-10",
+          "Value": "5.5",
+          "Unit": "个",
+          "Indicator": "距离",
+          "Entity": "摄影点评专家"
+        },
+        "confidence": 1,
+        "llm_enriched": false,
+        "created_at": "2026-02-03T10:02:41.749Z",
+        "updated_at": "2026-02-03T10:02:41.749Z"
+      },
+      {
+        "entity_id": "entity_1770112961749_m8kdl8grs",
+        "entity_type": "GovernmentEntity",
+        "canonical_name": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+        "aliases": [],
+        "schemas": [
+          {
+            "schema_name": "Procurement-Project",
+            "confidence": 0.2
+          }
+        ],
+        "supported_by": [
+          "ckb_imaging_science_prd_v1_1770112961722"
+        ],
+        "attributes": {
+          "项目名称": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程"
+        },
+        "confidence": 0.2,
+        "llm_enriched": false,
+        "created_at": "2026-02-03T10:02:41.749Z",
+        "updated_at": "2026-02-03T10:02:41.749Z"
+      },
+      {
+        "entity_id": "entity_1770112962924_jc73lldz7",
+        "entity_type": "GovernmentEntity",
+        "canonical_name": "影像科学 PhotoScience",
+        "aliases": [
+          "PhotoScience",
+          "影像风格逆向工程系统"
+        ],
+        "schemas": [
+          {
+            "schema_name": "Bidding-Document",
+            "confidence": 0.25
+          }
+        ],
+        "supported_by": [
+          "ckb_imaging_science_prd_v1_1770112961722"
+        ],
+        "attributes": {
+          "项目名称": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程"
+        },
+        "confidence": 0.25,
+        "llm_enriched": true,
+        "created_at": "2026-02-03T10:02:42.924Z",
+        "updated_at": "2026-02-03T10:02:42.924Z"
+      },
+      {
+        "entity_id": "entity_1770112962925_xntrajq8m",
+        "entity_type": "PhotographyEntity",
+        "canonical_name": "PhotographyEntity_1770112962925",
+        "aliases": [],
+        "schemas": [
+          {
+            "schema_name": "PhotographyEntity",
+            "confidence": 0
+          }
+        ],
+        "supported_by": [
+          "ckb_imaging_science_prd_v1_1770112961722"
+        ],
+        "attributes": {},
+        "confidence": 0,
+        "llm_enriched": false,
+        "created_at": "2026-02-03T10:02:42.925Z",
+        "updated_at": "2026-02-03T10:02:42.925Z"
+      },
+      {
+        "entity_id": "entity_1770112962925_ijcj0dpok",
+        "entity_type": "GovernmentReportEntity",
+        "canonical_name": "政府工作报告实体_1770112962925",
+        "aliases": [],
+        "schemas": [
+          {
+            "schema_name": "政府工作报告实体",
+            "confidence": 0
+          }
+        ],
+        "supported_by": [
+          "ckb_imaging_science_prd_v1_1770112961722"
+        ],
+        "attributes": {},
+        "confidence": 0,
+        "llm_enriched": false,
+        "created_at": "2026-02-03T10:02:42.925Z",
+        "updated_at": "2026-02-03T10:02:42.925Z"
+      }
+    ],
+    "relations": [
+      {
+        "source_id": "entity_1770112961749_kt4gstmjv",
+        "target_id": "entity_1770110861682_yy02az5sv",
+        "type": "builtin",
+        "subtype": "发生于",
+        "confidence": 1,
+        "evidence_ckb": "[\"ckb_imaging_science_prd_v1_1770112961722\"]",
+        "evidence_text": null,
+        "metadata": "{\"schema_name\":\"EITV\",\"target_field\":\"Time\",\"direction\":\"outgoing\"}"
+      }
+    ],
+    "triggeredSchemas": [
+      {
+        "schema": {
+          "schema_id": "7a940ebe-26ad-4e1e-9b11-d3275887a446",
+          "schema_name": "EITV",
+          "entity_type": "ResearchEntity",
+          "scene": "科研/政府",
+          "core_fields": [
+            {
+              "name": "Entity",
+              "weight": 0.4,
+              "required": true
+            },
+            {
+              "name": "Indicator",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "Time",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "Value",
+              "weight": 0.15,
+              "required": false
+            },
+            {
+              "name": "Unit",
+              "weight": 0.15,
+              "required": false
+            }
+          ],
+          "threshold": 0.6,
+          "relations": [
+            {
+              "type": "发生于",
+              "target_field": "Time",
+              "direction": "outgoing"
+            }
+          ],
+          "example_description": null,
+          "description": "用于记录某个实体在某个时间点的指标数值，便于统计、趋势分析和图谱构建",
+          "version": "1.0.0",
+          "active": true,
+          "created_at": "2026-02-02T15:22:58.102Z",
+          "updated_at": "2026-02-02T15:22:58.102Z"
+        },
+        "schema_name": "EITV",
+        "completeness": 1,
+        "weightedCompleteness": 1,
+        "mappedFields": 5,
+        "totalFields": 5,
+        "normalizedFields": [
+          {
+            "name": "Time",
+            "originalName": "时间",
+            "standardName": "Time",
+            "value": "2025-10",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "3",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Unit",
+            "originalName": "单位",
+            "standardName": "Unit",
+            "value": "个",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Indicator",
+            "originalName": "指标",
+            "standardName": "Indicator",
+            "value": "深度",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Indicator",
+            "originalName": "指标",
+            "standardName": "Indicator",
+            "value": "距离",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "项目名称",
+            "standardName": "Entity",
+            "value": "产品一句话定义： 影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程",
+            "confidence": 0.8,
+            "mappingMethod": "fuzzy_variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "实体",
+            "standardName": "Entity",
+            "value": "企业或机构",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "实体",
+            "standardName": "Entity",
+            "value": "页面布局",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1.0",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2025",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "10",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2.1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2.2",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "4",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "2.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "100",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "3.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "1.1",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "4.",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.2",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.3",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.4",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Value",
+            "originalName": "数值",
+            "standardName": "Value",
+            "value": "5.5",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          },
+          {
+            "name": "Entity",
+            "originalName": "实体",
+            "standardName": "Entity",
+            "value": "摄影点评专家",
+            "confidence": 0.95,
+            "mappingMethod": "variation",
+            "source": "extraction"
+          }
+        ],
+        "threshold": 0.6
+      }
+    ]
+  },
+  "metrics": {
+    "fieldCount": 51,
+    "entityCount": 5,
+    "relationCount": 1,
+    "tokenUsage": 0,
+    "apiCalls": 1,
+    "confidenceScores": {},
+    "documentsPerSecond": 0.8183306055646481,
+    "fieldsPerSecond": 41.734860883797054,
+    "entitiesPerSecond": 4.091653027823241,
+    "relationsPerSecond": 0.8183306055646481
+  },
+  "errors": [],
+  "warnings": [
+    {
+      "step": "entityBuilding",
+      "error": "Schema Procurement-Project: 字段覆盖率过低 - 20.0% (最低要求: 50.0%)",
+      "timestamp": 1770112961749
+    },
+    {
+      "step": "entityBuilding",
+      "error": "Schema Bidding-Document: 字段覆盖率过低 - 25.0% (最低要求: 50.0%)",
+      "timestamp": 1770112962925
+    },
+    {
+      "step": "entityBuilding",
+      "error": "Schema PhotographyEntity: 字段覆盖率过低 - 0.0% (最低要求: 50.0%)",
+      "timestamp": 1770112962925
+    },
+    {
+      "step": "entityBuilding",
+      "error": "Schema 政府工作报告实体: 字段覆盖率过低 - 0.0% (最低要求: 50.0%)",
+      "timestamp": 1770112962925
+    },
+    {
+      "step": "relationExtraction",
+      "error": "共现关系构建器失败: cooccurrenceRelationBuilder.buildRelations is not a function",
+      "timestamp": 1770112962930
+    },
+    {
+      "step": "relationExtraction",
+      "error": "语义关系构建器失败: semanticRelationBuilder.buildRelations is not a function",
+      "timestamp": 1770112962930
+    }
+  ]
+}

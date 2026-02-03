@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **三阶段Schema匹配**: 实现完整的三阶段Schema匹配流程（算法匹配 → LLM匹配 → 合并排名）
+  - 新增 `kg/prompts/schema_match.js` - LLM Schema匹配Prompt模板
+  - 新增 `_llmMatchFields()` 方法 - 处理未匹配字段的LLM兜底方案
+  - 新增 `_mergeMatchResults()` 方法 - 合并算法和LLM匹配结果
+  - 新增 `kg/pipeline/THREE_STAGE_SCHEMA_MATCHING.md` - 详细实现文档
 - Initial release preparation
 - CI/CD pipeline configuration
 - GitHub Actions workflows for automated testing
@@ -15,6 +20,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Token usage monitoring in CI
 - Pull request template
 - Comprehensive documentation
+
+### Changed
+- **Schema匹配阈值**: 从60%降低到40%，提高Schema召回率
+- **LLM兜底策略**: LLM从概率性启动改为100%兜底方案，确保所有未匹配字段都被处理
+- **实体名称生成**: LLM从50%概率改为100%兜底方案，验证和优化所有实体名称
+- **语义关系提取**: 修复集成问题，正确调用 `extractSemanticRelations()` 方法
+
+### Fixed
+- 修复语义关系构建器调用错误（`buildRelations()` → `extractSemanticRelations()`）
+- 修复实体验证逻辑，防止undefined实体导致崩溃
+- 修复 `.env` 文件中重复的API密钥配置
+
+### Documentation
+- 更新 `kg/pipeline/LLM_FALLBACK_EXPLAINED.md` - 说明LLM 100%兜底策略
+- 更新 `kg/pipeline/ENTITY_BUILDING_EXPLAINED.md` - 说明实体名称生成的LLM兜底
+- 新增 `kg/pipeline/THREE_STAGE_SCHEMA_MATCHING.md` - 三阶段匹配完整文档
 
 ## [1.0.0] - 2025-02-02
 

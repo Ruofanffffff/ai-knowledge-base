@@ -825,6 +825,30 @@ class UniversalDocumentPipeline {
    * 步骤2: 提取字段
    */
   async _extractFields(context, options) {
+    // 检查是否有自定义提取器
+    if (options.extraction.customExtractor && typeof options.extraction.customExtractor === 'function') {
+      console.log('[Pipeline] 使用自定义字段提取器');
+      
+      try {
+        const fields = await options.extraction.customExtractor(context.data.ckb, options.extraction);
+        
+        context.data.extractedFields = fields;
+        context.metrics.fieldCount = fields.length;
+        
+        StepExecutor.recordMetrics('extraction', {
+          fieldCount: fields.length,
+          usedCustomExtractor: true,
+          tokenUsage: 0,
+          apiCalls: 0
+        }, context);
+        
+        return fields;
+      } catch (error) {
+        console.error('[Pipeline] 自定义提取器失败:', error.message);
+        // 继续使用默认提取器
+      }
+    }
+    
     const extractionOptions = {
       useLLM: options.extraction.useLLM,
       useNER: options.extraction.useNER,
@@ -982,7 +1006,7 @@ class UniversalDocumentPipeline {
   }
   
   /**
-   * 步骤3: 匹配Schema（改进版：先分类预筛选，再归一化匹配）
+   * 步骤3: 匹配Schema（三阶段：算法匹配 → LLM匹配 → 合并结果）
    */
   async _matchSchema(context, options) {
     // 记录开始时的token使用情况
@@ -1072,7 +1096,8 @@ class UniversalDocumentPipeline {
       filterRate: allSchemas.length > 0 ? (allSchemas.length - schemas.length) / allSchemas.length : 0
     }, context);
     
-    console.log(`[Pipeline] 步骤3.3: 开始Schema匹配，共${schemas.length}个候选Schema`);
+    console.log(`[Pipeline] 步骤3.3: 开始三阶段Schema匹配，共${schemas.length}个候选Schema`);
+    console.log('[Pipeline] 阶段1: 算法匹配（映射表）...');
     
     // 优化1: 预加载映射表（避免重复加载）
     await this.mappingBasedNormalizer.loadMappings();
@@ -1097,115 +1122,156 @@ class UniversalDocumentPipeline {
       return bFieldCount - aFieldCount;
     });
     
-    // 优化4: 并行处理Schema匹配（批量处理，避免过载）
+    // 阶段1: 算法匹配（映射表）
     const schemaMatchResults = [];
-    const BATCH_SIZE = 10;  // 每批处理10个Schema
-    const HIGH_QUALITY_THRESHOLD = 0.85;  // 高质量匹配阈值
-    let foundHighQualityMatch = false;
+    const allMatchedFieldNames = new Set(); // 跟踪所有被匹配的字段名
     
-    for (let i = 0; i < sortedSchemas.length; i += BATCH_SIZE) {
-      // 优化5: 提前终止 - 如果已找到高质量匹配，只处理当前批次
-      if (foundHighQualityMatch && i > 0) {
-        console.log(`[Pipeline] 已找到高质量匹配，跳过剩余 ${sortedSchemas.length - i} 个Schema`);
-        break;
-      }
-      
-      const batch = sortedSchemas.slice(i, i + BATCH_SIZE);
-      
-      // 并行处理当前批次
-      const batchResults = await Promise.all(
-        batch.map(async (schema) => {
-          try {
-            // 尝试将提取的字段归一化到当前Schema
-            const normalizedFields = await this._normalizeFieldsWithCache(
-              context.data.extractedFields,
-              schema,
-              normalizationCache,
-              {
-                useLLM: options.normalization.useLLM,
-                useAlgorithm: options.normalization.useAlgorithm,
-                cleanValues: true,
-                useCache: true
-              }
-            );
-            
-            // 计算匹配度：成功映射的核心字段数量 / 总核心字段数量
-            const coreFields = schema.core_fields || [];
-            const mappedCoreFieldNames = new Set(
-              normalizedFields
-                .filter(f => f.mappingMethod && f.mappingMethod !== 'none')  // 只计算成功映射的字段
-                .map(f => f.standardName)  // 使用 standardName 而不是 name
-            );
-            
-            const mappedCoreFieldCount = coreFields.filter(cf => 
-              mappedCoreFieldNames.has(cf.name)
-            ).length;
-            
-            const completeness = coreFields.length > 0 ? 
-              mappedCoreFieldCount / coreFields.length : 0;
-            
-            // 计算加权完整度（考虑字段权重）
-            let weightedCompleteness = 0;
-            if (coreFields.length > 0) {
-              const totalWeight = coreFields.reduce((sum, cf) => sum + (cf.weight || 0), 0);
-              const mappedWeight = coreFields
-                .filter(cf => mappedCoreFieldNames.has(cf.name))
-                .reduce((sum, cf) => sum + (cf.weight || 0), 0);
-              weightedCompleteness = totalWeight > 0 ? mappedWeight / totalWeight : 0;
-            }
-            
-            const result = {
-              schema: schema,
-              schema_name: schema.schema_name || schema.name,
-              completeness: completeness,
-              weightedCompleteness: weightedCompleteness,
-              mappedFields: mappedCoreFieldCount,
-              totalFields: coreFields.length,
-              normalizedFields: normalizedFields,
-              threshold: schema.threshold || 0.6
-            };
-            
-            console.log(
-              `[Pipeline] Schema "${schema.schema_name || schema.name}": ` +
-              `完整度 ${(completeness * 100).toFixed(1)}%, ` +
-              `加权完整度 ${(weightedCompleteness * 100).toFixed(1)}%, ` +
-              `映射字段 ${mappedCoreFieldCount}/${coreFields.length}`
-            );
-            
-            return result;
-            
-          } catch (error) {
-            console.warn(`[Pipeline] Schema "${schema.schema_name || schema.name}" 归一化失败: ${error.message}`);
-            return null;
+    for (const schema of sortedSchemas) {
+      try {
+        // 尝试将提取的字段归一化到当前Schema
+        const normalizedFields = await this._normalizeFieldsWithCache(
+          context.data.extractedFields,
+          schema,
+          normalizationCache,
+          {
+            useLLM: options.normalization.useLLM,
+            useAlgorithm: options.normalization.useAlgorithm,
+            cleanValues: true,
+            useCache: true
           }
-        })
-      );
-      
-      // 过滤掉失败的结果并添加到总结果中
-      const validResults = batchResults.filter(r => r !== null);
-      schemaMatchResults.push(...validResults);
-      
-      // 检查是否有高质量匹配
-      const hasHighQuality = validResults.some(r => r.weightedCompleteness >= HIGH_QUALITY_THRESHOLD);
-      if (hasHighQuality) {
-        foundHighQualityMatch = true;
-        console.log(`[Pipeline] 发现高质量匹配 (>=${(HIGH_QUALITY_THRESHOLD * 100).toFixed(0)}%)，将在当前批次后停止`);
+        );
+        
+        // 记录成功匹配的字段名
+        normalizedFields
+          .filter(f => f.mappingMethod && f.mappingMethod !== 'none')
+          .forEach(f => {
+            // 记录原始字段名（从extractedFields中查找）
+            const originalField = context.data.extractedFields.find(
+              ef => ef.name === f.name || ef.value === f.value
+            );
+            if (originalField) {
+              allMatchedFieldNames.add(originalField.name);
+            }
+          });
+        
+        // 计算匹配度：成功映射的核心字段数量 / 总核心字段数量
+        const coreFields = schema.core_fields || [];
+        const mappedCoreFieldNames = new Set(
+          normalizedFields
+            .filter(f => f.mappingMethod && f.mappingMethod !== 'none')  // 只计算成功映射的字段
+            .map(f => f.standardName)  // 使用 standardName 而不是 name
+        );
+        
+        const mappedCoreFieldCount = coreFields.filter(cf => 
+          mappedCoreFieldNames.has(cf.name)
+        ).length;
+        
+        const completeness = coreFields.length > 0 ? 
+          mappedCoreFieldCount / coreFields.length : 0;
+        
+        // 计算加权完整度（考虑字段权重）
+        let weightedCompleteness = 0;
+        if (coreFields.length > 0) {
+          const totalWeight = coreFields.reduce((sum, cf) => sum + (cf.weight || 0), 0);
+          const mappedWeight = coreFields
+            .filter(cf => mappedCoreFieldNames.has(cf.name))
+            .reduce((sum, cf) => sum + (cf.weight || 0), 0);
+          weightedCompleteness = totalWeight > 0 ? mappedWeight / totalWeight : 0;
+        }
+        
+        const result = {
+          schema: schema,
+          schema_name: schema.schema_name || schema.name,
+          completeness: completeness,
+          weightedCompleteness: weightedCompleteness,
+          mappedFields: mappedCoreFieldCount,
+          totalFields: coreFields.length,
+          normalizedFields: normalizedFields,
+          threshold: schema.threshold || 0.6
+        };
+        
+        console.log(
+          `[Pipeline] Schema "${schema.schema_name || schema.name}": ` +
+          `完整度 ${(completeness * 100).toFixed(1)}%, ` +
+          `加权完整度 ${(weightedCompleteness * 100).toFixed(1)}%, ` +
+          `映射字段 ${mappedCoreFieldCount}/${coreFields.length}`
+        );
+        
+        schemaMatchResults.push(result);
+        
+      } catch (error) {
+        console.warn(`[Pipeline] Schema "${schema.schema_name || schema.name}" 归一化失败: ${error.message}`);
       }
     }
     
+    console.log(`[Pipeline] 算法匹配完成: ${schemaMatchResults.length} 个Schema, ${allMatchedFieldNames.size}/${context.data.extractedFields.length} 个字段被匹配`);
     console.log(`[Pipeline] 缓存命中统计: ${normalizationCache.size} 个字段被缓存`);
     normalizationCache.clear();  // 清理缓存
     
-    // 按加权完整度排序
-    schemaMatchResults.sort((a, b) => b.weightedCompleteness - a.weightedCompleteness);
+    // 识别未匹配的字段
+    const unmatchedFields = context.data.extractedFields.filter(
+      field => !allMatchedFieldNames.has(field.name)
+    );
     
-    // 获取触发的Schema（完整度达到阈值）
-    const triggeredSchemas = schemaMatchResults.filter(result => 
-      result.weightedCompleteness >= result.threshold
+    console.log(`[Pipeline] 未匹配字段: ${unmatchedFields.length} 个`);
+    if (unmatchedFields.length > 0 && unmatchedFields.length <= 20) {
+      console.log('[Pipeline] 未匹配字段列表:', unmatchedFields.map(f => f.name).join(', '));
+    }
+    
+    // 阶段2: LLM匹配（兜底方案）
+    let llmMatchesBySchema = new Map();
+    if (unmatchedFields.length > 0 && options.schemaMatching.useLLM) {
+      llmMatchesBySchema = await this._llmMatchFields(
+        unmatchedFields,
+        sortedSchemas,
+        context.data.ckb,
+        options
+      );
+    } else if (unmatchedFields.length === 0) {
+      console.log('[Pipeline] 阶段2: LLM匹配跳过（所有字段已被算法匹配）');
+    }
+    
+    // 阶段3: 合并算法和LLM匹配结果
+    const mergedResults = this._mergeMatchResults(
+      schemaMatchResults,
+      llmMatchesBySchema,
+      sortedSchemas
+    );
+    
+    // 按加权完整度排序（已在merge中完成，这里确保）
+    mergedResults.sort((a, b) => b.weightedCompleteness - a.weightedCompleteness);
+    
+    // 筛选：完整度 > 40% 的Schema（用户要求的阈值）
+    const COMPLETENESS_THRESHOLD = 0.4;
+    const qualifiedSchemas = mergedResults.filter(
+      result => result.weightedCompleteness >= COMPLETENESS_THRESHOLD
+    );
+    
+    console.log(`[Pipeline] 筛选结果: ${qualifiedSchemas.length}/${mergedResults.length} 个Schema完整度 >= ${(COMPLETENESS_THRESHOLD * 100).toFixed(0)}%`);
+    
+    // 改进: 使用排序机制替代硬阈值，取Top-N候选Schema
+    const TOP_N = 5;
+    const topSchemas = qualifiedSchemas.length > 0 ? 
+      qualifiedSchemas.slice(0, TOP_N) : 
+      mergedResults.slice(0, TOP_N);
+    
+    console.log(`[Pipeline] Schema匹配完成，Top-${TOP_N} 候选Schema:`);
+    topSchemas.forEach((s, i) => {
+      const meetsThreshold = s.weightedCompleteness >= COMPLETENESS_THRESHOLD;
+      const indicator = meetsThreshold ? '✓' : '○';
+      console.log(
+        `  ${indicator} ${i+1}. ${s.schema_name}: ${(s.weightedCompleteness * 100).toFixed(1)}% ` +
+        `(阈值: ${(COMPLETENESS_THRESHOLD * 100).toFixed(0)}%, 算法: ${s.algorithmMatches || s.mappedFields}, LLM: ${s.llmMatches || 0}, 总计: ${s.totalMatches || s.mappedFields}/${s.totalFields})`
+      );
+    });
+    
+    // 获取达到阈值的Schema（用于向后兼容）
+    const triggeredSchemas = topSchemas.filter(result => 
+      result.weightedCompleteness >= COMPLETENESS_THRESHOLD
     );
     
     console.log(
-      `[Pipeline] Schema匹配完成: ${triggeredSchemas.length}/${schemas.length} 个Schema达到阈值`
+      `[Pipeline] 其中 ${triggeredSchemas.length}/${TOP_N} 个Schema达到阈值`
     );
     
     // 记录结束时的token使用情况
@@ -1226,13 +1292,13 @@ class UniversalDocumentPipeline {
       console.log('[Pipeline] 未找到匹配的Schema，使用通用Schema');
       
       // 输出最接近的Schema信息
-      if (schemaMatchResults.length > 0) {
-        const closest = schemaMatchResults[0];
+      if (mergedResults.length > 0) {
+        const closest = mergedResults[0];
         console.log(
           `[Pipeline] 最接近的Schema: "${closest.schema_name}", ` +
           `完整度 ${(closest.weightedCompleteness * 100).toFixed(1)}%, ` +
-          `阈值 ${(closest.threshold * 100).toFixed(1)}%, ` +
-          `差距 ${((closest.threshold - closest.weightedCompleteness) * 100).toFixed(1)}%`
+          `阈值 ${(COMPLETENESS_THRESHOLD * 100).toFixed(0)}%, ` +
+          `差距 ${((COMPLETENESS_THRESHOLD - closest.weightedCompleteness) * 100).toFixed(1)}%`
         );
       }
       
@@ -1269,20 +1335,33 @@ class UniversalDocumentPipeline {
         completeness: 1.0,
         weightedCompleteness: 1.0,
         schema_name: 'Generic',
+        algorithmMatches: topFields.length,
+        llmMatches: 0,
+        totalMatches: topFields.length,
         normalizedFields: context.data.extractedFields  // 通用Schema不需要归一化
       }];
     } else {
-      context.data.matchedSchemas = triggeredSchemas;
+      // 改进: 使用Top-N候选Schema而不是只使用达到阈值的Schema
+      // 这样可以为更多Schema构建实体，然后由LLM筛选最佳实体
+      context.data.matchedSchemas = topSchemas;
+      context.data.triggeredSchemas = triggeredSchemas;  // 保留用于统计
     }
     
     StepExecutor.recordMetrics('schemaMatching', {
       totalSchemas: schemas.length,
+      algorithmMatchedSchemas: schemaMatchResults.length,
+      llmMatchedSchemas: llmMatchesBySchema.size,
+      mergedSchemas: mergedResults.length,
+      qualifiedSchemas: qualifiedSchemas.length,
       triggeredSchemas: context.data.matchedSchemas.length,
+      unmatchedFieldCount: unmatchedFields.length,
       avgCompleteness: context.data.matchedSchemas.reduce((sum, s) => sum + s.weightedCompleteness, 0) / 
                        (context.data.matchedSchemas.length || 1),
-      bestMatch: schemaMatchResults.length > 0 ? {
-        name: schemaMatchResults[0].schema_name,
-        completeness: schemaMatchResults[0].weightedCompleteness
+      bestMatch: mergedResults.length > 0 ? {
+        name: mergedResults[0].schema_name,
+        completeness: mergedResults[0].weightedCompleteness,
+        algorithmMatches: mergedResults[0].algorithmMatches || mergedResults[0].mappedFields,
+        llmMatches: mergedResults[0].llmMatches || 0
       } : null,
       tokenUsage: stepTokenUsage || 0,
       apiCalls: stepApiCalls || 0
@@ -1396,6 +1475,12 @@ class UniversalDocumentPipeline {
         const schemaMatch = context.data.matchedSchemas.find(
           sm => sm.schema.schema_name === normalizedFieldSet.schema.schema_name
         );
+        
+        // Skip schemas with 0% completeness or 0 fields
+        if (schemaMatch.weightedCompleteness === 0 || normalizedFieldSet.fields.length === 0) {
+          console.log(`[Pipeline] 跳过空Schema: ${schemaMatch.schema_name} (完整度: ${(schemaMatch.weightedCompleteness * 100).toFixed(1)}%, 字段数: ${normalizedFieldSet.fields.length})`);
+          continue;
+        }
         
         const entity = await entityBuilder.buildEntity(
           schemaMatch,
@@ -1574,9 +1659,19 @@ class UniversalDocumentPipeline {
     if (relationOptions.enableCooccurrence) {
       if (context.data.entities.length > 1) {
         try {
-          const cooccurrenceRelations = await cooccurrenceRelationBuilder.buildRelations(
-            context.data.entities,
-            [context.data.ckb.ckb_id]
+          // Create CKB objects with entity information for cooccurrence analysis
+          const ckbsWithEntities = [{
+            ckb_id: context.data.ckb.ckb_id,
+            entities: context.data.entities.map(e => ({
+              id: e.entity_id,
+              canonical_name: e.canonical_name
+            })),
+            quality: context.data.ckb.quality || { source_confidence: 0.9 }
+          }];
+          
+          const cooccurrenceRelations = await cooccurrenceRelationBuilder.buildCooccurrenceRelations(
+            ckbsWithEntities,
+            { weightThreshold: 0.5, minCooccurrences: 1 }
           );
           allRelations.push(...cooccurrenceRelations);
           builderResults.cooccurrence.success = true;
@@ -1601,14 +1696,38 @@ class UniversalDocumentPipeline {
     if (relationOptions.enableSemantic && relationOptions.semanticUseLLM) {
       if (context.data.entities.length > 1) {
         try {
-          const semanticRelations = await semanticRelationBuilder.buildRelations(
-            context.data.entities,
-            context.data.ckb,
-            { useLLM: true }
-          );
-          allRelations.push(...semanticRelations);
-          builderResults.semantic.success = true;
-          builderResults.semantic.count = semanticRelations.length;
+          // Create CKB object with entity information for semantic analysis
+          // Filter out any undefined entities
+          const validEntities = context.data.entities.filter(e => e && e.entity_id && e.canonical_name);
+          
+          if (validEntities.length < 2) {
+            console.log(`[Pipeline] 语义关系提取需要至少2个有效实体，当前只有 ${validEntities.length} 个`);
+            builderResults.semantic.success = true;
+            builderResults.semantic.count = 0;
+          } else {
+            const ckbWithEntities = {
+              ckb_id: context.data.ckb.ckb_id,
+              doc_id: context.document.id,
+              content: { text: context.data.ckb.text },
+              entities: validEntities.map(e => ({
+                id: e.entity_id,
+                canonical_name: e.canonical_name,
+                type: e.schema_name
+              }))
+            };
+            
+            const semanticRelations = await semanticRelationBuilder.extractSemanticRelations(
+              ckbWithEntities,
+              null, // Will use default LLM client
+              { 
+                confidenceThreshold: 0.7,
+                maxRelations: 10
+              }
+            );
+            allRelations.push(...semanticRelations);
+            builderResults.semantic.success = true;
+            builderResults.semantic.count = semanticRelations.length;
+          }
         } catch (error) {
           console.warn(`[Pipeline] 语义关系构建器失败: ${error.message}`);
           builderResults.semantic.error = error.message;
@@ -1803,6 +1922,229 @@ class UniversalDocumentPipeline {
     } else {
       console.log('[Pipeline] 回滚完成，所有数据已清理');
     }
+  }
+  
+  /**
+   * LLM匹配未匹配字段到Schema（阶段2：LLM兜底）
+   * 
+   * @param {Array} unmatchedFields - 算法阶段未匹配的字段
+   * @param {Array} schemas - 候选Schema列表
+   * @param {Object} ckb - CKB对象（用于上下文）
+   * @param {Object} options - 匹配选项
+   * @returns {Promise<Map>} Schema名称 -> LLM匹配结果的映射
+   */
+  async _llmMatchFields(unmatchedFields, schemas, ckb, options) {
+    if (!options.schemaMatching.useLLM || unmatchedFields.length === 0) {
+      console.log('[Pipeline] LLM匹配跳过: useLLM=false 或无未匹配字段');
+      return new Map();
+    }
+    
+    console.log(`[Pipeline] 阶段2: LLM匹配 ${unmatchedFields.length} 个未匹配字段...`);
+    
+    try {
+      // 导入prompt模块
+      const schemaMatchPrompt = require('../prompts/schema_match');
+      const { createQwenClient } = require('../utils/qwen_client');
+      
+      // 初始化LLM客户端
+      const llmClient = createQwenClient(process.env.QWEN_API_KEY);
+      
+      // 构建prompt
+      const context = ckb.content?.text?.substring(0, 500) || ''; // 限制上下文长度
+      const prompt = schemaMatchPrompt.buildSchemaMatchPrompt(
+        unmatchedFields,
+        schemas,
+        { context, maxSchemas: 10 }
+      );
+      
+      // 调用LLM
+      const response = await llmClient.callJSON(prompt, {
+        temperature: 0.3,
+        maxTokens: 2000,
+        systemPrompt: '你是一个Schema字段匹配专家。'
+      });
+      
+      // 验证响应
+      const validation = schemaMatchPrompt.validateSchemaMatchResult(
+        response,
+        unmatchedFields,
+        schemas
+      );
+      
+      if (validation.errors.length > 0) {
+        console.warn('[Pipeline] LLM匹配响应验证失败:', validation.errors);
+      }
+      
+      // 按Schema组织匹配结果
+      const llmMatchesBySchema = new Map();
+      
+      for (const match of validation.validMatches) {
+        if (!llmMatchesBySchema.has(match.schema_name)) {
+          llmMatchesBySchema.set(match.schema_name, []);
+        }
+        llmMatchesBySchema.get(match.schema_name).push(match);
+      }
+      
+      console.log(`[Pipeline] LLM匹配完成: ${validation.validMatches.length} 个字段匹配到 ${llmMatchesBySchema.size} 个Schema`);
+      
+      // 记录token使用
+      const tokens = response._meta?.tokens || 0;
+      await tokenTracker.recordUsage({
+        module: 'pipeline',
+        operation: 'llm_schema_match',
+        tokens: tokens,
+        ckb_id: ckb.ckb_id,
+        doc_id: ckb.doc_id,
+        model_name: 'qwen'
+      });
+      
+      return llmMatchesBySchema;
+      
+    } catch (error) {
+      console.error('[Pipeline] LLM匹配失败:', error.message);
+      return new Map();
+    }
+  }
+  
+  /**
+   * 合并算法匹配和LLM匹配结果（阶段3：合并排名）
+   * 
+   * @param {Array} algorithmResults - 算法匹配结果
+   * @param {Map} llmMatchesBySchema - LLM匹配结果（按Schema组织）
+   * @param {Array} schemas - 所有候选Schema
+   * @returns {Array} 合并后的Schema匹配结果
+   */
+  _mergeMatchResults(algorithmResults, llmMatchesBySchema, schemas) {
+    console.log('[Pipeline] 阶段3: 合并算法和LLM匹配结果...');
+    
+    const mergedResults = new Map();
+    
+    // 步骤1: 添加算法匹配结果
+    for (const result of algorithmResults) {
+      const schemaName = result.schema_name;
+      mergedResults.set(schemaName, {
+        schema: result.schema,
+        schema_name: schemaName,
+        algorithmMatches: result.mappedFields || 0,
+        llmMatches: 0,
+        totalMatches: result.mappedFields || 0,
+        completeness: result.completeness || 0,
+        weightedCompleteness: result.weightedCompleteness || 0,
+        normalizedFields: result.normalizedFields || [],
+        threshold: result.threshold || 0.6
+      });
+    }
+    
+    // 步骤2: 合并LLM匹配结果
+    for (const [schemaName, llmMatches] of llmMatchesBySchema.entries()) {
+      // 找到对应的Schema
+      const schema = schemas.find(s => (s.schema_name || s.name) === schemaName);
+      if (!schema) {
+        console.warn(`[Pipeline] LLM匹配的Schema "${schemaName}" 不在候选列表中，跳过`);
+        continue;
+      }
+      
+      const coreFieldCount = (schema.core_fields || []).length;
+      const llmMatchCount = llmMatches.length;
+      
+      if (mergedResults.has(schemaName)) {
+        // 已有算法匹配结果，合并LLM结果
+        const existing = mergedResults.get(schemaName);
+        existing.llmMatches = llmMatchCount;
+        existing.totalMatches = existing.algorithmMatches + llmMatchCount;
+        
+        // 重新计算完整度
+        if (coreFieldCount > 0) {
+          existing.completeness = existing.totalMatches / coreFieldCount;
+          
+          // 重新计算加权完整度（考虑字段权重）
+          const totalWeight = (schema.core_fields || []).reduce((sum, f) => sum + (f.weight || 0), 0);
+          if (totalWeight > 0) {
+            // 算法匹配的字段权重（已在algorithmResults中计算）
+            const algorithmWeight = existing.weightedCompleteness * totalWeight;
+            
+            // LLM匹配的字段权重
+            const llmWeight = llmMatches.reduce((sum, match) => {
+              const field = schema.core_fields.find(f => f.name === match.schema_field);
+              return sum + (field?.weight || 0);
+            }, 0);
+            
+            existing.weightedCompleteness = (algorithmWeight + llmWeight) / totalWeight;
+          } else {
+            existing.weightedCompleteness = existing.completeness;
+          }
+        }
+        
+        // 添加LLM匹配的字段到normalizedFields
+        for (const match of llmMatches) {
+          // 检查是否已存在（避免重复）
+          const exists = existing.normalizedFields.some(
+            f => f.name === match.schema_field || f.standardName === match.schema_field
+          );
+          
+          if (!exists) {
+            existing.normalizedFields.push({
+              name: match.schema_field,
+              standardName: match.schema_field,
+              value: '', // LLM匹配没有具体值
+              mappingMethod: 'llm',
+              confidence: match.confidence,
+              reason: match.reason
+            });
+          }
+        }
+        
+      } else {
+        // 没有算法匹配结果，创建新的结果（纯LLM匹配）
+        const completeness = coreFieldCount > 0 ? llmMatchCount / coreFieldCount : 0;
+        
+        // 计算加权完整度
+        let weightedCompleteness = completeness;
+        const totalWeight = (schema.core_fields || []).reduce((sum, f) => sum + (f.weight || 0), 0);
+        if (totalWeight > 0) {
+          const llmWeight = llmMatches.reduce((sum, match) => {
+            const field = schema.core_fields.find(f => f.name === match.schema_field);
+            return sum + (field?.weight || 0);
+          }, 0);
+          weightedCompleteness = llmWeight / totalWeight;
+        }
+        
+        mergedResults.set(schemaName, {
+          schema: schema,
+          schema_name: schemaName,
+          algorithmMatches: 0,
+          llmMatches: llmMatchCount,
+          totalMatches: llmMatchCount,
+          completeness: completeness,
+          weightedCompleteness: weightedCompleteness,
+          normalizedFields: llmMatches.map(match => ({
+            name: match.schema_field,
+            standardName: match.schema_field,
+            value: '',
+            mappingMethod: 'llm',
+            confidence: match.confidence,
+            reason: match.reason
+          })),
+          threshold: schema.threshold || 0.6
+        });
+      }
+    }
+    
+    // 步骤3: 转换为数组并排序
+    const mergedArray = Array.from(mergedResults.values());
+    mergedArray.sort((a, b) => b.weightedCompleteness - a.weightedCompleteness);
+    
+    // 步骤4: 输出合并统计
+    console.log('[Pipeline] 合并结果统计:');
+    mergedArray.slice(0, 10).forEach((result, index) => {
+      console.log(
+        `  ${index + 1}. ${result.schema_name}: ` +
+        `完整度 ${(result.weightedCompleteness * 100).toFixed(1)}% ` +
+        `(算法: ${result.algorithmMatches}, LLM: ${result.llmMatches}, 总计: ${result.totalMatches}/${(result.schema.core_fields || []).length})`
+      );
+    });
+    
+    return mergedArray;
   }
   
   /**

@@ -1324,5 +1324,254 @@
       "data_type": "datetime",
       "domain": "government"
     }
+  },
+  "PhotographyEntity": {
+    "Camera": {
+      "common_variations": [
+        "相机", "机身", "相机型号", "相机品牌", "相机名称",
+        "Camera", "camera", "机器", "设备", "拍摄设备",
+        "相机是什么", "用什么相机", "什么相机", "哪款相机",
+        "索尼", "尼康", "佳能", "富士", "徕卡", "宾得",
+        "Sony", "Nikon", "Canon", "Fuji", "Leica", "Pentax",
+        "A7", "D850", "5D", "X-T", "M10", "K-1"
+      ],
+      "weight": 0.3,
+      "required": true,
+      "description": "相机型号字段",
+      "data_type": "text",
+      "domain": "photography"
+    },
+    "Lens": {
+      "common_variations": [
+        "镜头", "镜头型号", "镜头焦段", "焦距", "镜头名称",
+        "Lens", "lens", "光学镜头", "摄影镜头",
+        "什么镜头", "用什么镜头", "镜头是什么", "哪个镜头",
+        "定焦", "变焦", "广角", "长焦", "标准镜头", "微距",
+        "35mm", "50mm", "85mm", "24-70", "70-200",
+        "f1.4", "f1.8", "f2.8", "f4", "f5.6"
+      ],
+      "weight": 0.3,
+      "required": true,
+      "description": "镜头型号字段",
+      "data_type": "text",
+      "domain": "photography"
+    },
+    "ISO": {
+      "common_variations": [
+        "ISO", "iso", "感光度", "ISO值", "ISO设置",
+        "ISO是多少", "感光度是多少", "ISO多少",
+        "ISO100", "ISO200", "ISO400", "ISO800", "ISO1600",
+        "低ISO", "高ISO", "自动ISO"
+      ],
+      "weight": 0.1,
+      "required": false,
+      "description": "ISO感光度字段",
+      "data_type": "number",
+      "domain": "photography"
+    },
+    "Aperture": {
+      "common_variations": [
+        "光圈", "光圈值", "光圈大小", "Aperture", "aperture",
+        "f值", "F值", "光圈是多少", "光圈多少",
+        "f1.4", "f1.8", "f2.0", "f2.8", "f4", "f5.6", "f8", "f11", "f16",
+        "大光圈", "小光圈", "最大光圈", "最小光圈"
+      ],
+      "weight": 0.1,
+      "required": false,
+      "description": "光圈值字段",
+      "data_type": "text",
+      "domain": "photography"
+    },
+    "Shutter": {
+      "common_variations": [
+        "快门", "快门速度", "曝光时间", "Shutter", "shutter",
+        "快门是多少", "快门速度是多少", "曝光多久",
+        "1/1000", "1/500", "1/250", "1/125", "1/60", "1/30",
+        "高速快门", "慢速快门", "长曝光", "短曝光"
+      ],
+      "weight": 0.1,
+      "required": false,
+      "description": "快门速度字段",
+      "data_type": "text",
+      "domain": "photography"
+    },
+    "Exposure": {
+      "common_variations": [
+        "曝光", "曝光补偿", "EV", "曝光值", "Exposure",
+        "曝光是多少", "EV值", "曝光补偿是多少",
+        "+1EV", "-1EV", "+2EV", "-2EV", "0EV",
+        "过曝", "欠曝", "正常曝光", "曝光正常", "曝光图"
+      ],
+      "weight": 0.05,
+      "required": false,
+      "description": "曝光补偿字段",
+      "data_type": "text",
+      "domain": "photography"
+    },
+    "Focus": {
+      "common_variations": [
+        "对焦", "对焦模式", "对焦点", "Focus", "focus", "焦点",
+        "对焦方式", "如何对焦", "对焦在哪",
+        "单次对焦", "连续对焦", "手动对焦", "自动对焦",
+        "AF", "MF", "AF-S", "AF-C", "中心对焦", "眼部对焦"
+      ],
+      "weight": 0.05,
+      "required": false,
+      "description": "对焦模式字段",
+      "data_type": "text",
+      "domain": "photography"
+    }
+  },
+  "PostProcessingEntity": {
+    "Software": {
+      "common_variations": [
+        "软件", "后期软件", "修图软件", "调色软件",
+        "Software", "software", "工具", "后期工具",
+        "用什么软件", "什么软件", "软件是什么",
+        "Lightroom", "LR", "Photoshop", "PS", "Capture One",
+        "Luminar", "DxO", "Affinity Photo"
+      ],
+      "weight": 0.4,
+      "required": true,
+      "description": "后期软件字段",
+      "data_type": "text",
+      "domain": "post_processing"
+    },
+    "Style": {
+      "common_variations": [
+        "风格", "调色风格", "色调", "影调", "Style", "style",
+        "什么风格", "风格是什么", "色调是什么", "影调是什么",
+        "日系", "胶片", "复古", "清新", "暗调", "亮调",
+        "高对比", "低对比", "冷色调", "暖色调", "黑白", "彩色",
+        "淡雅蓝", "清新绿", "摄影风格", "视觉语言", "色彩语言"
+      ],
+      "weight": 0.3,
+      "required": false,
+      "description": "调色风格字段",
+      "data_type": "text",
+      "domain": "post_processing"
+    },
+    "Preset": {
+      "common_variations": [
+        "预设", "预设名称", "滤镜", "Preset", "preset",
+        "用什么预设", "什么预设", "预设是什么",
+        "VSCO", "滨田英明", "川内伦子", "森山大道", "xmp"
+      ],
+      "weight": 0.3,
+      "required": false,
+      "description": "预设名称字段",
+      "data_type": "text",
+      "domain": "post_processing"
+    }
+  },
+  "ProductDesignEntity": {
+    "ProductName": {
+      "common_variations": [
+        "产品名称", "产品", "产品名", "项目名称", "项目",
+        "Product", "product", "产品叫什么", "什么产品",
+        "系统名称", "系统", "平台名称", "平台", "应用名称", "应用",
+        "软件名称", "软件", "工具名称", "工具", "产品一句话定义"
+      ],
+      "weight": 0.4,
+      "required": true,
+      "description": "产品名称字段",
+      "data_type": "text",
+      "domain": "product_design"
+    },
+    "Version": {
+      "common_variations": [
+        "版本", "版本号", "Version", "version", "V", "v",
+        "什么版本", "版本是什么", "版本号是什么",
+        "V1.0", "V2.0", "1.0", "2.0", "Beta", "Alpha"
+      ],
+      "weight": 0.2,
+      "required": false,
+      "description": "版本号字段",
+      "data_type": "text",
+      "domain": "product_design"
+    },
+    "Author": {
+      "common_variations": [
+        "作者", "创建人", "负责人", "设计师", "产品经理",
+        "Author", "author", "谁做的", "谁设计的", "谁负责",
+        "PM", "产品负责人", "项目负责人", "Johnie"
+      ],
+      "weight": 0.2,
+      "required": false,
+      "description": "作者字段",
+      "data_type": "text",
+      "domain": "product_design"
+    },
+    "Status": {
+      "common_variations": [
+        "状态", "项目状态", "开发状态", "Status", "status",
+        "什么状态", "状态是什么", "进度", "进展",
+        "开发中", "已完成", "规划中", "测试中", "上线"
+      ],
+      "weight": 0.2,
+      "required": false,
+      "description": "状态字段",
+      "data_type": "text",
+      "domain": "product_design"
+    }
+  },
+  "EITV": {
+    "Entity": {
+      "common_variations": [
+        "实体", "实体名称", "Entity", "entity", "对象", "主体",
+        "项目名称", "项目", "名称", "name", "Name",
+        "什么实体", "实体是什么", "对象是什么"
+      ],
+      "weight": 0.4,
+      "required": true,
+      "description": "实体字段 - 通用实体名称",
+      "data_type": "text",
+      "domain": "general"
+    },
+    "Indicator": {
+      "common_variations": [
+        "指标", "指标名称", "Indicator", "indicator", "度量", "参数",
+        "什么指标", "指标是什么", "度量什么", "参数是什么"
+      ],
+      "weight": 0.15,
+      "required": true,
+      "description": "指标字段 - 通用指标名称",
+      "data_type": "text",
+      "domain": "general"
+    },
+    "Time": {
+      "common_variations": [
+        "时间", "日期", "Time", "time", "Date", "date",
+        "时刻", "时段", "什么时候", "何时", "时间是什么",
+        "创建时间", "创建日期", "2025年10月", "2025-10"
+      ],
+      "weight": 0.15,
+      "required": true,
+      "description": "时间字段 - 通用时间信息",
+      "data_type": "datetime",
+      "domain": "general"
+    },
+    "Value": {
+      "common_variations": [
+        "数值", "值", "Value", "value", "数量", "大小",
+        "数字", "数额", "是多少", "值是多少"
+      ],
+      "weight": 0.15,
+      "required": false,
+      "description": "数值字段 - 通用数值信息",
+      "data_type": "number",
+      "domain": "general"
+    },
+    "Unit": {
+      "common_variations": [
+        "单位", "计量单位", "Unit", "unit", "量纲",
+        "什么单位", "单位是什么", "用什么单位", "个"
+      ],
+      "weight": 0.15,
+      "required": false,
+      "description": "单位字段 - 通用单位信息",
+      "data_type": "text",
+      "domain": "general"
+    }
   }
 }

@@ -410,6 +410,147 @@ function getLLMStats(mappingResults) {
   return stats;
 }
 
+/**
+ * LLM兜底机制 - 映射未映射的字段（无需指定schema）
+ * 
+ * 当算法映射失败率过高时，使用LLM分析未映射字段，
+ * 尝试将它们映射到常见的标准字段名。
+ * 
+ * @param {Array} unmappedFields - 未映射的字段列表
+ * @param {string} documentType - 文档类型（可选，用于提供上下文）
+ * @returns {Promise<Array>} 映射后的字段列表
+ */
+async function mapUnmappedFields(unmappedFields, documentType = null) {
+  if (!unmappedFields || unmappedFields.length === 0) {
+    return [];
+  }
+  
+  console.log(`[LLMMapper] LLM兜底: 尝试映射 ${unmappedFields.length} 个未映射字段`);
+  
+  // 限制字段数量，避免token超限
+  const MAX_FIELDS = 20;
+  const fieldsToMap = unmappedFields.slice(0, MAX_FIELDS);
+  if (unmappedFields.length > MAX_FIELDS) {
+    console.log(`[LLMMapper] 字段数量过多，只处理前 ${MAX_FIELDS} 个字段`);
+  }
+  
+  // 构建prompt
+  const fieldList = fieldsToMap.map(f => 
+    `- ${f.name}: ${f.value ? String(f.value).substring(0, 100) : '(无值)'}`
+  ).join('\n');
+  
+  const contextHint = documentType ? `\n文档类型: ${documentType}` : '';
+  
+  const prompt = `你是一个字段映射专家。请分析以下未映射的字段，尝试将它们映射到标准字段名。${contextHint}
+
+未映射字段:
+${fieldList}
+
+常见标准字段名包括:
+- ProductName (产品名称)
+- Version (版本)
+- Author (作者)
+- Status (状态)
+- Time (时间)
+- Date (日期)
+- Entity (实体)
+- Indicator (指标)
+- Value (数值)
+- Unit (单位)
+- Camera (相机)
+- Lens (镜头)
+- ISO (感光度)
+- Software (软件)
+- Style (风格)
+
+请为每个字段提供:
+1. 最合适的标准字段名（如果无法映射则返回null）
+2. 映射的置信度（0-1）
+3. 映射理由
+
+以JSON格式返回:
+{
+  "mappings": [
+    {
+      "originalName": "原始字段名",
+      "standardName": "标准字段名或null",
+      "confidence": 0.85,
+      "reason": "映射理由"
+    }
+  ]
+}`;
+  
+  try {
+    // 初始化LLM客户端
+    const client = initLLMClient();
+    if (!client) {
+      throw new Error('LLM客户端未初始化，请检查QWEN_API_KEY环境变量');
+    }
+    
+    const response = await client.call(prompt, {
+      temperature: 0.1,  // 低温度，更确定性的输出
+      maxTokens: 2000
+    });
+    
+    // 解析响应
+    const result = client.parseJSON(response.content);
+    
+    if (!result.mappings || !Array.isArray(result.mappings)) {
+      throw new Error('LLM响应格式错误: 缺少mappings数组');
+    }
+    
+    // 转换为标准格式
+    const mappedFields = [];
+    let successCount = 0;
+    
+    for (const mapping of result.mappings) {
+      const originalField = fieldsToMap.find(f => f.name === mapping.originalName);
+      if (!originalField) continue;
+      
+      if (mapping.standardName && mapping.confidence >= 0.5) {
+        mappedFields.push({
+          originalName: originalField.name,
+          standardName: mapping.standardName,
+          value: originalField.value,
+          confidence: mapping.confidence,
+          mappingMethod: 'llm_fallback',
+          reason: mapping.reason
+        });
+        successCount++;
+      } else {
+        // 映射失败，保留原始字段
+        mappedFields.push({
+          originalName: originalField.name,
+          standardName: null,
+          value: originalField.value,
+          confidence: 0,
+          mappingMethod: 'llm_fallback_failed',
+          reason: mapping.reason || '无法找到合适的标准字段名'
+        });
+      }
+    }
+    
+    console.log(
+      `[LLMMapper] LLM兜底完成: ${successCount}/${fieldsToMap.length} 个字段成功映射`
+    );
+    
+    return mappedFields;
+    
+  } catch (error) {
+    console.error(`[LLMMapper] LLM兜底失败:`, error.message);
+    
+    // 返回未映射的字段
+    return fieldsToMap.map(f => ({
+      originalName: f.name,
+      standardName: null,
+      value: f.value,
+      confidence: 0,
+      mappingMethod: 'llm_fallback_error',
+      reason: `LLM调用失败: ${error.message}`
+    }));
+  }
+}
+
 module.exports = {
   mapFieldNameWithLLM,
   batchMapFieldNames,
@@ -417,5 +558,6 @@ module.exports = {
   validateLLMResponse,
   getLLMStats,
   setLLMClient,
-  initLLMClient
+  initLLMClient,
+  mapUnmappedFields  // 新增：LLM兜底方法
 };

@@ -78,25 +78,25 @@ async function generateCanonicalName(fields, schema, ckb, options = {}) {
     llmClient = null
   } = options;
   
-  // Check budget status and respect LLM participation rate
-  const budgetStatus = tokenBudgetManager.getBudgetStatus();
-  const effectiveLLMProbability = llmProbability * budgetStatus.llmParticipationRate;
-  
-  // Step 1: Rule-based canonical name generation
+  // Step 1: Rule-based canonical name generation (算法生成基础名称)
   let canonicalName = generateRuleBasedName(fields, schema);
   
   // Step 2: Check if name is well-formed
   const isWellFormed = checkNameWellFormed(canonicalName);
   
-  // Step 3: LLM enhancement (adjusted probability based on budget)
-  if (useLLM && (Math.random() < effectiveLLMProbability || !isWellFormed)) {
+  // Step 3: LLM作为兜底方案 - 100%启动验证和优化
+  // LLM Enhancement: ALWAYS used as fallback to validate and optimize
+  // - If name is NOT well-formed: LLM MUST fix it (强制修正)
+  // - If name IS well-formed: LLM validates and may optimize (验证并优化)
+  if (useLLM) {
     try {
       const llmStart = Date.now();
       const llmResult = await enhanceNameWithLLM(
         canonicalName,
         schema,
         ckb,
-        llmClient
+        llmClient,
+        !isWellFormed // Pass flag: true if name needs fixing
       );
       
       if (llmResult && llmResult.canonical_name) {
@@ -113,7 +113,8 @@ async function generateCanonicalName(fields, schema, ckb, options = {}) {
         return {
           canonical_name: llmResult.canonical_name,
           aliases: llmResult.aliases || [],
-          llm_enhanced: true
+          llm_enhanced: true,
+          needs_fixing: !isWellFormed
         };
       }
     } catch (error) {
@@ -128,6 +129,11 @@ async function generateCanonicalName(fields, schema, ckb, options = {}) {
         ckb_id: ckb.ckb_id,
         doc_id: ckb.doc_id
       });
+      
+      // If name is NOT well-formed and LLM failed, this is critical
+      if (!isWellFormed) {
+        console.warn('[EntityBuilder] Name is not well-formed and LLM failed to fix it:', canonicalName);
+      }
       // Fall back to rule-based name
     }
   }
@@ -135,7 +141,8 @@ async function generateCanonicalName(fields, schema, ckb, options = {}) {
   return {
     canonical_name: canonicalName,
     aliases: [],
-    llm_enhanced: false
+    llm_enhanced: false,
+    needs_fixing: !isWellFormed
   };
 }
 
@@ -302,14 +309,16 @@ function checkNameWellFormed(name) {
  * Enhance canonical name with LLM
  * 
  * Uses LLM to standardize and improve entity name, generate aliases.
+ * LLM acts as 100% fallback to validate and optimize all entity names.
  * 
  * @param {string} rawName - Rule-based canonical name
  * @param {Object} schema - Schema definition
  * @param {Object} ckb - CKB object for context
  * @param {Object} llmClient - LLM client instance
+ * @param {boolean} needsFixing - Whether the name needs fixing (not well-formed)
  * @returns {Promise<Object>} { canonical_name, aliases }
  */
-async function enhanceNameWithLLM(rawName, schema, ckb, llmClient) {
+async function enhanceNameWithLLM(rawName, schema, ckb, llmClient, needsFixing = false) {
   // Use provided client or initialize default
   const client = llmClient || getLLMClient();
   
@@ -318,7 +327,7 @@ async function enhanceNameWithLLM(rawName, schema, ckb, llmClient) {
     return null;
   }
   
-  const prompt = buildNameEnhancementPrompt(rawName, schema, ckb);
+  const prompt = buildNameEnhancementPrompt(rawName, schema, ckb, needsFixing);
   
   try {
     const response = await client.callJSON(prompt, {
@@ -361,10 +370,17 @@ async function enhanceNameWithLLM(rawName, schema, ckb, llmClient) {
  * @param {string} rawName - Rule-based canonical name
  * @param {Object} schema - Schema definition
  * @param {Object} ckb - CKB object
+ * @param {boolean} needsFixing - Whether the name needs fixing
  * @returns {string} LLM prompt
  */
-function buildNameEnhancementPrompt(rawName, schema, ckb) {
+function buildNameEnhancementPrompt(rawName, schema, ckb, needsFixing = false) {
+  const taskDescription = needsFixing 
+    ? '⚠️ 当前名称不规范，需要修正！请生成一个规范的实体名称。'
+    : '✅ 当前名称基本规范，请验证并优化（如有必要）。';
+    
   return `你是一个实体名称标准化专家。请标准化以下实体名称。
+
+${taskDescription}
 
 原始名称: ${rawName}
 实体类型: ${schema.entity_type}
@@ -376,11 +392,13 @@ Schema: ${schema.schema_name}
 2. 统一格式(如"阿里C区" vs "阿里 C 区")
 3. 确保名称简洁、准确、易读
 4. 提供 2-3 个常见别名(可选)
+${needsFixing ? '5. ⚠️ 必须修正不规范的名称！' : '5. 如果当前名称已经很好，可以保持不变'}
 
 输出 JSON 格式:
 {
   "canonical_name": "标准化后的名称",
-  "aliases": ["别名1", "别名2"]
+  "aliases": ["别名1", "别名2"],
+  "reasoning": "简短说明${needsFixing ? '如何修正' : '是否需要优化'}的理由"
 }`;
 }
 
@@ -997,12 +1015,14 @@ async function buildEntity(schemaScore, fields, ckb, options = {}) {
   const entity = {
     entity_id: `entity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     entity_type: schemaScore.schema.entity_type || 'GeneralEntity',
+    schema_name: schemaScore.schema.schema_name,  // 添加顶层schema_name字段
     canonical_name: nameResult.canonical_name,
     aliases: nameResult.aliases || [],
     schemas: [{
       schema_name: schemaScore.schema.schema_name,
       confidence: schemaScore.completeness
     }],
+    fields: fieldsObj,  // 添加fields字段以便显示
     supported_by: [ckb.ckb_id],
     attributes: fieldsObj,
     confidence: schemaScore.completeness,

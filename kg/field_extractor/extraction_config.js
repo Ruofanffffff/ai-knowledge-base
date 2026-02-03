@@ -80,6 +80,7 @@ const STRATEGY_CONFIG = {
     useLLM: true,
     useRules: false,
     useNER: false,
+    useUniversal: false,
     forceLLM: true,
     useSemantic: true,
     maxFields: 50,
@@ -89,6 +90,7 @@ const STRATEGY_CONFIG = {
     useLLM: true,
     useRules: true,
     useNER: true,
+    useUniversal: false,
     forceLLM: false,
     minFieldCount: 3,
     minConfidence: 0.7
@@ -97,6 +99,7 @@ const STRATEGY_CONFIG = {
     useLLM: true,
     useRules: true,
     useNER: true,
+    useUniversal: false,
     forceLLM: false,
     llmFirst: true,
     minConfidence: 0.8
@@ -105,9 +108,20 @@ const STRATEGY_CONFIG = {
     useLLM: true,
     useRules: true,
     useNER: true,
+    useUniversal: false,
     forceLLM: false,
     parallel: true,
     minConfidence: 0.7
+  },
+  'universal': {
+    useLLM: false,
+    useRules: false,
+    useNER: false,
+    useUniversal: true,
+    forceLLM: false,
+    maxFields: 100,
+    minKeywordScore: 0.01,
+    minConfidence: 0.5
   }
 };
 

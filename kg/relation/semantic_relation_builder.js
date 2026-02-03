@@ -239,9 +239,11 @@ function buildSemanticExtractionPrompt(ckb) {
   const text = ckb.content?.text || '';
   const entities = ckb.entities || [];
 
-  const entityList = entities.map((e, i) => 
-    `${i + 1}. ${e.canonical_name} (ID: ${e.id}, Type: ${e.type})`
-  ).join('\n');
+  const entityList = entities
+    .filter(e => e && e.id && e.canonical_name) // Filter out invalid entities
+    .map((e, i) => 
+      `${i + 1}. ${e.canonical_name} (ID: ${e.id}, Type: ${e.type || 'unknown'})`
+    ).join('\n');
 
   return `你是一个知识图谱关系抽取专家。请从以下文本中抽取实体之间的语义关系。
 

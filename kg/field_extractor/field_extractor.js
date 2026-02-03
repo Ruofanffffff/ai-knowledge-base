@@ -15,10 +15,25 @@ const llmExtractor = require('./llm_extractor');
 const domainDetector = require('./domain_detector');
 const strategySelector = require('./strategy_selector');
 const performanceMonitor = require('../utils/performance_monitor');
+const UniversalExtractor = require('./universal_extractor');
 const crypto = require('crypto');
 
 // Extraction cache
 const extractionCache = new Map();
+
+// Universal extractor instance (singleton)
+let universalExtractorInstance = null;
+
+/**
+ * Get or create universal extractor instance
+ * @returns {UniversalExtractor} Universal extractor instance
+ */
+function getUniversalExtractor() {
+  if (!universalExtractorInstance) {
+    universalExtractorInstance = new UniversalExtractor();
+  }
+  return universalExtractorInstance;
+}
 
 /**
  * Extract fields from CKB (Enhanced)
@@ -27,6 +42,7 @@ const extractionCache = new Map();
  * @param {boolean} options.useLLM - Enable LLM extraction (default: true)
  * @param {boolean} options.useRules - Enable rule extraction (default: true)
  * @param {boolean} options.useNER - Enable NER extraction (default: true)
+ * @param {boolean} options.useUniversal - Enable Universal extraction (default: false)
  * @param {number} options.minFieldCount - Minimum fields before LLM fallback (default: 3)
  * @param {boolean} options.forceLLM - Force LLM extraction (default: false)
  * @param {string} options.domain - Override domain detection (optional)
@@ -45,6 +61,7 @@ async function extractFields(ckb, options = {}) {
     useLLM = true,
     useRules = true,
     useNER = true,
+    useUniversal = false,  // New option for Universal Extractor
     minFieldCount = 3,
     llmFallbackThreshold = 0.5,
     forceLLM = false,
@@ -162,6 +179,7 @@ async function extractFields(ckb, options = {}) {
         useLLM,
         useRules,
         useNER,
+        useUniversal,
         minFieldCount,
         forceLLM,
         trackTokens
@@ -257,6 +275,9 @@ async function executeStrategy(ckb, strategy, domain, schema, options) {
     case 'hybrid':
       return executeHybrid(ckb, text, domain, schema, options);
     
+    case 'universal':
+      return executeUniversal(ckb, text, options);
+    
     default:
       throw new Error(`Unknown strategy: ${strategy}`);
   }
@@ -267,14 +288,27 @@ async function executeStrategy(ckb, strategy, domain, schema, options) {
  * Rule+NER extraction first, LLM fallback if insufficient
  */
 async function executeRuleFirst(ckb, text, options) {
-  const { useRules, useNER, useLLM, minFieldCount } = options;
+  const { useRules, useNER, useLLM, useUniversal, minFieldCount } = options;
   let allFields = [];
+  
+  // Step 0: Universal extraction (if enabled)
+  if (useUniversal) {
+    const universalExtractor = getUniversalExtractor();
+    const universalFields = await universalExtractor.extractFields(ckb, {
+      maxFields: 100,
+      minKeywordScore: 0.01,
+      includeStructured: true,
+      includeKeywords: true
+    });
+    console.log(`Universal extraction found ${universalFields.length} fields`);
+    allFields = universalFields;
+  }
   
   // Step 1: Rule-based extraction
   if (useRules) {
     const ruleFields = ruleExtractor.extractFields(text);
     console.log(`Rule extraction found ${ruleFields.length} fields`);
-    allFields = ruleFields;
+    allFields = [...allFields, ...ruleFields];
   }
   
   // Step 2: NER extraction
@@ -444,6 +478,25 @@ async function executeHybrid(ckb, text, domain, schema, options) {
   console.log(`Hybrid extraction found ${allFields.length} total fields`);
   
   return allFields;
+}
+
+/**
+ * Execute universal strategy
+ * Universal extractor only (tokenization + keyword extraction + structured patterns)
+ */
+async function executeUniversal(ckb, text, options) {
+  const universalExtractor = getUniversalExtractor();
+  
+  const fields = await universalExtractor.extractFields(ckb, {
+    maxFields: options.maxFields || 100,
+    minKeywordScore: options.minKeywordScore || 0.01,
+    includeStructured: true,
+    includeKeywords: true
+  });
+  
+  console.log(`Universal extraction found ${fields.length} fields`);
+  
+  return fields;
 }
 
 /**
@@ -644,6 +697,8 @@ module.exports = {
   executeLLMFirst,
   executeSemanticOnly,
   executeHybrid,
+  executeUniversal,
+  getUniversalExtractor,
   generateCacheKey,
   clearCache,
   getCacheStats

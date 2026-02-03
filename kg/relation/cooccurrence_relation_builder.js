@@ -276,6 +276,7 @@ async function getCooccurrenceStats(filters = {}) {
 
 module.exports = {
   buildCooccurrenceRelations,
+  buildRelations: buildCooccurrenceRelations,  // Alias for compatibility
   updateCooccurrenceRelations,
   removeCooccurrenceRelations,
   getCooccurrenceStats

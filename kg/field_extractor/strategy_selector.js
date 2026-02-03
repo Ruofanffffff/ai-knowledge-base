@@ -157,7 +157,8 @@ function getStrategyDescription(strategy) {
     'rule-first': 'Rule+NER extraction first, LLM fallback if insufficient fields',
     'llm-first': 'LLM extraction first, Rule+NER fallback if LLM fails',
     'semantic-only': 'LLM semantic extraction only (no rule-based methods)',
-    'hybrid': 'Rule+NER and LLM extraction in parallel, merge results'
+    'hybrid': 'Rule+NER and LLM extraction in parallel, merge results',
+    'universal': 'Universal extractor (tokenization + keyword extraction + structured patterns)'
   };
   
   return descriptions[strategy] || 'Unknown strategy';

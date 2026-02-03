@@ -2,6 +2,22 @@
 
 通用文档处理流水线是一个端到端的文档处理系统，能够自动完成从文档输入到知识图谱生成的完整流程。
 
+## 🎯 核心特性
+
+### 三阶段Schema匹配 ⭐
+- **阶段1**: 算法匹配（映射表快速匹配）
+- **阶段2**: LLM匹配（100%兜底处理未匹配字段）
+- **阶段3**: 合并排名（40%完整度阈值）
+
+详细说明: [THREE_STAGE_SCHEMA_MATCHING.md](./THREE_STAGE_SCHEMA_MATCHING.md)
+
+### LLM 100%兜底策略 ⭐
+- **实体名称**: LLM验证和优化所有实体名称
+- **字段匹配**: LLM处理所有未匹配字段
+- **关系抽取**: LLM增强语义关系发现
+
+详细说明: [LLM_FALLBACK_EXPLAINED.md](./LLM_FALLBACK_EXPLAINED.md)
+
 ## 功能特性
 
 - ✅ **通用性**: 支持 text, PDF, Word, Excel, Markdown, HTML 等多种文档格式

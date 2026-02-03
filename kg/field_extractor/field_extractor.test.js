@@ -191,3 +191,73 @@ describe('Field Extractor Integration', () => {
     expect(highConfidenceFields.every(f => f.confidence >= 0.8)).toBe(true);
   });
 });
+
+describe('Field Extractor - Universal Strategy', () => {
+  test('should extract fields using universal strategy', async () => {
+    const ckb = {
+      ckb_id: 'test_universal_001',
+      doc_id: 'doc_001',
+      content: {
+        text: `
+相机：Sony A7M4
+镜头：35mm f1.8
+ISO：3200
+光圈：f1.8
+快门速度：1/15s
+拍摄日期：2025年10月15日
+        `
+      }
+    };
+    
+    const fields = await fieldExtractor.extractFields(ckb, {
+      strategy: 'universal',
+      useCache: false
+    });
+    
+    expect(fields.length).toBeGreaterThan(0);
+    
+    // 检查是否提取到相机字段
+    const cameraField = fields.find(f => f.name === '相机');
+    expect(cameraField).toBeDefined();
+    expect(cameraField.value).toBe('Sony A7M4');
+    expect(cameraField.source).toBe('universal_extractor');
+    
+    // 检查ISO字段
+    const isoField = fields.find(f => f.name === 'ISO');
+    expect(isoField).toBeDefined();
+    expect(isoField.value).toBe('3200');
+  });
+  
+  test('should use universal extractor with rule-first strategy', async () => {
+    const ckb = {
+      ckb_id: 'test_universal_002',
+      doc_id: 'doc_002',
+      content: {
+        text: `
+相机：Sony A7M4
+镜头：35mm f1.8
+ISO：3200
+        `
+      }
+    };
+    
+    const fields = await fieldExtractor.extractFields(ckb, {
+      strategy: 'rule-first',
+      useUniversal: true,
+      useLLM: false,
+      useRules: false,
+      useNER: false,
+      useCache: false
+    });
+    
+    expect(fields.length).toBeGreaterThan(0);
+    expect(fields.some(f => f.source === 'universal_extractor')).toBe(true);
+  });
+  
+  test('should get universal extractor instance', () => {
+    const extractor = fieldExtractor.getUniversalExtractor();
+    expect(extractor).toBeDefined();
+    expect(typeof extractor.extractFields).toBe('function');
+    expect(typeof extractor.getStats).toBe('function');
+  });
+});

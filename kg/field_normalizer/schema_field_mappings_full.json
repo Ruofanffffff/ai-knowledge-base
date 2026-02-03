@@ -7790,7 +7790,10 @@
         "镜头",
         "镜头型号",
         "焦距",
-        "光圈"
+        "光圈",
+        "定焦",
+        "变焦",
+        "镜头选择"
       ],
       "weight": 0.15,
       "required": false,
@@ -7813,7 +7816,14 @@
     },
     "Aperture": {
       "common_variations": [
-        "Aperture"
+        "Aperture",
+        "光圈",
+        "F值",
+        "f值",
+        "F",
+        "f",
+        "光圈值",
+        "光圈大小"
       ],
       "weight": 0.15,
       "required": false,
@@ -7823,7 +7833,12 @@
     },
     "Shutter": {
       "common_variations": [
-        "Shutter"
+        "Shutter",
+        "快门",
+        "快门速度",
+        "快门时间",
+        "ShutterSpeed",
+        "曝光时间"
       ],
       "weight": 0.15,
       "required": false,
@@ -7841,17 +7856,42 @@
         "type",
         "Type",
         "分类",
-        "类别"
+        "类别",
+        "曝光",
+        "曝光类型",
+        "曝光策略",
+        "曝光方式",
+        "欠曝",
+        "过曝",
+        "正常曝光"
       ],
       "weight": 0.4,
       "required": true,
       "description": "ExposureType字段 - 描述曝光策略及意图",
       "data_type": "text",
-      "domain": "photography"
+      "domain": "photography",
+      "variations": [
+        "曝光",
+        "曝光策略",
+        "曝光方式",
+        "曝光模式",
+        "曝光补偿",
+        "正常曝光",
+        "过曝",
+        "欠曝",
+        "曝光调整",
+        "曝光控制"
+      ]
     },
     "Compensation": {
       "common_variations": [
-        "Compensation"
+        "Compensation",
+        "补偿",
+        "曝光补偿",
+        "EV",
+        "ev",
+        "补光",
+        "曝光调整"
       ],
       "weight": 0.6,
       "required": false,
@@ -7872,7 +7912,18 @@
       "required": true,
       "description": "ISO字段 - 记录感光度使用情况",
       "data_type": "text",
-      "domain": "photography"
+      "domain": "photography",
+      "variations": [
+        "ISO",
+        "ISO值",
+        "ISO设置",
+        "感光度",
+        "感光度值",
+        "高ISO",
+        "低ISO",
+        "ISO调整",
+        "ISO控制"
+      ]
     },
     "NoiseLevel": {
       "common_variations": [
@@ -7882,23 +7933,61 @@
       "required": false,
       "description": "NoiseLevel字段 - 记录感光度使用情况",
       "data_type": "text",
-      "domain": "photography"
+      "domain": "photography",
+      "variations": [
+        "噪点",
+        "噪声",
+        "噪点水平",
+        "噪声水平",
+        "画质",
+        "低噪点",
+        "高噪点",
+        "噪点控制",
+        "降噪"
+      ]
     }
   },
   "Aperture-Usage": {
     "Aperture": {
       "common_variations": [
-        "Aperture"
+        "Aperture",
+        "光圈",
+        "F值",
+        "f值",
+        "F",
+        "f",
+        "光圈值",
+        "光圈大小",
+        "光圈选择"
       ],
       "weight": 0.4,
       "required": true,
       "description": "Aperture字段 - 光圈选择与景深效果",
       "data_type": "text",
-      "domain": "photography"
+      "domain": "photography",
+      "variations": [
+        "光圈",
+        "F值",
+        "F 值",
+        "f值",
+        "f 值",
+        "大光圈",
+        "小光圈",
+        "光圈大小",
+        "光圈值",
+        "光圈设置",
+        "开大光圈",
+        "收小光圈"
+      ]
     },
     "DOF": {
       "common_variations": [
-        "DOF"
+        "DOF",
+        "景深",
+        "虚化",
+        "背景虚化",
+        "焦外",
+        "虚化效果"
       ],
       "weight": 0.6,
       "required": false,
@@ -7910,7 +7999,13 @@
   "Shutter-Usage": {
     "ShutterSpeed": {
       "common_variations": [
-        "ShutterSpeed"
+        "ShutterSpeed",
+        "快门",
+        "快门速度",
+        "快门时间",
+        "Shutter",
+        "曝光时间",
+        "快门值"
       ],
       "weight": 0.4,
       "required": true,
@@ -7920,7 +8015,12 @@
     },
     "Motion": {
       "common_variations": [
-        "Motion"
+        "Motion",
+        "运动",
+        "动态",
+        "拖影",
+        "凝固",
+        "运动效果"
       ],
       "weight": 0.6,
       "required": false,
@@ -7978,13 +8078,33 @@
         "type",
         "Type",
         "分类",
-        "类别"
+        "类别",
+        "对焦",
+        "对焦模式",
+        "对焦方式",
+        "自动对焦",
+        "手动对焦",
+        "单点对焦",
+        "连续对焦"
       ],
       "weight": 0.4,
       "required": true,
       "description": "FocusType字段 - 对焦方式说明",
       "data_type": "text",
-      "domain": "photography"
+      "domain": "photography",
+      "variations": [
+        "对焦",
+        "对焦模式",
+        "对焦方式",
+        "对焦类型",
+        "自动对焦",
+        "手动对焦",
+        "AF",
+        "MF",
+        "单次对焦",
+        "连续对焦",
+        "追焦"
+      ]
     },
     "Target": {
       "common_variations": [
@@ -7993,7 +8113,10 @@
         "对象",
         "target",
         "目的",
-        "指标"
+        "指标",
+        "拍摄对象",
+        "主体",
+        "焦点"
       ],
       "weight": 0.6,
       "required": false,
@@ -8142,13 +8265,33 @@
         "镜头",
         "镜头型号",
         "焦距",
-        "光圈"
+        "光圈",
+        "镜头类型",
+        "镜头选择",
+        "定焦",
+        "变焦",
+        "长焦",
+        "广角",
+        "标准镜头"
       ],
       "weight": 1,
       "required": true,
       "description": "LensType字段 - 镜头选择逻辑",
       "data_type": "text",
-      "domain": "photography"
+      "domain": "photography",
+      "variations": [
+        "镜头",
+        "镜头类型",
+        "定焦",
+        "变焦",
+        "定焦镜头",
+        "变焦镜头",
+        "长焦",
+        "广角",
+        "长焦镜头",
+        "广角镜头",
+        "标准镜头"
+      ]
     }
   },
   "Camera-Body": {
@@ -8225,19 +8368,50 @@
   "Composition-Type": {
     "CompositionRule": {
       "common_variations": [
-        "CompositionRule"
+        "CompositionRule",
+        "构图",
+        "构图规则",
+        "构图法",
+        "构图方式",
+        "三分法",
+        "黄金分割",
+        "对称",
+        "引导线"
       ],
       "weight": 1,
       "required": true,
       "description": "CompositionRule字段 - 构图规则",
       "data_type": "text",
-      "domain": "photography"
+      "domain": "photography",
+      "variations": [
+        "构图",
+        "构图法",
+        "构图技巧",
+        "构图方法",
+        "构图规则",
+        "三分法",
+        "黄金分割",
+        "对称构图",
+        "中心构图",
+        "框架构图",
+        "引导线",
+        "对角线",
+        "留白",
+        "平衡",
+        "构图平衡"
+      ]
     }
   },
   "Subject-Placement": {
     "SubjectPosition": {
       "common_variations": [
-        "SubjectPosition"
+        "SubjectPosition",
+        "主体",
+        "主体位置",
+        "对象位置",
+        "人物位置",
+        "拍摄对象",
+        "主体放置"
       ],
       "weight": 1,
       "required": true,
@@ -8273,7 +8447,14 @@
   "Symmetry": {
     "SymmetryAxis": {
       "common_variations": [
-        "SymmetryAxis"
+        "SymmetryAxis",
+        "对称",
+        "对称轴",
+        "对称性",
+        "中轴",
+        "对称构图",
+        "mm",
+        "平衡"
       ],
       "weight": 1,
       "required": true,
@@ -8309,7 +8490,15 @@
   "Perspective": {
     "Angle": {
       "common_variations": [
-        "Angle"
+        "Angle",
+        "角度",
+        "视角",
+        "拍摄角度",
+        "低角度",
+        "高角度",
+        "平视",
+        "俯视",
+        "仰视"
       ],
       "weight": 1,
       "required": true,
@@ -8369,13 +8558,36 @@
   "Light-Composition": {
     "LightDirection": {
       "common_variations": [
-        "LightDirection"
+        "LightDirection",
+        "光线",
+        "光线方向",
+        "光向",
+        "逆光",
+        "顺光",
+        "侧光",
+        "侧逆光",
+        "光照"
       ],
       "weight": 1,
       "required": true,
       "description": "LightDirection字段 - 光影构图",
       "data_type": "text",
-      "domain": "photography"
+      "domain": "photography",
+      "variations": [
+        "光线方向",
+        "光线角度",
+        "光向",
+        "光位",
+        "逆光",
+        "顺光",
+        "侧光",
+        "顶光",
+        "底光",
+        "正面光",
+        "背面光",
+        "侧面光",
+        "斜光"
+      ]
     }
   },
   "Minimalism": {
@@ -8405,7 +8617,14 @@
   "Portrait-Style": {
     "Style": {
       "common_variations": [
-        "Style"
+        "Style",
+        "风格",
+        "人像",
+        "肖像",
+        "人物",
+        "人像风格",
+        "肖像风格",
+        "人物照"
       ],
       "weight": 1,
       "required": true,
@@ -8481,7 +8700,13 @@
   "Visual-Mood": {
     "Mood": {
       "common_variations": [
-        "Mood"
+        "Mood",
+        "情绪",
+        "氛围",
+        "画面情绪",
+        "感觉",
+        "气氛",
+        "意境"
       ],
       "weight": 1,
       "required": true,
