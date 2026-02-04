@@ -1,0 +1,28 @@
+# 代码所有者配置
+# 当这些文件被修改时,会自动请求对应的人review
+
+# 知识图谱模块
+/kg/**                          @你的GitHub用户名
+
+# 前端相关
+/client/**                      @同伴的GitHub用户名
+/web/**                         @同伴的GitHub用户名
+
+# Android相关
+/android/**                     @同伴的GitHub用户名
+
+# 服务器核心文件(需要双方review)
+/server.js                      @你的GitHub用户名 @同伴的GitHub用户名
+/package.json                   @你的GitHub用户名 @同伴的GitHub用户名
+
+# 路由文件
+/routes/knowledgeGraphRoutes.js @你的GitHub用户名
+/routes/authRoutes.js           @同伴的GitHub用户名
+/routes/adminRoutes.js          @同伴的GitHub用户名
+
+# 文档
+/README.md                      @你的GitHub用户名 @同伴的GitHub用户名
+/CHANGELOG.md                   @你的GitHub用户名 @同伴的GitHub用户名
+
+# 配置文件
+/.github/**                     @你的GitHub用户名 @同伴的GitHub用户名

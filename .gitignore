@@ -45,3 +45,12 @@ data/documents.json
 data/categories.json
 data/users.db
 data/*.db
+data/knowledge-graph.json
+data/recommendations.json
+
+# 数据库文件
+prisma/*.db
+prisma/*.db-journal
+
+# 统计和缓存文件
+kg/field_normalizer/.synonym_dict_stats.json

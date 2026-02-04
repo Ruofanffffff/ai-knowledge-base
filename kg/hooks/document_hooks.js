@@ -119,7 +119,16 @@ async function onDocumentCreated(document, options = {}) {
             console.log(`[KG Hook] Pipeline 处理完成: ${document.id}, 状态: ${context.status}`);
           } else {
             // 使用传统 kgService 模式
-            await kgService.buildKnowledgeGraph(document.id);
+            // 从 document.metadata 中获取 filePath 和 fileType
+            const filePath = document.metadata?.filePath || document.filePath;
+            const fileType = document.fileType || document.metadata?.fileType || '.txt';
+            
+            if (!filePath) {
+              console.error(`[KG Hook] 文档 ${document.id} 缺少 filePath，无法构建知识图谱`);
+              return;
+            }
+            
+            await kgService.buildKnowledgeGraph(document.id, filePath, fileType);
             console.log(`[KG Hook] 文档 ${document.id} 的知识图谱构建完成`);
           }
         } catch (error) {
@@ -156,7 +165,14 @@ async function onDocumentCreated(document, options = {}) {
       };
     } else {
       // 使用传统 kgService 模式
-      result = await kgService.buildKnowledgeGraph(document.id);
+      const filePath = document.metadata?.filePath || document.filePath;
+      const fileType = document.fileType || document.metadata?.fileType || '.txt';
+      
+      if (!filePath) {
+        throw new Error(`文档 ${document.id} 缺少 filePath，无法构建知识图谱`);
+      }
+      
+      result = await kgService.buildKnowledgeGraph(document.id, filePath, fileType);
       console.log(`[KG Hook] 文档 ${document.id} 的知识图谱构建完成`);
     }
     

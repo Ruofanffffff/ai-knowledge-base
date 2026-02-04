@@ -1,457 +1,318 @@
-# 知识库管理系统
+# AI Knowledge Base - Frontend
 
-一个功能强大的知识库管理系统,集成了 Schema 驱动的知识图谱功能,能够从非结构化文档中自动提取结构化知识并构建高质量的知识图谱。
+A modern React-based frontend application for the AI Knowledge Base system, featuring document management, knowledge graph visualization, and AI-powered search capabilities.
 
-## 核心功能
+## Features
 
-### 📚 文档管理
-- 支持多种文档格式 (Word, PDF, Excel, Markdown)
-- 文档上传、编辑、删除
-- 文档分类和标签管理
-- 全文搜索
+- **Authentication System**: Secure JWT-based authentication with login/register functionality
+- **Document Management**: Full CRUD operations for documents with auto-refresh
+- **Knowledge Graph Visualization**: Interactive D3.js-based graph visualization with multiple views
+  - Basic graph view
+  - Schema-driven knowledge graph
+  - CKB (Contextual Knowledge Block) explorer
+- **AI-Powered Search**: Semantic search with AI-generated answers
+- **File Upload**: Support for multiple file types with progress tracking
+- **Error Handling**: Comprehensive error modal system with user-friendly messages
+- **Auto-Refresh**: Configurable auto-refresh for documents and graph data
 
-### 🕸️ 知识图谱 (Schema-Driven KG)
-- **智能知识抽取**: 从文档中自动提取实体和关系
-- **Schema 驱动**: 基于 250+ 预定义 Schema 进行知识抽取
-- **三阶段Schema匹配**: 算法匹配 → LLM兜底 → 合并排名，确保高召回率
-- **多层次映射**: 4 层字段映射策略 (精确匹配 → 相似度 → 同义词 → LLM)
-- **LLM 100%兜底**: LLM作为兜底方案，验证和优化所有关键步骤
-- **Token 优化**: 智能控制 LLM 调用,降低成本 90%+
-- **高质量保证**: 置信度管理和质量过滤机制
-- **可视化展示**: 交互式知识图谱可视化
+## Tech Stack
 
-### 👤 用户管理
-- 用户注册和登录
-- 权限管理
-- 个人资料管理
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **Ant Design** for UI components
+- **D3.js** for graph visualization
+- **Axios** for HTTP requests
+- **Vitest** for testing
+- **React Router** for navigation
 
-### 📊 统计分析
-- 文档统计
-- 知识图谱统计
-- Token 使用统计
-- 性能监控
+## Prerequisites
 
-## 技术栈
+- Node.js 16+ and npm
+- Backend server running on port 3000 (see backend setup)
 
-### 后端
-- **运行时**: Node.js 18+
-- **框架**: Express.js
-- **ORM**: Prisma
-- **数据库**: SQLite (开发) / PostgreSQL (生产)
-- **LLM**: 通义千问 (Qwen) / DeepSeek
+## Environment Variables
 
-### 前端
-- **框架**: React 18 + TypeScript
-- **UI 库**: Ant Design 5.8
-- **可视化**: D3.js 7.8
-- **路由**: React Router DOM 6.15
+Create a `.env.local` file in the `client` directory with the following variables:
 
-### 测试
-- **测试框架**: Jest
-- **Property-Based Testing**: fast-check
+```env
+# API Configuration
+VITE_API_BASE_URL=http://localhost:3000/api
 
-## 快速开始
+# Auto-Refresh Configuration
+VITE_ENABLE_AUTO_REFRESH=true
+VITE_AUTO_REFRESH_INTERVAL=30000
 
-### 环境要求
+# Debug Mode
+VITE_DEBUG_MODE=true
+```
 
-- Node.js >= 18.0.0
-- npm >= 9.0.0 或 yarn >= 1.22.0
-- SQLite >= 3.35.0 (开发) 或 PostgreSQL >= 13.0 (生产)
+For production, create a `.env.production` file:
 
-### 安装
+```env
+VITE_API_BASE_URL=https://your-production-api.com/api
+VITE_ENABLE_AUTO_REFRESH=true
+VITE_AUTO_REFRESH_INTERVAL=60000
+VITE_DEBUG_MODE=false
+```
 
+## Installation
+
+1. Navigate to the client directory:
 ```bash
-# 克隆仓库
-git clone https://github.com/your-org/knowledge-base.git
-cd knowledge-base
+cd client
+```
 
-# 安装依赖
+2. Install dependencies:
+```bash
 npm install
-
-# 配置环境变量
-cp .env.example .env
-nano .env
 ```
 
-### 配置
-
-编辑 `.env` 文件,配置必要的环境变量:
-
+3. Create environment configuration:
 ```bash
-# 数据库配置
-DATABASE_URL="file:./prisma/knowledge-base.db"
-
-# LLM API 配置
-QWEN_API_KEY="your_qwen_api_key_here"
-
-# 知识图谱配置
-KG_ENABLED=true
-KG_TOKEN_DAILY_LIMIT=100000
+cp .env.example .env.local
+# Edit .env.local with your configuration
 ```
 
-详细配置说明请参考 [kg/CONFIG.md](./kg/CONFIG.md)
+## Development
 
-### 初始化
-
-```bash
-# 运行数据库迁移
-npx prisma migrate dev
-
-# 导入 Schema 定义
-node kg/schema/load_schemas.js
-```
-
-### 启动
+Start the development server:
 
 ```bash
-# 开发环境
 npm run dev
-
-# 生产环境
-npm start
 ```
 
-服务将在 `http://localhost:3000` 启动。
+The application will be available at `http://localhost:5173`
 
+## Building for Production
 
-## 知识图谱功能
+Build the application:
 
-### 系统架构
-
-```
-文档 (Document)
-    ↓
-CKB 解析 (CKB Parser)
-    ↓
-字段抽取 (Field Extractor)
-    ↓
-字段清洗 (Field Normalizer)
-    ↓
-Schema 匹配 (Schema Matcher)
-    ↓
-实体构建 (Entity Builder)
-    ↓
-关系构建 (Relation Builder)
-    ↓
-置信度计算 (Confidence Engine)
-    ↓
-质量过滤 (Quality Filter)
-    ↓
-知识图谱 (Knowledge Graph)
+```bash
+npm run build
 ```
 
-### 核心特性
+Preview the production build:
 
-#### 1. Schema 驱动
-- 250+ 预定义 Schema 覆盖多个领域
-- 支持科研、政府、个人生活、旅行、摄影等场景
-- 灵活的 Schema 定义和管理
+```bash
+npm run preview
+```
 
-#### 2. 智能字段映射
-- **精确匹配**: 字段名完全相同
-- **相似度匹配**: 编辑距离 + 余弦相似度
-- **同义词匹配**: 基于同义词词典 (覆盖率 > 90%)
-- **LLM 映射**: 使用大语言模型进行语义映射
+## Testing
 
-#### 3. Token 优化
-- LLM 响应缓存
-- 智能频率控制
-- 批量处理优化
-- 智能字段截断 (Token 节省率 ≥ 40%)
-- 每日 Token 预算管理
-
-#### 4. 高质量保证
-- 实体置信度计算
-- 关系置信度计算
-- 低质量数据过滤
-- 冲突消解机制
-
-#### 5. 多类型关系
-- **内建关系**: 基于 Schema 定义,100% 自动生成
-- **共现关系**: 基于实体共现统计
-- **语义关系**: 基于 LLM 的语义理解,分层触发
-
-### API 端点
-
-知识图谱系统提供了丰富的 API 端点:
-
-#### CKB 相关
-- `POST /api/knowledge-graph/ckb/parse` - 解析文档生成 CKB
-- `GET /api/knowledge-graph/ckb/:id` - 获取 CKB 详情
-- `GET /api/knowledge-graph/ckb/document/:docId` - 获取文档的所有 CKB
-
-#### Schema 相关
-- `GET /api/knowledge-graph/schemas` - 获取 Schema 列表
-- `POST /api/knowledge-graph/schemas` - 创建 Schema
-- `PUT /api/knowledge-graph/schemas/:id` - 更新 Schema
-- `DELETE /api/knowledge-graph/schemas/:id` - 删除 Schema
-
-#### 实体相关
-- `GET /api/knowledge-graph/entities` - 获取实体列表
-- `GET /api/knowledge-graph/entities/:id` - 获取实体详情
-- `GET /api/knowledge-graph/entities/search` - 搜索实体
-
-#### 关系相关
-- `GET /api/knowledge-graph/relations` - 获取关系列表
-- `GET /api/knowledge-graph/relations/:id` - 获取关系详情
-
-#### 图遍历相关
-- `POST /api/knowledge-graph/traverse` - 图遍历
-- `GET /api/knowledge-graph/neighbors/:id` - 获取邻居节点
-- `GET /api/knowledge-graph/path/:sourceId/:targetId` - 查找最短路径
-- `GET /api/knowledge-graph/subgraph/:id` - 获取子图
-
-#### KG 构建相关
-- `POST /api/knowledge-graph/build` - 构建知识图谱
-- `POST /api/knowledge-graph/update` - 更新知识图谱
-- `POST /api/knowledge-graph/rebuild` - 重建知识图谱
-- `DELETE /api/knowledge-graph/document/:docId` - 删除文档的知识图谱
-
-#### 统计相关
-- `GET /api/knowledge-graph/stats` - 获取知识图谱统计
-- `GET /api/knowledge-graph/stats/tokens` - Token 使用统计
-- `GET /api/knowledge-graph/stats/quality` - 质量报告
-- `GET /api/knowledge-graph/stats/performance` - 性能统计
-
-完整 API 文档请参考 [kg/API.md](./kg/API.md)
-
-### 性能指标
-
-- **处理时间**: 单文档 < 30s
-- **Token 消耗**: 约 2,000-3,000 tokens/文档
-- **实体置信度**: 平均 > 0.7
-- **关系置信度**: 平均 > 0.6
-- **字段映射准确率**: > 90%
-
-## 文档
-
-### 知识图谱文档
-- [README.md](./kg/README.md) - KG 模块概述
-- [ARCHITECTURE.md](./kg/ARCHITECTURE.md) - 系统架构设计
-- [SCHEMA_GUIDE.md](./kg/SCHEMA_GUIDE.md) - Schema 定义指南
-- [API.md](./kg/API.md) - API 参考文档
-- [CONFIG.md](./kg/CONFIG.md) - 配置说明
-- [DEPLOYMENT.md](./kg/DEPLOYMENT.md) - 部署指南
-
-### 其他文档
-- [知识库功能分析](./knowledge_base_analysis.md)
-- [技术栈说明](./knowledge_base_tech_stack.md)
-- [架构设计](./knowledge_base_architecture.md)
-
-## 测试
-
-### 运行所有测试
+Run all tests:
 
 ```bash
 npm test
 ```
 
-### 运行特定模块测试
+Run tests in watch mode:
 
 ```bash
-# CKB 解析测试
-npm test kg/ckb
-
-# 字段抽取测试
-npm test kg/field_extractor
-
-# 字段清洗测试
-npm test kg/field_normalizer
-
-# 实体构建测试
-npm test kg/entity
-
-# 关系构建测试
-npm test kg/relation
+npm run test
 ```
 
-### 运行 Property-Based 测试
+Run tests with UI:
 
 ```bash
-npm test -- --testNamePattern="Property"
+npm run test:ui
 ```
 
-### 测试覆盖率
+Run tests once (CI mode):
 
 ```bash
-npm run test:coverage
+npm run test:run
 ```
 
-目标覆盖率: ≥ 80%
+## Code Quality
 
-## 部署
-
-### 开发环境
+Run linter:
 
 ```bash
-npm run dev
+npm run lint
 ```
 
-### 生产环境
-
-使用 PM2 进行进程管理:
+Run type checker:
 
 ```bash
-# 安装 PM2
-npm install -g pm2
-
-# 启动应用
-pm2 start ecosystem.config.js
-
-# 查看状态
-pm2 status
-
-# 查看日志
-pm2 logs
+npx tsc --noEmit
 ```
 
-详细部署指南请参考 [kg/DEPLOYMENT.md](./kg/DEPLOYMENT.md)
+## Project Structure
 
-## 配置优化
-
-### Token 成本优化
-
-如果 Token 成本过高:
-
-```bash
-# 降低 LLM 调用频率
-KG_LLM_FIELD_MAPPING_RATE=0.3
-KG_LLM_ENTITY_DISAMBIGUATION_RATE=0.2
-KG_LLM_SEMANTIC_RELATION_RANDOM_SAMPLE_RATE=0.1
-
-# 启用缓存
-KG_CACHE_ENABLED=true
-
-# 启用同义词词典自动扩充
-KG_SYNONYM_DICT_AUTO_EXPAND=true
+```
+client/
+├── src/
+│   ├── api/              # API service layer
+│   │   ├── client.ts     # Axios HTTP client
+│   │   ├── auth.ts       # Authentication API
+│   │   ├── documents.ts  # Documents API
+│   │   ├── graph.ts      # Knowledge graph API
+│   │   ├── ai.ts         # AI search API
+│   │   ├── upload.ts     # File upload API
+│   │   └── types.ts      # TypeScript type definitions
+│   ├── components/       # Reusable components
+│   │   ├── ErrorModal/   # Error modal component
+│   │   ├── ProtectedRoute.tsx
+│   │   └── LoadingSpinner.tsx
+│   ├── contexts/         # React contexts
+│   │   ├── AuthContext.tsx
+│   │   └── ErrorContext.tsx
+│   ├── hooks/            # Custom React hooks
+│   │   ├── useAutoRefresh.ts
+│   │   ├── useDocuments.ts
+│   │   └── useGraph.ts
+│   ├── pages/            # Page components
+│   │   ├── Login.tsx
+│   │   ├── Dashboard.tsx
+│   │   ├── DocumentsList.tsx
+│   │   ├── Editor.tsx
+│   │   ├── Graph.tsx
+│   │   ├── Chat.tsx
+│   │   ├── KnowledgeGraph.tsx
+│   │   └── KnowledgeGraph/
+│   │       ├── SchemaKG.tsx
+│   │       └── CKBExplorer.tsx
+│   ├── utils/            # Utility functions
+│   │   ├── storage.ts    # localStorage utilities
+│   │   └── transformers.ts # Data transformation
+│   ├── config/           # Configuration
+│   │   └── constants.ts  # App constants
+│   └── test/             # Test setup
+│       └── setup.ts
+├── .env.local            # Local environment variables
+├── .env.production       # Production environment variables
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── vitest.config.ts
 ```
 
-### 性能优化
+## API Integration
 
-如果处理速度过慢:
+The frontend integrates with the backend API using the following endpoints:
 
-```bash
-# 增加并发数
-KG_BATCH_CONCURRENCY=5
-KG_BATCH_SIZE=20
+### Authentication
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration
+- `GET /api/auth/me` - Get current user
 
-# 增加超时时间
-KG_LLM_CALL_TIMEOUT_MS=15000
-```
+### Documents
+- `GET /api/documents` - List all documents
+- `GET /api/documents/:id` - Get single document
+- `POST /api/documents` - Create document
+- `PUT /api/documents/:id` - Update document
+- `DELETE /api/documents/:id` - Delete document
 
-### 质量优化
+### Knowledge Graph
+- `GET /api/knowledge-graph` - Get graph data
+- `GET /api/knowledge-graph/entities` - Get entities
+- `GET /api/knowledge-graph/relations` - Get relations
+- `POST /api/knowledge-graph/build` - Build graph from document
+- `GET /api/knowledge-graph/ckb` - Get CKBs
 
-如果知识图谱质量不足:
+### AI Search
+- `POST /api/ai/search` - Semantic search
+- `POST /api/ai/summarize/:id` - Summarize document
+- `POST /api/ai/tags` - Generate tags
 
-```bash
-# 增加 LLM 调用频率
-KG_LLM_FIELD_MAPPING_RATE=0.8
-KG_LLM_ENTITY_CANONICAL_NAME_RATE=0.8
-KG_LLM_ENTITY_DISAMBIGUATION_RATE=0.5
+### File Upload
+- `POST /api/upload` - Upload file
 
-# 提高置信度阈值
-KG_MIN_ENTITY_CONFIDENCE=0.6
-KG_MIN_RELATION_CONFIDENCE=0.6
-```
+## Authentication Flow
 
-## 故障排查
+1. User logs in with credentials
+2. Backend returns JWT token
+3. Token is stored in localStorage
+4. Token is included in all API requests via Authorization header
+5. On 401 error, user is redirected to login page
 
-### Token 超限
+## Data Transformation
 
-**症状**: 系统进入紧急模式,LLM 调用频率降低
+The frontend transforms backend data formats to frontend-friendly formats:
 
-**解决方案**:
-1. 检查 `KG_TOKEN_DAILY_LIMIT` 是否设置过低
-2. 启用缓存减少重复调用
-3. 降低 LLM 调用频率
+- **Backend Entity** → **Frontend GraphNode**
+  - `canonical_name` → `label`
+  - `source_id`/`target_id` → `source`/`target`
 
-### 处理超时
+- **Backend Relation** → **Frontend GraphLink**
+  - Preserves all fields with proper naming
 
-**症状**: 文档处理失败,提示超时
+## Auto-Refresh
 
-**解决方案**:
-1. 增加 `KG_TOTAL_PROCESSING_TIMEOUT_MS`
-2. 检查网络连接
-3. 检查 LLM API 响应速度
+Auto-refresh is configurable per feature:
 
-### Schema 数量不足
+- **Documents**: 30 seconds (configurable via `VITE_AUTO_REFRESH_INTERVAL`)
+- **Knowledge Graph**: 60 seconds
+- Can be paused/resumed programmatically
 
-**症状**: 系统启动时提示 Schema 数量不足
+## Error Handling
 
-**解决方案**:
-1. 确保 `KG_SCHEMA_AUTO_IMPORT=true`
-2. 手动运行: `node kg/schema/load_schemas.js`
-3. 检查 `SchemaList.md` 文件是否存在
+All API errors are handled through a centralized error modal system:
 
-## 贡献指南
+- **401 Unauthorized**: Redirects to login
+- **403 Forbidden**: Shows access denied message
+- **404 Not Found**: Shows resource not found message
+- **500+ Server Error**: Shows server error message
+- **Network Error**: Shows connection error message
 
-欢迎贡献代码、报告问题或提出建议!
+## Testing Strategy
 
-### 提交代码
+The project uses a comprehensive testing approach:
 
-1. Fork 本仓库
-2. 创建特性分支: `git checkout -b feature/your-feature`
-3. 提交更改: `git commit -am 'Add some feature'`
-4. 推送分支: `git push origin feature/your-feature`
-5. 创建 Pull Request
+1. **Unit Tests**: Test individual functions and components
+2. **Integration Tests**: Test API integration and data flow
+3. **Property-Based Tests**: Test properties that should hold for all inputs using fast-check
 
-### 代码规范
+Test coverage includes:
+- API services (auth, documents, graph, ai, upload)
+- Utility functions (storage, transformers)
+- React components (ErrorModal, ProtectedRoute)
+- Custom hooks (useDocuments, useGraph)
 
-- 使用 ESLint 进行代码检查
-- 遵循 JavaScript Standard Style
-- 编写单元测试和集成测试
-- 更新相关文档
+## Browser Support
 
-### 测试要求
+- Chrome/Edge (latest)
+- Firefox (latest)
+- Safari (latest)
 
-- 单元测试覆盖率 ≥ 80%
-- 所有 Property 测试通过
-- 集成测试通过
-- 端到端测试通过
+## Contributing
 
-## 许可证
+1. Create a feature branch
+2. Make your changes
+3. Run tests: `npm test`
+4. Run linter: `npm run lint`
+5. Run type checker: `npx tsc --noEmit`
+6. Submit a pull request
 
-MIT License
+## Troubleshooting
 
-## 联系方式
+### Backend Connection Issues
 
-- 项目主页: [GitHub Repository]
-- 问题反馈: [GitHub Issues]
-- 文档: [Documentation]
+If you see "Network Error" messages:
+1. Verify backend server is running on port 3000
+2. Check CORS configuration on backend
+3. Verify `VITE_API_BASE_URL` in `.env.local`
 
-## 致谢
+### Authentication Issues
 
-感谢所有贡献者和使用者!
+If login fails:
+1. Check backend authentication endpoints
+2. Verify JWT token is being stored in localStorage
+3. Check browser console for errors
 
-## 更新日志
+### Build Issues
 
-### v1.0.0 (2025-02-01)
+If build fails:
+1. Clear node_modules: `rm -rf node_modules && npm install`
+2. Clear Vite cache: `rm -rf node_modules/.vite`
+3. Check TypeScript errors: `npx tsc --noEmit`
 
-**知识图谱功能**:
-- ✅ 完成 Phase 1-9 开发
-- ✅ 实现 250+ Schema 支持
-- ✅ 实现智能字段映射
-- ✅ 实现 Token 优化
-- ✅ 实现前端可视化
-- ✅ 实现文档操作钩子
-- ✅ 完成项目集成
-- ✅ 完成文档编写
+## License
 
-**文档管理功能**:
-- ✅ 文档上传和管理
-- ✅ 全文搜索
-- ✅ 用户管理
-- ✅ 权限控制
+MIT
 
-### 下一步计划
+## Related Documentation
 
-- [ ] Phase 10: 测试完善
-- [ ] Phase 11: GitHub 部署
-- [ ] 性能优化和监控增强
-- [ ] 支持更多文档格式
-- [ ] 多语言支持
-
----
-
-**让知识抽取更智能、更高效!**
-
+- [Backend API Documentation](../kg/API.md)
+- [Knowledge Graph Architecture](../kg/ARCHITECTURE.md)
+- [Deployment Guide](../kg/DEPLOYMENT.md)

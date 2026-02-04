@@ -1,0 +1,1888 @@
+{
+  "generated_at": "2026-02-02T15:21:38.081Z",
+  "schema_count": 250,
+  "total_fields": 691,
+  "total_variations": 3144,
+  "avg_variations_per_field": "4.55",
+  "by_domain": {
+    "government": {
+      "schemas": 52,
+      "fields": 188,
+      "variations": 873
+    },
+    "research": {
+      "schemas": 27,
+      "fields": 89,
+      "variations": 521
+    },
+    "general": {
+      "schemas": 10,
+      "fields": 40,
+      "variations": 225
+    },
+    "personal": {
+      "schemas": 21,
+      "fields": 72,
+      "variations": 340
+    },
+    "entertainment": {
+      "schemas": 6,
+      "fields": 24,
+      "variations": 111
+    },
+    "travel": {
+      "schemas": 23,
+      "fields": 94,
+      "variations": 512
+    },
+    "sports": {
+      "schemas": 16,
+      "fields": 68,
+      "variations": 215
+    },
+    "photography": {
+      "schemas": 40,
+      "fields": 54,
+      "variations": 155
+    },
+    "post_processing": {
+      "schemas": 60,
+      "fields": 62,
+      "variations": 192
+    }
+  },
+  "by_entity_type": {
+    "ResearchEntity": {
+      "schemas": 37,
+      "fields": 129,
+      "variations": 713
+    },
+    "GovernmentEntity": {
+      "schemas": 34,
+      "fields": 123,
+      "variations": 549
+    },
+    "GeneralEntity": {
+      "schemas": 14,
+      "fields": 52,
+      "variations": 295
+    },
+    "PersonalEntity": {
+      "schemas": 25,
+      "fields": 85,
+      "variations": 402
+    },
+    "EntertainmentEntity": {
+      "schemas": 6,
+      "fields": 24,
+      "variations": 111
+    },
+    "TravelEntity": {
+      "schemas": 23,
+      "fields": 94,
+      "variations": 512
+    },
+    "SportsEntity": {
+      "schemas": 16,
+      "fields": 68,
+      "variations": 215
+    },
+    "PhotographyEntity": {
+      "schemas": 40,
+      "fields": 54,
+      "variations": 155
+    },
+    "PostProcessingEntity": {
+      "schemas": 60,
+      "fields": 62,
+      "variations": 192
+    }
+  },
+  "schemas": [
+    {
+      "name": "EITV",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 5,
+      "variation_count": 40
+    },
+    {
+      "name": "Entity-Attribute",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/学术",
+      "field_count": 3,
+      "variation_count": 20
+    },
+    {
+      "name": "Step-Action-Condition",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府工作",
+      "field_count": 3,
+      "variation_count": 18
+    },
+    {
+      "name": "Cause-Effect",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/学术",
+      "field_count": 3,
+      "variation_count": 18
+    },
+    {
+      "name": "Comparison",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 4,
+      "variation_count": 28
+    },
+    {
+      "name": "Trend",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 4,
+      "variation_count": 25
+    },
+    {
+      "name": "Threshold-Alert",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 3,
+      "variation_count": 19
+    },
+    {
+      "name": "Relationship",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/学术",
+      "field_count": 3,
+      "variation_count": 24
+    },
+    {
+      "name": "Event-Time-Location",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/生活",
+      "field_count": 3,
+      "variation_count": 28
+    },
+    {
+      "name": "KPI-Metric-Target",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 14
+    },
+    {
+      "name": "Fact-Source",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/学术",
+      "field_count": 3,
+      "variation_count": 12
+    },
+    {
+      "name": "Observation",
+      "entity_type": "ResearchEntity",
+      "scene": "科研",
+      "field_count": 4,
+      "variation_count": 35
+    },
+    {
+      "name": "Table-Summary",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "Graph-Summary",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/学术",
+      "field_count": 3,
+      "variation_count": 13
+    },
+    {
+      "name": "Video-Snapshot",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/生活",
+      "field_count": 3,
+      "variation_count": 21
+    },
+    {
+      "name": "Hypothesis-Evidence",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/学术",
+      "field_count": 3,
+      "variation_count": 18
+    },
+    {
+      "name": "Risk-Impact-Mitigation",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 3,
+      "variation_count": 18
+    },
+    {
+      "name": "Experiment-Result",
+      "entity_type": "ResearchEntity",
+      "scene": "科研",
+      "field_count": 4,
+      "variation_count": 23
+    },
+    {
+      "name": "Recommendation",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/个人",
+      "field_count": 3,
+      "variation_count": 18
+    },
+    {
+      "name": "Metadata",
+      "entity_type": "GeneralEntity",
+      "scene": "全场景",
+      "field_count": 4,
+      "variation_count": 37
+    },
+    {
+      "name": "Document-Annotation",
+      "entity_type": "ResearchEntity",
+      "scene": "学术/科研",
+      "field_count": 3,
+      "variation_count": 12
+    },
+    {
+      "name": "Literature-Summary",
+      "entity_type": "GeneralEntity",
+      "scene": "学术",
+      "field_count": 3,
+      "variation_count": 8
+    },
+    {
+      "name": "Citation-Link",
+      "entity_type": "GeneralEntity",
+      "scene": "学术",
+      "field_count": 3,
+      "variation_count": 32
+    },
+    {
+      "name": "Experiment-Graph",
+      "entity_type": "ResearchEntity",
+      "scene": "科研",
+      "field_count": 4,
+      "variation_count": 9
+    },
+    {
+      "name": "Lab-Observation",
+      "entity_type": "ResearchEntity",
+      "scene": "科研",
+      "field_count": 3,
+      "variation_count": 27
+    },
+    {
+      "name": "Sensor-Alert",
+      "entity_type": "ResearchEntity",
+      "scene": "政府/科研",
+      "field_count": 4,
+      "variation_count": 27
+    },
+    {
+      "name": "Maintenance-Log",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 22
+    },
+    {
+      "name": "Policy-Update",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 15
+    },
+    {
+      "name": "Task-Workflow",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/个人",
+      "field_count": 3,
+      "variation_count": 14
+    },
+    {
+      "name": "Budget-Plan",
+      "entity_type": "ResearchEntity",
+      "scene": "政府/科研",
+      "field_count": 3,
+      "variation_count": 10
+    },
+    {
+      "name": "Budget-Execution",
+      "entity_type": "ResearchEntity",
+      "scene": "政府/科研",
+      "field_count": 3,
+      "variation_count": 16
+    },
+    {
+      "name": "Public-Notice",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 20
+    },
+    {
+      "name": "Meeting-Minutes",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/学术",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "Legal-Case",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 14
+    },
+    {
+      "name": "Press-Release",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/生活",
+      "field_count": 3,
+      "variation_count": 19
+    },
+    {
+      "name": "Training-Session",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/学术",
+      "field_count": 3,
+      "variation_count": 9
+    },
+    {
+      "name": "Survey-Data",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 4,
+      "variation_count": 4
+    },
+    {
+      "name": "Weather-Record",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/生活",
+      "field_count": 4,
+      "variation_count": 28
+    },
+    {
+      "name": "Health-Observation",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 20
+    },
+    {
+      "name": "Habit-Tracker",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 14
+    },
+    {
+      "name": "Fitness-Progress",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 20
+    },
+    {
+      "name": "Travel-Photo",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 4,
+      "variation_count": 29
+    },
+    {
+      "name": "Recipe-Note",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 9
+    },
+    {
+      "name": "Book-Reading",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活/学术",
+      "field_count": 4,
+      "variation_count": 21
+    },
+    {
+      "name": "Movie-Log",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 4,
+      "variation_count": 20
+    },
+    {
+      "name": "Music-Log",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "Personal-Goal",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 4,
+      "variation_count": 19
+    },
+    {
+      "name": "Shopping-List",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 13
+    },
+    {
+      "name": "Expense-Record",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 4,
+      "variation_count": 21
+    },
+    {
+      "name": "Expense-Budget",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 17
+    },
+    {
+      "name": "Diary-Reflection",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 14
+    },
+    {
+      "name": "Goal-Progress",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活/学术",
+      "field_count": 3,
+      "variation_count": 14
+    },
+    {
+      "name": "Knowledge-Note",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/学术/个人",
+      "field_count": 3,
+      "variation_count": 13
+    },
+    {
+      "name": "Experiment-Log",
+      "entity_type": "ResearchEntity",
+      "scene": "科研",
+      "field_count": 3,
+      "variation_count": 20
+    },
+    {
+      "name": "Visualization-Annotation",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 3,
+      "variation_count": 8
+    },
+    {
+      "name": "Multimodal-AKU",
+      "entity_type": "GeneralEntity",
+      "scene": "全场景",
+      "field_count": 5,
+      "variation_count": 25
+    },
+    {
+      "name": "Literature-Mapping",
+      "entity_type": "GeneralEntity",
+      "scene": "学术",
+      "field_count": 3,
+      "variation_count": 15
+    },
+    {
+      "name": "Dataset-Metadata",
+      "entity_type": "ResearchEntity",
+      "scene": "科研",
+      "field_count": 4,
+      "variation_count": 28
+    },
+    {
+      "name": "Data-Quality-Metric",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 3,
+      "variation_count": 19
+    },
+    {
+      "name": "Data-Validation-Check",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 3,
+      "variation_count": 13
+    },
+    {
+      "name": "Metadata-Record",
+      "entity_type": "GeneralEntity",
+      "scene": "全场景",
+      "field_count": 4,
+      "variation_count": 27
+    },
+    {
+      "name": "Sensor-Record",
+      "entity_type": "ResearchEntity",
+      "scene": "政府/科研",
+      "field_count": 4,
+      "variation_count": 28
+    },
+    {
+      "name": "Alert-Record",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 27
+    },
+    {
+      "name": "Risk-Record",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 20
+    },
+    {
+      "name": "Maintenance-Plan",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 3,
+      "variation_count": 8
+    },
+    {
+      "name": "Policy-Document",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 27
+    },
+    {
+      "name": "Task-Assignment",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/个人",
+      "field_count": 4,
+      "variation_count": 9
+    },
+    {
+      "name": "Budget-Tracking",
+      "entity_type": "ResearchEntity",
+      "scene": "政府/科研",
+      "field_count": 4,
+      "variation_count": 24
+    },
+    {
+      "name": "Event-Record",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/生活",
+      "field_count": 4,
+      "variation_count": 35
+    },
+    {
+      "name": "Meeting-Summary",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/学术",
+      "field_count": 3,
+      "variation_count": 3
+    },
+    {
+      "name": "Legal-Document",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "Press-Release-Record",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/生活",
+      "field_count": 3,
+      "variation_count": 19
+    },
+    {
+      "name": "Training-Record",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/学术",
+      "field_count": 3,
+      "variation_count": 9
+    },
+    {
+      "name": "Survey-Result",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 4,
+      "variation_count": 4
+    },
+    {
+      "name": "Weather-Observation",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/生活",
+      "field_count": 4,
+      "variation_count": 28
+    },
+    {
+      "name": "Health-Monitor",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 20
+    },
+    {
+      "name": "Habit-Analysis",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 3
+    },
+    {
+      "name": "Travel-Journal",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 4,
+      "variation_count": 22
+    },
+    {
+      "name": "Reading-Note",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活/学术",
+      "field_count": 3,
+      "variation_count": 13
+    },
+    {
+      "name": "Movie-Review",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 4,
+      "variation_count": 20
+    },
+    {
+      "name": "Music-Review",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 4,
+      "variation_count": 15
+    },
+    {
+      "name": "Recipe-Record",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 9
+    },
+    {
+      "name": "Shopping-Record",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 4,
+      "variation_count": 14
+    },
+    {
+      "name": "Budget-Plan-Personal",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 17
+    },
+    {
+      "name": "Diary-Entry",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活",
+      "field_count": 3,
+      "variation_count": 14
+    },
+    {
+      "name": "Goal-Tracking",
+      "entity_type": "PersonalEntity",
+      "scene": "个人生活/学术",
+      "field_count": 3,
+      "variation_count": 14
+    },
+    {
+      "name": "Knowledge-Entry",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/学术/个人",
+      "field_count": 3,
+      "variation_count": 13
+    },
+    {
+      "name": "Experiment-Record",
+      "entity_type": "ResearchEntity",
+      "scene": "科研",
+      "field_count": 3,
+      "variation_count": 20
+    },
+    {
+      "name": "Visualization-Record",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 3,
+      "variation_count": 8
+    },
+    {
+      "name": "Multimodal-Record",
+      "entity_type": "GeneralEntity",
+      "scene": "全场景",
+      "field_count": 5,
+      "variation_count": 25
+    },
+    {
+      "name": "Literature-Mapping-2",
+      "entity_type": "GeneralEntity",
+      "scene": "学术",
+      "field_count": 3,
+      "variation_count": 15
+    },
+    {
+      "name": "Dataset-Record",
+      "entity_type": "ResearchEntity",
+      "scene": "科研",
+      "field_count": 4,
+      "variation_count": 28
+    },
+    {
+      "name": "Data-Quality",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 3,
+      "variation_count": 19
+    },
+    {
+      "name": "Data-Validation",
+      "entity_type": "ResearchEntity",
+      "scene": "科研/政府",
+      "field_count": 3,
+      "variation_count": 13
+    },
+    {
+      "name": "File-Metadata",
+      "entity_type": "GeneralEntity",
+      "scene": "全场景",
+      "field_count": 4,
+      "variation_count": 27
+    },
+    {
+      "name": "Sensor-Log",
+      "entity_type": "ResearchEntity",
+      "scene": "政府/科研",
+      "field_count": 4,
+      "variation_count": 28
+    },
+    {
+      "name": "Alert-Log",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 27
+    },
+    {
+      "name": "Risk-Log",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 20
+    },
+    {
+      "name": "Maintenance-Record",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 3,
+      "variation_count": 21
+    },
+    {
+      "name": "Policy-Log",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府",
+      "field_count": 4,
+      "variation_count": 22
+    },
+    {
+      "name": "Movie-Review",
+      "entity_type": "EntertainmentEntity",
+      "scene": "娱乐",
+      "field_count": 4,
+      "variation_count": 20
+    },
+    {
+      "name": "Music-Log",
+      "entity_type": "EntertainmentEntity",
+      "scene": "娱乐",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "Concert-Log",
+      "entity_type": "EntertainmentEntity",
+      "scene": "娱乐",
+      "field_count": 4,
+      "variation_count": 22
+    },
+    {
+      "name": "Game-Play",
+      "entity_type": "EntertainmentEntity",
+      "scene": "娱乐",
+      "field_count": 4,
+      "variation_count": 9
+    },
+    {
+      "name": "Book-Reading",
+      "entity_type": "TravelEntity",
+      "scene": "娱乐/旅行",
+      "field_count": 4,
+      "variation_count": 21
+    },
+    {
+      "name": "Travel-Trip",
+      "entity_type": "TravelEntity",
+      "scene": "旅行",
+      "field_count": 4,
+      "variation_count": 30
+    },
+    {
+      "name": "Travel-Itinerary",
+      "entity_type": "TravelEntity",
+      "scene": "旅行",
+      "field_count": 4,
+      "variation_count": 21
+    },
+    {
+      "name": "Hotel-Stay",
+      "entity_type": "TravelEntity",
+      "scene": "旅行",
+      "field_count": 4,
+      "variation_count": 22
+    },
+    {
+      "name": "Flight-Record",
+      "entity_type": "TravelEntity",
+      "scene": "旅行",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "Restaurant-Review",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/休闲",
+      "field_count": 5,
+      "variation_count": 33
+    },
+    {
+      "name": "Scenic-Spot",
+      "entity_type": "TravelEntity",
+      "scene": "旅行",
+      "field_count": 4,
+      "variation_count": 26
+    },
+    {
+      "name": "Travel-Photo",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/休闲",
+      "field_count": 4,
+      "variation_count": 29
+    },
+    {
+      "name": "Hiking-Log",
+      "entity_type": "SportsEntity",
+      "scene": "运动/休闲",
+      "field_count": 4,
+      "variation_count": 14
+    },
+    {
+      "name": "Cycling-Log",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 4,
+      "variation_count": 14
+    },
+    {
+      "name": "Running-Log",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 4,
+      "variation_count": 14
+    },
+    {
+      "name": "Gym-Workout",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 5,
+      "variation_count": 16
+    },
+    {
+      "name": "Swimming-Log",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 4,
+      "variation_count": 14
+    },
+    {
+      "name": "Yoga-Session",
+      "entity_type": "SportsEntity",
+      "scene": "运动/休闲",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "Meditation-Log",
+      "entity_type": "GeneralEntity",
+      "scene": "休闲",
+      "field_count": 3,
+      "variation_count": 9
+    },
+    {
+      "name": "Spa-Visit",
+      "entity_type": "GeneralEntity",
+      "scene": "休闲",
+      "field_count": 4,
+      "variation_count": 23
+    },
+    {
+      "name": "Theater-Log",
+      "entity_type": "EntertainmentEntity",
+      "scene": "娱乐",
+      "field_count": 4,
+      "variation_count": 27
+    },
+    {
+      "name": "Festival-Visit",
+      "entity_type": "TravelEntity",
+      "scene": "休闲/旅行",
+      "field_count": 4,
+      "variation_count": 17
+    },
+    {
+      "name": "Photography-Log",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/休闲",
+      "field_count": 4,
+      "variation_count": 24
+    },
+    {
+      "name": "Camping-Log",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/休闲",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "RoadTrip",
+      "entity_type": "TravelEntity",
+      "scene": "旅行",
+      "field_count": 4,
+      "variation_count": 23
+    },
+    {
+      "name": "Adventure-Activity",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/运动",
+      "field_count": 4,
+      "variation_count": 22
+    },
+    {
+      "name": "Beach-Visit",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/休闲",
+      "field_count": 4,
+      "variation_count": 23
+    },
+    {
+      "name": "Park-Visit",
+      "entity_type": "GeneralEntity",
+      "scene": "休闲",
+      "field_count": 4,
+      "variation_count": 28
+    },
+    {
+      "name": "ThemePark-Log",
+      "entity_type": "EntertainmentEntity",
+      "scene": "娱乐",
+      "field_count": 4,
+      "variation_count": 23
+    },
+    {
+      "name": "Wildlife-Observation",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/休闲",
+      "field_count": 4,
+      "variation_count": 23
+    },
+    {
+      "name": "Scenic-Route",
+      "entity_type": "TravelEntity",
+      "scene": "旅行",
+      "field_count": 4,
+      "variation_count": 22
+    },
+    {
+      "name": "Cultural-Experience",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/休闲",
+      "field_count": 4,
+      "variation_count": 27
+    },
+    {
+      "name": "Local-Food",
+      "entity_type": "TravelEntity",
+      "scene": "旅行",
+      "field_count": 4,
+      "variation_count": 22
+    },
+    {
+      "name": "Street-Photography",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/休闲",
+      "field_count": 4,
+      "variation_count": 24
+    },
+    {
+      "name": "Scenic-Photo",
+      "entity_type": "TravelEntity",
+      "scene": "旅行",
+      "field_count": 4,
+      "variation_count": 29
+    },
+    {
+      "name": "Travel-Diary",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/休闲",
+      "field_count": 4,
+      "variation_count": 22
+    },
+    {
+      "name": "Souvenir-Record",
+      "entity_type": "TravelEntity",
+      "scene": "旅行/休闲",
+      "field_count": 4,
+      "variation_count": 17
+    },
+    {
+      "name": "Activity-Log",
+      "entity_type": "SportsEntity",
+      "scene": "休闲/运动",
+      "field_count": 4,
+      "variation_count": 15
+    },
+    {
+      "name": "Gym-Session",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 5,
+      "variation_count": 10
+    },
+    {
+      "name": "Swimming-Session",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 5,
+      "variation_count": 15
+    },
+    {
+      "name": "Yoga-Session",
+      "entity_type": "SportsEntity",
+      "scene": "运动/休闲",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "Meditation-Session",
+      "entity_type": "GeneralEntity",
+      "scene": "休闲",
+      "field_count": 3,
+      "variation_count": 9
+    },
+    {
+      "name": "Cycling-Session",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 5,
+      "variation_count": 15
+    },
+    {
+      "name": "Running-Session",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 4,
+      "variation_count": 14
+    },
+    {
+      "name": "Hiking-Session",
+      "entity_type": "TravelEntity",
+      "scene": "运动/旅行",
+      "field_count": 5,
+      "variation_count": 15
+    },
+    {
+      "name": "Skiing-Log",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "Climbing-Log",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 4,
+      "variation_count": 17
+    },
+    {
+      "name": "Surfing-Log",
+      "entity_type": "SportsEntity",
+      "scene": "运动",
+      "field_count": 4,
+      "variation_count": 17
+    },
+    {
+      "name": "Skateboarding-Log",
+      "entity_type": "SportsEntity",
+      "scene": "运动/休闲",
+      "field_count": 4,
+      "variation_count": 10
+    },
+    {
+      "name": "Leisure-Activity",
+      "entity_type": "GeneralEntity",
+      "scene": "休闲",
+      "field_count": 4,
+      "variation_count": 15
+    },
+    {
+      "name": "Shooting-Info",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 5,
+      "variation_count": 16
+    },
+    {
+      "name": "Exposure-Strategy",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 2,
+      "variation_count": 8
+    },
+    {
+      "name": "ISO-Usage",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 2,
+      "variation_count": 5
+    },
+    {
+      "name": "Aperture-Usage",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 2,
+      "variation_count": 2
+    },
+    {
+      "name": "Shutter-Usage",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 2,
+      "variation_count": 2
+    },
+    {
+      "name": "White-Balance",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 2,
+      "variation_count": 2
+    },
+    {
+      "name": "Metering-Mode",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Focus-Mode",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 2,
+      "variation_count": 13
+    },
+    {
+      "name": "Drive-Mode",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Image-Format",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 2,
+      "variation_count": 2
+    },
+    {
+      "name": "Picture-Profile",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 12
+    },
+    {
+      "name": "Stabilization",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Flash-Usage",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 2,
+      "variation_count": 8
+    },
+    {
+      "name": "ND-Filter",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Polarizer",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Lens-Choice",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 11
+    },
+    {
+      "name": "Camera-Body",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Shooting-Condition",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 2,
+      "variation_count": 15
+    },
+    {
+      "name": "Scene-Type",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Shooting-Intent",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Composition-Type",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Subject-Placement",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Leading-Lines",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Frame-in-Frame",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Symmetry",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Negative-Space",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Depth-Layer",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Perspective",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Scale-Contrast",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Visual-Balance",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Color-Composition",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Light-Composition",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Minimalism",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Documentary-Style",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Portrait-Style",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Landscape-Style",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Street-Style",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Abstract-Style",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 2,
+      "variation_count": 2
+    },
+    {
+      "name": "Film-Look",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Visual-Mood",
+      "entity_type": "PhotographyEntity",
+      "scene": "摄影",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Raw-Develop",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Exposure-Adjust",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Contrast-Adjust",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Highlight-Control",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Shadow-Control",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "WhiteBalance-Fix",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Tone-Curve",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Clarity-Texture",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Sharpening",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Noise-Reduction",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Crop-Adjust",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Geometry",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Vignette",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Grain",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 8
+    },
+    {
+      "name": "Basic-Preset",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Batch-Edit",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Histogram-Check",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 6
+    },
+    {
+      "name": "Color-Profile",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 6
+    },
+    {
+      "name": "Bit-Depth",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "File-Export",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 2,
+      "variation_count": 2
+    },
+    {
+      "name": "File-Naming",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Version-Control",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Workflow-Step",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Preset-Evaluation",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 6
+    },
+    {
+      "name": "Series-Consistency",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Color-Grading",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "HSL-Adjust",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Split-Toning",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 2,
+      "variation_count": 2
+    },
+    {
+      "name": "LUT-Usage",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Skin-Tone",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Color-Match",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Dodge-Burn",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 6
+    },
+    {
+      "name": "Mask-Local",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Sky-Replacement",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Object-Removal",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Retouch-Skin",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 6
+    },
+    {
+      "name": "Frequency-Separation",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Liquify",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Composite",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Double-Exposure",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Light-Effect",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 13
+    },
+    {
+      "name": "Texture-Overlay",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "AI-Enhance",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "AI-Remove",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 6
+    },
+    {
+      "name": "Color-Consistency",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Print-Preparation",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Web-Export",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Social-Ratio",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Watermark",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Output-Sharpen",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 6
+    },
+    {
+      "name": "Backup-Strategy",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 8
+    },
+    {
+      "name": "Style-Analysis",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Reference-Study",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Preset-Build",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 7
+    },
+    {
+      "name": "Preset-Iteration",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Editing-Decision",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Before-After",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 5
+    },
+    {
+      "name": "Quality-Review",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Final-Selection",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 1
+    },
+    {
+      "name": "Portfolio-Ready",
+      "entity_type": "PostProcessingEntity",
+      "scene": "后期",
+      "field_count": 1,
+      "variation_count": 6
+    },
+    {
+      "name": "Procurement-Project",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/采购",
+      "field_count": 5,
+      "variation_count": 13
+    },
+    {
+      "name": "Technical-Requirements",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/采购",
+      "field_count": 4,
+      "variation_count": 4
+    },
+    {
+      "name": "Procurement-Terms",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/采购",
+      "field_count": 4,
+      "variation_count": 4
+    },
+    {
+      "name": "Bidding-Document",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/采购",
+      "field_count": 4,
+      "variation_count": 8
+    },
+    {
+      "name": "Supplier-Qualification",
+      "entity_type": "GovernmentEntity",
+      "scene": "政府/采购",
+      "field_count": 4,
+      "variation_count": 4
+    }
+  ]
+}

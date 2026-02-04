@@ -811,10 +811,16 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     // 保存到文件
     saveDocuments(mockDocuments);
     
-    // 模拟添加到向量数据库（异步处理）
-    setTimeout(() => {
-      console.log('Mock: Document added to vector DB');
-    }, 1000);
+    console.log('[Upload] 文档上传成功，开始触发知识图谱构建...');
+    
+    // 触发知识图谱构建钩子 (异步)
+    onDocumentCreated(document, { async: true, skipIfExists: false })
+      .then(result => {
+        console.log('[KG Hook] 文档上传后知识图谱构建结果:', result);
+      })
+      .catch(error => {
+        console.error('[KG Hook] 文档上传后知识图谱构建失败:', error);
+      });
     
     res.status(201).json(document);
   } catch (error) {
