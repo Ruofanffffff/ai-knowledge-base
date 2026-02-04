@@ -1,0 +1,43 @@
+const { CapacitorConfig } = require('@capacitor/cli');
+
+const config = {
+  appId: 'com.personal.knowledgebase',
+  appName: 'Personal Knowledge Base',
+  webDir: 'web',
+  bundledWebRuntime: false,
+  server: {
+    androidScheme: "http"
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 2000,
+      launchAutoHide: true,
+      backgroundColor: '#ffffff',
+      androidSplashResourceName: 'splash',
+      androidScaleType: 'CENTER_CROP',
+      showSpinner: false,
+      androidSpinnerStyle: 'large',
+      spinnerColor: '#999999',
+      splashFullScreen: true,
+      splashImmersive: true,
+      layoutName: 'launch_screen'
+    },
+    StatusBar: {
+      style: 'DARK',
+      backgroundColor: '#ffffff'
+    },
+    Keyboard: {
+      resize: 'body',
+      style: 'DARK',
+      resizeOnFullScreen: true
+    }
+  },
+  android: {
+    buildOptions: {
+      keystorePath: '',
+      keystoreAlias: ''
+    }
+  }
+};
+
+module.exports = config;

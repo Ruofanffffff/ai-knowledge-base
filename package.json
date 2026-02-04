@@ -25,7 +25,12 @@
     "db:generate": "npx prisma generate",
     "db:studio": "npx prisma studio",
     "schema:import": "node kg/schema/load_schemas.js",
-    "schema:check": "node kg/schema/schema_startup_check.js"
+    "schema:check": "node kg/schema/schema_startup_check.js",
+    "android:build": "./build-android.sh",
+    "android:dev": "./dev-android.sh",
+    "android:sync": "cd client && npm run build && cd .. && npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:run": "npx cap run android"
   },
   "keywords": [
     "knowledge",
@@ -36,7 +41,9 @@
     "knowledge-graph",
     "schema-driven",
     "llm",
-    "token-optimization"
+    "token-optimization",
+    "android",
+    "capacitor"
   ],
   "author": "Your Name",
   "license": "MIT",
@@ -47,10 +54,13 @@
     "supertest": "^7.2.2"
   },
   "dependencies": {
+    "@capacitor/android": "^8.0.2",
+    "@capacitor/cli": "^8.0.2",
+    "@capacitor/core": "^8.0.2",
     "@prisma/client": "^5.22.0",
     "axios": "^1.13.4",
     "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "docx": "^8.5.0",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
