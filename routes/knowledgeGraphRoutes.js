@@ -2002,4 +2002,120 @@ router.get('/relation-types-compatible', authMiddleware, async (req, res) => {
   }
 });
 
+// ============================================
+// Graph Visualization Route
+// ============================================
+
+/**
+ * Get knowledge graph visualization data
+ * GET /api/knowledge-graph
+ * 
+ * Returns nodes and links formatted for frontend visualization.
+ * Query params:
+ *   - minConfidence: Minimum confidence threshold (default: 0.5)
+ *   - maxNodes: Maximum number of nodes to return (default: 100)
+ *   - entityType: Filter by entity type (optional)
+ *   - relationType: Filter by relation type (optional)
+ */
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const { 
+      minConfidence = 0.5, 
+      maxNodes = 100,
+      entityType,
+      relationType
+    } = req.query;
+    
+    // Get entities
+    const entityOptions = {
+      take: parseInt(maxNodes),
+      orderBy: 'confidence',
+      order: 'desc'
+    };
+    
+    let entities;
+    if (entityType) {
+      entities = await entityStore.getEntitiesByType(entityType, entityOptions);
+    } else {
+      entities = await entityStore.getEntitiesByConfidence(
+        parseFloat(minConfidence),
+        1.0,
+        entityOptions
+      );
+    }
+    
+    // If no entities found, return empty graph
+    if (!entities || entities.length === 0) {
+      return res.json({
+        success: true,
+        nodes: [],
+        links: [],
+        message: 'No entities found. Upload documents to build knowledge graph.'
+      });
+    }
+    
+    // Get entity IDs
+    const entityIds = entities.map(e => e.entity_id);
+    
+    // Get relations between these entities
+    const relationOptions = {
+      minConfidence: parseFloat(minConfidence),
+      includeEntities: false
+    };
+    
+    if (relationType) {
+      relationOptions.type = relationType;
+    }
+    
+    const allRelations = await relationStore.getAllRelations(relationOptions);
+    
+    // Filter relations to only include those between our entities
+    const entityIdSet = new Set(entityIds);
+    const relations = allRelations.filter(r => 
+      entityIdSet.has(r.source_id) && entityIdSet.has(r.target_id)
+    );
+    
+    // Transform entities to nodes format
+    const nodes = entities.map(entity => ({
+      id: entity.entity_id,
+      label: entity.canonical_name,
+      type: entity.entity_type,
+      confidence: entity.confidence,
+      // Optional: add position hints (can be used by frontend for layout)
+      // x and y will be calculated by frontend if not provided
+    }));
+    
+    // Transform relations to links format
+    const links = relations.map(relation => ({
+      source: relation.source_id,
+      target: relation.target_id,
+      relation: relation.subtype || relation.type,
+      confidence: relation.confidence
+    }));
+    
+    res.json({
+      success: true,
+      nodes,
+      links,
+      metadata: {
+        nodeCount: nodes.length,
+        linkCount: links.length,
+        minConfidence: parseFloat(minConfidence),
+        filters: {
+          entityType: entityType || 'all',
+          relationType: relationType || 'all'
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error getting graph visualization data:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      nodes: [],
+      links: []
+    });
+  }
+});
+
 module.exports = router;
