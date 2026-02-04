@@ -7,16 +7,69 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+// Lazy load relation type modules to avoid circular dependencies
+let relationTypeRegistry = null;
+let relationTypeValidator = null;
+
+function getRelationTypeRegistry() {
+  if (!relationTypeRegistry) {
+    const RelationTypeRegistry = require('./relation_type_registry');
+    relationTypeRegistry = new RelationTypeRegistry();
+  }
+  return relationTypeRegistry;
+}
+
+function getRelationTypeValidator() {
+  if (!relationTypeValidator) {
+    const RelationTypeValidator = require('./relation_type_validator');
+    const registry = getRelationTypeRegistry();
+    relationTypeValidator = new RelationTypeValidator(registry);
+  }
+  return relationTypeValidator;
+}
+
 /**
  * Save a single relation to the database
  * 
  * @param {Object} relation - Relation object to save
+ * @param {Object} options - Save options
+ * @param {boolean} options.validateRelationType - Whether to validate against relation type (default: true)
+ * @param {Object} options.sourceEntity - Source entity (for validation)
+ * @param {Object} options.targetEntity - Target entity (for validation)
  * @returns {Promise<Object>} Saved relation
  */
-async function saveRelation(relation) {
+async function saveRelation(relation, options = {}) {
+  const { validateRelationType = true, sourceEntity, targetEntity } = options;
+  
   // Validate relation
   if (!relation.source_id || !relation.target_id) {
     throw new Error('Relation must have source_id and target_id');
+  }
+  
+  // Validate against relation type if enabled and subtype is a relation type ID
+  if (validateRelationType && relation.subtype) {
+    try {
+      const registry = getRelationTypeRegistry();
+      const relationType = registry.get(relation.subtype);
+      if (relationType && sourceEntity && targetEntity) {
+        const validator = getRelationTypeValidator();
+        const validation = validator.validate(
+          {
+            sourceEntityType: sourceEntity.entity_type,
+            targetEntityType: targetEntity.entity_type,
+            confidence: relation.confidence
+          },
+          relationType
+        );
+        
+        if (!validation.valid) {
+          console.warn(`Relation type validation failed for ${relation.subtype}:`, validation.errors);
+          // Log warning but continue for backward compatibility
+        }
+      }
+    } catch (error) {
+      // Ignore validation errors if registry is not available
+    }
   }
   
   // Check for duplicate
@@ -385,6 +438,41 @@ function formatEntity(entity) {
 }
 
 /**
+ * Get relations by relation type
+ * 
+ * @param {string} relationTypeId - Relation type ID
+ * @param {Object} options - Query options
+ * @returns {Promise<Array>} Array of relations
+ */
+async function getByRelationType(relationTypeId, options = {}) {
+  const { 
+    minConfidence, 
+    skip = 0, 
+    take = 100,
+    includeEntities = false 
+  } = options;
+  
+  const where = { subtype: relationTypeId };
+  
+  if (minConfidence !== undefined) {
+    where.confidence = { gte: minConfidence };
+  }
+  
+  const relations = await prisma.kGRelation.findMany({
+    where,
+    skip,
+    take,
+    include: includeEntities ? {
+      source: true,
+      target: true
+    } : undefined,
+    orderBy: { confidence: 'desc' }
+  });
+  
+  return relations.map(formatRelation);
+}
+
+/**
  * Try to parse JSON string, return default value on error
  * 
  * @param {string} jsonString - JSON string
@@ -407,6 +495,7 @@ module.exports = {
   getOutgoingRelations,
   getIncomingRelations,
   getAllRelations,
+  getByRelationType,
   countRelations,
   getRelationStats,
   deleteRelation,

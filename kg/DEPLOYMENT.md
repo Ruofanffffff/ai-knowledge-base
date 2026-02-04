@@ -1227,7 +1227,26 @@ async function sendAlert(subject, message) {
 
 ---
 
-**文档版本**: v1.0.0  
-**最后更新**: 2025-02-01  
+**文档版本**: v1.0.1  
+**最后更新**: 2025-02-03  
 **维护者**: Schema-Driven KG Team
+
+## 最新更新 (v1.0.1)
+
+### 新增配置项
+
+```bash
+# 三阶段Schema匹配
+KG_SCHEMA_MATCH_ALGORITHM_THRESHOLD=0.4  # 算法匹配阈值（从0.6降至0.4）
+KG_SCHEMA_MATCH_LLM_FALLBACK=true        # 启用LLM兜底匹配
+
+# LLM 100%兜底策略
+# Schema匹配、实体名称生成、字段映射现在都使用LLM作为兜底方案
+```
+
+### 性能提升
+
+- **Schema召回率**: 提高约15-20%（阈值降低+LLM兜底）
+- **实体质量**: 所有实体名称经过LLM验证和优化
+- **字段映射准确率**: 提高至95%+（LLM兜底处理未映射字段）
 

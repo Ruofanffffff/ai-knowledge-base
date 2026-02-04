@@ -1952,6 +1952,256 @@ for doc in docs; do
 done
 ```
 
+## 10.6 关系类型管理
+
+### 获取所有关系类型
+
+```bash
+GET /api/knowledge-graph/relation-types
+```
+
+**查询参数:**
+- `domain` (可选): 按领域过滤 (life/work/travel/shopping/government/management)
+- `category` (可选): 按分类过滤
+- `entityType` (可选): 按实体类型过滤
+- `role` (可选): 实体角色 (source/target/both)
+- `activeOnly` (可选): 只返回激活的关系类型 (默认: true)
+
+**响应示例:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "count": 90,
+    "relationTypes": [
+      {
+        "relationTypeId": "family_parent",
+        "name": "parent",
+        "displayName": "父母",
+        "description": "表示父母关系",
+        "domain": "life",
+        "category": "family",
+        "sourceEntityTypes": ["PersonEntity"],
+        "targetEntityTypes": ["PersonEntity"],
+        "isDirectional": true,
+        "isTemporal": false,
+        "supportsConfidence": true,
+        "version": "1.0.0",
+        "active": true
+      }
+    ]
+  }
+}
+```
+
+**使用示例:**
+
+```bash
+# 获取所有关系类型
+curl -X GET http://localhost:3000/api/knowledge-graph/relation-types
+
+# 获取生活领域的关系类型
+curl -X GET "http://localhost:3000/api/knowledge-graph/relation-types?domain=life"
+
+# 获取适用于PersonEntity的关系类型
+curl -X GET "http://localhost:3000/api/knowledge-graph/relation-types?entityType=PersonEntity&role=source"
+```
+
+### 获取单个关系类型
+
+```bash
+GET /api/knowledge-graph/relation-types/:id
+```
+
+**路径参数:**
+- `id`: 关系类型ID (如 "family_parent")
+
+**响应示例:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "relationTypeId": "family_parent",
+    "name": "parent",
+    "displayName": "父母",
+    "description": "表示父母关系",
+    "domain": "life",
+    "category": "family",
+    "sourceEntityTypes": ["PersonEntity"],
+    "targetEntityTypes": ["PersonEntity"],
+    "isDirectional": true,
+    "isTemporal": false,
+    "supportsConfidence": true,
+    "version": "1.0.0",
+    "active": true
+  }
+}
+```
+
+### 注册新关系类型
+
+```bash
+POST /api/knowledge-graph/relation-types
+```
+
+**请求体:**
+
+```json
+{
+  "relationTypeId": "custom_relation",
+  "name": "custom",
+  "displayName": "自定义关系",
+  "description": "自定义关系描述",
+  "domain": "life",
+  "category": "custom",
+  "sourceEntityTypes": ["PersonEntity"],
+  "targetEntityTypes": ["PersonEntity"],
+  "isDirectional": true,
+  "isTemporal": false,
+  "supportsConfidence": true,
+  "version": "1.0.0",
+  "active": true
+}
+```
+
+**响应示例:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "relationTypeId": "custom_relation",
+    "name": "custom",
+    "displayName": "自定义关系",
+    ...
+  }
+}
+```
+
+### 更新关系类型
+
+```bash
+PUT /api/knowledge-graph/relation-types/:id
+```
+
+**请求体:**
+
+```json
+{
+  "displayName": "新名称",
+  "description": "更新的描述",
+  "active": false
+}
+```
+
+### 删除关系类型
+
+```bash
+DELETE /api/knowledge-graph/relation-types/:id
+```
+
+**响应示例:**
+
+```json
+{
+  "success": true,
+  "message": "Relation type deleted successfully"
+}
+```
+
+### 获取关系类型统计
+
+```bash
+GET /api/knowledge-graph/relation-types-stats
+```
+
+**响应示例:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 90,
+    "active": 85,
+    "inactive": 5,
+    "byDomain": {
+      "life": 17,
+      "work": 15,
+      "travel": 13,
+      "shopping": 13,
+      "government": 16,
+      "management": 16
+    },
+    "byCategory": {
+      "family": 6,
+      "social": 4,
+      "residence": 3,
+      "health": 4
+    }
+  }
+}
+```
+
+### 搜索关系类型
+
+```bash
+GET /api/knowledge-graph/relation-types-search?q=父母
+```
+
+**查询参数:**
+- `q`: 搜索关键词
+
+**响应示例:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "count": 1,
+    "results": [
+      {
+        "relationTypeId": "family_parent",
+        "name": "parent",
+        "displayName": "父母",
+        ...
+      }
+    ]
+  }
+}
+```
+
+### 获取兼容的关系类型
+
+```bash
+GET /api/knowledge-graph/relation-types-compatible?sourceEntityType=PersonEntity&targetEntityType=PersonEntity
+```
+
+**查询参数:**
+- `sourceEntityType`: 源实体类型
+- `targetEntityType` (可选): 目标实体类型
+- `role` (可选): 角色 (source/target/both)
+
+**响应示例:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "count": 15,
+    "compatibleTypes": [
+      {
+        "relationTypeId": "family_parent",
+        "name": "parent",
+        "displayName": "父母",
+        ...
+      }
+    ]
+  }
+}
+```
+
 ## 11. 参考资源
 
 ### 11.1 相关文档
@@ -1974,7 +2224,7 @@ done
 
 ---
 
-**文档版本**: v1.0.0  
-**最后更新**: 2025-02-01  
+**文档版本**: v1.0.1  
+**最后更新**: 2025-02-03  
 **维护者**: Schema-Driven KG Team
 

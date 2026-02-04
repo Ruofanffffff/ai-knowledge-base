@@ -420,7 +420,8 @@ describe('Built-in Relation Builder - Property Tests', () => {
 
             // Property: All relations should pass validation
             for (const relation of relations) {
-              expect(validateRelation(relation)).toBe(true);
+              const validation = validateRelation(relation);
+              expect(validation.valid).toBe(true);
               expect(relation.source_id).toBeTruthy();
               expect(relation.target_id).toBeTruthy();
               expect(relation.source_id).not.toBe(relation.target_id);

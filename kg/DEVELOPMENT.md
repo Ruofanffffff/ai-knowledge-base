@@ -812,6 +812,51 @@ Closes #123
 
 ---
 
-**文档版本**: v1.0.0  
+**文档版本**: v1.0.1  
 **最后更新**: 2025-02-03  
 **维护者**: Schema-Driven KG Team
+
+## 最新更新 (v1.0.1)
+
+### 三阶段Schema匹配开发
+
+如果需要调试或扩展Schema匹配功能：
+
+**相关文件**:
+- `kg/schema/schema_matcher.js` - Schema匹配器主文件
+- `kg/prompts/schema_match.js` - LLM Schema匹配Prompt模板
+- `kg/pipeline/THREE_STAGE_SCHEMA_MATCHING.md` - 详细实现文档
+
+**调试方法**:
+```javascript
+// 测试三阶段匹配
+const { matchSchemas } = require('./kg/schema/schema_matcher');
+
+const fields = {
+  "时间": "2025-01-01",
+  "地点": "北京",
+  "观测值": "10.5米"
+};
+
+const matches = await matchSchemas(fields, ckb);
+console.log('匹配结果:', matches);
+```
+
+### LLM 100%兜底策略
+
+**实现位置**:
+- Schema匹配: `kg/schema/schema_matcher.js` - `_llmMatchFields()`
+- 实体名称: `kg/entity/entity_builder.js` - `_generateCanonicalName()`
+- 字段映射: `kg/field_normalizer/field_normalizer.js` - `normalizeFields()`
+
+**测试方法**:
+```bash
+# 测试Schema匹配兜底
+npm test kg/schema/schema_matcher.test.js
+
+# 测试实体名称生成
+npm test kg/entity/entity_builder.test.js
+
+# 测试字段映射
+npm test kg/field_normalizer/field_normalizer.test.js
+```

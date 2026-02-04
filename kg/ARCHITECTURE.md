@@ -791,6 +791,24 @@ model TokenUsage {
 
 ---
 
-**文档版本**: v1.0.0  
-**最后更新**: 2025-02-01  
+**文档版本**: v1.0.1  
+**最后更新**: 2025-02-03  
 **维护者**: Schema-Driven KG Team
+
+## 最新更新 (v1.0.1)
+
+### 三阶段Schema匹配
+系统现在采用三阶段Schema匹配策略，确保高召回率：
+1. **算法匹配阶段**: 使用字段覆盖率和语义相似度进行初步匹配（阈值从60%降至40%）
+2. **LLM兜底阶段**: 对未匹配的字段使用LLM进行语义理解和匹配（100%兜底）
+3. **合并排名阶段**: 合并两阶段结果，综合评分排序
+
+### LLM 100%兜底策略
+- **Schema匹配**: LLM作为兜底方案，处理所有未匹配字段
+- **实体名称生成**: LLM 100%验证和优化所有实体名称
+- **字段映射**: 4层策略后，LLM兜底处理未映射字段
+
+详细说明请参考：
+- [THREE_STAGE_SCHEMA_MATCHING.md](./pipeline/THREE_STAGE_SCHEMA_MATCHING.md)
+- [LLM_FALLBACK_EXPLAINED.md](./pipeline/LLM_FALLBACK_EXPLAINED.md)
+- [ENTITY_BUILDING_EXPLAINED.md](./pipeline/ENTITY_BUILDING_EXPLAINED.md)

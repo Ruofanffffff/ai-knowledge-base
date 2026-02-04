@@ -1740,4 +1740,266 @@ router.get('/pipeline/status', authMiddleware, async (req, res) => {
   }
 });
 
+// ============================================
+// Relation Type Routes
+// ============================================
+
+const relationTypeStore = require('../kg/relation/relation_type_store');
+const relationTypeQuery = require('../kg/relation/relation_type_query');
+const relationTypeRegistry = require('../kg/relation/relation_type_registry');
+
+/**
+ * Get all relation types
+ * GET /api/knowledge-graph/relation-types
+ */
+router.get('/relation-types', authMiddleware, async (req, res) => {
+  try {
+    const { domain, category, entityType, role, activeOnly } = req.query;
+    
+    let relationTypes;
+    
+    if (domain) {
+      relationTypes = await relationTypeStore.findByDomain(domain, { activeOnly: activeOnly !== 'false' });
+    } else if (category) {
+      relationTypes = await relationTypeStore.findByCategory(category, { activeOnly: activeOnly !== 'false' });
+    } else if (entityType) {
+      relationTypes = await relationTypeStore.findByEntityType(entityType, role || 'both', { activeOnly: activeOnly !== 'false' });
+    } else {
+      relationTypes = await relationTypeStore.findAll({ activeOnly: activeOnly !== 'false' });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        count: relationTypes.length,
+        relationTypes
+      }
+    });
+  } catch (error) {
+    console.error('Error getting relation types:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Get relation type by ID
+ * GET /api/knowledge-graph/relation-types/:id
+ */
+router.get('/relation-types/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const relationType = await relationTypeStore.findById(id);
+    
+    if (!relationType) {
+      return res.status(404).json({
+        success: false,
+        error: 'Relation type not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: relationType
+    });
+  } catch (error) {
+    console.error('Error getting relation type:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Register new relation type
+ * POST /api/knowledge-graph/relation-types
+ */
+router.post('/relation-types', authMiddleware, async (req, res) => {
+  try {
+    const relationType = req.body;
+    
+    // Validate required fields
+    const requiredFields = [
+      'relationTypeId', 'name', 'displayName', 'domain', 'category',
+      'sourceEntityTypes', 'targetEntityTypes'
+    ];
+    
+    for (const field of requiredFields) {
+      if (!relationType[field]) {
+        return res.status(400).json({
+          success: false,
+          error: `Missing required field: ${field}`
+        });
+      }
+    }
+    
+    // Create relation type
+    const created = await relationTypeStore.create(relationType);
+    
+    res.status(201).json({
+      success: true,
+      data: created
+    });
+  } catch (error) {
+    console.error('Error creating relation type:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Update relation type
+ * PUT /api/knowledge-graph/relation-types/:id
+ */
+router.put('/relation-types/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const updated = await relationTypeStore.update(id, updates);
+    
+    res.json({
+      success: true,
+      data: updated
+    });
+  } catch (error) {
+    console.error('Error updating relation type:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Delete relation type
+ * DELETE /api/knowledge-graph/relation-types/:id
+ */
+router.delete('/relation-types/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const deleted = await relationTypeStore.delete(id);
+    
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        error: 'Relation type not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Relation type deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting relation type:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Get relation type statistics
+ * GET /api/knowledge-graph/relation-types/stats
+ */
+router.get('/relation-types-stats', authMiddleware, async (req, res) => {
+  try {
+    const stats = await relationTypeStore.getStats();
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error getting relation type stats:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Search relation types
+ * GET /api/knowledge-graph/relation-types/search
+ */
+router.get('/relation-types-search', authMiddleware, async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing search query parameter: q'
+      });
+    }
+    
+    const registry = relationTypeRegistry;
+    const query = new relationTypeQuery(registry);
+    const results = query.search(q);
+    
+    res.json({
+      success: true,
+      data: {
+        count: results.length,
+        results
+      }
+    });
+  } catch (error) {
+    console.error('Error searching relation types:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Get compatible relation types for entity types
+ * GET /api/knowledge-graph/relation-types/compatible
+ */
+router.get('/relation-types-compatible', authMiddleware, async (req, res) => {
+  try {
+    const { sourceEntityType, targetEntityType, role } = req.query;
+    
+    if (!sourceEntityType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameter: sourceEntityType'
+      });
+    }
+    
+    const registry = relationTypeRegistry;
+    const query = new relationTypeQuery(registry);
+    const compatibleTypes = query.getCompatibleTypes(
+      sourceEntityType,
+      targetEntityType || sourceEntityType,
+      role || 'both'
+    );
+    
+    res.json({
+      success: true,
+      data: {
+        count: compatibleTypes.length,
+        compatibleTypes
+      }
+    });
+  } catch (error) {
+    console.error('Error getting compatible relation types:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

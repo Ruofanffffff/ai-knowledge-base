@@ -953,6 +953,53 @@ pm2 restart all
 
 ---
 
-**文档版本**: v1.0.0  
+**文档版本**: v1.0.1  
 **最后更新**: 2025-02-03  
 **维护者**: Schema-Driven KG Team
+
+## 最新更新 (v1.0.1)
+
+### 新增故障排查项
+
+#### Schema匹配召回率低
+
+**症状**: 文档内容无法匹配到合适的Schema，但内容明显符合某个Schema
+
+**可能原因**:
+- 算法匹配阈值过高
+- LLM兜底未启用
+- 字段名称差异过大
+
+**解决方案**:
+```bash
+# 1. 降低算法匹配阈值（已默认降至0.4）
+KG_SCHEMA_MATCH_ALGORITHM_THRESHOLD=0.4
+
+# 2. 确保LLM兜底已启用
+KG_SCHEMA_MATCH_LLM_FALLBACK=true
+
+# 3. 查看匹配日志
+tail -f logs/kg.log | grep "Schema match"
+
+# 4. 测试三阶段匹配
+curl -X POST http://localhost:3000/api/knowledge-graph/debug/schema-match-test \
+  -d '{"text": "测试文本内容"}'
+```
+
+#### 实体名称质量不佳
+
+**症状**: 生成的实体名称不够规范或不够准确
+
+**说明**: v1.0.1版本已将实体名称生成改为LLM 100%兜底，所有实体名称都经过LLM验证和优化
+
+**如果仍有问题**:
+```bash
+# 1. 检查LLM API状态
+curl http://localhost:3000/api/knowledge-graph/health/llm
+
+# 2. 查看实体构建日志
+tail -f logs/kg.log | grep "Entity canonical name"
+
+# 3. 手动重新生成实体名称
+curl -X POST http://localhost:3000/api/knowledge-graph/entities/:id/regenerate-name
+```

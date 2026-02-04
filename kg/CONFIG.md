@@ -333,9 +333,35 @@ KG_SYNONYM_DICT_LEARNING_ENABLED=false
 3. 增加 `KG_LLM_FIELD_MAPPING_RATE`
 4. 检查文档内容是否包含大量非标准字段
 
+## 最新更新 (v1.0.1)
+
+### 三阶段Schema匹配配置
+
+#### KG_SCHEMA_MATCH_ALGORITHM_THRESHOLD
+- **类型**: Number (0-1)
+- **默认值**: `0.4`
+- **说明**: 算法匹配阶段的阈值（从0.6降至0.4）
+- **用途**: 提高Schema召回率，确保更多潜在匹配被识别
+
+#### KG_SCHEMA_MATCH_LLM_FALLBACK
+- **类型**: Boolean
+- **默认值**: `true`
+- **说明**: 启用LLM兜底匹配
+- **用途**: 对未匹配字段使用LLM进行语义理解
+
+### LLM 100%兜底策略
+
+以下操作现在使用LLM作为100%兜底方案：
+
+- **Schema匹配**: 处理所有未匹配字段
+- **实体名称生成**: 验证和优化所有实体名称
+- **字段映射**: 4层策略后的兜底处理
+
 ## 参考资料
 
 - [Schema 驱动知识图谱设计文档](../.kiro/specs/schema-driven-knowledge-graph/design.md)
 - [Schema 驱动知识图谱需求文档](../.kiro/specs/schema-driven-knowledge-graph/requirements.md)
+- [三阶段Schema匹配](./pipeline/THREE_STAGE_SCHEMA_MATCHING.md)
+- [LLM兜底策略说明](./pipeline/LLM_FALLBACK_EXPLAINED.md)
 - [Token 优化策略](./utils/token_budget_manager.js)
 - [性能监控](./utils/performance_monitor.js)

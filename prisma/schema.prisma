@@ -399,3 +399,35 @@ model FieldDistribution {
   @@index([lastSeen])
   @@index([fieldType])
 }
+
+// ============================================
+// Relation Type Expansion Models
+// ============================================
+
+// 关系类型定义表
+// 定义知识图谱中可用的关系类型，支持多领域（生活、工作、旅行、购物、政务、管理）
+model RelationType {
+  id                 String   @id @default(uuid())
+  relationTypeId     String   @unique @map("relation_type_id")  // 唯一标识符，如 "family_parent"
+  name               String                                      // 英文名称，如 "parent"
+  displayName        String   @map("display_name")              // 中文显示名称，如 "父母"
+  description        String?                                     // 语义描述
+  domain             String                                      // 所属领域：life/work/travel/shopping/government/management
+  category           String                                      // 二级分类，如 "family"/"employment"
+  sourceEntityTypes  String   @map("source_entity_types")       // JSON array: 允许的源实体类型
+  targetEntityTypes  String   @map("target_entity_types")       // JSON array: 允许的目标实体类型
+  isDirectional      Boolean  @default(true) @map("is_directional")      // 是否有方向性
+  isTemporal         Boolean  @default(false) @map("is_temporal")        // 是否具有时效性
+  supportsConfidence Boolean  @default(true) @map("supports_confidence") // 是否支持置信度
+  parentType         String?  @map("parent_type")               // 父类型ID（用于继承）
+  metadata           String?                                     // JSON: 扩展元数据
+  version            String   @default("1.0.0")                 // 版本号
+  active             Boolean  @default(true)                    // 是否激活
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  
+  @@map("relation_types")
+  @@index([domain])
+  @@index([category])
+  @@index([active])
+}

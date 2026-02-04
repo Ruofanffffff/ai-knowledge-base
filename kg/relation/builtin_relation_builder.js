@@ -8,6 +8,27 @@
 
 const entityStore = require('../entity/entity_store');
 
+// Lazy load relation type modules to avoid circular dependencies
+let relationTypeRegistry = null;
+let relationTypeValidator = null;
+
+function getRelationTypeRegistry() {
+  if (!relationTypeRegistry) {
+    const RelationTypeRegistry = require('./relation_type_registry');
+    relationTypeRegistry = new RelationTypeRegistry();
+  }
+  return relationTypeRegistry;
+}
+
+function getRelationTypeValidator() {
+  if (!relationTypeValidator) {
+    const RelationTypeValidator = require('./relation_type_validator');
+    const registry = getRelationTypeRegistry();
+    relationTypeValidator = new RelationTypeValidator(registry);
+  }
+  return relationTypeValidator;
+}
+
 /**
  * Build built-in relations for an entity based on Schema definition
  * 
@@ -56,7 +77,21 @@ async function buildRelations(entity, schema, fields, ckbIds = []) {
  * @returns {Promise<Object|null>} Relation object or null
  */
 async function buildRelationFromTemplate(entity, relTemplate, fields, ckbIds) {
-  const { type, target_field, direction = 'outgoing' } = relTemplate;
+  const { type, target_field, direction = 'outgoing', relation_type_id } = relTemplate;
+  
+  // Validate relation type if specified
+  let relationType = null;
+  if (relation_type_id) {
+    try {
+      const registry = getRelationTypeRegistry();
+      relationType = registry.get(relation_type_id);
+      if (!relationType) {
+        console.warn(`Relation type not found: ${relation_type_id}. Using legacy type: ${type}`);
+      }
+    } catch (error) {
+      console.warn(`Could not validate relation type: ${error.message}`);
+    }
+  }
   
   // Find the target field value
   const targetField = fields.find(f => f.name === target_field);
@@ -79,16 +114,39 @@ async function buildRelationFromTemplate(entity, relTemplate, fields, ckbIds) {
     source_id: direction === 'outgoing' ? entity.entity_id : targetEntity.entity_id,
     target_id: direction === 'outgoing' ? targetEntity.entity_id : entity.entity_id,
     type: 'builtin',
-    subtype: type,
+    subtype: relation_type_id || type,  // Use relation_type_id if available
     confidence: 1.0,  // Built-in relations are deterministic
     evidence_ckb: JSON.stringify(ckbIds),
     evidence_text: null,
     metadata: JSON.stringify({
       schema_name: entity.schemas[0]?.schema_name,
       target_field: target_field,
-      direction: direction
+      direction: direction,
+      relation_type_id: relation_type_id || null
     })
   };
+  
+  // Validate relation against relation type if available
+  if (relationType) {
+    try {
+      const validator = getRelationTypeValidator();
+      const validation = validator.validate(
+        {
+          sourceEntityType: entity.entity_type,
+          targetEntityType: targetEntity.entity_type,
+          confidence: relation.confidence
+        },
+        relationType
+      );
+      
+      if (!validation.valid) {
+        console.warn(`Relation validation failed for ${relation_type_id}:`, validation.errors);
+        // Still create the relation but log the warning for backward compatibility
+      }
+    } catch (error) {
+      console.warn(`Could not validate relation: ${error.message}`);
+    }
+  }
   
   return relation;
 }
@@ -192,25 +250,58 @@ async function buildRelationsBatch(entities) {
  * Validate a relation before creation
  * 
  * @param {Object} relation - Relation to validate
- * @returns {boolean} True if valid
+ * @param {Object} options - Validation options
+ * @param {Object} options.sourceEntity - Source entity (for type validation)
+ * @param {Object} options.targetEntity - Target entity (for type validation)
+ * @returns {Object} Validation result with valid flag and errors
  */
-function validateRelation(relation) {
+function validateRelation(relation, options = {}) {
+  const errors = [];
+  
   // Check required fields
   if (!relation.source_id || !relation.target_id) {
-    return false;
+    errors.push('Missing source_id or target_id');
   }
   
   // Check that source and target are different
   if (relation.source_id === relation.target_id) {
-    return false;
+    errors.push('Source and target cannot be the same');
   }
   
   // Check confidence range
   if (relation.confidence < 0 || relation.confidence > 1) {
-    return false;
+    errors.push('Confidence must be between 0 and 1');
   }
   
-  return true;
+  // Validate against relation type if available
+  if (relation.subtype && options.sourceEntity && options.targetEntity) {
+    try {
+      const registry = getRelationTypeRegistry();
+      const relationType = registry.get(relation.subtype);
+      if (relationType) {
+        const validator = getRelationTypeValidator();
+        const validation = validator.validate(
+          {
+            sourceEntityType: options.sourceEntity.entity_type,
+            targetEntityType: options.targetEntity.entity_type,
+            confidence: relation.confidence
+          },
+          relationType
+        );
+        
+        if (!validation.valid) {
+          errors.push(...validation.errors);
+        }
+      }
+    } catch (error) {
+      // Ignore validation errors if registry is not available
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
 }
 
 module.exports = {

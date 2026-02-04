@@ -10,6 +10,16 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+// Lazy load relation type modules to avoid circular dependencies
+let relationTypeRegistry = null;
+function getRelationTypeRegistry() {
+  if (!relationTypeRegistry) {
+    const RelationTypeRegistry = require('../relation/relation_type_registry');
+    relationTypeRegistry = new RelationTypeRegistry();
+  }
+  return relationTypeRegistry;
+}
+
 /**
  * Helper function to deserialize Schema JSON fields
  * @param {Object} schema - Raw schema from database
@@ -96,6 +106,25 @@ function validateSchema(schema) {
       
       if (!relation.direction || !['outgoing', 'incoming'].includes(relation.direction)) {
         throw new Error('Each relation must have a direction (outgoing or incoming)');
+      }
+      
+      // Validate relation_type_id if provided
+      if (relation.relation_type_id) {
+        try {
+          const registry = getRelationTypeRegistry();
+          const relationType = registry.get(relation.relation_type_id);
+          if (!relationType) {
+            throw new Error(`Invalid relation_type_id: ${relation.relation_type_id} not found in registry`);
+          }
+          
+          // Check if relation type is active
+          if (!relationType.active) {
+            throw new Error(`Relation type ${relation.relation_type_id} is not active`);
+          }
+        } catch (error) {
+          // If registry is not available or empty, just warn
+          console.warn(`Could not validate relation_type_id: ${error.message}`);
+        }
       }
     }
   }
@@ -473,6 +502,74 @@ function exportToCSV(schemas) {
   return csvLines.join('\n');
 }
 
+/**
+ * Get suggested relation types for a schema based on entity type
+ * @param {string} entityType - Entity type
+ * @param {string} role - Role: 'source' | 'target' | 'both'
+ * @returns {Array} Array of suggested relation types
+ */
+function getSuggestedRelationTypes(entityType, role = 'both') {
+  try {
+    const relationTypeQuery = require('../relation/relation_type_query');
+    const registry = getRelationTypeRegistry();
+    const query = new relationTypeQuery(registry);
+    
+    // Get compatible relation types for this entity type
+    const compatibleTypes = query.getCompatibleTypes(entityType, entityType, role);
+    
+    return compatibleTypes.map(rt => ({
+      relationTypeId: rt.relationTypeId,
+      name: rt.name,
+      displayName: rt.displayName,
+      description: rt.description,
+      domain: rt.domain,
+      category: rt.category,
+      isDirectional: rt.isDirectional
+    }));
+  } catch (error) {
+    console.warn('Error getting suggested relation types:', error);
+    return [];
+  }
+}
+
+/**
+ * Validate relation types in schema
+ * @param {Object} schema - Schema object
+ * @returns {Object} Validation result with warnings
+ */
+function validateRelationTypes(schema) {
+  const warnings = [];
+  
+  if (!schema.relations || schema.relations.length === 0) {
+    return { valid: true, warnings: [] };
+  }
+  
+  try {
+    const registry = getRelationTypeRegistry();
+    
+    for (const relation of schema.relations) {
+      if (relation.relation_type_id) {
+        const relationType = registry.get(relation.relation_type_id);
+        
+        if (!relationType) {
+          warnings.push(`Relation type ${relation.relation_type_id} not found in registry`);
+        } else if (!relationType.active) {
+          warnings.push(`Relation type ${relation.relation_type_id} is not active`);
+        }
+      } else {
+        warnings.push(`Relation ${relation.type} does not have a relation_type_id (using legacy type)`);
+      }
+    }
+  } catch (error) {
+    console.warn('Error validating relation types:', error);
+  }
+  
+  return {
+    valid: warnings.length === 0,
+    warnings
+  };
+}
+
 module.exports = {
   createSchema,
   getSchema,
@@ -487,5 +584,7 @@ module.exports = {
   getSchemas,
   hasEntities,
   importSchemas,
-  exportToCSV
+  exportToCSV,
+  getSuggestedRelationTypes,
+  validateRelationTypes
 };
