@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Search, Filter, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -31,6 +31,9 @@ export function Graph() {
   const [graphNodes, setGraphNodes] = useState(initialNodes);
   const [viewState, setViewState] = useState({ x: 0, y: 0, zoom: 1 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedNode, setDraggedNode] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   // 2. Calculate dynamic radius and combine with state
   const nodes = useMemo(() => {
@@ -45,29 +48,33 @@ export function Graph() {
       const r = 25 + (count * 8); 
       return { ...node, r, degree: count };
     });
-  }, [graphNodes, initialLinks]);
+  }, [graphNodes]);
 
-  // Handle Pan (Canvas Drag)
-  const handlePan = (e: any, info: any) => {
-    setViewState(prev => ({
-      ...prev,
-      x: prev.x + info.delta.x,
-      y: prev.y + info.delta.y
-    }));
+  // Handle node mouse down
+  const handleNodeMouseDown = (nodeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraggedNode(nodeId);
+    setIsDragging(true);
   };
 
-  // Handle Node Drag
-  const handleNodeDrag = (id: string, info: any) => {
-    setGraphNodes(prev => prev.map(n => {
-      if (n.id === id) {
-        return { 
-          ...n, 
-          x: n.x + info.delta.x / viewState.zoom, 
-          y: n.y + info.delta.y / viewState.zoom 
-        };
-      }
-      return n;
-    }));
+  // Handle mouse move
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!isDragging || !draggedNode || !svgRef.current) return;
+
+    const svg = svgRef.current;
+    const rect = svg.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 800;
+    const y = ((e.clientY - rect.top) / rect.height) * 600;
+
+    setGraphNodes(prev => prev.map(n => 
+      n.id === draggedNode ? { ...n, x, y } : n
+    ));
+  };
+
+  // Handle mouse up
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDraggedNode(null);
   };
 
   const handleZoomIn = () => setViewState(prev => ({ ...prev, zoom: Math.min(prev.zoom * 1.2, 3) }));
@@ -96,11 +103,18 @@ export function Graph() {
       </div>
 
       {/* Graph Area */}
-      <motion.div 
-        className="w-full h-full cursor-grab active:cursor-grabbing"
-        onPan={handlePan}
-      >
-         <svg width="100%" height="100%" viewBox="0 0 800 600" className="w-full h-full pointer-events-none">
+      <div className="w-full h-full">
+         <svg 
+           ref={svgRef}
+           width="100%" 
+           height="100%" 
+           viewBox="0 0 800 600" 
+           className="w-full h-full"
+           onMouseMove={handleMouseMove}
+           onMouseUp={handleMouseUp}
+           onMouseLeave={handleMouseUp}
+           style={{ cursor: isDragging ? 'grabbing' : 'default' }}
+         >
             {/* Background Dot Grid for reference */}
             <defs>
                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -118,9 +132,8 @@ export function Graph() {
 
             {/* Viewport Group */}
             <motion.g
-              animate={{ x: viewState.x, y: viewState.y, scale: viewState.zoom }}
+              animate={{ scale: viewState.zoom }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="pointer-events-auto"
             >
               {/* Links and Labels */}
               {initialLinks.map((link, i) => {
@@ -176,21 +189,13 @@ export function Graph() {
                  const isDimmed = hoveredNode && hoveredNode !== node.id && !initialLinks.some(l => (l.source === node.id && l.target === hoveredNode) || (l.target === node.id && l.source === hoveredNode));
                  
                  return (
-                    <motion.g 
+                    <g 
                       key={node.id}
                       onMouseEnter={() => setHoveredNode(node.id)}
                       onMouseLeave={() => setHoveredNode(null)}
-                      onPan={(e, info) => {
-                        e.stopPropagation();
-                        handleNodeDrag(node.id, info);
-                      }}
-                      initial={{ scale: 0, opacity: 0 }}
-                      animate={{ 
-                        scale: isHovered ? 1.1 : 1, 
-                        opacity: isDimmed ? 0.2 : 1,
-                      }}
-                      transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                      style={{ cursor: 'grab' }}
+                      onMouseDown={(e) => handleNodeMouseDown(node.id, e)}
+                      style={{ cursor: isDragging && draggedNode === node.id ? 'grabbing' : 'grab' }}
+                      opacity={isDimmed ? 0.2 : 1}
                     >
                        {/* Pulse Effect */}
                        {node.degree > 3 && (
@@ -204,13 +209,14 @@ export function Graph() {
                           />
                        )}
 
-                       <circle 
+                       <motion.circle 
                           cx={node.x} cy={node.y} r={node.r} 
                           fill={node.color} 
                           fillOpacity="0.2"
                           stroke={node.color}
                           strokeWidth="2"
-                          filter={isHovered ? "url(#glow)" : ""}
+                          animate={{ scale: isHovered ? 1.1 : 1 }}
+                          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
                        />
                        
                        <circle 
@@ -228,12 +234,12 @@ export function Graph() {
                        >
                           {node.label}
                        </text>
-                    </motion.g>
+                    </g>
                  );
               })}
             </motion.g>
          </svg>
-      </motion.div>
+      </div>
 
       {/* Info Panel */}
       {hoveredNode && (

@@ -3,5 +3,24 @@
   import App from "./App.tsx";
   import "./index.css";
 
+  // Filter out sqlcipher errors from browser extensions
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    const message = args[0]?.toString() || '';
+    if (message.includes('sqlcipher') || message.includes('sqlcipher_attribute')) {
+      // Silently ignore these errors from browser extensions
+      return;
+    }
+    originalError.apply(console, args);
+  };
+
+  // Add global error handler
+  window.addEventListener('error', (event) => {
+    if (event.message && event.message.includes('sqlcipher')) {
+      event.preventDefault();
+      return;
+    }
+  });
+
   createRoot(document.getElementById("root")!).render(<App />);
   

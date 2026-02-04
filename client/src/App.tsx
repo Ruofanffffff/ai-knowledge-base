@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ErrorProvider, setGlobalErrorHandler, useError } from './contexts/ErrorContext';
 import { ErrorModal } from './components/ErrorModal/ErrorModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -44,13 +45,15 @@ function AppContent() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <ErrorProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </ErrorProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ErrorProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </ErrorProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
