@@ -1,44 +1,106 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { Search, Filter, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, Filter, ZoomIn, ZoomOut, RefreshCw, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import axios from 'axios';
+
+interface Node {
+  id: string;
+  x: number;
+  y: number;
+  label: string;
+  type: string;
+  color: string;
+  r?: number;
+  degree?: number;
+}
+
+interface Link {
+  source: string;
+  target: string;
+  relation: string;
+}
 
 export function Graph() {
-  // 1. Initial State
-  const initialNodes = [
-    { id: '1', x: 400, y: 300, label: '人工智能', type: 'main', color: '#8b5cf6' },
-    { id: '2', x: 600, y: 200, label: '机器学习', type: 'sub', color: '#ec4899' },
-    { id: '3', x: 650, y: 400, label: '深度学习', type: 'sub', color: '#ec4899' },
-    { id: '4', x: 250, y: 200, label: '自然语言处理', type: 'sub', color: '#3b82f6' },
-    { id: '5', x: 200, y: 400, label: '计算机视觉', type: 'sub', color: '#3b82f6' },
-    { id: '6', x: 750, y: 250, label: '神经网络', type: 'leaf', color: '#a855f7' },
-    { id: '7', x: 700, y: 150, label: '支持向量机', type: 'leaf', color: '#f472b6' },
-    { id: '8', x: 300, y: 150, label: 'Transformer', type: 'leaf', color: '#60a5fa' },
-  ];
-
-  const initialLinks = [
-    { source: '1', target: '2', relation: '包含' },
-    { source: '1', target: '3', relation: '包含' },
-    { source: '1', target: '4', relation: '包含' },
-    { source: '1', target: '5', relation: '包含' },
-    { source: '2', target: '6', relation: '依赖' },
-    { source: '2', target: '7', relation: '算法' },
-    { source: '3', target: '6', relation: '核心' },
-    { source: '4', target: '8', relation: '架构' },
-    { source: '3', target: '2', relation: '子集' }, 
-    { source: '5', target: '3', relation: '应用' },
-  ];
-
-  const [graphNodes, setGraphNodes] = useState(initialNodes);
+  // 1. State
+  const [graphNodes, setGraphNodes] = useState<Node[]>([]);
+  const [graphLinks, setGraphLinks] = useState<Link[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [viewState, setViewState] = useState({ x: 0, y: 0, zoom: 1 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // 2. Calculate dynamic radius and combine with state
+  // 2. Fetch graph data from backend
+  useEffect(() => {
+    const fetchGraphData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // 调用后端API获取知识图谱数据
+        const response = await axios.get('/api/knowledge-graph');
+        
+        if (response.data && response.data.nodes && response.data.links) {
+          // 转换后端数据格式为前端格式
+          const nodes = response.data.nodes.map((node: any, index: number) => ({
+            id: node.id || node.entity_id || String(index + 1),
+            x: node.x || 400 + (Math.random() - 0.5) * 400,
+            y: node.y || 300 + (Math.random() - 0.5) * 300,
+            label: node.label || node.name || '未命名',
+            type: node.type || 'default',
+            color: node.color || getColorByType(node.type || 'default')
+          }));
+          
+          const links = response.data.links.map((link: any) => ({
+            source: link.source || link.source_entity_id,
+            target: link.target || link.target_entity_id,
+            relation: link.relation || link.relation_type || '关联'
+          }));
+          
+          setGraphNodes(nodes);
+          setGraphLinks(links);
+        } else {
+          // 如果没有数据,设置为空数组
+          setGraphNodes([]);
+          setGraphLinks([]);
+        }
+      } catch (err: any) {
+        console.error('Failed to fetch graph data:', err);
+        setError('加载知识图谱失败: ' + (err.response?.data?.error || err.message));
+        // 出错时设置为空数组
+        setGraphNodes([]);
+        setGraphLinks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGraphData();
+  }, []);
+
+  // 3. Helper functions
+  const getColorByType = (type: string): string => {
+    const colorMap: Record<string, string> = {
+      'main': '#8b5cf6',
+      'sub': '#ec4899',
+      'leaf': '#a855f7',
+      'concept': '#3b82f6',
+      'entity': '#10b981',
+      'EventEntity': '#3b82f6',
+      'LocationEntity': '#10b981',
+      'PersonEntity': '#f59e0b',
+      'OrganizationEntity': '#8b5cf6',
+      'default': '#6b7280'
+    };
+    return colorMap[type] || colorMap['default'];
+  };
+
+  // 4. Calculate dynamic radius and combine with state
   const nodes = useMemo(() => {
     const degree: Record<string, number> = {};
-    initialLinks.forEach(link => {
+    graphLinks.forEach(link => {
       degree[link.source] = (degree[link.source] || 0) + 1;
       degree[link.target] = (degree[link.target] || 0) + 1;
     });
@@ -48,7 +110,7 @@ export function Graph() {
       const r = 25 + (count * 8); 
       return { ...node, r, degree: count };
     });
-  }, [graphNodes]);
+  }, [graphNodes, graphLinks]);
 
   // Handle node mouse down
   const handleNodeMouseDown = (nodeId: string, e: React.MouseEvent) => {
@@ -81,8 +143,37 @@ export function Graph() {
   const handleZoomOut = () => setViewState(prev => ({ ...prev, zoom: Math.max(prev.zoom / 1.2, 0.2) }));
   const handleReset = () => {
     setViewState({ x: 0, y: 0, zoom: 1 });
-    setGraphNodes(initialNodes);
+    // 重新加载数据而不是使用演示数据
+    window.location.reload();
   };
+
+  // 5. Loading and error states
+  if (loading) {
+    return (
+      <div className="flex-1 h-full flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <Loader2 size={48} className="animate-spin text-purple-500 mx-auto mb-4" />
+          <p className="text-slate-600">加载知识图谱中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && graphNodes.length === 0) {
+    return (
+      <div className="flex-1 h-full flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          >
+            重新加载
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 h-full flex flex-col bg-slate-50 relative overflow-hidden">
@@ -101,6 +192,17 @@ export function Graph() {
             <input type="text" placeholder="搜索节点..." className="bg-transparent outline-none text-sm w-full" />
          </div>
       </div>
+
+      {/* Empty State Notice */}
+      {graphNodes.length === 0 && !loading && !error && (
+        <div className="absolute top-20 left-4 right-4 z-10 pointer-events-none">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 shadow-sm pointer-events-auto max-w-2xl mx-auto">
+            <p className="text-sm text-blue-800">
+              <span className="font-semibold">知识图谱为空</span> - 请上传文档以构建知识图谱。上传文档后,系统会自动提取实体和关系。
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Graph Area */}
       <div className="w-full h-full">
@@ -136,7 +238,7 @@ export function Graph() {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
             >
               {/* Links and Labels */}
-              {initialLinks.map((link, i) => {
+              {graphLinks.map((link, i) => {
                  const source = nodes.find(n => n.id === link.source)!;
                  const target = nodes.find(n => n.id === link.target)!;
                  
@@ -186,7 +288,7 @@ export function Graph() {
               {/* Nodes */}
               {nodes.map((node) => {
                  const isHovered = hoveredNode === node.id;
-                 const isDimmed = hoveredNode && hoveredNode !== node.id && !initialLinks.some(l => (l.source === node.id && l.target === hoveredNode) || (l.target === node.id && l.source === hoveredNode));
+                 const isDimmed = hoveredNode && hoveredNode !== node.id && !graphLinks.some(l => (l.source === node.id && l.target === hoveredNode) || (l.target === node.id && l.source === hoveredNode));
                  
                  return (
                     <g 
