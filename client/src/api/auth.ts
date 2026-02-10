@@ -31,9 +31,12 @@ export const authApi = {
     );
     
     if (response.data.success && response.data.data) {
-      const { token, user } = response.data.data;
-      setAuthToken(token);
-      return { token, user };
+      const { user, accessToken } = response.data.data;
+      // 后端返回的是accessToken字段
+      if (accessToken) {
+        setAuthToken(accessToken);
+        return { token: accessToken, user };
+      }
     }
     
     throw new Error(response.data.error || 'Login failed');
@@ -44,19 +47,17 @@ export const authApi = {
    * POST /api/auth/register
    * 
    * @param userData - Username, email, and password
-   * @returns Promise with token and user data
+   * @returns Promise with user data
    * @throws Error if registration fails
    */
-  async register(userData: RegisterRequest): Promise<AuthResponse> {
-    const response = await apiClient.post<ApiResponse<AuthResponse>>(
+  async register(userData: RegisterRequest): Promise<{ user: User }> {
+    const response = await apiClient.post<ApiResponse<User>>(
       '/auth/register',
       userData
     );
     
     if (response.data.success && response.data.data) {
-      const { token, user } = response.data.data;
-      setAuthToken(token);
-      return { token, user };
+      return { user: response.data.data };
     }
     
     throw new Error(response.data.error || 'Registration failed');

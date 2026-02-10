@@ -80,14 +80,26 @@ class MappingBasedNormalizer {
     const schemaMapping = this.mappings[schemaName];
     if (!schemaMapping) {
       console.warn(`No mapping found for schema: ${schemaName}`);
-      // 如果没有映射表，直接使用LLM
-      if (useLLM && llmNormalizer) {
-        return await llmNormalizer(extractedFields, schema);
-      }
+      // 如果没有映射表，直接使用原始字段名（不使用LLM）
+      const normalizedFields = extractedFields.map(field => ({
+        ...field,
+        standardName: field.name,
+        mappingConfidence: 1.0,
+        mappingMethod: 'exact'
+      }));
+      
       return {
-        normalizedFields: [],
-        mappedCount: 0,
-        unmappedFields: extractedFields
+        normalizedFields,
+        mappedCount: normalizedFields.length,
+        unmappedFields: [],
+        completeness: 1.0,
+        weightedCompleteness: 1.0,
+        stats: {
+          totalFields: extractedFields.length,
+          algorithmMapped: normalizedFields.length,
+          llmMapped: 0,
+          unmapped: 0
+        }
       };
     }
 

@@ -49,10 +49,10 @@ function deserializeEntity(dbEntity) {
     entity_id: dbEntity.id,
     entity_type: dbEntity.type,
     canonical_name: dbEntity.canonicalName,
-    aliases: JSON.parse(dbEntity.aliases),
-    schemas: JSON.parse(dbEntity.schemas),
-    supported_by: JSON.parse(dbEntity.supportedBy),
-    attributes: JSON.parse(dbEntity.attributes),
+    aliases: dbEntity.aliases ? JSON.parse(dbEntity.aliases) : [],
+    schemas: dbEntity.schemas ? JSON.parse(dbEntity.schemas) : {},
+    supported_by: dbEntity.supportedBy ? JSON.parse(dbEntity.supportedBy) : [],
+    attributes: dbEntity.attributes ? JSON.parse(dbEntity.attributes) : {},
     confidence: dbEntity.confidence,
     llm_enriched: dbEntity.llmEnriched,
     created_at: dbEntity.createdAt.toISOString(),
@@ -374,13 +374,21 @@ async function getAllEntities(options = {}) {
   try {
     const { skip = 0, take = 100, orderBy = 'createdAt', order = 'desc' } = options;
     
+    console.log('[EntityStore] getAllEntities called with options:', options);
+    
     const entities = await prisma.kGEntity.findMany({
       skip,
       take,
       orderBy: { [orderBy]: order }
     });
     
-    return entities.map(deserializeEntity);
+    console.log('[EntityStore] Found', entities.length, 'entities');
+    console.log('[EntityStore] First entity:', entities[0]);
+    
+    const deserialized = entities.map(deserializeEntity);
+    console.log('[EntityStore] Deserialized entities count:', deserialized.length);
+    
+    return deserialized;
   } catch (error) {
     console.error('[EntityStore] Error getting all entities:', error);
     throw error;

@@ -1,44 +1,35 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { Search, Filter, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, Filter, ZoomIn, ZoomOut, RefreshCw, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useGraph } from '../hooks/useGraph';
 
 export function Graph() {
+  const { graphData, isLoading, error, fetchGraphData, refresh } = useGraph({ autoRefresh: true });
+  
   // 1. Initial State
-  const initialNodes = [
-    { id: '1', x: 400, y: 300, label: '人工智能', type: 'main', color: '#8b5cf6' },
-    { id: '2', x: 600, y: 200, label: '机器学习', type: 'sub', color: '#ec4899' },
-    { id: '3', x: 650, y: 400, label: '深度学习', type: 'sub', color: '#ec4899' },
-    { id: '4', x: 250, y: 200, label: '自然语言处理', type: 'sub', color: '#3b82f6' },
-    { id: '5', x: 200, y: 400, label: '计算机视觉', type: 'sub', color: '#3b82f6' },
-    { id: '6', x: 750, y: 250, label: '神经网络', type: 'leaf', color: '#a855f7' },
-    { id: '7', x: 700, y: 150, label: '支持向量机', type: 'leaf', color: '#f472b6' },
-    { id: '8', x: 300, y: 150, label: 'Transformer', type: 'leaf', color: '#60a5fa' },
-  ];
-
-  const initialLinks = [
-    { source: '1', target: '2', relation: '包含' },
-    { source: '1', target: '3', relation: '包含' },
-    { source: '1', target: '4', relation: '包含' },
-    { source: '1', target: '5', relation: '包含' },
-    { source: '2', target: '6', relation: '依赖' },
-    { source: '2', target: '7', relation: '算法' },
-    { source: '3', target: '6', relation: '核心' },
-    { source: '4', target: '8', relation: '架构' },
-    { source: '3', target: '2', relation: '子集' }, 
-    { source: '5', target: '3', relation: '应用' },
-  ];
-
-  const [graphNodes, setGraphNodes] = useState(initialNodes);
+  const [graphNodes, setGraphNodes] = useState(graphData.nodes);
+  const [graphLinks, setGraphLinks] = useState(graphData.links);
   const [viewState, setViewState] = useState({ x: 0, y: 0, zoom: 1 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  
+  // 当组件挂载时，获取初始数据
+  useEffect(() => {
+    fetchGraphData();
+  }, [fetchGraphData]);
+  
+  // 当graphData更新时，更新本地状态
+  useEffect(() => {
+    setGraphNodes(graphData.nodes);
+    setGraphLinks(graphData.links);
+  }, [graphData]);
 
   // 2. Calculate dynamic radius and combine with state
   const nodes = useMemo(() => {
     const degree: Record<string, number> = {};
-    initialLinks.forEach(link => {
+    graphLinks.forEach(link => {
       degree[link.source] = (degree[link.source] || 0) + 1;
       degree[link.target] = (degree[link.target] || 0) + 1;
     });
@@ -48,7 +39,7 @@ export function Graph() {
       const r = 25 + (count * 8); 
       return { ...node, r, degree: count };
     });
-  }, [graphNodes]);
+  }, [graphNodes, graphLinks]);
 
   // Handle node mouse down
   const handleNodeMouseDown = (nodeId: string, e: React.MouseEvent) => {
@@ -81,26 +72,52 @@ export function Graph() {
   const handleZoomOut = () => setViewState(prev => ({ ...prev, zoom: Math.max(prev.zoom / 1.2, 0.2) }));
   const handleReset = () => {
     setViewState({ x: 0, y: 0, zoom: 1 });
-    setGraphNodes(initialNodes);
+    refresh();
   };
 
   return (
     <div className="flex-1 h-full flex flex-col bg-slate-50 relative overflow-hidden">
       {/* Toolbar */}
-      <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
+      <div className="absolute top-4 left-4 right-4 md:right-6 z-10 flex justify-between pointer-events-none">
          <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl p-2 flex gap-2 pointer-events-auto">
-            <button onClick={handleZoomIn} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="放大"><ZoomIn size={20} /></button>
-            <button onClick={handleZoomOut} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="缩小"><ZoomOut size={20} /></button>
-            <button onClick={handleReset} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="重置"><RefreshCw size={20} /></button>
+            <button onClick={handleZoomIn} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="放大"><ZoomIn size={16} /></button>
+            <button onClick={handleZoomOut} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="缩小"><ZoomOut size={16} /></button>
+            <button onClick={handleReset} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="重置">
+              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            </button>
             <div className="w-px h-6 bg-slate-200 my-auto" />
-            <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="筛选"><Filter size={20} /></button>
+            <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="筛选"><Filter size={16} /></button>
          </div>
          
-         <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl px-4 py-2 flex items-center gap-2 pointer-events-auto w-64">
+         <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl px-4 py-2 flex items-center gap-2 pointer-events-auto w-48 md:w-64">
             <Search size={16} className="text-slate-400" />
             <input type="text" placeholder="搜索节点..." className="bg-transparent outline-none text-sm w-full" />
          </div>
       </div>
+      
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
+          <div className="text-center">
+            <Loader2 size={40} className="animate-spin text-purple-600 mx-auto mb-2" />
+            <p className="text-slate-600">加载知识图谱数据...</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Error Message */}
+      {error && (
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
+          <div className="text-center max-w-md px-4">
+            <div className="text-red-500 mb-2">❌</div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-1">加载失败</h3>
+            <p className="text-slate-600 mb-4">无法加载知识图谱数据，请检查网络连接或稍后重试。</p>
+            <button onClick={refresh} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+              重试
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Graph Area */}
       <div className="w-full h-full">
@@ -136,9 +153,12 @@ export function Graph() {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
             >
               {/* Links and Labels */}
-              {initialLinks.map((link, i) => {
+              {graphLinks.map((link, i) => {
                  const source = nodes.find(n => n.id === link.source)!;
                  const target = nodes.find(n => n.id === link.target)!;
+                 
+                 // 跳过找不到源或目标节点的链接
+                 if (!source || !target) return null;
                  
                  const midX = (source.x + target.x) / 2;
                  const midY = (source.y + target.y) / 2;
@@ -186,7 +206,7 @@ export function Graph() {
               {/* Nodes */}
               {nodes.map((node) => {
                  const isHovered = hoveredNode === node.id;
-                 const isDimmed = hoveredNode && hoveredNode !== node.id && !initialLinks.some(l => (l.source === node.id && l.target === hoveredNode) || (l.target === node.id && l.source === hoveredNode));
+                 const isDimmed = hoveredNode && hoveredNode !== node.id && !graphLinks.some(l => (l.source === node.id && l.target === hoveredNode) || (l.target === node.id && l.source === hoveredNode));
                  
                  return (
                     <g 

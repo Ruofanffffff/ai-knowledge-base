@@ -72,7 +72,7 @@ async function updateEntityConfidence(entityId, options = {}) {
   } = options;
 
   // Get entity and supporting CKBs
-  const entity = await entityStore.getEntity(entityId);
+  const entity = await entityStore.getEntityById(entityId);
   if (!entity) {
     return { updated: 0, deleted: 0, cascaded: 0 };
   }
@@ -133,13 +133,13 @@ async function updateRelationConfidence(relationId, options = {}) {
   } = options;
 
   // Get relation and entities
-  const relation = await relationStore.getRelation(relationId);
+  const relation = await relationStore.getRelationById(relationId);
   if (!relation) {
     return { updated: 0, deleted: 0 };
   }
 
-  const sourceEntity = await entityStore.getEntity(relation.source_id);
-  const targetEntity = await entityStore.getEntity(relation.target_id);
+  const sourceEntity = await entityStore.getEntityById(relation.source_id);
+  const targetEntity = await entityStore.getEntityById(relation.target_id);
 
   if (!sourceEntity || !targetEntity) {
     // Delete relation if entities don't exist
@@ -186,18 +186,17 @@ async function updateRelationConfidence(relationId, options = {}) {
  */
 async function cascadeUpdateRelations(entityId, options = {}) {
   // Find all relations involving this entity
-  const relations = await relationStore.getRelations({
-    $or: [
-      { source_id: entityId },
-      { target_id: entityId }
-    ]
-  });
+  const relations = await relationStore.getAllRelations();
+  // Filter relations involving this entity
+  const entityRelations = relations.filter(relation => 
+    relation.source_id === entityId || relation.target_id === entityId
+  );
 
   let updated = 0;
   let deleted = 0;
 
-  for (const relation of relations) {
-    const result = await updateRelationConfidence(relation.id, options);
+  for (const relation of entityRelations) {
+    const result = await updateRelationConfidence(relation.relation_id, options);
     updated += result.updated;
     deleted += result.deleted;
   }
@@ -211,18 +210,17 @@ async function cascadeUpdateRelations(entityId, options = {}) {
  * @returns {Promise<number>} Number of relations deleted
  */
 async function cascadeDeleteRelations(entityId) {
-  const relations = await relationStore.getRelations({
-    $or: [
-      { source_id: entityId },
-      { target_id: entityId }
-    ]
-  });
+  const relations = await relationStore.getAllRelations();
+  // Filter relations involving this entity
+  const entityRelations = relations.filter(relation => 
+    relation.source_id === entityId || relation.target_id === entityId
+  );
 
-  for (const relation of relations) {
-    await relationStore.deleteRelation(relation.id);
+  for (const relation of entityRelations) {
+    await relationStore.deleteRelation(relation.relation_id);
   }
 
-  return relations.length;
+  return entityRelations.length;
 }
 
 /**

@@ -61,9 +61,15 @@ async function buildKnowledgeGraph(docId, filePath, fileType, options = {}) {
       console.warn(`[KG Service] Document ${docId} may exceed budget:`, budgetCheck);
     }
     
+    // Clean file type: remove dot and convert to lowercase
+    let cleanFileType = fileType || '';
+    if (cleanFileType.startsWith('.')) {
+      cleanFileType = cleanFileType.substring(1).toLowerCase();
+    }
+    
     // Step 1: Parse document to CKBs
-    console.log(`[KG Service] Parsing document ${docId}...`);
-    const ckbs = await ckbParser.parseDocument(docId, filePath, fileType);
+    console.log(`[KG Service] Parsing document ${docId} (type: ${cleanFileType})...`);
+    const ckbs = await ckbParser.parseDocument(docId, filePath, cleanFileType);
     result.ckbs_created = ckbs.length;
     console.log(`[KG Service] Created ${ckbs.length} CKBs`);
 
@@ -168,12 +174,17 @@ async function buildKnowledgeGraph(docId, filePath, fileType, options = {}) {
 
     // Step 7: Update confidence scores
     console.log(`[KG Service] Updating confidence scores...`);
-    const allEntities = await entityStore.getEntities({ doc_id: docId });
-    for (const entity of allEntities) {
+    const allEntities = await entityStore.getAllEntities();
+    // Filter entities by document ID
+    const docEntities = allEntities.filter(entity => {
+      const supportedBy = entity.supported_by || [];
+      return supportedBy.some(source => source.doc_id === docId);
+    });
+    for (const entity of docEntities) {
       try {
-        await confidenceEngine.updateEntityConfidence(entity.id);
+        await confidenceEngine.updateEntityConfidence(entity.entity_id);
       } catch (error) {
-        console.error(`[KG Service] Confidence update failed for entity ${entity.id}:`, error);
+        console.error(`[KG Service] Confidence update failed for entity ${entity.entity_id}:`, error);
       }
     }
 
@@ -273,18 +284,23 @@ async function updateKnowledgeGraph(docId, options = {}) {
     }
 
     // Get affected entities
-    const affectedEntities = await entityStore.getEntities({ doc_id: docId });
+    const allEntities = await entityStore.getAllEntities();
+    // Filter entities by document ID
+    const affectedEntities = allEntities.filter(entity => {
+      const supportedBy = entity.supported_by || [];
+      return supportedBy.some(source => source.doc_id === docId);
+    });
     
     // Update confidence for affected entities
     for (const entity of affectedEntities) {
       try {
-        const updateResult = await confidenceEngine.updateEntityConfidence(entity.id);
-        result.entities_updated += updateResult.updated;
-        result.entities_deleted += updateResult.deleted;
+        const updateResult = await confidenceEngine.updateEntityConfidence(entity.entity_id);
+        result.entities_updated += updateResult.updated || 0;
+        result.entities_deleted += updateResult.deleted || 0;
         result.relations_updated += (updateResult.cascaded?.updated || 0);
       } catch (error) {
-        console.error(`[KG Service] Entity update failed for ${entity.id}:`, error);
-        result.errors.push({ entity_id: entity.id, error: error.message });
+        console.error(`[KG Service] Entity update failed for ${entity.entity_id}:`, error);
+        result.errors.push({ entity_id: entity.entity_id, error: error.message });
       }
     }
 
@@ -330,31 +346,154 @@ async function rebuildKnowledgeGraph(options = {}) {
     console.log(`[KG Service] Clearing existing knowledge graph...`);
     await clearKnowledgeGraph();
 
-    // Get all documents
+    // Get all documents from users.db
     const documents = await getAllDocuments();
     console.log(`[KG Service] Found ${documents.length} documents to process`);
+    
+    // Copy documents to knowledge-base.db for foreign key constraint
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    for (const doc of documents) {
+      try {
+        // Check if document already exists in knowledge-base.db
+        const existingDoc = await prisma.document.findUnique({
+          where: { id: doc.id }
+        });
+        
+        if (!existingDoc) {
+          // Create document in knowledge-base.db
+          await prisma.document.create({
+            data: {
+              id: doc.id,
+              title: doc.title,
+              content: doc.content,
+              type: doc.type,
+              fileType: doc.file_type,
+              metadata: JSON.stringify(doc.metadata)
+            }
+          });
+          console.log(`[KG Service] Copied document ${doc.id} to knowledge-base.db`);
+        }
+      } catch (error) {
+        console.error(`[KG Service] Failed to copy document ${doc.id}:`, error);
+      }
+    }
+    
+    await prisma.$disconnect();
 
     // Process each document
     for (const doc of documents) {
       try {
-        const buildResult = await buildKnowledgeGraph(
-          doc.id,
-          doc.file_path,
-          doc.file_type,
-          { llmClient, enableSemanticRelations, enableQualityFilter }
-        );
-
+        // Get raw file type from document
+        let rawFileType = doc.file_type || '';
+        console.log(`Processing document ${doc.id} (raw type: ${rawFileType}, path: ${doc.file_path})`);
+        
+        // Process all documents regardless of file type
+        // For text-based files, use parseTextFile directly
+        const ckbParser = require('../ckb/ckb_parser');
+        const ckbs = await ckbParser.parseTextFile(doc.id, doc.file_path, rawFileType);
+        
         result.documents_processed++;
-        result.total_ckbs += buildResult.ckbs_created;
-        result.total_entities += buildResult.entities_created;
-        result.total_relations += 
-          buildResult.relations_created.builtin +
-          buildResult.relations_created.cooccurrence +
-          buildResult.relations_created.semantic;
-
-        if (buildResult.errors.length > 0) {
-          result.errors.push(...buildResult.errors);
+        result.total_ckbs += ckbs.length;
+        console.log(`Parsed ${ckbs.length} CKBs for document ${doc.id}`);
+        
+        // Store CKBs in database
+        const ckbStore = require('../ckb/ckb_store');
+        for (const ckb of ckbs) {
+          await ckbStore.saveCKB(ckb);
         }
+        
+        // Build entities and relations
+        const fieldExtractor = require('../field_extractor/field_extractor');
+        const schemaManager = require('../schema/schema_manager');
+        const schemaMatcher = require('../schema/schema_matcher');
+        const fieldNormalizer = require('../field_normalizer/field_normalizer');
+        const entityBuilder = require('../entity/entity_builder');
+        const entityStore = require('../entity/entity_store');
+        const builtinRelationBuilder = require('../relation/builtin_relation_builder');
+        const cooccurrenceRelationBuilder = require('../relation/cooccurrence_relation_builder');
+        const semanticRelationBuilder = require('../relation/semantic_relation_builder');
+        const relationStore = require('../relation/relation_store');
+        const confidenceEngine = require('../confidence/confidence_engine');
+        
+        // Extract and normalize fields for each CKB
+        for (const ckb of ckbs) {
+          try {
+            const rawFields = await fieldExtractor.extractFields(ckb);
+            ckb.extracted_fields = rawFields;
+          } catch (error) {
+            console.error(`Field extraction failed for CKB ${ckb.ckb_id}:`, error);
+          }
+        }
+        
+        // Match schemas and build entities
+        const schemas = await schemaManager.listSchemas({ active: true });
+        const entities = [];
+        
+        for (const ckb of ckbs) {
+          if (!ckb.extracted_fields) continue;
+          
+          try {
+            const schemaMatches = await schemaMatcher.matchSchemas(ckb.extracted_fields, schemas);
+            
+            for (const match of schemaMatches) {
+              if (match.completeness >= match.schema.threshold) {
+                const normalizedFields = await fieldNormalizer.normalizeFields(
+                  ckb.extracted_fields,
+                  match.schema,
+                  { llmClient }
+                );
+                
+                const entity = await entityBuilder.buildEntity(
+                  match,
+                  normalizedFields,
+                  ckb,
+                  { llmClient }
+                );
+                
+                if (entity) {
+                  entities.push(entity);
+                  await entityStore.saveEntity(entity);
+                  result.total_entities++;
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`Entity building failed for CKB ${ckb.ckb_id}:`, error);
+          }
+        }
+        
+        // Build relations
+        if (entities.length > 0) {
+          // Build builtin relations
+          const builtinRelations = await builtinRelationBuilder.buildBuiltinRelations(entities);
+          for (const relation of builtinRelations) {
+            await relationStore.createRelation(relation);
+            result.total_relations++;
+          }
+          
+          // Build cooccurrence relations
+          const cooccurrenceRelations = await cooccurrenceRelationBuilder.buildCooccurrenceRelations(ckbs);
+          for (const relation of cooccurrenceRelations) {
+            await relationStore.createRelation(relation);
+            result.total_relations++;
+          }
+          
+          // Build semantic relations if LLM is available
+          if (llmClient && enableSemanticRelations) {
+            const semanticRelations = await semanticRelationBuilder.batchExtractSemanticRelations(
+              ckbs,
+              llmClient
+            );
+            for (const relation of semanticRelations) {
+              await relationStore.createRelation(relation);
+              result.total_relations++;
+            }
+          }
+        }
+        
+        console.log(`Built ${entities.length} entities and ${result.total_relations} relations for document ${doc.id}`);
       } catch (error) {
         console.error(`[KG Service] Failed to process document ${doc.id}:`, error);
         result.errors.push({ doc_id: doc.id, error: error.message });
@@ -394,21 +533,26 @@ async function deleteKnowledgeGraph(docId) {
     
     // Delete each CKB and cascade
     for (const ckb of ckbs) {
-      await ckbStore.deleteCKB(ckb.ckb_id);
+      await ckbStore.deleteCKB(ckb.id);
       result.ckbs_deleted++;
 
       // Remove CKB from cooccurrence relations
-      const cooccurrenceStats = await cooccurrenceRelationBuilder.removeCooccurrenceRelations(ckb.ckb_id);
+      const cooccurrenceStats = await cooccurrenceRelationBuilder.removeCooccurrenceRelations(ckb.id);
       result.relations_deleted += cooccurrenceStats.deleted;
     }
 
     // Get affected entities
-    const entities = await entityStore.getEntities({ doc_id: docId });
+    const allEntities = await entityStore.getAllEntities();
+    // Filter entities by document ID
+    const entities = allEntities.filter(entity => {
+      const supportedBy = entity.supported_by || [];
+      return supportedBy.some(source => source.doc_id === docId);
+    });
     
     // Update or delete entities
     for (const entity of entities) {
-      const updateResult = await confidenceEngine.updateEntityConfidence(entity.id);
-      result.entities_deleted += updateResult.deleted;
+      const updateResult = await confidenceEngine.updateEntityConfidence(entity.entity_id);
+      result.entities_deleted += updateResult.deleted || 0;
       result.relations_deleted += updateResult.cascaded || 0;
     }
 
@@ -427,21 +571,21 @@ async function deleteKnowledgeGraph(docId) {
 async function clearKnowledgeGraph() {
   try {
     // Delete all entities (will cascade to relations)
-    const entities = await entityStore.getEntities({});
+    const entities = await entityStore.getAllEntities();
     for (const entity of entities) {
-      await entityStore.deleteEntity(entity.id);
+      await entityStore.deleteEntity(entity.entity_id);
     }
 
     // Delete all relations
-    const relations = await relationStore.getRelations({});
+    const relations = await relationStore.getAllRelations();
     for (const relation of relations) {
-      await relationStore.deleteRelation(relation.id);
+      await relationStore.deleteRelation(relation.relation_id);
     }
 
     // Delete all CKBs
     const ckbs = await ckbStore.getAllCKBs();
     for (const ckb of ckbs) {
-      await ckbStore.deleteCKB(ckb.ckb_id);
+      await ckbStore.deleteCKB(ckb.id);
     }
 
     console.log(`[KG Service] Knowledge graph cleared`);
@@ -452,13 +596,51 @@ async function clearKnowledgeGraph() {
 }
 
 /**
- * Get all documents (placeholder - should query document store)
+ * Get all documents from database
  * @returns {Promise<Array>} Documents
  */
 async function getAllDocuments() {
-  // This should query the actual document store
-  // For now, return empty array
-  return [];
+  const sqlite3 = require('sqlite3').verbose();
+  const path = require('path');
+  const DB_PATH = path.join(__dirname, '../../data/users.db');
+  
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(DB_PATH, (err) => {
+      if (err) {
+        console.error('Error opening database:', err.message);
+        return reject(err);
+      }
+    });
+    
+    db.all('SELECT id, title, content, type, file_type, metadata FROM documents', [], (err, rows) => {
+      db.close();
+      
+      if (err) {
+        console.error('Error fetching documents:', err.message);
+        return reject(err);
+      }
+      
+      const documents = rows.map(row => {
+        const metadata = row.metadata ? JSON.parse(row.metadata) : {};
+        // Clean file type: remove dot and convert to lowercase
+        let cleanFileType = row.file_type || '';
+        if (cleanFileType.startsWith('.')) {
+          cleanFileType = cleanFileType.substring(1).toLowerCase();
+        }
+        return {
+          id: row.id.toString(),
+          title: row.title,
+          content: row.content,
+          type: row.type,
+          file_type: cleanFileType,
+          file_path: metadata.filePath || '',
+          metadata: metadata
+        };
+      });
+      
+      resolve(documents);
+    });
+  });
 }
 
 /**
@@ -467,25 +649,31 @@ async function getAllDocuments() {
  */
 async function getKnowledgeGraphStats() {
   try {
-    const entities = await entityStore.getAllEntities({});
-    const relations = await relationStore.getAllRelations({});
-    const ckbs = await ckbStore.getAllCKBs();
+    const entityCount = await entityStore.countEntities();
+    const relationCount = await relationStore.countRelations();
+    const ckbCount = await ckbStore.countCKBs();
 
     const stats = {
-      ckb_count: ckbs.length,
-      entity_count: entities.length,
-      relation_count: relations.length,
+      ckb_count: ckbCount,
+      entity_count: entityCount,
+      relation_count: relationCount,
       entity_types: {},
       relation_types: {},
       confidence_stats: await confidenceEngine.getConfidenceStats()
     };
 
+    // Get all entities for type counting (limit to 1000 for performance)
+    const entities = await entityStore.getAllEntities({ take: 1000 });
+    
     // Count entity types
     for (const entity of entities) {
       const type = entity.entity_type || 'unknown';
       stats.entity_types[type] = (stats.entity_types[type] || 0) + 1;
     }
 
+    // Get all relations for type counting (limit to 1000 for performance)
+    const relations = await relationStore.getAllRelations({ take: 1000 });
+    
     // Count relation types
     for (const relation of relations) {
       const type = relation.type || 'unknown';

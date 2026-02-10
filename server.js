@@ -21,6 +21,9 @@ const { logger, accessLogMiddleware, errorHandlerMiddleware, getLogStatus, clean
 const app = express();
 const PORT = 3000;
 
+// 静态文件服务
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // 初始化用户认证服务
 const { initAuthService, authMiddleware } = require('./services/authService');
 const { initStatsService } = require('./services/statsService');
@@ -523,19 +526,49 @@ app.get('/api/documents', authMiddleware, (req, res) => {
         return res.status(500).json({ error: 'Failed to fetch documents' });
       }
       
-      const documents = rows.map(row => ({
-        id: row.id.toString(),
-        title: row.title,
-        content: row.content,
-        type: row.type,
-        fileType: row.file_type,
-        metadata: row.metadata ? JSON.parse(row.metadata) : {},
-        tags: row.tags ? JSON.parse(row.tags) : [],
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      }));
+      if (!rows || rows.length === 0) {
+        return res.json([]);
+      }
       
-      res.json(documents);
+      const documents = [];
+      let processedCount = 0;
+      
+      rows.forEach(row => {
+        const document = {
+          id: row.id.toString(),
+          title: row.title,
+          content: row.content,
+          type: row.type,
+          fileType: row.file_type,
+          metadata: row.metadata ? JSON.parse(row.metadata) : {},
+          tags: row.tags ? JSON.parse(row.tags) : [],
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          summaries: []
+        };
+        
+        // 获取文档的总结
+        userDb.all('SELECT model, content, created_at FROM summaries WHERE user_id = ? AND document_id = ?', [userId, row.id], (err, summaryRows) => {
+          if (err) {
+            console.error('Error fetching summaries:', err);
+          } else if (summaryRows && summaryRows.length > 0) {
+            document.summaries = summaryRows.map(summaryRow => ({
+              id: `${document.id}_${summaryRow.model}`,
+              model: summaryRow.model,
+              content: summaryRow.content,
+              createdAt: summaryRow.created_at
+            }));
+          }
+          
+          // 添加文档到列表（无论是否获取到总结）
+          documents.push(document);
+          
+          processedCount++;
+          if (processedCount === rows.length) {
+            res.json(documents);
+          }
+        });
+      });
     });
   } catch (error) {
     console.error('Error fetching documents:', error);
@@ -567,10 +600,29 @@ app.get('/api/documents/:id', authMiddleware, (req, res) => {
         metadata: row.metadata ? JSON.parse(row.metadata) : {},
         tags: row.tags ? JSON.parse(row.tags) : [],
         createdAt: row.created_at,
-        updatedAt: row.updated_at
+        updatedAt: row.updated_at,
+        summaries: []
       };
       
-      res.json(document);
+      // 获取文档的总结
+      userDb.all('SELECT model, content, created_at FROM summaries WHERE user_id = ? AND document_id = ?', [userId, id], (err, summaryRows) => {
+        if (err) {
+          console.error('Error fetching summaries:', err);
+          // 即使获取总结失败，也返回文档
+          return res.json(document);
+        }
+        
+        if (summaryRows && summaryRows.length > 0) {
+          document.summaries = summaryRows.map(summaryRow => ({
+            id: `${document.id}_${summaryRow.model}`,
+            model: summaryRow.model,
+            content: summaryRow.content,
+            createdAt: summaryRow.created_at
+          }));
+        }
+        
+        res.json(document);
+      });
     });
   } catch (error) {
     console.error('Error fetching document:', error);
@@ -834,9 +886,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 // AI搜索API
 app.post('/api/ai/search', async (req, res) => {
   try {
-    const { query, topK = 5 } = req.body;
+    const { query, model: requestedModel, topK = 5 } = req.body;
     
     console.log('收到AI搜索请求:', query);
+    console.log('请求的模型:', requestedModel);
     
     if (!query) {
       return res.status(400).json({
@@ -1021,14 +1074,30 @@ ${webSearchContext}
 
 请给出详细的回答。`;
     
-    // 调用云端大模型
-    console.log('正在调用云端大模型生成答案...');
+    // 调用AI模型
+    console.log('正在调用AI模型生成答案...');
     let aiResponse = null;
     let lastError = null;
     
-    const cloudModels = ['deepseek-chat', 'qwen-plus', 'qwen-turbo'];
+    // 模型调用策略
+    const modelCallOrder = [];
     
-    for (const cloudModel of cloudModels) {
+    // 如果指定了模型，优先使用
+    if (requestedModel) {
+      modelCallOrder.push(requestedModel);
+    }
+    
+    // 添加备用模型
+    const cloudModels = ['deepseek-chat', 'qwen-plus', 'qwen-turbo'];
+    cloudModels.forEach(model => {
+      if (!modelCallOrder.includes(model)) {
+        modelCallOrder.push(model);
+      }
+    });
+    
+    console.log('模型调用顺序:', modelCallOrder);
+    
+    for (const cloudModel of modelCallOrder) {
       try {
         console.log(`尝试使用模型: ${cloudModel}`);
         
@@ -1046,7 +1115,7 @@ ${webSearchContext}
         
         let apiUrl, requestBody;
         
-        if (cloudModel === 'qwen-turbo' || cloudModel === 'qwen-plus') {
+        if (cloudModel === 'qwen-turbo' || cloudModel === 'qwen-plus' || cloudModel.startsWith('qwen')) {
           apiUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
           requestBody = {
             model: cloudModel,
@@ -1056,7 +1125,7 @@ ${webSearchContext}
             temperature: 0.7,
             max_tokens: 2000
           };
-        } else if (cloudModel === 'deepseek-chat' || cloudModel === 'deepseek-reasoner') {
+        } else if (cloudModel === 'deepseek-chat' || cloudModel === 'deepseek-reasoner' || cloudModel.startsWith('deepseek')) {
           apiUrl = 'https://api.deepseek.com/v1/chat/completions';
           requestBody = {
             model: cloudModel,
@@ -1066,10 +1135,49 @@ ${webSearchContext}
             temperature: 0.7,
             max_tokens: 2000
           };
+        } else if (LOCAL_MODELS.includes(cloudModel)) {
+          // 本地模型调用
+          console.log(`调用本地模型: ${cloudModel}`);
+          try {
+            const localResponse = await fetch(`${OLLAMA_API_URL}/chat`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: cloudModel,
+                messages: [
+                  { role: 'user', content: prompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 2000
+              })
+            });
+            
+            if (!localResponse.ok) {
+              throw new Error(`本地模型调用失败: ${localResponse.status}`);
+            }
+            
+            const localData = await localResponse.json();
+            if (localData.message && localData.message.content) {
+              aiResponse = localData.message.content;
+              console.log(`本地模型 ${cloudModel} 调用成功`);
+              break;
+            } else {
+              throw new Error(`本地模型返回格式无效`);
+            }
+          } catch (error) {
+            console.error(`本地模型 ${cloudModel} 调用失败:`, error);
+            lastError = error.message;
+            continue;
+          }
         } else {
+          // 支持其他模型...
+          console.log(`模型 ${cloudModel} 暂不支持，跳过`);
           continue;
         }
         
+        // 云端模型调用
         const cloudResponse = await fetch(apiUrl, {
           method: 'POST',
           headers: {
@@ -1190,6 +1298,208 @@ app.post('/api/ai/generate-tags', (req, res) => {
   }
 });
 
+// 文档总结API
+app.post('/api/ai/summary', authMiddleware, async (req, res) => {
+  try {
+    const { documentId, model: requestedModel } = req.body;
+    const userId = req.userId;
+    
+    if (!documentId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Document ID is required'
+      });
+    }
+    
+    // 从数据库加载文档
+    userDb.get('SELECT * FROM documents WHERE id = ? AND user_id = ?', [documentId, userId], async (err, row) => {
+      if (err) {
+        console.error('Error fetching document:', err);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to fetch document'
+        });
+      }
+      
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          error: 'Document not found'
+        });
+      }
+      
+      const document = {
+        id: row.id.toString(),
+        title: row.title,
+        content: row.content
+      };
+      
+      // 构建总结提示
+      const prompt = `请对以下文档内容进行详细总结，包括主要内容、关键观点和重要信息：\n\n${document.content}\n\n要求：\n1. 总结要全面准确，涵盖文档的核心内容\n2. 语言要简洁明了，逻辑清晰\n3. 重点突出，不要包含无关细节\n4. 用中文回答`;
+      
+      // 模型调用策略
+      const modelCallOrder = [];
+      if (requestedModel) {
+        modelCallOrder.push(requestedModel);
+      }
+      const cloudModels = ['deepseek-chat', 'qwen-plus', 'qwen-turbo'];
+      cloudModels.forEach(model => {
+        if (!modelCallOrder.includes(model)) {
+          modelCallOrder.push(model);
+        }
+      });
+      
+      console.log('文档总结模型调用顺序:', modelCallOrder);
+      
+      let summary = null;
+      let lastError = null;
+      
+      // 尝试调用模型
+      for (const model of modelCallOrder) {
+        try {
+          console.log(`尝试使用模型 ${model} 进行文档总结`);
+          
+          if (LOCAL_MODELS.includes(model)) {
+            // 本地模型调用
+            const localResponse = await fetch(`${OLLAMA_API_URL}/chat`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: model,
+                messages: [
+                  { role: 'user', content: prompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 2000
+              })
+            });
+            
+            if (!localResponse.ok) {
+              throw new Error(`本地模型调用失败: ${localResponse.status}`);
+            }
+            
+            const localData = await localResponse.json();
+            if (localData.message && localData.message.content) {
+              summary = localData.message.content;
+              console.log(`本地模型 ${model} 总结成功`);
+              break;
+            } else {
+              throw new Error(`本地模型返回格式无效`);
+            }
+          } else {
+            // 云端模型调用
+            let apiKey, apiUrl, requestBody;
+            
+            if (model.startsWith('qwen')) {
+              apiKey = process.env.QWEN_API_KEY;
+              apiUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+              requestBody = {
+                model: model,
+                messages: [
+                  { role: 'user', content: prompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 2000
+              };
+            } else if (model.startsWith('deepseek')) {
+              apiKey = process.env.DEEPSEEK_API_KEY;
+              apiUrl = 'https://api.deepseek.com/v1/chat/completions';
+              requestBody = {
+                model: model,
+                messages: [
+                  { role: 'user', content: prompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 2000
+              };
+            } else {
+              continue;
+            }
+            
+            if (!apiKey) {
+              console.log(`模型 ${model} 的API密钥未配置，跳过`);
+              continue;
+            }
+            
+            const cloudResponse = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify(requestBody)
+            });
+            
+            if (!cloudResponse.ok) {
+              const errorText = await cloudResponse.text();
+              console.error(`模型 ${model} API error:`, errorText);
+              lastError = `模型 ${model} API error: ${cloudResponse.status} - ${errorText}`;
+              continue;
+            }
+            
+            const cloudData = await cloudResponse.json();
+            
+            if (cloudData.choices && cloudData.choices.length > 0) {
+              summary = cloudData.choices[0].message.content;
+              console.log(`模型 ${model} 总结成功`);
+              break;
+            } else if (cloudData.output && cloudData.output.text) {
+              summary = cloudData.output.text;
+              console.log(`模型 ${model} 总结成功`);
+              break;
+            } else {
+              console.error(`模型 ${model} 返回格式无效`);
+              lastError = `模型 ${model} 返回格式无效`;
+              continue;
+            }
+          }
+        } catch (error) {
+          console.error(`模型 ${model} 调用失败:`, error);
+          lastError = error.message;
+          continue;
+        }
+      }
+      
+      if (!summary) {
+        return res.status(500).json({
+          success: false,
+          error: `生成总结失败: ${lastError || '所有模型调用失败'}`
+        });
+      }
+      
+      // 存储总结到数据库
+      userDb.run(
+        'INSERT OR REPLACE INTO summaries (user_id, document_id, model, content, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
+        [userId, documentId, requestedModel || 'qwen-plus', summary],
+        (err) => {
+          if (err) {
+            console.error('Error saving summary to database:', err);
+            // 即使存储失败，也返回总结结果
+            return res.json({
+              success: true,
+              summary
+            });
+          }
+          
+          console.log('Summary saved to database successfully');
+          res.json({
+            success: true,
+            summary
+          });
+        }
+      );
+    });
+  } catch (error) {
+    console.error('生成文档总结失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '生成文档总结失败'
+    });
+  }
+});
+
 // 获取可用的AI模型列表
 app.get('/api/ai/models', async (req, res) => {
   try {
@@ -1219,6 +1529,43 @@ app.get('/api/ai/models', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch models from Ollama'
+    });
+  }
+});
+
+// 获取可用模型配置（本地和云端）
+app.get('/api/ai/available-models', (req, res) => {
+  try {
+    const localModels = LOCAL_MODELS.map(modelName => ({
+      model_name: modelName,
+      model_type: 'local',
+      endpoint: OLLAMA_API_URL,
+      is_enabled: true,
+      priority: 1
+    }));
+
+    const cloudModels = Object.keys(CLOUD_MODELS).map(modelName => ({
+      model_name: modelName,
+      model_type: 'cloud',
+      provider: CLOUD_MODELS[modelName].provider,
+      endpoint: CLOUD_MODELS[modelName].endpoint,
+      is_enabled: !!CLOUD_MODELS[modelName].apiKey,
+      priority: 0
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        local: localModels,
+        cloud: cloudModels,
+        all: [...localModels, ...cloudModels]
+      }
+    });
+  } catch (error) {
+    console.error('Failed to get available models:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get available models'
     });
   }
 });
@@ -2038,6 +2385,39 @@ function generateDefaultCategories(documents) {
       description: '包含各类通用文档和资料',
       color: '#4A90E2',
       documentIds: documents.map(doc => doc.id)
+    },
+    {
+      id: 'technical',
+      name: '技术文档',
+      description: '技术相关的文档和资料',
+      color: '#50E3C2',
+      documentIds: documents.filter(doc => 
+        doc.title.toLowerCase().includes('技术') || 
+        doc.title.toLowerCase().includes('tech') ||
+        doc.tags?.some(tag => tag.toLowerCase().includes('技术') || tag.toLowerCase().includes('tech'))
+      ).map(doc => doc.id)
+    },
+    {
+      id: 'ai',
+      name: 'AI相关',
+      description: '人工智能相关的文档和资料',
+      color: '#9013FE',
+      documentIds: documents.filter(doc => 
+        doc.title.toLowerCase().includes('ai') || 
+        doc.title.toLowerCase().includes('人工智能') ||
+        doc.tags?.some(tag => tag.toLowerCase().includes('ai') || tag.toLowerCase().includes('人工智能'))
+      ).map(doc => doc.id)
+    },
+    {
+      id: 'project',
+      name: '项目文档',
+      description: '项目相关的文档和资料',
+      color: '#FF6B6B',
+      documentIds: documents.filter(doc => 
+        doc.title.toLowerCase().includes('项目') || 
+        doc.title.toLowerCase().includes('project') ||
+        doc.tags?.some(tag => tag.toLowerCase().includes('项目') || tag.toLowerCase().includes('project'))
+      ).map(doc => doc.id)
     }
   ];
   
@@ -2055,7 +2435,7 @@ function generateDefaultCategories(documents) {
         fileType: doc.fileType
       }))
     };
-  });
+  }).filter(category => category.documentCount > 0);
 }
 
 app.get('/api/categories', authMiddleware, async (req, res) => {
