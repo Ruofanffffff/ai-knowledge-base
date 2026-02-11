@@ -11,6 +11,7 @@ const entityStore = require('../entity/entity_store');
 // Lazy load relation type modules to avoid circular dependencies
 let relationTypeRegistry = null;
 let relationTypeValidator = null;
+let relationDescriptionGenerator = null;
 
 function getRelationTypeRegistry() {
   if (!relationTypeRegistry) {
@@ -29,6 +30,17 @@ function getRelationTypeValidator() {
   return relationTypeValidator;
 }
 
+function getRelationDescriptionGenerator() {
+  if (!relationDescriptionGenerator) {
+    const { RelationDescriptionGenerator } = require('../human_readable/relation_description_generator');
+    relationDescriptionGenerator = new RelationDescriptionGenerator({
+      enableLLM: process.env.ENABLE_RELATION_DESCRIPTION_LLM === 'true',
+      language: process.env.RELATION_DESCRIPTION_LANGUAGE || 'zh'
+    });
+  }
+  return relationDescriptionGenerator;
+}
+
 /**
  * Build built-in relations for an entity based on Schema definition
  * 
@@ -36,9 +48,10 @@ function getRelationTypeValidator() {
  * @param {Object} schema - The schema definition containing relation templates
  * @param {Array} fields - The extracted fields from CKB
  * @param {Array} ckbIds - The CKB IDs supporting this entity
+ * @param {Object} options - Additional options
  * @returns {Promise<Array>} Array of relation objects
  */
-async function buildRelations(entity, schema, fields, ckbIds = []) {
+async function buildRelations(entity, schema, fields, ckbIds = [], options = {}) {
   const relations = [];
   
   // Check if schema has relation templates
@@ -53,7 +66,8 @@ async function buildRelations(entity, schema, fields, ckbIds = []) {
         entity,
         relTemplate,
         fields,
-        ckbIds
+        ckbIds,
+        options
       );
       
       if (relation) {
@@ -74,10 +88,12 @@ async function buildRelations(entity, schema, fields, ckbIds = []) {
  * @param {Object} relTemplate - Relation template from schema
  * @param {Array} fields - Extracted fields
  * @param {Array} ckbIds - Supporting CKB IDs
+ * @param {Object} options - Additional options
  * @returns {Promise<Object|null>} Relation object or null
  */
-async function buildRelationFromTemplate(entity, relTemplate, fields, ckbIds) {
+async function buildRelationFromTemplate(entity, relTemplate, fields, ckbIds, options = {}) {
   const { type, target_field, direction = 'outgoing', relation_type_id } = relTemplate;
+  const { enableDescriptions = process.env.ENABLE_RELATION_DESCRIPTIONS === 'true' } = options;
   
   // Validate relation type if specified
   let relationType = null;
@@ -125,6 +141,32 @@ async function buildRelationFromTemplate(entity, relTemplate, fields, ckbIds) {
       relation_type_id: relation_type_id || null
     })
   };
+  
+  // Generate description if enabled
+  if (enableDescriptions) {
+    try {
+      const generator = getRelationDescriptionGenerator();
+      const sourceEntity = direction === 'outgoing' ? entity : targetEntity;
+      const targetEntityForDesc = direction === 'outgoing' ? targetEntity : entity;
+      
+      const descriptionResult = await generator.generateDescription({
+        type: relation_type_id || type,
+        source: sourceEntity,
+        target: targetEntityForDesc
+      }, {
+        method: process.env.DESCRIPTION_GENERATION_METHOD || 'auto'
+      });
+      
+      // Add description to metadata
+      const metadata = JSON.parse(relation.metadata);
+      metadata.description = descriptionResult.description;
+      metadata.description_method = descriptionResult.method;
+      metadata.description_confidence = descriptionResult.confidence;
+      relation.metadata = JSON.stringify(metadata);
+    } catch (error) {
+      console.warn(`Failed to generate description for relation: ${error.message}`);
+    }
+  }
   
   // Validate relation against relation type if available
   if (relationType) {

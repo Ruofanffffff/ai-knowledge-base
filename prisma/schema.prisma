@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./knowledge-base.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // 用户表
@@ -22,6 +22,7 @@ model User {
   documents Document[]
   settings  Setting[]
   backups   Backup[]
+  notes     Note[]     // 新增: 便签关联
   
   @@map("users")
 }
@@ -199,6 +200,8 @@ model Schema {
   relations          String?                       // JSON string
   exampleDescription String?  @map("example_description")  // 示例描述
   description        String?                       // Schema 描述
+  anchorFields       String?  @map("anchor_fields") // JSON string: 锚点字段配置
+  anchorConfig       String?  @map("anchor_config") // JSON string: 锚点配置
   version            String
   active             Boolean  @default(true)       // 是否启用
   createdAt          DateTime @default(now()) @map("created_at")
@@ -212,17 +215,26 @@ model Schema {
 
 // KG 实体表
 model KGEntity {
-  id            String       @id @default(uuid())
-  type          String
-  canonicalName String       @map("canonical_name")
-  aliases       String?                       // JSON string
-  schemas       String                        // JSON string
-  supportedBy   String       @map("supported_by")  // JSON string
-  attributes    String?                       // JSON string
-  confidence    Float
-  llmEnriched   Boolean      @default(false) @map("llm_enriched")
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
+  id                String       @id @default(uuid())
+  type              String
+  canonicalName     String       @map("canonical_name")
+  
+  // 🆕 锚点相关字段
+  anchorFingerprint String?      @map("anchor_fingerprint")  // 锚点指纹
+  anchorFields      String?      @map("anchor_fields")       // JSON string: 锚点字段键值对
+  
+  aliases           String?                       // JSON string
+  schemas           String                        // JSON string: [{schema_name, schema_id, confidence}, ...]
+  supportedBy       String       @map("supported_by")  // JSON string
+  attributes        String?                       // JSON string
+  confidence        Float
+  llmEnriched       Boolean      @default(false) @map("llm_enriched")
+  
+  // 🆕 证据定位字段 (CKB Intelligent Chunking)
+  evidence          String?                       // JSON string: Evidence location information
+  
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
   
   relationsAsSource KGRelation[] @relation("SourceEntity")
   relationsAsTarget KGRelation[] @relation("TargetEntity")
@@ -231,6 +243,8 @@ model KGEntity {
   @@index([type])
   @@index([canonicalName])
   @@index([confidence])
+  @@index([anchorFingerprint])
+  @@index([type, anchorFingerprint])
 }
 
 // KG 关系表
@@ -244,6 +258,10 @@ model KGRelation {
   confidence   Float
   evidenceCkb  String   @map("evidence_ckb")  // JSON string
   evidenceText String?  @map("evidence_text")
+  
+  // 🆕 证据定位字段 (CKB Intelligent Chunking)
+  evidence     String?                        // JSON string: Evidence location information
+  
   metadata     String?                        // JSON string
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -430,4 +448,67 @@ model RelationType {
   @@index([domain])
   @@index([category])
   @@index([active])
+}
+
+// ============================================
+// Notes Feature Models
+// ============================================
+
+// 便签表
+model Note {
+  id          String       @id @default(uuid())
+  userId      String       @map("user_id")
+  content     String       @db.Text
+  tags        String[]
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  
+  attachments Attachment[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("notes")
+  @@index([userId])
+  @@index([tags])
+  @@index([createdAt])
+}
+
+// 附件类型枚举
+enum AttachmentType {
+  IMAGE
+  DOCUMENT
+  TABLE
+}
+
+// 附件表
+model Attachment {
+  id          String              @id @default(uuid())
+  noteId      String              @map("note_id")
+  type        AttachmentType
+  storageKey  String              @map("storage_key")  // S3对象键
+  url         String
+  size        Int
+  mimeType    String              @map("mime_type")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  
+  analysis    AttachmentAnalysis?
+  note        Note                @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  
+  @@map("attachments")
+  @@index([noteId])
+  @@index([type])
+}
+
+// 附件分析表
+model AttachmentAnalysis {
+  id           String     @id @default(uuid())
+  attachmentId String     @unique @map("attachment_id")
+  textContent  String?    @map("text_content") @db.Text
+  description  String?    @db.Text
+  tags         String[]
+  metadata     Json
+  createdAt    DateTime   @default(now()) @map("created_at")
+  
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  
+  @@map("attachment_analysis")
 }

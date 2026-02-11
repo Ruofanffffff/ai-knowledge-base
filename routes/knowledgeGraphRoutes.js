@@ -704,6 +704,84 @@ router.get('/entities/:id', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * Get entity context (original text with evidence)
+ * GET /api/knowledge-graph/entities/:id/context
+ * 
+ * Returns the original text context where the entity was found,
+ * with highlighted evidence locations.
+ * 
+ * Query params:
+ *   - contextWindow: Context window size in characters (default: 100)
+ *   - maxEvidence: Maximum number of evidence locations to return (default: 3)
+ */
+router.get('/entities/:id/context', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { contextWindow = 100, maxEvidence = 3 } = req.query;
+    
+    // Get entity
+    const entity = await entityStore.getEntityById(id);
+    
+    if (!entity) {
+      return res.status(404).json({
+        success: false,
+        error: 'Entity not found'
+      });
+    }
+    
+    // Check if entity has evidence information
+    if (!entity.evidence || !entity.evidence.ckb_id) {
+      return res.status(404).json({
+        success: false,
+        error: 'No evidence information available for this entity'
+      });
+    }
+    
+    // Get CKB
+    const ckb = await ckbStore.getCKB(entity.evidence.ckb_id);
+    
+    if (!ckb) {
+      return res.status(404).json({
+        success: false,
+        error: 'Source CKB not found'
+      });
+    }
+    
+    // Initialize Evidence Locator
+    const { EvidenceLocator } = require('../kg/ckb/evidence_locator');
+    const evidenceLocator = new EvidenceLocator({
+      contextWindow: parseInt(contextWindow),
+      maxEvidence: parseInt(maxEvidence)
+    });
+    
+    // Get entity context
+    const contextResult = evidenceLocator.getEntityContext(entity, [ckb], {
+      contextWindow: parseInt(contextWindow)
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        entity_id: id,
+        entity_name: entity.canonical_name,
+        entity_type: entity.entity_type,
+        ckb_id: ckb.ckb_id,
+        doc_id: ckb.doc_id,
+        document_title: ckb.content?.title || 'Untitled',
+        contexts: contextResult.contexts || [],
+        total_locations: contextResult.total_locations || 0
+      }
+    });
+  } catch (error) {
+    console.error('Error getting entity context:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // ============================================
 // Relation Routes
 // ============================================
@@ -803,6 +881,136 @@ router.get('/relations/:id', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting relation:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Get relation context (original text with evidence)
+ * GET /api/knowledge-graph/relations/:id/context
+ * 
+ * Returns the original text context where the relation was found,
+ * with highlighted evidence locations showing both source and target entities.
+ * 
+ * Query params:
+ *   - contextWindow: Context window size in characters (default: 150)
+ */
+router.get('/relations/:id/context', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { contextWindow = 150 } = req.query;
+    
+    // Get relation
+    const relation = await relationStore.getRelationById(id);
+    
+    if (!relation) {
+      return res.status(404).json({
+        success: false,
+        error: 'Relation not found'
+      });
+    }
+    
+    // Check if relation has evidence information
+    if (!relation.evidence_ckb || relation.evidence_ckb.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No evidence information available for this relation'
+      });
+    }
+    
+    // Get source and target entities
+    const sourceEntity = await entityStore.getEntityById(relation.source_id);
+    const targetEntity = await entityStore.getEntityById(relation.target_id);
+    
+    if (!sourceEntity || !targetEntity) {
+      return res.status(404).json({
+        success: false,
+        error: 'Source or target entity not found'
+      });
+    }
+    
+    // Get CKB
+    const ckbId = relation.evidence_ckb[0]; // Use first CKB
+    const ckb = await ckbStore.getCKB(ckbId);
+    
+    if (!ckb) {
+      return res.status(404).json({
+        success: false,
+        error: 'Source CKB not found'
+      });
+    }
+    
+    // Initialize Evidence Locator
+    const { EvidenceLocator } = require('../kg/ckb/evidence_locator');
+    const evidenceLocator = new EvidenceLocator({
+      contextWindow: parseInt(contextWindow),
+      maxEvidence: 3
+    });
+    
+    // Locate relation evidence
+    const relationEvidence = evidenceLocator.locateRelation(
+      relation,
+      sourceEntity,
+      targetEntity,
+      [ckb]
+    );
+    
+    // Get contexts for both entities
+    const sourceContext = evidenceLocator.getEntityContext(sourceEntity, [ckb], {
+      contextWindow: parseInt(contextWindow)
+    });
+    
+    const targetContext = evidenceLocator.getEntityContext(targetEntity, [ckb], {
+      contextWindow: parseInt(contextWindow)
+    });
+    
+    // Combine contexts
+    const allContexts = [
+      ...(sourceContext.contexts || []),
+      ...(targetContext.contexts || [])
+    ];
+    
+    // Remove duplicates based on text
+    const uniqueContexts = [];
+    const seenTexts = new Set();
+    
+    for (const ctx of allContexts) {
+      if (!seenTexts.has(ctx.text)) {
+        seenTexts.add(ctx.text);
+        uniqueContexts.push(ctx);
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        relation_id: id,
+        relation_type: relation.type,
+        relation_subtype: relation.subtype,
+        source_entity: {
+          id: sourceEntity.entity_id,
+          name: sourceEntity.canonical_name,
+          type: sourceEntity.entity_type
+        },
+        target_entity: {
+          id: targetEntity.entity_id,
+          name: targetEntity.canonical_name,
+          type: targetEntity.entity_type
+        },
+        ckb_id: ckb.ckb_id,
+        doc_id: ckb.doc_id,
+        document_title: ckb.content?.title || 'Untitled',
+        evidence_text: relation.metadata?.evidence_text || null,
+        contexts: uniqueContexts,
+        total_locations: relationEvidence.total_locations || 0,
+        confidence: relationEvidence.confidence || 0
+      }
+    });
+  } catch (error) {
+    console.error('Error getting relation context:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -1509,6 +1717,66 @@ router.get('/stats/budget/alerts', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting budget alerts:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Get anchor generation metrics
+ * GET /api/knowledge-graph/stats/anchor
+ * 
+ * Returns metrics for the anchor-driven entity synthesis system including:
+ * - Anchor generation performance (count, success rate, duration)
+ * - Entity merging statistics
+ * - Conflict detection metrics
+ * - LLM advisory usage
+ * - Coverage statistics
+ */
+router.get('/stats/anchor', authMiddleware, async (req, res) => {
+  try {
+    const anchorGenerator = require('../kg/entity/anchor_generator');
+    
+    const metrics = anchorGenerator.getMetrics();
+    const summary = anchorGenerator.getMetricsSummary();
+    
+    res.json({
+      success: true,
+      data: {
+        summary,
+        detailed: metrics
+      }
+    });
+  } catch (error) {
+    console.error('Error getting anchor metrics:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Reset anchor generation metrics
+ * POST /api/knowledge-graph/stats/anchor/reset
+ * 
+ * Resets all anchor system metrics to zero.
+ * Useful for starting fresh monitoring after deployment or testing.
+ */
+router.post('/stats/anchor/reset', authMiddleware, async (req, res) => {
+  try {
+    const anchorGenerator = require('../kg/entity/anchor_generator');
+    
+    anchorGenerator.resetMetrics();
+    
+    res.json({
+      success: true,
+      message: 'Anchor metrics reset successfully'
+    });
+  } catch (error) {
+    console.error('Error resetting anchor metrics:', error);
     res.status(500).json({
       success: false,
       error: error.message

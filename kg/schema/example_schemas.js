@@ -27,6 +27,18 @@ const groundwaterLevelChangeEvent = {
     { type: '发生时间', target_field: '时间', direction: 'outgoing' },
     { type: '影响指标', target_field: '指标', direction: 'outgoing' }
   ],
+  // 🆕 锚点字段配置 - 用于实体合并
+  anchor_fields: [
+    { name: '区域', normalization_strategy: 'location', priority: 1 },
+    { name: '指标', normalization_strategy: 'indicator', priority: 2 },
+    { name: '时间', normalization_strategy: 'time_month', priority: 3 }
+  ],
+  // 🆕 锚点配置
+  anchor_config: {
+    time_granularity: 'month',
+    allow_fuzzy_match: false,
+    conflict_strategy: 'llm_advisory'
+  },
   version: '1.0.0'
 };
 
@@ -47,6 +59,15 @@ const locationEntity = {
   relations: [
     { type: '属于', target_field: '上级区域', direction: 'outgoing' }
   ],
+  // 🆕 锚点字段配置 - 地点实体只需要区域名称作为锚点
+  anchor_fields: [
+    { name: '区域名称', normalization_strategy: 'location', priority: 1 }
+  ],
+  // 🆕 锚点配置
+  anchor_config: {
+    allow_fuzzy_match: false,
+    conflict_strategy: 'auto'
+  },
   version: '1.0.0'
 };
 
@@ -87,6 +108,17 @@ const projectEntity = {
   relations: [
     { type: '负责人', target_field: '项目负责人', direction: 'outgoing' }
   ],
+  // 🆕 锚点字段配置 - 项目名称和开始时间作为锚点
+  anchor_fields: [
+    { name: '项目名称', normalization_strategy: 'lowercase', priority: 1 },
+    { name: '开始时间', normalization_strategy: 'time_month', priority: 2 }
+  ],
+  // 🆕 锚点配置
+  anchor_config: {
+    time_granularity: 'month',
+    allow_fuzzy_match: false,
+    conflict_strategy: 'llm_advisory'
+  },
   version: '1.0.0'
 };
 

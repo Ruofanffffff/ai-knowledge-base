@@ -34,6 +34,7 @@ function deserializeSchema(schema) {
     entity_type: schema.entityType,
     scene: schema.scene,
     core_fields: JSON.parse(schema.coreFields),
+    anchor_fields: schema.anchorFields ? JSON.parse(schema.anchorFields) : [],  // 🔧 添加锚点字段
     threshold: schema.threshold,
     relations: schema.relations ? JSON.parse(schema.relations) : [],
     example_description: schema.exampleDescription,

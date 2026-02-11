@@ -1,38 +1,139 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Send, Mic, Bot, User, FileText, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useApiData } from '../hooks/useApiData';
+import { apiService } from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorDisplay from '../components/ErrorDisplay';
+import EmptyState from '../components/EmptyState';
 
 export function Chat() {
-  const [messages, setMessages] = useState([
-    { 
-      id: 1, 
-      role: 'user', 
-      content: 'Transformer 模型的关键组件有哪些？' 
-    },
-    { 
-      id: 2, 
-      role: 'assistant', 
-      content: 'Transformer 模型（在《Attention Is All You Need》中提出）主要由编码器（Encoder）和解码器（Decoder）堆栈组成。关键组件包括：\n\n1. **自注意力机制 (Self-Attention)**：允许模型衡量句子中不同单词的重要性。\n2. **多头注意力 (Multi-Head Attention)**：并行运行多个注意力机制。\n3. **前馈神经网络 (Feed-Forward Networks)**：分别且相同地应用于每个位置。\n4. **位置编码 (Positional Encoding)**：由于没有循环/卷积，这注入了关于标记相对或绝对位置的信息。',
-      sources: ['神经网络架构', 'Attention Is All You Need (论文)']
-    }
-  ]);
+  const [currentSessionId] = useState<string | undefined>();
   const [input, setInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    const newMsg = { id: Date.now(), role: 'user', content: input };
-    setMessages([...messages, newMsg]);
+  // Fetch chat sessions
+  const { 
+    loading: sessionsLoading,
+    error: sessionsError 
+  } = useApiData(() => apiService.getChatSessions(), []);
+
+  // Fetch chat history for current session
+  const { 
+    data: messages, 
+    loading: messagesLoading,
+    error: messagesError,
+    refetch: refetchMessages
+  } = useApiData(() => apiService.getChatHistory(currentSessionId), [currentSessionId]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isSending) return;
+    
+    setIsSending(true);
+    const userMessage = input;
     setInput('');
-    // Simulate response would happen here
-    setTimeout(() => {
-       setMessages(prev => [...prev, {
-         id: Date.now() + 1,
-         role: 'assistant',
-         content: '我正在基于您的知识库处理您的请求...',
-         sources: []
-       }]);
-    }, 1000);
+
+    try {
+      const response = await apiService.sendChatMessage(userMessage, currentSessionId);
+      
+      if (response.success) {
+        // Refetch messages to get the updated chat history
+        await refetchMessages();
+      } else {
+        // Show error but keep the input
+        setInput(userMessage);
+        console.error('Failed to send message:', response.error);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setInput(userMessage);
+    } finally {
+      setIsSending(false);
+    }
   };
+
+  // Loading state
+  if (sessionsLoading || messagesLoading) {
+    return <LoadingSpinner size="large" message="加载聊天中..." />;
+  }
+
+  // Error state
+  if (sessionsError || messagesError) {
+    return (
+      <ErrorDisplay 
+        title="加载失败"
+        message={sessionsError || messagesError || '未知错误'} 
+        onRetry={() => {
+          window.location.reload();
+        }} 
+      />
+    );
+  }
+
+  // Empty state - no messages
+  if (!messages || messages.length === 0) {
+    return (
+      <div className="flex-1 h-full flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white shrink-0">
+          <div className="flex items-center gap-2">
+             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white">
+                <Sparkles size={16} />
+             </div>
+             <div>
+                <h1 className="font-bold text-slate-900 text-sm">AI 助手</h1>
+                <p className="text-[10px] text-slate-500">基于您的知识库回答</p>
+             </div>
+          </div>
+          <div className="flex gap-2">
+             <select className="bg-slate-50 border border-slate-200 text-xs rounded-lg px-2 py-1 outline-none focus:border-purple-500">
+                <option>GPT-4 (默认)</option>
+                <option>Claude 3.5 Sonnet</option>
+                <option>Local Llama 3</option>
+             </select>
+          </div>
+        </div>
+
+        {/* Empty State */}
+        <div className="flex-1 flex items-center justify-center">
+          <EmptyState 
+            message="还没有聊天记录。开始输入问题与AI助手对话吧！"
+          />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-4 border-t border-slate-100 bg-white">
+          <div className="relative">
+             <textarea 
+               value={input}
+               onChange={(e) => setInput(e.target.value)}
+               placeholder="输入问题..."
+               className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-20 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 resize-none shadow-sm"
+               rows={1}
+               onKeyDown={(e) => {
+                 if (e.key === 'Enter' && !e.shiftKey) {
+                   e.preventDefault();
+                   handleSend();
+                 }
+               }}
+             />
+             <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                <button className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-slate-200 rounded-lg transition-colors">
+                   <Mic size={16} />
+                </button>
+                <button 
+                  onClick={handleSend}
+                  disabled={!input.trim() || isSending}
+                  className="p-1.5 bg-purple-600 text-white rounded-lg shadow-md shadow-purple-500/20 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                   <Send size={14} />
+                </button>
+             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 h-full flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -108,17 +209,25 @@ export function Chat() {
                  handleSend();
                }
              }}
+             disabled={isSending}
            />
            <div className="absolute right-2 bottom-2 flex items-center gap-1">
-              <button className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-slate-200 rounded-lg transition-colors">
+              <button 
+                className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-slate-200 rounded-lg transition-colors"
+                disabled={isSending}
+              >
                  <Mic size={16} />
               </button>
               <button 
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={!input.trim() || isSending}
                 className="p-1.5 bg-purple-600 text-white rounded-lg shadow-md shadow-purple-500/20 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                 <Send size={14} />
+                 {isSending ? (
+                   <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                 ) : (
+                   <Send size={14} />
+                 )}
               </button>
            </div>
         </div>

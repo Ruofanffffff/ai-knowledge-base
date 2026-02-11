@@ -9,6 +9,20 @@
 
 const relationStore = require('./relation_store');
 
+// Lazy load relation description generator to avoid circular dependencies
+let relationDescriptionGenerator = null;
+
+function getRelationDescriptionGenerator() {
+  if (!relationDescriptionGenerator) {
+    const { RelationDescriptionGenerator } = require('../human_readable/relation_description_generator');
+    relationDescriptionGenerator = new RelationDescriptionGenerator({
+      enableLLM: process.env.ENABLE_RELATION_DESCRIPTION_LLM === 'true',
+      language: process.env.RELATION_DESCRIPTION_LANGUAGE || 'zh'
+    });
+  }
+  return relationDescriptionGenerator;
+}
+
 /**
  * Build cooccurrence relations from CKB data
  * @param {Array} ckbs - List of CKBs with entity mentions
@@ -19,11 +33,13 @@ async function buildCooccurrenceRelations(ckbs, options = {}) {
   const {
     weightThreshold = 0.5,
     minCooccurrences = 2,
-    sourceWeight = 1.0
+    sourceWeight = 1.0,
+    enableDescriptions = process.env.ENABLE_RELATION_DESCRIPTIONS === 'true'
   } = options;
 
   // Track entity co-occurrences
   const cooccurrenceMap = new Map();
+  const entityMap = new Map(); // Track entity objects for description generation
 
   // Process each CKB
   for (const ckb of ckbs) {
@@ -37,6 +53,14 @@ async function buildCooccurrenceRelations(ckbs, options = {}) {
       for (let j = i + 1; j < entities.length; j++) {
         const entity1 = entities[i];
         const entity2 = entities[j];
+
+        // Store entity objects for later use
+        if (!entityMap.has(entity1.id)) {
+          entityMap.set(entity1.id, entity1);
+        }
+        if (!entityMap.has(entity2.id)) {
+          entityMap.set(entity2.id, entity2);
+        }
 
         // Create bidirectional pair key
         const pairKey = createPairKey(entity1.id, entity2.id);
@@ -85,6 +109,31 @@ async function buildCooccurrenceRelations(ckbs, options = {}) {
         }
       };
 
+      // Generate description if enabled
+      if (enableDescriptions) {
+        try {
+          const generator = getRelationDescriptionGenerator();
+          const sourceEntity = entityMap.get(cooccurrence.entity1_id);
+          const targetEntity = entityMap.get(cooccurrence.entity2_id);
+          
+          if (sourceEntity && targetEntity) {
+            const descriptionResult = await generator.generateDescription({
+              type: 'co_occurrence',
+              source: sourceEntity,
+              target: targetEntity
+            }, {
+              method: process.env.DESCRIPTION_GENERATION_METHOD || 'template'
+            });
+            
+            relation.metadata.description = descriptionResult.description;
+            relation.metadata.description_method = descriptionResult.method;
+            relation.metadata.description_confidence = descriptionResult.confidence;
+          }
+        } catch (error) {
+          console.warn(`Failed to generate description for co-occurrence relation: ${error.message}`);
+        }
+      }
+
       relations.push(relation);
     }
   }
@@ -105,7 +154,8 @@ async function updateCooccurrenceRelations(ckb, options = {}) {
 
   const {
     weightThreshold = 0.5,
-    sourceWeight = ckb.quality?.source_confidence || 1.0
+    sourceWeight = ckb.quality?.source_confidence || 1.0,
+    enableDescriptions = process.env.ENABLE_RELATION_DESCRIPTIONS === 'true'
   } = options;
 
   const updatedRelations = [];
@@ -158,6 +208,26 @@ async function updateCooccurrenceRelations(ckb, options = {}) {
               avg_source_weight: sourceWeight
             }
           };
+
+          // Generate description if enabled
+          if (enableDescriptions) {
+            try {
+              const generator = getRelationDescriptionGenerator();
+              const descriptionResult = await generator.generateDescription({
+                type: 'co_occurrence',
+                source: entity1,
+                target: entity2
+              }, {
+                method: process.env.DESCRIPTION_GENERATION_METHOD || 'template'
+              });
+              
+              newRelation.metadata.description = descriptionResult.description;
+              newRelation.metadata.description_method = descriptionResult.method;
+              newRelation.metadata.description_confidence = descriptionResult.confidence;
+            } catch (error) {
+              console.warn(`Failed to generate description for new co-occurrence relation: ${error.message}`);
+            }
+          }
 
           const created = await relationStore.createRelation(newRelation);
           updatedRelations.push(created);

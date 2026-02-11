@@ -16,11 +16,17 @@ const {
 } = require('../prompts/extract_fields');
 const { createQwenClient } = require('../utils/qwen_client');
 const tokenBudgetManager = require('../utils/token_budget_manager');
+const { ContextOptimizer } = require('../ckb/context_optimizer');
 
 /**
  * LLM client instance
  */
 let llmClient = null;
+
+/**
+ * Context optimizer instance
+ */
+let contextOptimizer = null;
 
 /**
  * Initialize LLM client
@@ -30,6 +36,21 @@ function initLLMClient() {
     llmClient = createQwenClient(process.env.QWEN_API_KEY);
   }
   return llmClient;
+}
+
+/**
+ * Initialize Context Optimizer
+ */
+function initContextOptimizer() {
+  if (!contextOptimizer) {
+    contextOptimizer = new ContextOptimizer({
+      maxTokens: parseInt(process.env.CONTEXT_OPTIMIZER_MAX_TOKENS || '2000'),
+      minChunks: parseInt(process.env.CONTEXT_OPTIMIZER_MIN_CHUNKS || '2'),
+      maxChunks: parseInt(process.env.CONTEXT_OPTIMIZER_MAX_CHUNKS || '10'),
+      relevanceThreshold: parseFloat(process.env.CONTEXT_OPTIMIZER_THRESHOLD || '0.1')
+    });
+  }
+  return contextOptimizer;
 }
 
 /**
@@ -44,6 +65,8 @@ function initLLMClient() {
  * @param {Object} options.schema - Target schema for validation (optional)
  * @param {boolean} options.enableSegmentation - Enable document segmentation for long documents (default: true)
  * @param {number} options.segmentSize - Maximum characters per segment (default: 10000)
+ * @param {boolean} options.enableContextOptimization - Enable context optimization (default: from env)
+ * @param {Array<string>} options.fieldNames - Field names to extract (for context optimization)
  * @returns {Promise<Array>} Additional fields from LLM
  */
 async function extractFieldsWithLLM(ckb, existingFields = [], options = {}) {
@@ -62,12 +85,48 @@ async function extractFieldsWithLLM(ckb, existingFields = [], options = {}) {
     maxFields = 30,
     schema = null,  // 目标schema
     enableSegmentation = true,  // 启用文档分段
-    segmentSize = 10000  // 每段最大字符数
+    segmentSize = 10000,  // 每段最大字符数
+    enableContextOptimization = process.env.ENABLE_CONTEXT_OPTIMIZATION === 'true',
+    fieldNames = []  // 要提取的字段名称（用于上下文优化）
   } = options;
   
+  // 如果启用了上下文优化且提供了字段名称
+  let optimizedText = text;
+  let optimizationMetrics = null;
+  
+  if (enableContextOptimization && fieldNames.length > 0) {
+    try {
+      const optimizer = initContextOptimizer();
+      const result = await optimizer.optimizeForFieldExtraction(
+        [ckb],
+        fieldNames,
+        {
+          maxTokens: parseInt(process.env.CONTEXT_OPTIMIZER_MAX_TOKENS || '2000')
+        }
+      );
+      
+      if (result.optimized) {
+        optimizedText = result.context;
+        optimizationMetrics = {
+          tokenSavings: result.tokenSavings,
+          tokenSavingsPercent: result.tokenSavingsPercent,
+          originalTokenCount: result.originalTokenCount,
+          optimizedTokenCount: result.tokenCount
+        };
+        console.log(`Context optimization: saved ${result.tokenSavingsPercent}% tokens (${result.tokenSavings} tokens)`);
+      } else {
+        console.log(`Context optimization skipped: ${result.reason}`);
+      }
+    } catch (error) {
+      console.warn('Context optimization failed, falling back to full text:', error.message);
+      // 降级到全文
+      optimizedText = text;
+    }
+  }
+  
   // 如果文档太长且启用了分段,使用分段提取
-  if (enableSegmentation && text.length > segmentSize) {
-    console.log(`Document too long (${text.length} chars), using segmented extraction`);
+  if (enableSegmentation && optimizedText.length > segmentSize) {
+    console.log(`Document too long (${optimizedText.length} chars), using segmented extraction`);
     return await extractFieldsWithSegmentation(ckb, existingFields, options);
   }
   
@@ -75,14 +134,14 @@ async function extractFieldsWithLLM(ckb, existingFields = [], options = {}) {
   let prompt;
   if (domain === 'travel') {
     // 使用旅游领域专用prompt
-    prompt = buildTravelFieldExtractionPrompt(text, { maxFields, schema, existingFields });
+    prompt = buildTravelFieldExtractionPrompt(optimizedText, { maxFields, schema, existingFields });
   } else if (useSemantic) {
     // 使用语义字段提取prompt
-    prompt = buildSemanticFieldExtractionPrompt(text, { maxFields, schema, existingFields });
+    prompt = buildSemanticFieldExtractionPrompt(optimizedText, { maxFields, schema, existingFields });
   } else if (useSimplified) {
-    prompt = buildSimplifiedPrompt(text, existingFields);
+    prompt = buildSimplifiedPrompt(optimizedText, existingFields);
   } else {
-    prompt = buildFieldExtractionPrompt(text, existingFields);
+    prompt = buildFieldExtractionPrompt(optimizedText, existingFields);
   }
   
   try {
@@ -92,7 +151,7 @@ async function extractFieldsWithLLM(ckb, existingFields = [], options = {}) {
       systemPrompt: '你是一个专业的知识图谱字段提取专家。请严格按照JSON格式输出，确保JSON完整有效。'
     });
     
-    const fields = parseLLMResponse(response, text);
+    const fields = parseLLMResponse(response, optimizedText);
     
     // Validate against schema if provided
     let validatedFields = fields;
@@ -117,7 +176,8 @@ async function extractFieldsWithLLM(ckb, existingFields = [], options = {}) {
       totalTokens: response.tokens || 0,
       ckbId: ckb.ckb_id,
       docId: ckb.doc_id,
-      domain: domain || 'general'
+      domain: domain || 'general',
+      contextOptimization: optimizationMetrics
     });
     
     return validatedFields;
@@ -376,5 +436,6 @@ module.exports = {
   shouldUseLLM,
   parseLLMResponse,
   initLLMClient,
+  initContextOptimizer,
   getPromptBuilderForDomain
 };

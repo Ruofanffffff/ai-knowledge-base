@@ -215,33 +215,56 @@ class MappingBasedNormalizer {
         }
       }
 
-      // 3. 模糊匹配（包含关系）
-      if (fieldName.includes(standardName.toLowerCase()) || 
-          standardName.toLowerCase().includes(fieldName)) {
-        return {
-          name: standardName,  // 添加name字段供entity_builder使用
-          originalName: field.name,
-          standardName: standardName,
-          value: field.value,
-          confidence: 0.85,
-          mappingMethod: 'fuzzy',
-          source: field.source || 'extraction'
-        };
+      // 3. 模糊匹配（包含关系）- 添加长度检查避免误匹配
+      const minLength = Math.min(fieldName.length, standardName.toLowerCase().length);
+      // 只有当较短字符串长度>=4且相似度足够高时才进行模糊匹配
+      if (minLength >= 4) {
+        if (fieldName.includes(standardName.toLowerCase()) || 
+            standardName.toLowerCase().includes(fieldName)) {
+          // 计算相似度：较短字符串长度 / 较长字符串长度
+          const maxLength = Math.max(fieldName.length, standardName.toLowerCase().length);
+          const similarity = minLength / maxLength;
+          
+          // 只有相似度>=0.6时才认为是模糊匹配
+          if (similarity >= 0.6) {
+            return {
+              name: standardName,  // 添加name字段供entity_builder使用
+              originalName: field.name,
+              standardName: standardName,
+              value: field.value,
+              confidence: 0.85,
+              mappingMethod: 'fuzzy',
+              source: field.source || 'extraction'
+            };
+          }
+        }
       }
 
-      // 4. 常见说法的模糊匹配
+      // 4. 常见说法的模糊匹配 - 添加长度检查避免误匹配
       for (const variation of variations) {
         const varLower = variation.toLowerCase();
-        if (fieldName.includes(varLower) || varLower.includes(fieldName)) {
-          return {
-            name: standardName,  // 添加name字段供entity_builder使用
-            originalName: field.name,
-            standardName: standardName,
-            value: field.value,
-            confidence: 0.8,
-            mappingMethod: 'fuzzy_variation',
-            source: field.source || 'extraction'
-          };
+        const minVarLength = Math.min(fieldName.length, varLower.length);
+        
+        // 只有当较短字符串长度>=4且相似度足够高时才进行模糊匹配
+        if (minVarLength >= 4) {
+          if (fieldName.includes(varLower) || varLower.includes(fieldName)) {
+            // 计算相似度
+            const maxVarLength = Math.max(fieldName.length, varLower.length);
+            const varSimilarity = minVarLength / maxVarLength;
+            
+            // 只有相似度>=0.6时才认为是模糊匹配
+            if (varSimilarity >= 0.6) {
+              return {
+                name: standardName,  // 添加name字段供entity_builder使用
+                originalName: field.name,
+                standardName: standardName,
+                value: field.value,
+                confidence: 0.8,
+                mappingMethod: 'fuzzy_variation',
+                source: field.source || 'extraction'
+              };
+            }
+          }
         }
       }
     }

@@ -1,0 +1,38 @@
+{
+  "llm": {
+    "enabled": true,
+    "model": "qwen-plus",
+    "apiKey": "your-api-key-here",
+    "baseURL": null,
+    "timeout": 30000,
+    "maxRetries": 3,
+    "temperature": 0.7,
+    "maxTokens": 2000
+  },
+  "algorithm": {
+    "enabled": true,
+    "extractorType": "universal"
+  },
+  "fusion": {
+    "conflictStrategy": "prefer_algorithm",
+    "deduplication": true,
+    "confidenceThreshold": 0.5
+  },
+  "performance": {
+    "enableCache": true,
+    "cacheExpiry": 86400,
+    "batchSize": 5,
+    "maxProcessingTime": 5000
+  },
+  "quality": {
+    "minEntities": 0,
+    "minRelations": 0,
+    "minConfidence": 0.5,
+    "requiredFields": []
+  },
+  "language": {
+    "default": "zh",
+    "supported": ["zh", "en"],
+    "autoDetect": true
+  }
+}

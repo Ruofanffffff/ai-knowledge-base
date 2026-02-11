@@ -61,7 +61,7 @@ ${constraintsSection}
 {
   "matches": [
     {
-      "field_name": "原始字段名",
+      "field_name": "原始字段名（必须与未匹配字段列表中的字段名完全一致）",
       "schema_name": "Schema名称",
       "schema_field": "Schema字段名",
       "confidence": 0.85,
@@ -70,8 +70,14 @@ ${constraintsSection}
   ]
 }
 
-如果某个字段无法匹配到任何Schema，不要在输出中包含它。
-只输出置信度 >= 0.7 的匹配结果。`;
+**重要约束**:
+1. **field_name必须完全匹配**: field_name必须与"未匹配字段列表"中的字段名完全一致，不能修改或替换
+   - ✅ 正确: 如果列表中有"FocalLength"，就使用"FocalLength"
+   - ❌ 错误: 不要使用"数值"、"焦距"等其他名称
+2. **避免通用字段名**: 不要匹配名为"数值"、"单位"、"实体"、"区域"、"指标"等过于通用的字段
+3. **优先匹配具体字段**: 优先匹配有明确含义的字段名（如FocalLength, Aperture, ISO等）
+4. 如果某个字段无法匹配到任何Schema，不要在输出中包含它
+5. 只输出置信度 >= 0.7 的匹配结果`;
 }
 
 /**
@@ -144,47 +150,52 @@ function buildMatchingExamplesSection() {
 
 **示例 1：摄影领域字段匹配**
 未匹配字段：
-1. 摄影技巧 (值: 肖像拍摄)
-2. 背景虚化 (值: 大光圈)
-3. 定焦镜头 (值: 50mm)
+1. **FocalLength** (值: 55)
+2. **Aperture** (值: 1.8)
+3. **ISO** (值: 100)
+4. 数值 (值: 9)
 
 候选Schema：
-1. Shooting-Info (拍摄信息) - 核心字段: Technique, Subject, Style
-2. Aperture-Usage (光圈使用) - 核心字段: ApertureValue, Effect, Purpose
-3. Lens-Choice (镜头选择) - 核心字段: LensType, FocalLength, Usage
+1. PhotographyEntity (摄影实体) - 核心字段: FocalLength, Aperture, ISO, ShutterSpeed
+2. Lens-Recommendation (镜头推荐) - 核心字段: LensType, FocalLength, Usage
 
 输出：
 {
   "matches": [
     {
-      "field_name": "摄影技巧",
-      "schema_name": "Shooting-Info",
-      "schema_field": "Technique",
-      "confidence": 0.9,
-      "reason": "摄影技巧直接对应拍摄信息中的技术字段"
-    },
-    {
-      "field_name": "背景虚化",
-      "schema_name": "Aperture-Usage",
-      "schema_field": "Effect",
-      "confidence": 0.85,
-      "reason": "背景虚化是光圈使用产生的效果"
-    },
-    {
-      "field_name": "定焦镜头",
-      "schema_name": "Lens-Choice",
-      "schema_field": "LensType",
+      "field_name": "FocalLength",
+      "schema_name": "PhotographyEntity",
+      "schema_field": "FocalLength",
       "confidence": 0.95,
-      "reason": "定焦镜头是镜头类型的一种"
+      "reason": "焦距字段直接对应摄影实体的焦距字段"
+    },
+    {
+      "field_name": "Aperture",
+      "schema_name": "PhotographyEntity",
+      "schema_field": "Aperture",
+      "confidence": 0.95,
+      "reason": "光圈字段直接对应摄影实体的光圈字段"
+    },
+    {
+      "field_name": "ISO",
+      "schema_name": "PhotographyEntity",
+      "schema_field": "ISO",
+      "confidence": 0.95,
+      "reason": "ISO字段直接对应摄影实体的ISO字段"
     }
   ]
 }
 
+**注意**: 
+- ✅ 使用了原始字段名"FocalLength"、"Aperture"、"ISO"
+- ❌ 没有匹配通用字段"数值"（过于通用，应该被过滤）
+
 **示例 2：科研领域字段匹配**
 未匹配字段：
-1. 监测点位 (值: 阿里C区)
-2. 变化趋势 (值: 下降)
-3. 影响因素 (值: 降雨减少)
+1. **SiteName** (值: 阿里C区)
+2. **Trend** (值: 下降)
+3. **Factor** (值: 降雨减少)
+4. 指标 (值: 水位)
 
 候选Schema：
 1. EITV (实体-指标-时间-数值) - 核心字段: Entity, Indicator, Time, Value
@@ -195,28 +206,32 @@ function buildMatchingExamplesSection() {
 {
   "matches": [
     {
-      "field_name": "监测点位",
+      "field_name": "SiteName",
       "schema_name": "Monitoring-Site",
       "schema_field": "SiteName",
-      "confidence": 0.9,
-      "reason": "监测点位对应监测站点的名称"
+      "confidence": 0.95,
+      "reason": "站点名称字段直接对应监测站点的名称字段"
     },
     {
-      "field_name": "变化趋势",
+      "field_name": "Trend",
       "schema_name": "Trend-Analysis",
       "schema_field": "Trend",
       "confidence": 0.95,
-      "reason": "变化趋势直接对应趋势分析中的趋势字段"
+      "reason": "趋势字段直接对应趋势分析的趋势字段"
     },
     {
-      "field_name": "影响因素",
+      "field_name": "Factor",
       "schema_name": "Trend-Analysis",
       "schema_field": "Factor",
       "confidence": 0.9,
-      "reason": "影响因素对应趋势分析中的因素字段"
+      "reason": "因素字段对应趋势分析的因素字段"
     }
   ]
-}`;
+}
+
+**注意**: 
+- ✅ 使用了原始字段名"SiteName"、"Trend"、"Factor"
+- ❌ 没有匹配通用字段"指标"（过于通用，应该被过滤）`;
 }
 
 /**
@@ -226,44 +241,60 @@ function buildMatchingExamplesSection() {
 function buildMatchingConstraintsSection() {
   return `## 重要约束
 
-1. **语义匹配优先**：基于字段的语义含义进行匹配，而非字面相似度
+1. **字段名必须完全匹配** ⚠️ 最重要
+   - field_name必须与"未匹配字段列表"中的字段名完全一致
+   - ✅ 正确: 如果列表中有"FocalLength"，就使用"FocalLength"
+   - ❌ 错误: 不要使用"数值"、"焦距"等其他名称
+   - ❌ 错误: 不要修改、翻译或替换字段名
+
+2. **避免通用字段名** ⚠️ 重要
+   - 不要匹配以下通用字段名:
+     - "数值"、"值"、"内容"
+     - "单位"、"类型"、"名称"
+     - "实体"、"对象"、"项目"
+     - "区域"、"位置"、"地点"
+     - "指标"、"参数"、"属性"
+   - 这些字段名过于通用，无法准确映射到Schema字段
+   - 优先匹配有明确含义的字段名（如FocalLength, Aperture, ISO等）
+
+3. **语义匹配优先**：基于字段的语义含义进行匹配，而非字面相似度
    - 考虑字段名称的含义
    - 考虑字段值的类型和内容
    - 考虑字段在文档中的上下文
 
-2. **领域知识应用**：利用领域知识判断字段归属
-   - 摄影领域：光圈、快门、ISO、焦距等
-   - 科研领域：指标、监测、趋势、数值等
-   - 旅游领域：景点、行程、交通、住宿等
+4. **领域知识应用**：利用领域知识判断字段归属
+   - 摄影领域：FocalLength, Aperture, ShutterSpeed, ISO等
+   - 科研领域：Indicator, Monitoring, Trend, Value等
+   - 旅游领域：Destination, Itinerary, Transportation, Accommodation等
 
-3. **Schema场景匹配**：优先匹配与文档场景相关的Schema
+5. **Schema场景匹配**：优先匹配与文档场景相关的Schema
    - 检查Schema的场景描述
    - 检查Schema的实体类型
    - 检查Schema的核心字段
 
-4. **置信度评估标准**：
+6. **置信度评估标准**：
    - 0.9-1.0：字段语义完全匹配，领域明确
    - 0.8-0.9：字段语义相关，有一定推断
    - 0.7-0.8：字段可能相关，需要上下文支持
    - < 0.7：不要输出（置信度太低）
 
-5. **宁缺毋滥**：如果不确定，不要输出匹配结果
+7. **宁缺毋滥**：如果不确定，不要输出匹配结果
    - 错误的匹配比不匹配更糟糕
    - 只输出置信度 >= 0.7 的匹配
    - 一个字段可以匹配多个Schema的不同字段
 
-6. **字段唯一性**：每个字段在同一个Schema中只能匹配一个字段
-   - ✅ 正确："摄影技巧" → Shooting-Info.Technique
-   - ❌ 错误："摄影技巧" → Shooting-Info.Technique 和 Shooting-Info.Subject
+8. **字段唯一性**：每个字段在同一个Schema中只能匹配一个字段
+   - ✅ 正确："FocalLength" → PhotographyEntity.FocalLength
+   - ❌ 错误："FocalLength" → PhotographyEntity.FocalLength 和 PhotographyEntity.Lens
 
-7. **考虑字段值**：字段值可以提供重要线索
+9. **考虑字段值**：字段值可以提供重要线索
    - 如果值是日期格式，可能是时间字段
    - 如果值是地名，可能是位置字段
-   - 如果值是数字，可能是数值字段
+   - 如果值是数字，检查字段名是否有明确含义
 
-8. **多Schema匹配**：一个字段可以匹配多个不同Schema
-   - ✅ 正确："时间" → EITV.Time 和 Event.Timestamp
-   - 这样可以让多个Schema都有机会被触发`;
+10. **多Schema匹配**：一个字段可以匹配多个不同Schema
+    - ✅ 正确："Time" → EITV.Time 和 Event.Timestamp
+    - 这样可以让多个Schema都有机会被触发`;
 }
 
 /**

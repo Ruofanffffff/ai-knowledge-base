@@ -2228,3 +2228,736 @@ GET /api/knowledge-graph/relation-types-compatible?sourceEntityType=PersonEntity
 **最后更新**: 2025-02-03  
 **维护者**: Schema-Driven KG Team
 
+
+
+---
+
+## 9. Anchor System API
+
+### 9.1 概述
+
+锚点系统 (Anchor System) 是知识图谱的核心机制,用于实现确定性的实体识别和合并。本节介绍与锚点系统相关的 API 端点。
+
+**关键概念**:
+- **Anchor Fingerprint**: 基于语义关键字段生成的确定性标识符
+- **Anchor Fields**: 用于生成锚点指纹的字段集合
+- **Schema Instance**: Schema 匹配产生的中间表示
+- **Compatibility Mode**: 兼容模式 (ANCHOR_ONLY, HYBRID, LEGACY)
+
+### 9.2 处理文档 (带锚点支持)
+
+**端点**: `POST /build`
+
+**描述**: 处理文档并使用锚点系统构建知识图谱
+
+**请求参数**:
+```json
+{
+  "docId": "string",              // 文档 ID (必需)
+  "ckbIds": ["string"],           // CKB ID 列表 (可选)
+  "compatibilityMode": "string"   // 兼容模式 (可选): ANCHOR_ONLY, HYBRID, LEGACY
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "entities": [
+      {
+        "id": "entity-uuid-1",
+        "name": "A7M4 摄影设置",
+        "type": "PhotographyEntity",
+        "properties": {
+          "Camera": "A7M4",
+          "Lens": "35mm F1.8",
+          "ISO": "100"
+        },
+        "anchor_fingerprint": "PhotographyEntity|a7m4|35mm_f1.8",
+        "anchor_fields": {
+          "Camera": "A7M4",
+          "Lens": "35mm F1.8"
+        },
+        "schemas": ["Photography Setup A", "Photography Setup B"],
+        "ckb_ids": ["ckb-uuid-1", "ckb-uuid-2"],
+        "confidence": 0.92,
+        "created_at": "2026-02-08T10:00:00Z"
+      }
+    ],
+    "relations": [...],
+    "anchorStats": {
+      "totalInstances": 10,
+      "uniqueAnchors": 5,
+      "mergedEntities": 5,
+      "conflictsDetected": 1,
+      "llmAdvisoryUsed": 1
+    },
+    "stats": {
+      "entities_created": 5,
+      "relations_created": 8,
+      "processing_time_ms": 1250
+    }
+  }
+}
+```
+
+**新增字段说明**:
+- `anchor_fingerprint`: 实体的锚点指纹 (确定性标识符)
+- `anchor_fields`: 用于生成锚点的字段值
+- `schemas`: 该实体由哪些 Schema 合并而来
+- `anchorStats`: 锚点系统统计信息
+
+**示例**:
+```bash
+# 使用锚点系统处理文档
+curl -X POST http://localhost:3000/api/knowledge-graph/build \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docId": "doc-123",
+    "compatibilityMode": "ANCHOR_ONLY"
+  }'
+```
+
+### 9.3 按锚点查询实体
+
+**端点**: `GET /entities/by-anchor/:anchorFingerprint`
+
+**描述**: 根据锚点指纹查询实体
+
+**路径参数**:
+- `anchorFingerprint`: 锚点指纹 (必需)
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "entity": {
+      "id": "entity-uuid-1",
+      "name": "A7M4 摄影设置",
+      "anchor_fingerprint": "PhotographyEntity|a7m4|35mm_f1.8",
+      "anchor_fields": {
+        "Camera": "A7M4",
+        "Lens": "35mm F1.8"
+      },
+      ...
+    }
+  }
+}
+```
+
+**错误响应**:
+- `404`: 未找到匹配的实体
+
+**示例**:
+```bash
+curl -X GET "http://localhost:3000/api/knowledge-graph/entities/by-anchor/PhotographyEntity%7Ca7m4%7C35mm_f1.8" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 9.4 获取锚点统计
+
+**端点**: `GET /anchors/stats`
+
+**描述**: 获取锚点系统的统计信息
+
+**查询参数**:
+- `entityType`: 按实体类型筛选 (可选)
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "total_entities": 1000,
+    "entities_with_anchors": 950,
+    "anchor_coverage": 0.95,
+    "unique_anchors": 800,
+    "merge_ratio": 1.19,
+    "by_entity_type": {
+      "PhotographyEntity": {
+        "total": 200,
+        "with_anchors": 195,
+        "unique_anchors": 150,
+        "merge_ratio": 1.30
+      },
+      "EventEntity": {
+        "total": 300,
+        "with_anchors": 290,
+        "unique_anchors": 250,
+        "merge_ratio": 1.16
+      }
+    },
+    "top_anchors": [
+      {
+        "anchor": "PhotographyEntity|a7m4|35mm_f1.8",
+        "entity_count": 5,
+        "schemas": ["Photography Setup A", "Photography Setup B"]
+      }
+    ]
+  }
+}
+```
+
+**字段说明**:
+- `anchor_coverage`: 有锚点的实体占比
+- `merge_ratio`: 平均每个锚点合并的实体数
+- `top_anchors`: 最常见的锚点 (合并最多实体的锚点)
+
+**示例**:
+```bash
+# 获取所有锚点统计
+curl -X GET http://localhost:3000/api/knowledge-graph/anchors/stats \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# 获取特定类型的锚点统计
+curl -X GET "http://localhost:3000/api/knowledge-graph/anchors/stats?entityType=PhotographyEntity" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 9.5 查找相似锚点
+
+**端点**: `POST /anchors/similar`
+
+**描述**: 查找与给定字段相似的锚点
+
+**请求参数**:
+```json
+{
+  "entityType": "string",           // 实体类型 (必需)
+  "fields": {                       // 字段值 (必需)
+    "Camera": "A7M4",
+    "Lens": "35mm F1.8"
+  },
+  "threshold": 0.8                  // 相似度阈值 (可选,默认: 0.8)
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "matches": [
+      {
+        "entity_id": "entity-uuid-1",
+        "anchor_fingerprint": "PhotographyEntity|a7m4|35mm_f1.8",
+        "similarity": 1.0,
+        "fields": {
+          "Camera": "A7M4",
+          "Lens": "35mm F1.8"
+        }
+      },
+      {
+        "entity_id": "entity-uuid-2",
+        "anchor_fingerprint": "PhotographyEntity|a7m4|50mm_f1.8",
+        "similarity": 0.85,
+        "fields": {
+          "Camera": "A7M4",
+          "Lens": "50mm F1.8"
+        }
+      }
+    ]
+  }
+}
+```
+
+**示例**:
+```bash
+curl -X POST http://localhost:3000/api/knowledge-graph/anchors/similar \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entityType": "PhotographyEntity",
+    "fields": {
+      "Camera": "A7M4",
+      "Lens": "35mm F1.8"
+    },
+    "threshold": 0.8
+  }'
+```
+
+### 9.6 检测锚点冲突
+
+**端点**: `POST /anchors/detect-conflicts`
+
+**描述**: 检测给定锚点下的实体是否存在冲突
+
+**请求参数**:
+```json
+{
+  "anchorFingerprint": "string"     // 锚点指纹 (必需)
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "hasConflict": true,
+    "conflictType": "value_conflict",
+    "severity": "medium",
+    "details": {
+      "field": "ISO",
+      "values": ["100", "200", "400"],
+      "instances": 3
+    },
+    "recommendation": {
+      "action": "merge",
+      "reasoning": "ISO值差异在可接受范围内,建议合并并保留所有值",
+      "confidence": 0.85
+    }
+  }
+}
+```
+
+**冲突类型**:
+- `time_inconsistency`: 时间不一致
+- `value_conflict`: 数值冲突
+- `state_contradiction`: 状态矛盾
+
+**严重程度**:
+- `low`: 轻微冲突,可自动处理
+- `medium`: 中等冲突,建议人工审核
+- `high`: 严重冲突,需要人工介入
+
+**示例**:
+```bash
+curl -X POST http://localhost:3000/api/knowledge-graph/anchors/detect-conflicts \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "anchorFingerprint": "PhotographyEntity|a7m4|35mm_f1.8"
+  }'
+```
+
+### 9.7 获取 Schema 的锚点配置
+
+**端点**: `GET /schemas/:id/anchor-config`
+
+**描述**: 获取 Schema 的锚点字段配置
+
+**路径参数**:
+- `id`: Schema ID (必需)
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "schema_id": "schema-uuid-1",
+    "schema_name": "Photography Setup A",
+    "entity_type": "PhotographyEntity",
+    "anchor_fields": ["Camera", "Lens"],
+    "anchor_config": {
+      "normalization": {
+        "Camera": "lowercase",
+        "Lens": "lowercase"
+      },
+      "required": ["Camera"],
+      "optional": ["Lens"]
+    },
+    "example_anchor": "PhotographyEntity|a7m4|35mm_f1.8"
+  }
+}
+```
+
+**字段说明**:
+- `anchor_fields`: 用于生成锚点的字段列表
+- `normalization`: 字段标准化策略
+- `required`: 必需的锚点字段
+- `optional`: 可选的锚点字段
+- `example_anchor`: 示例锚点指纹
+
+**示例**:
+```bash
+curl -X GET http://localhost:3000/api/knowledge-graph/schemas/schema-uuid-1/anchor-config \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 9.8 更新 Schema 的锚点配置
+
+**端点**: `PUT /schemas/:id/anchor-config`
+
+**描述**: 更新 Schema 的锚点字段配置
+
+**路径参数**:
+- `id`: Schema ID (必需)
+
+**请求参数**:
+```json
+{
+  "anchor_fields": ["Camera", "Lens", "Timestamp"],
+  "anchor_config": {
+    "normalization": {
+      "Camera": "lowercase",
+      "Lens": "lowercase",
+      "Timestamp": "time_day"
+    },
+    "required": ["Camera"],
+    "optional": ["Lens", "Timestamp"]
+  }
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "schema_id": "schema-uuid-1",
+    "updated": true,
+    "message": "锚点配置已更新"
+  }
+}
+```
+
+**注意事项**:
+- 更新锚点配置会影响后续生成的实体
+- 已存在的实体不会自动更新,需要重新处理
+- 建议在更新前备份数据
+
+**示例**:
+```bash
+curl -X PUT http://localhost:3000/api/knowledge-graph/schemas/schema-uuid-1/anchor-config \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "anchor_fields": ["Camera", "Lens", "Timestamp"],
+    "anchor_config": {
+      "normalization": {
+        "Camera": "lowercase",
+        "Lens": "lowercase",
+        "Timestamp": "time_day"
+      }
+    }
+  }'
+```
+
+### 9.9 验证锚点配置
+
+**端点**: `POST /schemas/validate-anchor-config`
+
+**描述**: 验证锚点配置是否正确
+
+**请求参数**:
+```json
+{
+  "schema_id": "string",            // Schema ID (必需)
+  "anchor_fields": ["string"],      // 锚点字段列表 (必需)
+  "anchor_config": {                // 锚点配置 (可选)
+    "normalization": {
+      "field1": "strategy1"
+    }
+  }
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "valid": true,
+    "warnings": [
+      "字段 'Timestamp' 建议使用时间标准化策略"
+    ],
+    "suggestions": [
+      "考虑添加 'Location' 字段以提高锚点唯一性"
+    ]
+  }
+}
+```
+
+**验证项**:
+- 锚点字段是否存在于 Schema 定义中
+- 标准化策略是否有效
+- 锚点字段组合是否足够唯一
+- 是否有改进建议
+
+**示例**:
+```bash
+curl -X POST http://localhost:3000/api/knowledge-graph/schemas/validate-anchor-config \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema_id": "schema-uuid-1",
+    "anchor_fields": ["Camera", "Lens"],
+    "anchor_config": {
+      "normalization": {
+        "Camera": "lowercase",
+        "Lens": "lowercase"
+      }
+    }
+  }'
+```
+
+### 9.10 重新生成实体锚点
+
+**端点**: `POST /entities/:id/regenerate-anchor`
+
+**描述**: 为指定实体重新生成锚点指纹
+
+**路径参数**:
+- `id`: 实体 ID (必需)
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "entity_id": "entity-uuid-1",
+    "old_anchor": "PhotographyEntity|a7m4|35mm",
+    "new_anchor": "PhotographyEntity|a7m4|35mm_f1.8",
+    "updated": true
+  }
+}
+```
+
+**使用场景**:
+- Schema 锚点配置更新后
+- 实体数据修正后
+- 锚点指纹格式错误
+
+**示例**:
+```bash
+curl -X POST http://localhost:3000/api/knowledge-graph/entities/entity-uuid-1/regenerate-anchor \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 9.11 批量重新生成锚点
+
+**端点**: `POST /entities/batch-regenerate-anchors`
+
+**描述**: 批量为实体重新生成锚点指纹
+
+**请求参数**:
+```json
+{
+  "entityType": "string",           // 实体类型 (可选)
+  "schemaId": "string",             // Schema ID (可选)
+  "entityIds": ["string"],          // 实体 ID 列表 (可选)
+  "dryRun": false                   // 是否仅模拟 (可选,默认: false)
+}
+```
+
+**响应示例**:
+```json
+{
+  "success": true,
+  "data": {
+    "total": 100,
+    "updated": 95,
+    "skipped": 5,
+    "errors": 0,
+    "details": [
+      {
+        "entity_id": "entity-uuid-1",
+        "old_anchor": "PhotographyEntity|a7m4|35mm",
+        "new_anchor": "PhotographyEntity|a7m4|35mm_f1.8",
+        "status": "updated"
+      }
+    ]
+  }
+}
+```
+
+**示例**:
+```bash
+# 重新生成所有 PhotographyEntity 的锚点
+curl -X POST http://localhost:3000/api/knowledge-graph/entities/batch-regenerate-anchors \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entityType": "PhotographyEntity",
+    "dryRun": false
+  }'
+
+# 模拟运行 (不实际更新)
+curl -X POST http://localhost:3000/api/knowledge-graph/entities/batch-regenerate-anchors \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entityType": "PhotographyEntity",
+    "dryRun": true
+  }'
+```
+
+---
+
+## 10. 兼容性和迁移
+
+### 10.1 兼容模式
+
+系统支持三种兼容模式:
+
+| 模式 | 说明 | 使用场景 |
+|------|------|----------|
+| `ANCHOR_ONLY` | 仅使用锚点系统 | 新部署,完全迁移后 |
+| `HYBRID` | 同时支持锚点和传统模式 | 渐进式迁移,测试阶段 |
+| `LEGACY` | 仅使用传统模式 | 回滚,兼容性需求 |
+
+### 10.2 设置兼容模式
+
+**全局配置**:
+```javascript
+// config/anchor.config.js
+module.exports = {
+  mode: 'ANCHOR_ONLY'  // or 'HYBRID' or 'LEGACY'
+};
+```
+
+**请求级别配置**:
+```json
+{
+  "docId": "doc-123",
+  "compatibilityMode": "ANCHOR_ONLY"
+}
+```
+
+### 10.3 迁移建议
+
+1. **开发环境**: 使用 `ANCHOR_ONLY` 模式测试
+2. **测试环境**: 使用 `HYBRID` 模式验证
+3. **生产环境**: 
+   - 初期使用 `HYBRID` 模式
+   - 验证稳定后切换到 `ANCHOR_ONLY`
+   - 保留 `LEGACY` 模式作为回滚选项
+
+---
+
+## 11. 错误码参考
+
+### 11.1 锚点系统错误码
+
+| 错误码 | 说明 | 解决方案 |
+|--------|------|----------|
+| `ANCHOR_001` | Schema 未配置锚点字段 | 为 Schema 添加 anchor_fields 配置 |
+| `ANCHOR_002` | 锚点字段值缺失 | 确保所有锚点字段都有值 |
+| `ANCHOR_003` | 锚点指纹格式错误 | 重新生成锚点指纹 |
+| `ANCHOR_004` | 标准化策略无效 | 使用有效的标准化策略 |
+| `ANCHOR_005` | 冲突检测失败 | 检查冲突检测配置 |
+| `ANCHOR_006` | LLM 建议服务不可用 | 检查 API 密钥或禁用 LLM 建议 |
+
+### 11.2 错误响应示例
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ANCHOR_001",
+    "message": "Schema 'Photography Setup A' 未配置锚点字段",
+    "details": {
+      "schema_id": "schema-uuid-1",
+      "schema_name": "Photography Setup A"
+    },
+    "suggestion": "请为该 Schema 添加 anchor_fields 配置"
+  }
+}
+```
+
+---
+
+## 12. 最佳实践
+
+### 12.1 锚点字段选择
+
+**推荐做法**:
+- 选择语义上唯一标识实体的字段
+- 包含 2-4 个字段 (太少不够唯一,太多影响性能)
+- 优先选择稳定的字段 (不经常变化)
+- 考虑时间粒度 (使用 time_month 而非精确时间戳)
+
+**示例**:
+```json
+{
+  "anchor_fields": ["Location", "Indicator", "Timestamp"],
+  "anchor_config": {
+    "normalization": {
+      "Location": "lowercase",
+      "Indicator": "lowercase",
+      "Timestamp": "time_month"
+    }
+  }
+}
+```
+
+### 12.2 性能优化
+
+**批量处理**:
+```bash
+# 批量处理多个文档
+curl -X POST http://localhost:3000/api/knowledge-graph/build-batch \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docIds": ["doc-1", "doc-2", "doc-3"],
+    "compatibilityMode": "ANCHOR_ONLY"
+  }'
+```
+
+**缓存利用**:
+- 启用锚点指纹缓存
+- 使用批量 API 减少请求次数
+- 合理设置分页大小
+
+### 12.3 监控和调试
+
+**监控指标**:
+- 锚点覆盖率 (目标: >90%)
+- 合并比率 (平均每个锚点合并的实体数)
+- 冲突检测率
+- LLM 建议使用率
+
+**调试工具**:
+```bash
+# 获取锚点统计
+curl -X GET http://localhost:3000/api/knowledge-graph/anchors/stats \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# 检测特定锚点的冲突
+curl -X POST http://localhost:3000/api/knowledge-graph/anchors/detect-conflicts \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"anchorFingerprint": "..."}'
+```
+
+---
+
+## 附录
+
+### A. 标准化策略参考
+
+| 策略 | 说明 | 示例 |
+|------|------|------|
+| `lowercase` | 转换为小写 | "A7M4" → "a7m4" |
+| `time_year` | 标准化到年 | "2026-01-20" → "2026" |
+| `time_month` | 标准化到月 | "2026-01-20" → "2026-01" |
+| `time_day` | 标准化到日 | "2026-01-20" → "2026-01-20" |
+| `location` | 位置标准化 | "阿里C区" → "c_zone" |
+| `indicator` | 指标标准化 | "地下水位" → "groundwater_level" |
+| `none` | 不标准化 | "A7M4" → "A7M4" |
+
+### B. 相关文档
+
+- **架构文档**: `kg/entity/ANCHOR_ARCHITECTURE.md`
+- **开发者指南**: `kg/entity/ANCHOR_DEVELOPER_GUIDE.md`
+- **Schema 配置指南**: `kg/schema/ANCHOR_FIELDS_GUIDE.md`
+- **迁移指南**: `kg/entity/MIGRATION_GUIDE.md`
+- **故障排查**: `kg/entity/TROUBLESHOOTING.md`
+
+### C. 版本历史
+
+| 版本 | 日期 | 变更 |
+|------|------|------|
+| 2.0 | 2026-02-08 | 添加锚点系统 API |
+| 1.0 | 2025-02-01 | 初始版本 |
+
+---
+
+**文档更新日期**: 2026-02-08  
+**API 版本**: 2.0  
+**锚点系统版本**: 1.0

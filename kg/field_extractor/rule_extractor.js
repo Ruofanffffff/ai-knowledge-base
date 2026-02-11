@@ -56,6 +56,82 @@ function extractFields(text) {
 function extractSemanticFields(text) {
   const fields = [];
   
+  // Photography-specific patterns (FIRST - highest priority)
+  const photographyPatterns = [
+    // Pattern: 焦距：55 mm
+    {
+      pattern: /焦距[:：]\s*(\d+\.?\d*)\s*(mm|毫米)?/gi,
+      fieldName: 'FocalLength',
+      fieldType: 'photography',
+      confidence: 0.98
+    },
+    // Pattern: F 值：1.8 or F值：1.8 or 光圈：f/1.8
+    {
+      pattern: /(?:F\s*值|光圈)[:：]\s*[fF]?\/?(\d+\.?\d*)/gi,
+      fieldName: 'Aperture',
+      fieldType: 'photography',
+      confidence: 0.98
+    },
+    // Pattern: 快门速度：1/250 秒
+    {
+      pattern: /快门速度[:：]\s*(1\/\d+|\d+\.?\d*)\s*秒?/gi,
+      fieldName: 'ShutterSpeed',
+      fieldType: 'photography',
+      confidence: 0.98
+    },
+    // Pattern: ISO：100 or 感光度：100
+    {
+      pattern: /(?:ISO|感光度)[:：]\s*(\d+)/gi,
+      fieldName: 'ISO',
+      fieldType: 'photography',
+      confidence: 0.98
+    },
+    // Pattern: 镜头型号 SEL35F18F (单独出现)
+    {
+      pattern: /\b(SEL\d{2,3}[A-Z0-9]{2,6})\b/gi,
+      fieldName: 'LensModel',
+      fieldType: 'photography',
+      confidence: 0.98
+    },
+    // Pattern: 镜头：SEL35F18F or 产品：SEL35F18F
+    {
+      pattern: /(?:镜头|产品)[:：]?\s*([A-Z0-9]{6,})/gi,
+      fieldName: 'LensModel',
+      fieldType: 'photography',
+      confidence: 0.95
+    },
+    // Pattern: 相机模式：A 模式 or 拍摄模式：光圈优先
+    {
+      pattern: /(?:相机模式|拍摄模式)[:：]\s*([^\n，。；]{2,20})/gi,
+      fieldName: 'ShootingMode',
+      fieldType: 'photography',
+      confidence: 0.9
+    },
+    // Pattern: 白平衡：自动 or 对焦模式：单次
+    {
+      pattern: /(?:白平衡|对焦模式|驱动模式)[:：]\s*([^\n，。；]{2,10})/gi,
+      fieldName: 'CameraSetting',
+      fieldType: 'photography',
+      confidence: 0.9
+    }
+  ];
+  
+  // Extract photography fields first
+  photographyPatterns.forEach(({ pattern, fieldName, fieldType, confidence }) => {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const fieldValue = match[1].trim();
+      
+      fields.push({
+        name: fieldName,
+        value: fieldValue,
+        type: fieldType,
+        confidence: confidence,
+        raw: match[0]
+      });
+    }
+  });
+  
   // Common semantic patterns: "字段名：值" or "字段名: 值"
   const semanticPatterns = [
     // Pattern 1: 字段名：数值+单位
@@ -375,23 +451,26 @@ function extractIndicatorFields(text) {
  * @returns {Array} Deduplicated fields
  */
 function deduplicateFields(fields) {
+  // Generic field names that should be filtered out completely
+  const genericNamesToFilter = ['数值', '单位', '实体', '区域', '指标', '对象', '项目', '内容', '值', '类型', '名称', '位置', '地点', '参数', '属性'];
+  
+  // Filter out generic field names first
+  const filtered = fields.filter(field => {
+    // Check if field name is in the generic list
+    if (genericNamesToFilter.includes(field.name)) {
+      return false;
+    }
+    // Check if field name is too short (likely generic)
+    if (field.name.length === 1) {
+      return false;
+    }
+    return true;
+  });
+  
   const seen = new Map();
   
-  // Generic field names that should be deprioritized
-  const genericNames = ['数值', '单位', '区域', '时间', '指标', '实体'];
-  
-  // Sort by specificity: semantic fields (non-generic names) first
-  const sorted = fields.sort((a, b) => {
-    const aGeneric = genericNames.includes(a.name);
-    const bGeneric = genericNames.includes(b.name);
-    
-    // Non-generic fields come first
-    if (!aGeneric && bGeneric) return -1;
-    if (aGeneric && !bGeneric) return 1;
-    
-    // If both are same type (generic or specific), prefer higher confidence
-    return b.confidence - a.confidence;
-  });
+  // Sort by confidence (higher confidence first)
+  const sorted = filtered.sort((a, b) => b.confidence - a.confidence);
   
   // Deduplicate based on value and type
   return sorted.filter(field => {

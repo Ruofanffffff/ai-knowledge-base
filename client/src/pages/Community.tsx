@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Masonry, { ResponsiveMasonry } from "react-responsive-masonry";
-import { Search, Heart, Share2, MoreHorizontal, Filter, SlidersHorizontal, Image as ImageIcon, Video, Layers, Wand2 } from 'lucide-react';
+import { Search, Heart, MoreHorizontal, SlidersHorizontal, Image as ImageIcon, Video, Wand2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface ArtWork {

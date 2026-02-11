@@ -35,6 +35,14 @@ const documentProcessor = require('./document_processor');
 // Universal Document Pipeline
 const { UniversalDocumentPipeline } = require('./pipeline/universal_document_pipeline');
 
+// Anchor-Driven Entity Synthesis System
+const anchorGenerator = require('./entity/anchor_generator');
+const anchorMerger = require('./entity/anchor_merger');
+const anchorConflictDetector = require('./entity/anchor_conflict_detector');
+const llmConflictAdvisor = require('./entity/llm_conflict_advisor');
+const anchorMetrics = require('./entity/anchor_metrics');
+const schemaInstance = require('./schema/schema_instance');
+
 module.exports = {
   // CKB Layer
   ckbParser,
@@ -47,10 +55,18 @@ module.exports = {
   schemaManager,
   schemaMatcher,
   schemaStartupCheck,
+  schemaInstance,
   
   // Entity Layer
   entityBuilder,
   entityStore,
+  
+  // Anchor System
+  anchorGenerator,
+  anchorMerger,
+  anchorConflictDetector,
+  llmConflictAdvisor,
+  anchorMetrics,
   
   // Relation Layer
   builtinRelationBuilder,

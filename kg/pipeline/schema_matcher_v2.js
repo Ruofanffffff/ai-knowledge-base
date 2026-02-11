@@ -190,18 +190,10 @@ class SchemaMatcherV2 {
     const prompt = this._buildLLMMatchPrompt(unmappedFields, schemas);
     
     try {
-      const response = await qwenClient.chat([
-        {
-          role: 'system',
-          content: '你是一个专业的字段映射助手。你的任务是判断提取的字段在哪些Schema的哪些字段上有匹配。'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ], {
+      const response = await qwenClient.call(prompt, {
         temperature: 0.1,
-        maxTokens: 2000
+        maxTokens: 2000,
+        systemPrompt: '你是一个专业的字段映射助手。你的任务是判断提取的字段在哪些Schema的哪些字段上有匹配。'
       });
 
       // 解析LLM响应

@@ -278,7 +278,7 @@
 - [x] 24.2 Integrate auto-refresh in useGraph hook
   - Configure 60-second interval
   - Export pause/resume controls
-- [~] 24.3 Add auto-refresh controls to UI (optional)
+- [ ] 24.3 Add auto-refresh controls to UI (optional)
   - Add pause/resume buttons to pages
   - Show refresh status indicator
   - Display last refresh timestamp

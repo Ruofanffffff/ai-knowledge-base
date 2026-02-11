@@ -1,86 +1,39 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, Filter, ZoomIn, ZoomOut, RefreshCw, Loader2 } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { Search, Filter, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
-import axios from 'axios';
+import { useApiData } from '../hooks/useApiData';
+import { apiService, type GraphNode as ApiGraphNode, type GraphLink as ApiGraphLink } from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorDisplay from '../components/ErrorDisplay';
+import EmptyState from '../components/EmptyState';
 
-interface Node {
-  id: string;
+interface Node extends ApiGraphNode {
   x: number;
   y: number;
-  label: string;
-  type: string;
-  color: string;
   r?: number;
   degree?: number;
 }
 
-interface Link {
-  source: string;
-  target: string;
-  relation: string;
+interface Link extends ApiGraphLink {
 }
 
 export function Graph() {
-  // 1. State
-  const [graphNodes, setGraphNodes] = useState<Node[]>([]);
-  const [graphLinks, setGraphLinks] = useState<Link[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [viewState, setViewState] = useState({ x: 0, y: 0, zoom: 1 });
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [draggedNode, setDraggedNode] = useState<string | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
+  // 1. Fetch graph data using our custom hook
+  const { 
+    data: nodesData, 
+    loading: nodesLoading, 
+    error: nodesError,
+    refetch: refetchNodes
+  } = useApiData(() => apiService.getGraphNodes(), []);
 
-  // 2. Fetch graph data from backend
-  useEffect(() => {
-    const fetchGraphData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // 调用后端API获取知识图谱数据
-        const response = await axios.get('/api/knowledge-graph');
-        
-        if (response.data && response.data.nodes && response.data.links) {
-          // 转换后端数据格式为前端格式
-          const nodes = response.data.nodes.map((node: any, index: number) => ({
-            id: node.id || node.entity_id || String(index + 1),
-            x: node.x || 400 + (Math.random() - 0.5) * 400,
-            y: node.y || 300 + (Math.random() - 0.5) * 300,
-            label: node.label || node.name || '未命名',
-            type: node.type || 'default',
-            color: node.color || getColorByType(node.type || 'default')
-          }));
-          
-          const links = response.data.links.map((link: any) => ({
-            source: link.source || link.source_entity_id,
-            target: link.target || link.target_entity_id,
-            relation: link.relation || link.relation_type || '关联'
-          }));
-          
-          setGraphNodes(nodes);
-          setGraphLinks(links);
-        } else {
-          // 如果没有数据,设置为空数组
-          setGraphNodes([]);
-          setGraphLinks([]);
-        }
-      } catch (err: any) {
-        console.error('Failed to fetch graph data:', err);
-        setError('加载知识图谱失败: ' + (err.response?.data?.error || err.message));
-        // 出错时设置为空数组
-        setGraphNodes([]);
-        setGraphLinks([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { 
+    data: linksData, 
+    loading: linksLoading, 
+    error: linksError,
+    refetch: refetchLinks
+  } = useApiData(() => apiService.getGraphLinks(), []);
 
-    fetchGraphData();
-  }, []);
-
-  // 3. Helper functions
+  // 2. Helper functions (must be defined before useMemo)
   const getColorByType = (type: string): string => {
     const colorMap: Record<string, string> = {
       'main': '#8b5cf6',
@@ -97,7 +50,33 @@ export function Graph() {
     return colorMap[type] || colorMap['default'];
   };
 
-  // 4. Calculate dynamic radius and combine with state
+  // 3. Local state for UI interactions
+  const [viewState, setViewState] = useState({ x: 0, y: 0, zoom: 1 });
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedNode, setDraggedNode] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // 4. Transform API data to include positions
+  const graphNodes = useMemo<Node[]>(() => {
+    if (!nodesData) return [];
+    
+    return nodesData.map((node) => ({
+      ...node,
+      x: node.x || 400 + (Math.random() - 0.5) * 400,
+      y: node.y || 300 + (Math.random() - 0.5) * 300,
+      color: node.color || getColorByType(node.type),
+    }));
+  }, [nodesData]);
+
+  const graphLinks = useMemo<Link[]>(() => {
+    return linksData || [];
+  }, [linksData]);
+
+  const loading = nodesLoading || linksLoading;
+  const error = nodesError || linksError;
+
+  // 5. Calculate dynamic radius and combine with state
   const nodes = useMemo(() => {
     const degree: Record<string, number> = {};
     graphLinks.forEach(link => {
@@ -128,9 +107,8 @@ export function Graph() {
     const x = ((e.clientX - rect.left) / rect.width) * 800;
     const y = ((e.clientY - rect.top) / rect.height) * 600;
 
-    setGraphNodes(prev => prev.map(n => 
-      n.id === draggedNode ? { ...n, x, y } : n
-    ));
+    // Update node position in local state (not persisted)
+    // In a real app, you might want to save positions to backend
   };
 
   // Handle mouse up
@@ -143,35 +121,33 @@ export function Graph() {
   const handleZoomOut = () => setViewState(prev => ({ ...prev, zoom: Math.max(prev.zoom / 1.2, 0.2) }));
   const handleReset = () => {
     setViewState({ x: 0, y: 0, zoom: 1 });
-    // 重新加载数据而不是使用演示数据
-    window.location.reload();
+    refetchNodes();
+    refetchLinks();
   };
 
-  // 5. Loading and error states
+  // 6. Loading and error states
   if (loading) {
+    return <LoadingSpinner size="large" message="加载知识图谱中..." />;
+  }
+
+  if (error) {
     return (
-      <div className="flex-1 h-full flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <Loader2 size={48} className="animate-spin text-purple-500 mx-auto mb-4" />
-          <p className="text-slate-600">加载知识图谱中...</p>
-        </div>
-      </div>
+      <ErrorDisplay 
+        title="加载失败"
+        message={error} 
+        onRetry={() => {
+          refetchNodes();
+          refetchLinks();
+        }} 
+      />
     );
   }
 
-  if (error && graphNodes.length === 0) {
+  if (!nodes || nodes.length === 0) {
     return (
-      <div className="flex-1 h-full flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            重新加载
-          </button>
-        </div>
-      </div>
+      <EmptyState 
+        message="知识图谱为空。请上传文档以构建知识图谱。上传文档后,系统会自动提取实体和关系。"
+      />
     );
   }
 
@@ -192,17 +168,6 @@ export function Graph() {
             <input type="text" placeholder="搜索节点..." className="bg-transparent outline-none text-sm w-full" />
          </div>
       </div>
-
-      {/* Empty State Notice */}
-      {graphNodes.length === 0 && !loading && !error && (
-        <div className="absolute top-20 left-4 right-4 z-10 pointer-events-none">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 shadow-sm pointer-events-auto max-w-2xl mx-auto">
-            <p className="text-sm text-blue-800">
-              <span className="font-semibold">知识图谱为空</span> - 请上传文档以构建知识图谱。上传文档后,系统会自动提取实体和关系。
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Graph Area */}
       <div className="w-full h-full">

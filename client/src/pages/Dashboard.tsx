@@ -2,10 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, FileText, Folder, Clock, MoreVertical, Sparkles, Network } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Chat } from './Chat';
+import { apiService } from '../services/api';
+import useApiData from '../hooks/useApiData';
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
 }
+
+// Helper function to format relative time
+const formatRelativeTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 60) {
+    return `${diffMins} 分钟前`;
+  } else if (diffHours < 24) {
+    return `${diffHours} 小时前`;
+  } else if (diffDays === 1) {
+    return '昨天';
+  } else if (diffDays < 7) {
+    return `${diffDays} 天前`;
+  } else {
+    return date.toLocaleDateString('zh-CN');
+  }
+};
 
 // Typewriter Component
 const Typewriter = ({ text, delay = 50 }: { text: string; delay?: number }) => {
@@ -26,12 +50,64 @@ const Typewriter = ({ text, delay = 50 }: { text: string; delay?: number }) => {
 };
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const recentDocs = [
-    { id: 1, title: 'AI 研究战略 2024', type: 'doc', updated: '2 小时前', tags: ['战略', 'AI'] },
-    { id: 2, title: '神经网络架构', type: 'doc', updated: '5 小时前', tags: ['技术', '深度学习'] },
-    { id: 3, title: '项目头脑风暴', type: 'folder', updated: '昨天', items: 12 },
-    { id: 4, title: '竞品分析', type: 'doc', updated: '2 天前', tags: ['商业'] },
-  ];
+  // Fetch recent documents from API
+  const { data: documents, loading: docsLoading } = useApiData(() => apiService.getDocuments());
+  
+  // Get the 4 most recent documents
+  const recentDocs = documents?.slice(0, 4).map(doc => ({
+    id: doc.id,
+    title: doc.title || doc.name || 'Untitled',
+    type: 'doc',
+    updated: formatRelativeTime(doc.updatedAt || doc.uploadDate),
+    tags: doc.tags || []
+  })) || [];
+
+  // Render loading state for recent docs section
+  const renderRecentDocs = () => {
+    if (docsLoading) {
+      return (
+        <div className="p-8 flex justify-center items-center">
+          <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      );
+    }
+    
+    if (recentDocs.length === 0) {
+      return (
+        <div className="p-8 text-center text-slate-400 text-sm">
+          暂无最近文档
+        </div>
+      );
+    }
+    
+    return recentDocs.map((doc) => (
+      <div 
+        key={doc.id}
+        onClick={() => doc.type === 'doc' && onNavigate('editor')}
+        className="p-4 flex items-center gap-3 hover:bg-slate-50 cursor-pointer group transition-colors"
+      >
+        <div className={`p-2 rounded-lg ${doc.type === 'folder' ? 'bg-orange-50 text-orange-400' : 'bg-blue-50 text-blue-400'}`}>
+          {doc.type === 'folder' ? <Folder size={16} /> : <FileText size={16} />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-medium text-slate-700 truncate group-hover:text-purple-600">{doc.title}</h3>
+          <div className="flex items-center gap-2 mt-0.5">
+             <span className="text-xs text-slate-400 flex items-center gap-0.5">
+                <Clock size={10} /> {doc.updated}
+             </span>
+             {doc.tags?.slice(0, 2).map((tag, i) => (
+                <span key={i} className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">
+                   {tag}
+                </span>
+             ))}
+          </div>
+        </div>
+        <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded text-slate-400">
+          <MoreVertical size={14} />
+        </button>
+      </div>
+    ));
+  };
 
   return (
     <div className="flex-1 h-full overflow-hidden flex flex-col bg-slate-50/50">
@@ -123,33 +199,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <button onClick={() => onNavigate('documents')} className="text-xs text-purple-600 font-medium hover:underline">查看全部</button>
             </div>
             <div className="divide-y divide-slate-100 overflow-y-auto max-h-[400px]">
-              {recentDocs.map((doc) => (
-                <div 
-                  key={doc.id}
-                  onClick={() => doc.type === 'doc' && onNavigate('editor')}
-                  className="p-4 flex items-center gap-3 hover:bg-slate-50 cursor-pointer group transition-colors"
-                >
-                  <div className={`p-2 rounded-lg ${doc.type === 'folder' ? 'bg-orange-50 text-orange-400' : 'bg-blue-50 text-blue-400'}`}>
-                    {doc.type === 'folder' ? <Folder size={16} /> : <FileText size={16} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-slate-700 truncate group-hover:text-purple-600">{doc.title}</h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                       <span className="text-xs text-slate-400 flex items-center gap-0.5">
-                          <Clock size={10} /> {doc.updated}
-                       </span>
-                       {doc.tags?.slice(0, 2).map((tag, i) => (
-                          <span key={i} className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">
-                             {tag}
-                          </span>
-                       ))}
-                    </div>
-                  </div>
-                  <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded text-slate-400">
-                    <MoreVertical size={14} />
-                  </button>
-                </div>
-              ))}
+              {renderRecentDocs()}
             </div>
           </div>
 

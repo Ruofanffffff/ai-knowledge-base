@@ -1,0 +1,38 @@
+{
+  "software_development": {
+    "code_architecture": [
+      {
+        "name": "Code-Module",
+        "entityType": "CodeModuleEntity",
+        "scene": "软件开发/代码",
+        "description": "代码模块 - 记录代码模块的基本信息、功能和依赖关系",
+        "example": "UserService模块，负责用户认证和授权，依赖DatabaseModule",
+        "threshold": 0.5,
+        "fields": [
+          { "name": "ModuleName", "weight": 0.4, "required": true, "field_type": "text", "description": "模块名称", "anchor": true },
+          { "name": "Language", "weight": 0.15, "required": false, "field_type": "text", "description": "编程语言" },
+          { "name": "Purpose", "weight": 0.2, "required": false, "field_type": "text", "description": "模块用途" },
+          { "name": "Dependencies", "weight": 0.15, "required": false, "field_type": "list", "description": "依赖模块" },
+          { "name": "Author", "weight": 0.1, "required": false, "field_type": "text", "description": "作者" }
+        ],
+        "relations": [{ "type": "depends_on", "target_field": "Dependencies", "direction": "outgoing" }]
+      },
+      {
+        "name": "API-Endpoint",
+        "entityType": "APIEndpointEntity",
+        "scene": "软件开发/API",
+        "description": "API端点 - 记录API接口的路径、方法、参数和响应",
+        "example": "POST /api/users - 创建新用户，需要name和email参数",
+        "threshold": 0.6,
+        "fields": [
+          { "name": "Path", "weight": 0.3, "required": true, "field_type": "text", "description": "API路径", "anchor": true },
+          { "name": "Method", "weight": 0.2, "required": true, "field_type": "text", "description": "HTTP方法", "anchor": true },
+          { "name": "Parameters", "weight": 0.2, "required": false, "field_type": "list", "description": "请求参数" },
+          { "name": "Response", "weight": 0.15, "required": false, "field_type": "text", "description": "响应格式" },
+          { "name": "Authentication", "weight": 0.15, "required": false, "field_type": "text", "description": "认证方式" }
+        ],
+        "relations": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,3155 @@
+{
+  "timestamp": "2026-02-08T15:45:30.499Z",
+  "document": "影像科学PRD.md",
+  "result": {
+    "entities": [
+      {
+        "id": "entity_1770565498381_2ifw0f009",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "我喜欢「滨田英明」的作品（左图），那我如何将我的照片（右图）进行调色，来模仿滨田英明的风格？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.381Z",
+          "originalField": {
+            "name": "典型问题",
+            "value": "我喜欢「滨田英明」的作品（左图），那我如何将我的照片（右图）进行调色，来模仿滨田英明的风格？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_7q1zpwuvb",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "通过网络搜索（抖音/小红书/或其他站点发布的摄影博客、文章攻略，来学习该摄影师的拍摄和调色手法。或者，直接在网上照搬参数。",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "常见的解决方法是",
+            "value": "通过网络搜索（抖音/小红书/或其他站点发布的摄影博客、文章攻略，来学习该摄影师的拍摄和调色手法。或者，直接在网上照搬参数。",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_0pe3qqf3v",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程系统」，用于拆解、诊断、复现优秀摄影作品的视觉语言，并将其转化为可执行的前期拍摄与后期调色方案。",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "产品一句话定义",
+            "value": "影像科学（PhotoScience）是一款站在资深摄影师 + 调色师视角的「影像风格逆向工程系统」，用于拆解、诊断、复现优秀摄影作品的视觉语言，并将其转化为可执行的前期拍摄与后期调色方案。",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_u214m66gm",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "影像意图 → 光影结构 → 色彩策略 → 参数映射",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "仿色的本质是",
+            "value": "影像意图 → 光影结构 → 色彩策略 → 参数映射",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_2xzh9x0vc",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "1️⃣ 影像意图层（Intent）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "基于以下模型对产品进行设计",
+            "value": "1️⃣ 影像意图层（Intent）",
+            "type": "mixed",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_pj92l60tp",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "综合给出具体分析结果和建议：",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    综合建议",
+            "value": "综合给出具体分析结果和建议：",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_2r6fwujym",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "分析参考图的主题是什么？想表现什么感情色彩（温情？自然？静谧？不做作？高反差？传达了什么生活的奥义？……）？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    内容",
+            "value": "分析参考图的主题是什么？想表现什么感情色彩（温情？自然？静谧？不做作？高反差？传达了什么生活的奥义？……）？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_tomy5dcpk",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "直方图是怎么样的（是什么形状？元素位于直方图的哪个位置，说明什么问题？参考图呈现的照片效果是什么？参考图直方图上有没有缺失？说明了什么问题？结合直方图来分析参考图和用户图的差别）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    影调",
+            "value": "直方图是怎么样的（是什么形状？元素位于直方图的哪个位置，说明什么问题？参考图呈现的照片效果是什么？参考图直方图上有没有缺失？说明了什么问题？结合直方图来分析参考图和用户图的差别）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_6v112r386",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "是什么风格的？（淡雅蓝？清新绿？……这些与拍摄的题材有什么关联？和拍摄的元素之间的关系是什么，如，拍摄的大海和蓝天呈现的是淡雅蓝，森林草地呈现的是清新绿，人像中肤色呈现的是淡黄色【给出颜色六位编号】）主要用了哪些色彩，这些色彩怎么进行搭配的？可能使用的设备是什么？这些设备的特色是啥？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    色调",
+            "value": "是什么风格的？（淡雅蓝？清新绿？……这些与拍摄的题材有什么关联？和拍摄的元素之间的关系是什么，如，拍摄的大海和蓝天呈现的是淡雅蓝，森林草地呈现的是清新绿，人像中肤色呈现的是淡黄色【给出颜色六位编号】）主要用了哪些色彩，这些色彩怎么进行搭配的？可能使用的设备是什么？这些设备的特色是啥？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_ttw96rmre",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "如何构图的？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    构图",
+            "value": "如何构图的？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_2hejh4pjc",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "结合用户图，给出综合的建议（用户图的主题是什么，是否需要变更，如何变更更好？如何通过后期裁剪、去除无效元素、增加新元素等方法模仿参考图感情色彩和摄影风格？颜色搭配的方案和比例？检测或猜测用户使用的设备是什么（不同设备会有不同的特色，如索尼偏黄、胶片相机有颗粒、尼康色彩丰富饱和度高、佳能柔和等）？用户应该着重怎么进行后期调色（现有颜色的增、减、变化）？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    拍摄及调整建议",
+            "value": "结合用户图，给出综合的建议（用户图的主题是什么，是否需要变更，如何变更更好？如何通过后期裁剪、去除无效元素、增加新元素等方法模仿参考图感情色彩和摄影风格？颜色搭配的方案和比例？检测或猜测用户使用的设备是什么（不同设备会有不同的特色，如索尼偏黄、胶片相机有颗粒、尼康色彩丰富饱和度高、佳能柔和等）？用户应该着重怎么进行后期调色（现有颜色的增、减、变化）？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_wvl4x12m2",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "详细为用户讲解参考图在构图中的优势（焦点的位置、留白的比例、构图的方法），以及对用户图前期拍摄的详细建议（前期应该选择什么天气、什么时间、模特需要怎么穿着、怎么布光、怎么打光、拍摄的地点选择在哪？模特如何摆造型？等）和后期调整的详细建议",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    构图分析",
+            "value": "详细为用户讲解参考图在构图中的优势（焦点的位置、留白的比例、构图的方法），以及对用户图前期拍摄的详细建议（前期应该选择什么天气、什么时间、模特需要怎么穿着、怎么布光、怎么打光、拍摄的地点选择在哪？模特如何摆造型？等）和后期调整的详细建议",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_rjckj2pqz",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于综合建议内容，给出详细的色彩数据，包括：色彩策略（基于参考图，如何调整用户图的色彩方法概述）。色彩的HSL具体数值、高光/中间调/阴影的具体数值、色温色调的具体数值",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    色彩建议",
+            "value": "基于综合建议内容，给出详细的色彩数据，包括：色彩策略（基于参考图，如何调整用户图的色彩方法概述）。色彩的HSL具体数值、高光/中间调/阴影的具体数值、色温色调的具体数值",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_ke2dr1zgj",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于综合建议，仍需要PS做的内容，包括但不限于：基础面板调整、色阶调整、曲线调整、可选颜色调整、减淡与加深、氛围与颗粒",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    Photoshop工作流",
+            "value": "基于综合建议，仍需要PS做的内容，包括但不限于：基础面板调整、色阶调整、曲线调整、可选颜色调整、减淡与加深、氛围与颗粒",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_tqe04an9e",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于以上建议和方法，使用nano banana，生成一张用户图调整后的参考照片，同时生成可以让LR直接使用的.xmp预设和pdf报告",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    AI模拟",
+            "value": "基于以上建议和方法，使用nano banana，生成一张用户图调整后的参考照片，同时生成可以让LR直接使用的.xmp预设和pdf报告",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_lvjmjpi6e",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "    摄影爱好者：摄影风格尚未定型，有自己喜欢的摄影师和摄影风格",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "本产品的用户为",
+            "value": "    摄影爱好者：摄影风格尚未定型，有自己喜欢的摄影师和摄影风格",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_tedqzjebl",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "会使用PS或同类调色软件，但是对影调、色调并不专业，对后期调色没思路",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    后期小白",
+            "value": "会使用PS或同类调色软件，但是对影调、色调并不专业，对后期调色没思路",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_s8narhzoj",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "需要快速且专业的产出摄影文案，以应对自媒体平台的快速发布需求",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    机构及MSN",
+            "value": "需要快速且专业的产出摄影文案，以应对自媒体平台的快速发布需求",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_8u27y7mi0",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "五、    功能需求",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "业务流程如下图所示",
+            "value": "五、    功能需求",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_40ibm6g7j",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "默认中文界面，点击后跳转至英文界面",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    中英文切换按钮",
+            "value": "默认中文界面，点击后跳转至英文界面",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_ur8joakwe",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "点击均跳转到“登陆”页面",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    登录、申请权限、开启探索按钮",
+            "value": "点击均跳转到“登陆”页面",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_28uyjwo1k",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "点击均跳转到演示视频页面并开启播放",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    观看视频按钮",
+            "value": "点击均跳转到演示视频页面并开启播放",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_7uaotgokt",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "如果不想输入密码，可以点击“使用验证码登录”，使用验证码登录。页面参考如下：",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "PS",
+            "value": "如果不想输入密码，可以点击“使用验证码登录”，使用验证码登录。页面参考如下：",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_lgarf07wa",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "其中：",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "点击“头像”进入如下界面",
+            "value": "其中：",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_48lje91uo",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "用以展示该用户账号的具体信息：",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    身份",
+            "value": "用以展示该用户账号的具体信息：",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_o43iyj61q",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "点击右侧的齿轮，可以支持编辑",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    用户名",
+            "value": "点击右侧的齿轮，可以支持编辑",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_6pkun6v9y",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "仅支持预览，不支持编辑",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    电子邮箱",
+            "value": "仅支持预览，不支持编辑",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_1qs42pqnv",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "仅展示用户已经完成了支付宝绑定操作",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    支付宝绑定",
+            "value": "仅展示用户已经完成了支付宝绑定操作",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_mydw1vu25",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "•    风格参考图（左侧）：为参考图",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "核心使用界面需要上传两张照片",
+            "value": "•    风格参考图（左侧）：为参考图",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_7bd0on7f5",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "为用户图",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "目标原图（右侧）",
+            "value": "为用户图",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_z82q9n2eh",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "参考图与用户图各有一张，用于展示目前图像的具体亮度信息",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    亮度直方图",
+            "value": "参考图与用户图各有一张，用于展示目前图像的具体亮度信息",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_1rkkh5cnp",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于图像的色彩和亮度，会画在雷达图上。用户使用鼠标移动到图像的任意一个位置，会显示出这个点的具体色彩RGB值。同时，雷达图上也会显示出这个点（方向表示色相，距中心的距离表示饱和度）。优势在于：用户可以很方便查看到图像中对应具体的色彩的值。使用场景如，能看到人物脸部颜色是否准确？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    色彩雷达",
+            "value": "基于图像的色彩和亮度，会画在雷达图上。用户使用鼠标移动到图像的任意一个位置，会显示出这个点的具体色彩RGB值。同时，雷达图上也会显示出这个点（方向表示色相，距中心的距离表示饱和度）。优势在于：用户可以很方便查看到图像中对应具体的色彩的值。使用场景如，能看到人物脸部颜色是否准确？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_jt3yva4gd",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "需要启用AI大模型能力对图像进行更深度的评估，故需要用户点击“启动深度扫描”按钮",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    AI诊断",
+            "value": "需要启用AI大模型能力对图像进行更深度的评估，故需要用户点击“启动深度扫描”按钮",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_c5s0a2ocy",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "得到结果后会展示：",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "AI分析时会展示",
+            "value": "得到结果后会展示：",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_10kamar2p",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "在曝光、颜色、构图、感情色彩上让AI进行评分，并且给予对应的评价描述：",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "多维度展示",
+            "value": "在曝光、颜色、构图、感情色彩上让AI进行评分，并且给予对应的评价描述：",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_adwydr391",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "AI阅读并理解该照片的风格，并评价其优劣势",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "诊断报告",
+            "value": "AI阅读并理解该照片的风格，并评价其优劣势",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_1k5cxg1ai",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于判断，AI给出的前后期改进建议",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "改进建议",
+            "value": "基于判断，AI给出的前后期改进建议",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_4udsdjhzu",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "AI对于问题的总结",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "问题定位",
+            "value": "AI对于问题的总结",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_2vhawp65e",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "伪色将亮度映射为颜色，帮助您无需猜测即可判断曝光。",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    显示曝光图",
+            "value": "伪色将亮度映射为颜色，帮助您无需猜测即可判断曝光。",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_0bce815o1",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "用于展示这次对比仿色的综合建议，如下：",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "3.1综合审查",
+            "value": "用于展示这次对比仿色的综合建议，如下：",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_5v6zk3otj",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "    左侧：展示两张照片（参考图【左】和用户图【右】），下面有该图的具体评价描述（主题是啥？想表现什么感情色彩（温情？自然？静谧？不做作？高反差？传达了什么生活的奥义？……有什么特色）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "页面布局为",
+            "value": "    左侧：展示两张照片（参考图【左】和用户图【右】），下面有该图的具体评价描述（主题是啥？想表现什么感情色彩（温情？自然？静谧？不做作？高反差？传达了什么生活的奥义？……有什么特色）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_tp0h78w3k",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示具体的详细内容，包括：",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    右侧",
+            "value": "展示具体的详细内容，包括：",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_i3gsyo0f5",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "给出综合的建议（用户图的主题是什么，是否需要变更，如何变更更好？如何通过后期裁剪、去除无效元素、增加新元素等方法模仿参考图感情色彩和摄影风格？颜色搭配的方案和比例？检测或猜测用户使用的设备是什么（不同设备会有不同的特色，如索尼偏黄、胶片相机有颗粒、尼康色彩丰富饱和度高、佳能柔和等）？用户应该着重怎么进行后期调色（现有颜色的增、减、变化）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    核心策略",
+            "value": "给出综合的建议（用户图的主题是什么，是否需要变更，如何变更更好？如何通过后期裁剪、去除无效元素、增加新元素等方法模仿参考图感情色彩和摄影风格？颜色搭配的方案和比例？检测或猜测用户使用的设备是什么（不同设备会有不同的特色，如索尼偏黄、胶片相机有颗粒、尼康色彩丰富饱和度高、佳能柔和等）？用户应该着重怎么进行后期调色（现有颜色的增、减、变化）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_2936ky8qp",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "照片属于什么类型？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    主要风格流派",
+            "value": "照片属于什么类型？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_dvo2kheqw",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "这种类型流派具有什么特色",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    流派特色",
+            "value": "这种类型流派具有什么特色",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_o1ra9tues",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "    内容上，参考图与用户的主题内容分别是什么？参考图传达的感情色彩是什么，用户图应该怎么向他靠近？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    综合点评",
+            "value": "    内容上，参考图与用户的主题内容分别是什么？参考图传达的感情色彩是什么，用户图应该怎么向他靠近？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_ycc48icoh",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "用户图应该调整哪些颜色，来逼近或者达到目标图的水准。需要具体到分析用户图上每一个元素的颜色分析，以及如何调整",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    颜色策略",
+            "value": "用户图应该调整哪些颜色，来逼近或者达到目标图的水准。需要具体到分析用户图上每一个元素的颜色分析，以及如何调整",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_2h3pi7luh",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "分析一下参考图在内容、影调、色调上的优点",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    参考图优点评估",
+            "value": "分析一下参考图在内容、影调、色调上的优点",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_bnkjn3k2b",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "分析参考图与用户图的直方图特点，图中主要的元素（主体、背景、核心元素）在直方图的位置，参考图怎么控制光线，在直方图上如何表达？用户图应该如何调整？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    直方图展示与分析",
+            "value": "分析参考图与用户图的直方图特点，图中主要的元素（主体、背景、核心元素）在直方图的位置，参考图怎么控制光线，在直方图上如何表达？用户图应该如何调整？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_6yt73v80w",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "用户图调整为参考图是否可行？置信度有多少？有什么限制因素？是否可突破？有什么建议？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    可行性评估",
+            "value": "用户图调整为参考图是否可行？置信度有多少？有什么限制因素？是否可突破？有什么建议？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_0tn70fqi5",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "    限制因素：",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    可行性百分比",
+            "value": "    限制因素：",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_yxpz7g3o1",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "5.3.2 构图分析：用于展示这次对比仿色的构图分析，如下：",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    建议",
+            "value": "5.3.2 构图分析：用于展示这次对比仿色的构图分析，如下：",
+            "type": "mixed",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_8nq80g41x",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示参考图，参考图下有四个按钮（向量、三分法、视觉质量、进入构图诊疗室）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    左侧",
+            "value": "展示参考图，参考图下有四个按钮（向量、三分法、视觉质量、进入构图诊疗室）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_ijjpmm0b6",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "点击向量按钮，会在照片上展示叠加图层，用于展示视线路径",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    向量",
+            "value": "点击向量按钮，会在照片上展示叠加图层，用于展示视线路径",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_bptmdityp",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "点击三分法按钮，会在照片上展示叠加图层，将照片拆分为九宫格，用于帮助用户确认构图和焦点",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    三分法",
+            "value": "点击三分法按钮，会在照片上展示叠加图层，将照片拆分为九宫格，用于帮助用户确认构图和焦点",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_5xkmkxm5k",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "点击视觉质量按钮，会在照片上展示叠加图层用于标记主体位置",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    视觉质量",
+            "value": "点击视觉质量按钮，会在照片上展示叠加图层用于标记主体位置",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_767ihlzyk",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "根据综合点评中的具体构图内容，评价原图的问题，和建议",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    原图",
+            "value": "根据综合点评中的具体构图内容，评价原图的问题，和建议",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_y4dnqoh5u",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "根据综合点评中的具体构图内容，展示出AI认为的构图内容，并给出具体建议",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    智能构图",
+            "value": "根据综合点评中的具体构图内容，展示出AI认为的构图内容，并给出具体建议",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_ofne3dh1e",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "根据综合点评中的具体构图内容，指导用户前期应该如何拍照，以及后期应该如何操作",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    拍摄指导",
+            "value": "根据综合点评中的具体构图内容，指导用户前期应该如何拍照，以及后期应该如何操作",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_x2b2g3jxq",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "根据综合点评中的具体构图内容，在照片上进行分割，然后给出建议",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    后期蒙版",
+            "value": "根据综合点评中的具体构图内容，在照片上进行分割，然后给出建议",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_fn3i4lzss",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "•    📐 几何模式（线、面、块）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "建议构图诊疗室不是按钮，而是模式切换",
+            "value": "•    📐 几何模式（线、面、块）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_lmddla82p",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示参考图，参考图下有四个按钮（向量、三分法、视觉质量、进入构图诊疗室）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    右侧",
+            "value": "展示参考图，参考图下有四个按钮（向量、三分法、视觉质量、进入构图诊疗室）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_827mruatl",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示出参考图的构图分类",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    结构几何",
+            "value": "展示出参考图的构图分类",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_h5l8pvk24",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示出参考图视觉权重分数，主体位置，所占比例，构图的方法以及评价",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    视觉权重",
+            "value": "展示出参考图视觉权重分数，主体位置，所占比例，构图的方法以及评价",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_p0m6meg44",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示出主体的位置构图的方法",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    视觉质量",
+            "value": "展示出主体的位置构图的方法",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_82ctooi9v",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "告诉用户参考图可以让用户注意力先到哪里，再到哪里，最后到哪里，绘制出视觉路径",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    视觉流路径",
+            "value": "告诉用户参考图可以让用户注意力先到哪里，再到哪里，最后到哪里，绘制出视觉路径",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_jhlpcripo",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "前景是啥？中景是啥？背景是啥？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    空间深度",
+            "value": "前景是啥？中景是啥？背景是啥？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_h456lcyc5",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示出参考图的留白空间百分比是多少？",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    留白",
+            "value": "展示出参考图的留白空间百分比是多少？",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_gtc9y4cwd",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "用于展示参考图的光影特色分析内容，以及对用户图的调整指导",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "3.3光影分析",
+            "value": "用于展示参考图的光影特色分析内容，以及对用户图的调整指导",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_gi6ofmv8e",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "    左侧（需要在前端进行重新设计优化调整，后端需要匹配前端进行开发）：展示一张RGB曲线图，包含：RGB/R/G/B四个曲线，以及曲线上对应的点。需要展示出参考图和用户两张图对应的曲线，通过前端独特的设计，能够直观让用户看出区别",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "页面布局参考如下",
+            "value": "    左侧（需要在前端进行重新设计优化调整，后端需要匹配前端进行开发）：展示一张RGB曲线图，包含：RGB/R/G/B四个曲线，以及曲线上对应的点。需要展示出参考图和用户两张图对应的曲线，通过前端独特的设计，能够直观让用户看出区别",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_j955p0ww9",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示具体数据以及描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    右侧",
+            "value": "展示具体数据以及描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_jn3eo7onz",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "    曝光与阴影（点击：展示出曲线的前后变化）：用户图应该如何处理曝光与阴影",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    曝光矩阵",
+            "value": "    曝光与阴影（点击：展示出曲线的前后变化）：用户图应该如何处理曝光与阴影",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_lhpfo4rz2",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示出曲线的前后变化）：用户图应该如何处理色温与色调",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    色温与色调（点击",
+            "value": "展示出曲线的前后变化）：用户图应该如何处理色温与色调",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_7vdrgfl9n",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示出曲线的前后变化）：用户图应该如何处理曲线",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    曲线（点击",
+            "value": "展示出曲线的前后变化）：用户图应该如何处理曲线",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_6otewqzu9",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "数值与为什么要这么调的原因描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    曝光",
+            "value": "数值与为什么要这么调的原因描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_b7akz3c4u",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "数值与为什么要这么调的原因描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    对比度",
+            "value": "数值与为什么要这么调的原因描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_5icxswur5",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "数值与为什么要这么调的原因描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    高光",
+            "value": "数值与为什么要这么调的原因描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_p9u93zkn5",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "数值与为什么要这么调的原因描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    阴影",
+            "value": "数值与为什么要这么调的原因描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_s8vjo334u",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "数值与为什么要这么调的原因描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    白色",
+            "value": "数值与为什么要这么调的原因描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_6c8khmg37",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "数值与为什么要这么调的原因描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    黑色",
+            "value": "数值与为什么要这么调的原因描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_d5jkc3b7h",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "用于展示基于综合建议的色彩怎么调整的具体参数",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "4.1 色彩分级",
+            "value": "用于展示基于综合建议的色彩怎么调整的具体参数",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_f5xqmsovr",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示参考图是什么风格，是什么流派，务必基于综合建议进行延伸",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    主风格回顾",
+            "value": "展示参考图是什么风格，是什么流派，务必基于综合建议进行延伸",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_4vcwqqzkm",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示参考图风格的具体内容，务必基于综合建议进行延伸",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    风格总结回顾",
+            "value": "展示参考图风格的具体内容，务必基于综合建议进行延伸",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_0qc35lb58",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "展示用户图如何基于综合建议进行调整，务必基于综合建议进行延伸",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    关键调整策略",
+            "value": "展示用户图如何基于综合建议进行调整，务必基于综合建议进行延伸",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_90p5whzbd",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "即色彩分级的具体参数",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    电影级调色",
+            "value": "即色彩分级的具体参数",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_me8m9ukxf",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "鼠标移动上去，能显示描述（为什么这么调整）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    高光",
+            "value": "鼠标移动上去，能显示描述（为什么这么调整）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_7vx4zu723",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "鼠标移动上去，能显示描述（为什么这么调整）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    中间调",
+            "value": "鼠标移动上去，能显示描述（为什么这么调整）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_m5z9vj3v3",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "鼠标移动上去，能显示描述（为什么这么调整）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    阴影",
+            "value": "鼠标移动上去，能显示描述（为什么这么调整）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_8et3jp7e6",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "鼠标移动上去，能显示描述（为什么这么调整）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    平衡",
+            "value": "鼠标移动上去，能显示描述（为什么这么调整）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_lmh7dfgmv",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "    红（色相/饱和度/明度）",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    全息HSL矩阵",
+            "value": "    红（色相/饱和度/明度）",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_nvvopxs5m",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "具体说明色调和影调的调整方法",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    色彩匹配协议",
+            "value": "具体说明色调和影调的调整方法",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_vktow406a",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "参考图是什么场景？用户图是什么场景",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    场景类型",
+            "value": "参考图是什么场景？用户图是什么场景",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_y5b3glrxn",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于综合建议，在光影上应该如何调整的具体细节描述，需要与综合建议保持一致",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    光影策略",
+            "value": "基于综合建议，在光影上应该如何调整的具体细节描述，需要与综合建议保持一致",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_8sya4si4q",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于综合建议，用什么颜色，占比如何，怎么调整",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    光影色彩",
+            "value": "基于综合建议，用什么颜色，占比如何，怎么调整",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_t8st3zrfa",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于综合建议，直方图具体怎么调整，调整以后会有什么效果",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    动态范围",
+            "value": "基于综合建议，直方图具体怎么调整，调整以后会有什么效果",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_y4e0z3krr",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于综合建议，颜色校准怎么调整，为什么，调整以后会有什么效果",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    校准策略",
+            "value": "基于综合建议，颜色校准怎么调整，为什么，调整以后会有什么效果",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_hta289iny",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "    色温：基于综合建议，数值及为什么这么调整的描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    白平衡目标",
+            "value": "    色温：基于综合建议，数值及为什么这么调整的描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_9a2xaoug6",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "    曝光：基于综合建议，数值及为什么这么调整的描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    影调控制",
+            "value": "    曝光：基于综合建议，数值及为什么这么调整的描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_xmbix6yt5",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于综合建议，数值及为什么这么调整的描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    对比度",
+            "value": "基于综合建议，数值及为什么这么调整的描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565498382_gc2ardosx",
+        "type": "numerical_parameter",
+        "name": "unknown",
+        "properties": {
+          "value": "基于综合建议，数值及为什么这么调整的描述",
+          "extractionMethod": "structured",
+          "confidence": 0.9
+        },
+        "confidence": 1,
+        "source": "algorithm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:44:58.382Z",
+          "originalField": {
+            "name": "    高光",
+            "value": "基于综合建议，数值及为什么这么调整的描述",
+            "type": "text",
+            "confidence": 0.9,
+            "extraction_method": "structured",
+            "ckb_id": "temp_ckb",
+            "doc_id": "temp_doc",
+            "source": "universal_extractor"
+          },
+          "extractionMethod": "structured"
+        }
+      },
+      {
+        "id": "entity_1770565520247_f17a2v6d8",
+        "type": "semantic_concept",
+        "name": "影像意图",
+        "properties": {
+          "description": "照片所承载的情感与叙事目的，如‘安静’、‘张力’、‘日常感’、‘仪式感’、‘观察者视角’或‘参与者视角’"
+        },
+        "confidence": 0.98,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_zb5qvb3yn",
+        "type": "semantic_concept",
+        "name": "光影结构",
+        "properties": {
+          "description": "图像中亮度分布的组织方式，包括高光克制性、中灰主导性、阴影压死程度等结构性特征"
+        },
+        "confidence": 0.97,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_iz2bvfls3",
+        "type": "semantic_concept",
+        "name": "色彩策略",
+        "properties": {
+          "description": "对色相、饱和度、明度的系统性控制逻辑，包括主色（Dominant Hue）识别、特定色相削弱、肤色作为视觉锚点等决策"
+        },
+        "confidence": 0.96,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_q5caqlnqe",
+        "type": "semantic_concept",
+        "name": "参数映射",
+        "properties": {
+          "description": "将影像意图→光影结构→色彩策略逐层解耦后，转化为Lightroom/Photoshop等工具中可执行的具体参数（如白平衡、曲线、HSL、校准值等）的过程"
+        },
+        "confidence": 0.95,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_hxabvuexq",
+        "type": "semantic_concept",
+        "name": "淡雅蓝",
+        "properties": {
+          "description": "一种低饱和、中高明度的蓝色调风格，常见于大海与蓝天题材，传达静谧、通透、清冷的情绪"
+        },
+        "confidence": 0.94,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_jrvn8c9so",
+        "type": "semantic_concept",
+        "name": "清新绿",
+        "properties": {
+          "description": "一种中低饱和、高明度的绿色调风格，常见于森林与草地题材，传达自然、生机、呼吸感"
+        },
+        "confidence": 0.93,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_wpwvlzbnx",
+        "type": "semantic_concept",
+        "name": "淡黄色",
+        "properties": {
+          "description": "一种低饱和暖色调，常用于人像肤色表现（如#F5F0E6），强调柔和、温润、不做作的质感"
+        },
+        "confidence": 0.92,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_5ea88q7xa",
+        "type": "technique",
+        "name": "三分法构图",
+        "properties": {
+          "description": "将画面横向与纵向各分为三等份，形成九宫格网格，将主体或视觉兴趣点置于交点或线上以增强平衡与引导性"
+        },
+        "confidence": 0.96,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_r7n26hsm6",
+        "type": "technique",
+        "name": "视觉流路径分析",
+        "properties": {
+          "description": "通过预测人眼注视顺序（眼动轨迹），识别图像中注意力从起点→过渡→终点的动态引导路径"
+        },
+        "confidence": 0.95,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_5vps8dlaq",
+        "type": "technique",
+        "name": "主体权重模式",
+        "properties": {
+          "description": "基于注意力热图（Attention Map）量化画面中各区域对视觉焦点的贡献权重，用于评估构图有效性"
+        },
+        "confidence": 0.94,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_2d25q8jh6",
+        "type": "technique",
+        "name": "后期裁剪模拟",
+        "properties": {
+          "description": "AI生成多个符合目标构图规则（如三分法、黄金螺旋、负空间比例）的候选裁剪方案，支持直观比选"
+        },
+        "confidence": 0.93,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_0y5brj4ub",
+        "type": "technique",
+        "name": "伪色曝光图",
+        "properties": {
+          "description": "将亮度值映射为颜色编码的可视化技术：红色=过曝，黄色=近过曝，粉红=皮肤色，绿色=中性灰，蓝色=深度阴影，紫色=欠曝丢失细节"
+        },
+        "confidence": 0.97,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_arw7gu355",
+        "type": "scene",
+        "name": "旅拍后调色",
+        "properties": {
+          "description": "用户在旅行摄影完成后，面对大量原始素材，需快速确定统一风格并制定可执行调色流程的场景"
+        },
+        "confidence": 0.95,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_ia2gh5c7i",
+        "type": "scene",
+        "name": "摄影师风格研究",
+        "properties": {
+          "description": "系统性分析滨田英明等标志性摄影师的大量作品，提取其共性影像语言（影调、色彩、构图、题材）以建立风格模型"
+        },
+        "confidence": 0.96,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_9oisr32sd",
+        "type": "scene",
+        "name": "自媒体内容快速产出",
+        "properties": {
+          "description": "机构或MSN团队需在短视频/图文平台高频发布风格统一的摄影作品，依赖标准化前后期方法论提升效率"
+        },
+        "confidence": 0.94,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_rftwy13km",
+        "type": "scene",
+        "name": "室内弱光人像拍摄",
+        "properties": {
+          "description": "在光线受限的室内环境中，依赖设备光学性能与曝光控制策略实现肤色准确、噪点可控、氛围自然的人像创作"
+        },
+        "confidence": 0.89,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      },
+      {
+        "id": "entity_1770565520247_dqp0otr3l",
+        "type": "scene",
+        "name": "户外自然光拍摄",
+        "properties": {
+          "description": "利用日出/日落黄金时刻或阴天漫射光进行风景、人像或街拍，强调光影层次与色彩本真性"
+        },
+        "confidence": 0.91,
+        "source": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:20.247Z"
+        }
+      }
+    ],
+    "relations": [
+      {
+        "id": "relation_1770565530492_yjrbwmimu",
+        "type": "applies_to",
+        "source": "三分法构图",
+        "target": "影像意图",
+        "confidence": 0.85,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.492Z"
+        }
+      },
+      {
+        "id": "relation_1770565530492_f95f3pgxo",
+        "type": "applies_to",
+        "source": "视觉流路径分析",
+        "target": "影像意图",
+        "confidence": 0.85,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.492Z"
+        }
+      },
+      {
+        "id": "relation_1770565530492_zmw84fdxj",
+        "type": "applies_to",
+        "source": "主体权重模式",
+        "target": "影像意图",
+        "confidence": 0.85,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.492Z"
+        }
+      },
+      {
+        "id": "relation_1770565530492_e1lw92222",
+        "type": "applies_to",
+        "source": "后期裁剪模拟",
+        "target": "影像意图",
+        "confidence": 0.85,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.492Z"
+        }
+      },
+      {
+        "id": "relation_1770565530492_h8nestdn6",
+        "type": "applies_to",
+        "source": "伪色曝光图",
+        "target": "光影结构",
+        "confidence": 0.9,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.492Z"
+        }
+      },
+      {
+        "id": "relation_1770565530492_2djg8sium",
+        "type": "affects",
+        "source": "参数映射",
+        "target": "色彩策略",
+        "confidence": 0.95,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.492Z"
+        }
+      },
+      {
+        "id": "relation_1770565530492_7ypqyq2w6",
+        "type": "affects",
+        "source": "参数映射",
+        "target": "光影结构",
+        "confidence": 0.95,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.492Z"
+        }
+      },
+      {
+        "id": "relation_1770565530492_12bpux2mx",
+        "type": "affects",
+        "source": "参数映射",
+        "target": "影像意图",
+        "confidence": 0.95,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.492Z"
+        }
+      },
+      {
+        "id": "relation_1770565530492_44pz7trwx",
+        "type": "suitable_for",
+        "source": "淡雅蓝",
+        "target": "旅拍后调色",
+        "confidence": 0.9,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.493Z"
+        }
+      },
+      {
+        "id": "relation_1770565530493_delmooqxw",
+        "type": "suitable_for",
+        "source": "清新绿",
+        "target": "户外自然光拍摄",
+        "confidence": 0.9,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.493Z"
+        }
+      },
+      {
+        "id": "relation_1770565530493_9hedu1i9o",
+        "type": "suitable_for",
+        "source": "淡黄色",
+        "target": "室内弱光人像拍摄",
+        "confidence": 0.9,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.493Z"
+        }
+      },
+      {
+        "id": "relation_1770565530493_qedn6lm8z",
+        "type": "recommended_for",
+        "source": "视觉流路径分析",
+        "target": "摄影师风格研究",
+        "confidence": 0.85,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.493Z"
+        }
+      },
+      {
+        "id": "relation_1770565530493_8hqbm5xqs",
+        "type": "recommended_for",
+        "source": "主体权重模式",
+        "target": "自媒体内容快速产出",
+        "confidence": 0.85,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.493Z"
+        }
+      },
+      {
+        "id": "relation_1770565530493_co2307syh",
+        "type": "recommended_for",
+        "source": "后期裁剪模拟",
+        "target": "旅拍后调色",
+        "confidence": 0.85,
+        "extractionSource": "llm",
+        "metadata": {
+          "extractedAt": "2026-02-08T15:45:30.493Z"
+        }
+      }
+    ],
+    "metadata": {
+      "language": "zh",
+      "processingTime": 32378,
+      "algorithmTime": 264,
+      "llmTime": 32111,
+      "tokensUsed": 16032,
+      "cost": 0.0108555,
+      "llmModel": "qwen-plus",
+      "conflicts": 0,
+      "status": "success",
+      "algorithmParametersFound": 100,
+      "llmEntitiesFound": 0,
+      "llmRelationsFound": 0
+    },
+    "conflicts": [],
+    "quality": {
+      "entityCompleteness": 1,
+      "relationCompleteness": 0.1206896551724138,
+      "averageConfidence": 0.9805343511450381,
+      "fieldCompleteness": 1,
+      "totalEntities": 117,
+      "totalRelations": 14,
+      "algorithmEntities": 100,
+      "llmEntities": 17,
+      "algorithmRelations": 0,
+      "llmRelations": 14
+    },
+    "validation": {
+      "isValid": true,
+      "errors": [],
+      "warnings": [],
+      "entityValidation": {
+        "total": 117,
+        "valid": 117,
+        "withWarnings": 0
+      },
+      "relationValidation": {
+        "total": 14,
+        "valid": 14,
+        "withWarnings": 0
+      },
+      "metadataValidation": {
+        "hasRequiredFields": true,
+        "fieldsPresent": 13
+      }
+    }
+  },
+  "analysis": {
+    "totalEntities": 117,
+    "totalRelations": 14,
+    "entityTypes": {
+      "numerical_parameter": 100,
+      "semantic_concept": 7,
+      "technique": 5,
+      "scene": 5
+    },
+    "algorithmEntities": 100,
+    "llmEntities": 17,
+    "avgConfidence": 0.9918803418803419,
+    "lowConfidenceCount": 0,
+    "semanticConcepts": [
+      {
+        "name": "影像意图",
+        "confidence": 0.98,
+        "description": "照片所承载的情感与叙事目的，如‘安静’、‘张力’、‘日常感’、‘仪式感’、‘观察者视角’或‘参与者视角’"
+      },
+      {
+        "name": "光影结构",
+        "confidence": 0.97,
+        "description": "图像中亮度分布的组织方式，包括高光克制性、中灰主导性、阴影压死程度等结构性特征"
+      },
+      {
+        "name": "色彩策略",
+        "confidence": 0.96,
+        "description": "对色相、饱和度、明度的系统性控制逻辑，包括主色（Dominant Hue）识别、特定色相削弱、肤色作为视觉锚点等决策"
+      },
+      {
+        "name": "参数映射",
+        "confidence": 0.95,
+        "description": "将影像意图→光影结构→色彩策略逐层解耦后，转化为Lightroom/Photoshop等工具中可执行的具体参数（如白平衡、曲线、HSL、校准值等）的过程"
+      },
+      {
+        "name": "淡雅蓝",
+        "confidence": 0.94,
+        "description": "一种低饱和、中高明度的蓝色调风格，常见于大海与蓝天题材，传达静谧、通透、清冷的情绪"
+      },
+      {
+        "name": "清新绿",
+        "confidence": 0.93,
+        "description": "一种中低饱和、高明度的绿色调风格，常见于森林与草地题材，传达自然、生机、呼吸感"
+      },
+      {
+        "name": "淡黄色",
+        "confidence": 0.92,
+        "description": "一种低饱和暖色调，常用于人像肤色表现（如#F5F0E6），强调柔和、温润、不做作的质感"
+      }
+    ],
+    "fineGrainedEntities": [
+      {
+        "name": "三分法构图",
+        "type": "technique",
+        "confidence": 0.96
+      },
+      {
+        "name": "视觉流路径分析",
+        "type": "technique",
+        "confidence": 0.95
+      },
+      {
+        "name": "主体权重模式",
+        "type": "technique",
+        "confidence": 0.94
+      },
+      {
+        "name": "后期裁剪模拟",
+        "type": "technique",
+        "confidence": 0.93
+      },
+      {
+        "name": "伪色曝光图",
+        "type": "technique",
+        "confidence": 0.97
+      }
+    ],
+    "relationTypes": {
+      "applies_to": 5,
+      "affects": 3,
+      "suitable_for": 3,
+      "recommended_for": 3
+    },
+    "quality": {
+      "entityCompleteness": 1,
+      "relationCompleteness": 0.1206896551724138,
+      "averageConfidence": 0.9805343511450381,
+      "fieldCompleteness": 1,
+      "totalEntities": 117,
+      "totalRelations": 14,
+      "algorithmEntities": 100,
+      "llmEntities": 17,
+      "algorithmRelations": 0,
+      "llmRelations": 14
+    },
+    "metadata": {
+      "language": "zh",
+      "processingTime": 32378,
+      "algorithmTime": 264,
+      "llmTime": 32111,
+      "tokensUsed": 16032,
+      "cost": 0.0108555,
+      "llmModel": "qwen-plus",
+      "conflicts": 0,
+      "status": "success",
+      "algorithmParametersFound": 100,
+      "llmEntitiesFound": 0,
+      "llmRelationsFound": 0
+    }
+  },
+  "validations": {
+    "passed": [
+      "✓ 成功提取实体",
+      "✓ 提取到 7 个语义概念",
+      "✓ 提取到 14 个关系",
+      "✓ 混合提取策略工作正常",
+      "✓ 平均置信度良好: 99.2%",
+      "✓ 处理时间符合要求: 32.38s",
+      "✓ 提取状态: 成功",
+      "✓ 实体完整性: 100.0%"
+    ],
+    "failed": [],
+    "warnings": []
+  }
+}

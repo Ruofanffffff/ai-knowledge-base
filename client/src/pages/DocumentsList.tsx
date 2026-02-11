@@ -1,13 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FileText, Folder, MoreVertical, Search, Filter, Grid, List as ListIcon, Plus, Upload, X, CheckCircle, Loader2, File, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useApiData } from '../hooks/useApiData';
+import { apiService, type Document } from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorDisplay from '../components/ErrorDisplay';
+import EmptyState from '../components/EmptyState';
 
 interface DocumentsListProps {
   onNavigate: (page: string) => void;
 }
 
 interface Doc {
-  id: number;
+  id: string;
   title: string;
   type: 'doc' | 'folder' | 'image' | 'pdf';
   size: string;
@@ -22,18 +27,65 @@ interface UploadFile {
   status: 'waiting' | 'uploading' | 'processing' | 'done' | 'error';
 }
 
-const initialDocs: Doc[] = [
-  { id: 1, title: '项目提案.docx', type: 'doc', size: '2.4 MB', updated: '今天, 10:23 AM', author: '你' },
-  { id: 2, title: 'Q3 财务报表.xlsx', type: 'doc', size: '1.1 MB', updated: '昨天', author: '团队' },
-  { id: 3, title: '市场营销素材', type: 'folder', size: '-', updated: '2023年10月24日', author: '你' },
-  { id: 4, title: '会议记录', type: 'folder', size: '-', updated: '2023年10月22日', author: 'Sarah' },
-  { id: 5, title: '技术规范 v2.pdf', type: 'pdf', size: '4.5 MB', updated: '2023年10月20日', author: '工程部' },
-  { id: 6, title: 'Logo 设计稿.png', type: 'image', size: '3.2 MB', updated: '2023年10月18日', author: '设计组' },
-];
-
 export function DocumentsList({ onNavigate }: DocumentsListProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [docs, setDocs] = useState<Doc[]>(initialDocs);
+  
+  // Helper function to determine document type from file extension
+  const getDocType = (fileType: string): 'doc' | 'folder' | 'image' | 'pdf' => {
+    const type = fileType.toLowerCase();
+    if (type.includes('pdf')) return 'pdf';
+    if (type.match(/\.(jpg|jpeg|png|gif|svg|webp)/)) return 'image';
+    return 'doc';
+  };
+
+  // Helper function to format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 10) / 10 + ' ' + sizes[i];
+  };
+
+  // Helper function to format date
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return '今天';
+    if (diffDays === 1) return '昨天';
+    if (diffDays < 7) return `${diffDays}天前`;
+    
+    return date.toLocaleDateString('zh-CN', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+  
+  // Fetch documents from API
+  const { 
+    data: apiDocuments, 
+    loading, 
+    error, 
+    refetch 
+  } = useApiData(() => apiService.getDocuments(), []);
+
+  // Transform API documents to local format
+  const docs: Doc[] = React.useMemo(() => {
+    if (!apiDocuments) return [];
+    
+    return apiDocuments.map((doc: Document) => ({
+      id: doc.id,
+      title: doc.name || doc.title || 'Untitled',
+      type: getDocType(doc.fileType || doc.type || ''),
+      size: doc.size ? formatFileSize(doc.size) : '-',
+      updated: formatDate(doc.uploadDate),
+      author: '你', // Default author since API doesn't provide this
+    }));
+  }, [apiDocuments, getDocType, formatFileSize, formatDate]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadFile[]>([]);
   const [isUploadPanelOpen, setIsUploadPanelOpen] = useState(true); // Default open when uploading
@@ -70,7 +122,7 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
     }
   };
 
-  const handleFiles = (files: File[]) => {
+  const handleFiles = async (files: File[]) => {
     if (files.length === 0) return;
 
     // Initialize new uploads
@@ -83,54 +135,70 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
     
     setUploadingFiles(prev => [...prev, ...newUploads]);
 
-    // Simulate upload process for each file
-    files.forEach((file, index) => {
+    // Upload each file using the API
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
       // Delay start slightly for each file to stagger
-      setTimeout(() => {
-        // Start uploading
-        setUploadingFiles(prev => prev.map(u => u.name === file.name ? { ...u, status: 'uploading' } : u));
-        
-        let progress = 0;
-        const interval = setInterval(() => {
-          progress += Math.random() * 15; // Randomize progress speed
-          if (progress > 90) progress = 90; // Hold at 90% for processing
-          
-          setUploadingFiles(prev => 
-            prev.map(item => item.name === file.name && item.status !== 'done' ? { ...item, progress: Math.round(progress) } : item)
-          );
-
-          if (progress >= 90) {
-            clearInterval(interval);
-            // Simulate processing
-            setUploadingFiles(prev => prev.map(u => u.name === file.name ? { ...u, status: 'processing', progress: 100 } : u));
-            
-            setTimeout(() => {
-              // Done
-              setUploadingFiles(prev => prev.map(u => u.name === file.name ? { ...u, status: 'done' } : u));
-              
-              // Add to docs list
-              setDocs(prev => [
-                {
-                  id: Date.now() + Math.random(),
-                  title: file.name,
-                  type: file.name.endsWith('.pdf') ? 'pdf' : file.name.match(/\.(jpg|jpeg|png|gif)$/) ? 'image' : 'doc',
-                  size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
-                  updated: '刚刚',
-                  author: '你'
-                },
-                ...prev
-              ]);
-
-              // Remove from list after a delay
-              setTimeout(() => {
-                setUploadingFiles(prev => prev.filter(u => u.name !== file.name));
-              }, 3000);
-
-            }, 800 + Math.random() * 1000);
+      await new Promise(resolve => setTimeout(resolve, i * 300));
+      
+      // Start uploading
+      setUploadingFiles(prev => prev.map(u => 
+        u.name === file.name ? { ...u, status: 'uploading' } : u
+      ));
+      
+      // Simulate progress (since we don't have real progress from API)
+      const progressInterval = setInterval(() => {
+        setUploadingFiles(prev => prev.map(u => {
+          if (u.name === file.name && u.status === 'uploading' && u.progress < 90) {
+            return { ...u, progress: Math.min(u.progress + Math.random() * 15, 90) };
           }
-        }, 200);
-      }, index * 300);
-    });
+          return u;
+        }));
+      }, 200);
+
+      try {
+        // Upload file using API
+        const response = await apiService.uploadDocument(file);
+        
+        clearInterval(progressInterval);
+        
+        if (response.success) {
+          // Processing
+          setUploadingFiles(prev => prev.map(u => 
+            u.name === file.name ? { ...u, status: 'processing', progress: 100 } : u
+          ));
+          
+          // Wait a bit for processing animation
+          await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1000));
+          
+          // Done
+          setUploadingFiles(prev => prev.map(u => 
+            u.name === file.name ? { ...u, status: 'done' } : u
+          ));
+          
+          // Refetch documents list
+          await refetch();
+          
+          // Remove from upload list after delay
+          setTimeout(() => {
+            setUploadingFiles(prev => prev.filter(u => u.name !== file.name));
+          }, 3000);
+        } else {
+          // Error
+          setUploadingFiles(prev => prev.map(u => 
+            u.name === file.name ? { ...u, status: 'error', progress: 0 } : u
+          ));
+          console.error('Upload failed:', response.error);
+        }
+      } catch (error) {
+        clearInterval(progressInterval);
+        setUploadingFiles(prev => prev.map(u => 
+          u.name === file.name ? { ...u, status: 'error', progress: 0 } : u
+        ));
+        console.error('Upload error:', error);
+      }
+    }
   };
 
   const getIcon = (type: string) => {
@@ -213,7 +281,36 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
         </div>
       </div>
 
-      <div className="p-8 overflow-y-auto h-full">
+      {/* Loading State */}
+      {loading && (
+        <div className="flex-1 flex items-center justify-center">
+          <LoadingSpinner size="large" message="加载文档中..." />
+        </div>
+      )}
+
+      {/* Error State */}
+      {!loading && error && (
+        <div className="flex-1 flex items-center justify-center">
+          <ErrorDisplay 
+            title="加载失败"
+            message={error} 
+            onRetry={refetch} 
+          />
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && !error && docs.length === 0 && (
+        <div className="flex-1 flex items-center justify-center">
+          <EmptyState 
+            message="还没有上传任何文档。点击上传文件按钮开始吧！"
+          />
+        </div>
+      )}
+
+      {/* Content - Only show when not loading, no error, and has docs */}
+      {!loading && !error && docs.length > 0 && (
+        <div className="p-8 overflow-y-auto h-full">
          {/* Filters */}
          <div className="flex items-center gap-4 mb-6">
             <div className="relative flex-1 max-w-md">
@@ -307,7 +404,8 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
              </table>
            </div>
          )}
-      </div>
+        </div>
+      )}
 
       {/* Upload Progress Panel (Floating Bottom Right) */}
       <AnimatePresence>

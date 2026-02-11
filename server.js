@@ -505,6 +505,26 @@ app.use('/api/knowledge-graph', knowledgeGraphRoutes);
 const documentProcessingRoutes = require('./routes/documentProcessingRoutes');
 app.use('/api', documentProcessingRoutes);
 
+// 便签路由
+const notesRoutes = require('./routes/notesRoutes');
+app.use('/api/notes', notesRoutes);
+
+// 附件路由
+const attachmentRoutes = require('./routes/attachmentRoutes');
+app.use('/api/attachments', attachmentRoutes);
+
+// 图像分析路由
+const imageAnalysisRoutes = require('./routes/imageAnalysisRoutes');
+app.use('/api/image-analysis', imageAnalysisRoutes);
+
+// AI增强路由
+const aiEnhancementRoutes = require('./routes/aiEnhancementRoutes');
+app.use('/api/ai', aiEnhancementRoutes);
+
+// 搜索路由
+const searchRoutes = require('./routes/searchRoutes');
+app.use('/api/search', searchRoutes);
+
 const mockTags = [
   { id: '1', name: '前端', color: '#1890ff', description: '前端开发相关内容' },
   { id: '2', name: '后端', color: '#52c41a', description: '后端开发相关内容' },

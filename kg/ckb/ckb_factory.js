@@ -19,7 +19,8 @@ function createCKB(params) {
     structure = {},
     text = '',
     language = 'zh',
-    sourceConfidence = 0.8
+    sourceConfidence = 0.8,
+    chunks = null  // Optional: pre-computed chunks
   } = params;
   
   // Validate required fields
@@ -48,6 +49,11 @@ function createCKB(params) {
       updated: new Date().toISOString()
     }
   };
+  
+  // Add chunks if provided (backward compatible)
+  if (chunks && Array.isArray(chunks)) {
+    ckb.chunks = chunks;
+  }
   
   return ckb;
 }
@@ -96,5 +102,43 @@ function calculateQuality(text, sourceConfidence) {
 }
 
 module.exports = {
-  createCKB
+  createCKB,
+  createFromDocument
 };
+
+/**
+ * Create CKBs from a document
+ * @param {Object} document - Document object with id, type, and content
+ * @returns {Array} Array of CKB objects
+ */
+function createFromDocument(document) {
+  if (!document || !document.content) {
+    throw new Error('Invalid document: must have content');
+  }
+  
+  // For now, create a single CKB from the entire document
+  // In a real implementation, might split into multiple CKBs based on structure
+  const ckb = createCKB({
+    docId: document.id || 'unknown',
+    sourceType: document.type || 'text',
+    sourceMeta: {
+      originalType: document.type
+    },
+    text: document.content,
+    language: detectLanguage(document.content)
+  });
+  
+  return [ckb];
+}
+
+/**
+ * Detect language of text (simple heuristic)
+ * @param {string} text - Text to analyze
+ * @returns {string} Language code ('zh' or 'en')
+ */
+function detectLanguage(text) {
+  const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const totalChars = text.length;
+  
+  return chineseChars / totalChars > 0.3 ? 'zh' : 'en';
+}

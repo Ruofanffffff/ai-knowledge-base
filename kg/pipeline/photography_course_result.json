@@ -1,0 +1,229 @@
+{
+  "documentId": "photography-course-001",
+  "status": "completed",
+  "processingTime": 18293,
+  "metrics": {
+    "fieldCount": 47,
+    "entityCount": 4,
+    "relationCount": 7,
+    "tokenUsage": null,
+    "apiCalls": 1,
+    "confidenceScores": {},
+    "documentsPerSecond": 0.05466571912753512,
+    "fieldsPerSecond": 2.569288798994151,
+    "entitiesPerSecond": 0.2186628765101405,
+    "relationsPerSecond": 0.3826600338927459
+  },
+  "fields": {},
+  "entities": [],
+  "relations": [],
+  "matchedSchemas": [],
+  "summary": {
+    "documentId": "photography-course-001",
+    "status": "completed",
+    "totalDuration": 18293,
+    "slowestStep": "schemaMatching",
+    "slowestStepDuration": 18254,
+    "successfulSteps": 7,
+    "failedSteps": 0,
+    "totalSteps": 7,
+    "performance": {
+      "totalDuration": 18293,
+      "stepDurationsSum": 18293,
+      "overhead": 0,
+      "overheadPercentage": "0.00%",
+      "throughput": {
+        "documentsPerSecond": 0.05466571912753512,
+        "fieldsPerSecond": 2.569288798994151,
+        "entitiesPerSecond": 0.2186628765101405,
+        "relationsPerSecond": 0.3826600338927459
+      },
+      "bottleneck": {
+        "step": "schemaMatching",
+        "duration": 18254,
+        "percentage": "99.79%"
+      }
+    },
+    "steps": {
+      "parsing": {
+        "status": "success",
+        "duration": 0,
+        "percentage": "0.00%",
+        "metrics": {
+          "tokenUsage": 0,
+          "apiCalls": 0
+        }
+      },
+      "extraction": {
+        "status": "success",
+        "duration": 5,
+        "percentage": "0.03%",
+        "metrics": {
+          "fieldCount": 47,
+          "usedLLM": false,
+          "belowThreshold": false,
+          "tokenUsage": 0,
+          "apiCalls": 0
+        }
+      },
+      "schemaMatching": {
+        "status": "success",
+        "duration": 18254,
+        "percentage": "99.79%",
+        "metrics": {
+          "totalSchemas": 95,
+          "algorithmMatchedSchemas": 95,
+          "llmMatchedSchemas": 1,
+          "mergedSchemas": 95,
+          "qualifiedSchemas": 5,
+          "triggeredSchemas": 5,
+          "unmatchedFieldCount": 27,
+          "avgCompleteness": 0.8300000000000001,
+          "bestMatch": {
+            "name": "PhotographyEntity",
+            "completeness": 2.3000000000000007,
+            "llmMatches": 23
+          },
+          "tokenUsage": 0,
+          "apiCalls": 1
+        }
+      },
+      "normalization": {
+        "status": "success",
+        "duration": 1,
+        "percentage": "0.01%",
+        "metrics": {
+          "schemasProcessed": 5,
+          "totalNormalizedFields": 37,
+          "overallSuccessRate": 2.0555555555555554,
+          "schemaMetrics": [
+            {
+              "schemaName": "PhotographyEntity",
+              "expectedFields": 7,
+              "mappedFields": 3,
+              "successRate": 0.42857142857142855,
+              "failedFields": [
+                "Camera",
+                "Lens",
+                "Exposure",
+                "Focus"
+              ]
+            },
+            {
+              "schemaName": "Focus-Mode",
+              "expectedFields": 2,
+              "mappedFields": 2,
+              "successRate": 1,
+              "failedFields": [
+                "FocusType"
+              ]
+            },
+            {
+              "schemaName": "Shooting-Info",
+              "expectedFields": 5,
+              "mappedFields": 18,
+              "successRate": 3.6,
+              "failedFields": [
+                "Camera",
+                "ISO"
+              ]
+            },
+            {
+              "schemaName": "Shutter-Usage",
+              "expectedFields": 2,
+              "mappedFields": 4,
+              "successRate": 2,
+              "failedFields": [
+                "Motion"
+              ]
+            },
+            {
+              "schemaName": "Aperture-Usage",
+              "expectedFields": 2,
+              "mappedFields": 10,
+              "successRate": 5,
+              "failedFields": [
+                "DOF"
+              ]
+            }
+          ],
+          "tokenUsage": 0,
+          "apiCalls": 0
+        }
+      },
+      "entityBuilding": {
+        "status": "success",
+        "duration": 10,
+        "percentage": "0.05%",
+        "metrics": {
+          "entityCount": 4,
+          "schemaInstanceCount": 5,
+          "avgConfidence": 0.0125,
+          "mode": "anchor",
+          "tokenUsage": 0,
+          "apiCalls": 0
+        }
+      },
+      "relationExtraction": {
+        "status": "success",
+        "duration": 11,
+        "percentage": "0.06%",
+        "metrics": {
+          "relationCount": 7,
+          "builtinCount": 1,
+          "cooccurrenceCount": 0,
+          "semanticCount": 0,
+          "enabledBuilders": 2,
+          "successfulBuilders": 2,
+          "failedBuilders": 0,
+          "builderResults": {
+            "builtin": {
+              "success": true,
+              "count": 1,
+              "error": null
+            },
+            "cooccurrence": {
+              "success": true,
+              "count": 6,
+              "error": null
+            },
+            "semantic": {
+              "success": false,
+              "count": 0,
+              "error": null
+            }
+          },
+          "tokenUsage": 0,
+          "apiCalls": 0
+        }
+      },
+      "storage": {
+        "status": "success",
+        "duration": 12,
+        "percentage": "0.07%",
+        "metrics": {
+          "storedEntities": 4,
+          "storedRelations": 7,
+          "tokenUsage": 0,
+          "apiCalls": 0
+        }
+      }
+    },
+    "metrics": {
+      "fieldCount": 47,
+      "entityCount": 4,
+      "relationCount": 7,
+      "tokenUsage": null,
+      "apiCalls": 1,
+      "confidenceScores": {},
+      "documentsPerSecond": 0.05466571912753512,
+      "fieldsPerSecond": 2.569288798994151,
+      "entitiesPerSecond": 0.2186628765101405,
+      "relationsPerSecond": 0.3826600338927459
+    },
+    "errorCount": 0,
+    "warningCount": 0,
+    "errors": [],
+    "warnings": []
+  }
+}

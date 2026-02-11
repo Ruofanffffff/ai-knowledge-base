@@ -1,0 +1,346 @@
+{
+  "Backup-Strategy": {
+    "Location": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Basic-Preset": {
+    "PresetName": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Batch-Edit": {
+    "ImageCount": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Before-After": {
+    "Comparison": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Bit-Depth": {
+    "Bit": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Color-Consistency": {
+    "Rule": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Color-Grading": {
+    "Palette": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Color-Match": {
+    "Reference": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Color-Profile": {
+    "Profile": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Composite": {
+    "LayerLogic": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Dodge-Burn": {
+    "Area": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Editing-Decision": {
+    "Decision": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "File-Naming": {
+    "NamingRule": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Final-Selection": {
+    "ImageID": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Frequency-Separation": {
+    "Radius": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Grain": {
+    "GrainAmount": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "HSL-Adjust": {
+    "ColorRange": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Histogram-Check": {
+    "HistogramState": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "LUT-Usage": {
+    "LUTName": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Light-Effect": {
+    "EffectType": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Liquify": {
+    "Adjustment": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Mask-Local": {
+    "MaskType": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Object-Removal": {
+    "Object": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Output-Sharpen": {
+    "Target": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Portfolio-Ready": {
+    "Status": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Preset-Build": {
+    "TargetStyle": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Preset-Evaluation": {
+    "Result": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Preset-Iteration": {
+    "Version": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Print-Preparation": {
+    "ColorSpace": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Quality-Review": {
+    "Issue": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Reference-Study": {
+    "Photographer": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Retouch-Skin": {
+    "Area": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Series-Consistency": {
+    "SeriesID": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Skin-Tone": {
+    "SkinRange": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Sky-Replacement": {
+    "SkyType": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Social-Ratio": {
+    "AspectRatio": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Style-Analysis": {
+    "StyleName": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Texture-Overlay": {
+    "TextureType": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Version-Control": {
+    "Version": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Vignette": {
+    "Amount": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Watermark": {
+    "Text": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Web-Export": {
+    "Platform": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  },
+  "Workflow-Step": {
+    "StepOrder": {
+      "common_variations": [],
+      "weight": 1,
+      "required": true,
+      "description": ""
+    }
+  }
+}

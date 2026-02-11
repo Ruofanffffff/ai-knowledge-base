@@ -2,12 +2,14 @@ module.exports = {
   testEnvironment: 'node',
   coveragePathIgnorePatterns: ['/node_modules/'],
   transformIgnorePatterns: [
-    'node_modules/(?!(uuid)/)'
+    'node_modules/(?!(uuid|@aws-sdk)/)'
   ],
-  testMatch: ['**/*.test.js'],
+  testMatch: ['**/*.test.js', '**/*.property.test.js'],
   collectCoverageFrom: [
     'kg/**/*.js',
+    'services/**/*.js',
     '!kg/**/*.test.js',
+    '!services/**/*.test.js',
     '!**/node_modules/**'
   ],
   coverageThreshold: {

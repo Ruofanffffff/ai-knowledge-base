@@ -28,6 +28,25 @@ const relationStore = require('../relation/relation_store');
 const tokenTracker = require('../utils/token_tracker');
 const performanceMonitor = require('../utils/performance_monitor');
 const DocumentClassifier = require('./document_classifier');
+const { HierarchicalRelationExtractor } = require('../human_readable/hierarchical_relation_extractor');
+const { HumanReadabilityValidator } = require('../human_readable/human_readability_validator');
+
+/**
+ * Helper function to check if human-readable KG features are enabled
+ * Respects both the master switch and individual feature flags
+ */
+function _getHierarchicalEnabled() {
+  const masterSwitch = process.env.ENABLE_HUMAN_READABLE_KG === 'true';
+  const featureFlag = process.env.ENABLE_HIERARCHICAL_EXTRACTION === 'true';
+  
+  // If master switch is explicitly false, disable all features
+  if (process.env.ENABLE_HUMAN_READABLE_KG === 'false') {
+    return false;
+  }
+  
+  // If master switch is true or undefined, respect individual feature flag
+  return featureFlag;
+}
 
 /**
  * Processing Context - 流水线处理上下文
@@ -71,6 +90,8 @@ class ProcessingContext {
       normalization: { status: 'not_started', duration: 0, result: null, error: null, metrics: {} },
       entityBuilding: { status: 'not_started', duration: 0, result: null, error: null, metrics: {} },
       relationExtraction: { status: 'not_started', duration: 0, result: null, error: null, metrics: {} },
+      hierarchicalExtraction: { status: 'not_started', duration: 0, result: null, error: null, metrics: {} },
+      validation: { status: 'not_started', duration: 0, result: null, error: null, metrics: {} },
       storage: { status: 'not_started', duration: 0, result: null, error: null, metrics: {} }
     };
     
@@ -81,7 +102,9 @@ class ProcessingContext {
       matchedSchemas: [],
       normalizedFields: [],
       entities: [],
-      relations: []
+      relations: [],
+      hierarchicalRelations: [],
+      validationResult: null
     };
     
     // 性能指标
@@ -271,6 +294,20 @@ class ProcessingContext {
 }
 
 /**
+ * Compatibility Mode - 兼容模式枚举
+ * 
+ * 定义实体构建的三种模式：
+ * - ANCHOR_ONLY: 纯锚点模式（新系统，默认）
+ * - HYBRID: 混合模式（锚点优先，失败时降级到传统模式）
+ * - LEGACY: 传统模式（旧系统，基于名称相似度）
+ */
+const COMPATIBILITY_MODE = {
+  ANCHOR_ONLY: 'anchor_only',
+  HYBRID: 'hybrid',
+  LEGACY: 'legacy'
+};
+
+/**
  * Pipeline Options - 流水线配置选项
  */
 const DEFAULT_OPTIONS = {
@@ -301,7 +338,9 @@ const DEFAULT_OPTIONS = {
   entityBuilding: {
     useLLM: true,
     allowPartialEntities: true,
-    minFieldCoverage: 0.5
+    minFieldCoverage: 0.5,
+    compatibilityMode: COMPATIBILITY_MODE.ANCHOR_ONLY,  // 🆕 兼容模式（默认：纯锚点模式）
+    detectConflicts: false  // 🆕 是否检测锚点冲突（Phase 4实现）
   },
   
   // 关系抽取配置
@@ -310,7 +349,9 @@ const DEFAULT_OPTIONS = {
     enableCooccurrence: true,
     enableSemantic: true,
     semanticUseLLM: true,
-    minConfidence: 0.5
+    minConfidence: 0.5,
+    enableHierarchical: _getHierarchicalEnabled(),
+    hierarchicalMethod: process.env.HIERARCHICAL_EXTRACTION_METHOD || 'pattern'  // pattern, llm, hybrid
   },
   
   // 存储配置
@@ -607,7 +648,57 @@ class UniversalDocumentPipeline {
       }
     }
     
+    // Validate hierarchical extraction configuration
+    this._validateHierarchicalConfig(merged);
+    
     return merged;
+  }
+  
+  /**
+   * 验证层级关系抽取配置
+   * @private
+   * @param {Object} options - 配置选项
+   * @throws {Error} 如果配置无效
+   */
+  _validateHierarchicalConfig(options) {
+    const hierarchicalConfig = options.relationExtraction;
+    
+    if (!hierarchicalConfig) {
+      return; // No hierarchical config, skip validation
+    }
+    
+    // Validate hierarchical extraction method
+    if (hierarchicalConfig.enableHierarchical) {
+      const validMethods = ['pattern', 'llm', 'hybrid'];
+      const method = hierarchicalConfig.hierarchicalMethod;
+      
+      if (method && !validMethods.includes(method)) {
+        throw new Error(
+          `Invalid hierarchical extraction method: "${method}". ` +
+          `Valid options are: ${validMethods.join(', ')}`
+        );
+      }
+      
+      // Validate min confidence if provided
+      if (hierarchicalConfig.minConfidence !== undefined) {
+        const confidence = hierarchicalConfig.minConfidence;
+        if (typeof confidence !== 'number' || confidence < 0 || confidence > 1) {
+          throw new Error(
+            `Invalid minConfidence for hierarchical extraction: ${confidence}. ` +
+            `Must be a number between 0 and 1.`
+          );
+        }
+      }
+      
+      // Warn if LLM method is selected but LLM is not available
+      if ((method === 'llm' || method === 'hybrid') && !hierarchicalConfig.semanticUseLLM) {
+        console.warn(
+          '[Pipeline] Warning: Hierarchical extraction method is set to "' + method + '" ' +
+          'but semanticUseLLM is disabled. LLM-based hierarchical extraction will not work. ' +
+          'Consider setting semanticUseLLM to true or using "pattern" method.'
+        );
+      }
+    }
   }
   
   /**
@@ -758,6 +849,26 @@ class UniversalDocumentPipeline {
         context,
         false
       );
+      
+      // 步骤6.5: 层级关系抽取 (非关键步骤)
+      if (finalOptions.relationExtraction.enableHierarchical) {
+        await StepExecutor.executeStep(
+          'hierarchicalExtraction',
+          async () => await this._extractHierarchicalRelations(context, finalOptions),
+          context,
+          false
+        );
+      }
+      
+      // 步骤6.6: 人类可读性验证 (非关键步骤)
+      if (context.data.entities.length > 0 || context.data.relations.length > 0) {
+        await StepExecutor.executeStep(
+          'validation',
+          async () => await this._validateReadability(context, finalOptions),
+          context,
+          false
+        );
+      }
       
       // 步骤7: 知识图谱存储 (关键步骤)
       if (context.data.entities.length > 0) {
@@ -1235,7 +1346,8 @@ class UniversalDocumentPipeline {
     const mergedResults = this._mergeMatchResults(
       schemaMatchResults,
       llmMatchesBySchema,
-      sortedSchemas
+      sortedSchemas,
+      unmatchedFields  // 🔧 添加unmatchedFields参数
     );
     
     // 按加权完整度排序（已在merge中完成，这里确保）
@@ -1467,6 +1579,202 @@ class UniversalDocumentPipeline {
     const apiCallsBefore = tokenStatsBefore.total_records || 0;
     const tokensBefore = tokenStatsBefore.total_tokens || 0;
     
+    // 🆕 使用兼容模式构建实体
+    return await this._buildEntitiesCompatible(context, options, buildingOptions, tokenStatsBefore);
+  }
+  
+  /**
+   * 🆕 兼容模式实体构建（Task 7.2）
+   * 
+   * 根据配置的兼容模式选择不同的实体构建策略：
+   * - ANCHOR_ONLY: 使用新的锚点驱动机制
+   * - HYBRID: 优先锚点，失败时降级到传统模式
+   * - LEGACY: 使用旧的名称相似度机制
+   * 
+   * @param {ProcessingContext} context - 处理上下文
+   * @param {Object} options - 配置选项
+   * @param {Object} buildingOptions - 实体构建选项
+   * @param {Object} tokenStatsBefore - 开始时的token统计
+   * @returns {Promise<Array>} 实体列表
+   */
+  async _buildEntitiesCompatible(context, options, buildingOptions, tokenStatsBefore) {
+    const mode = options.entityBuilding.compatibilityMode || COMPATIBILITY_MODE.ANCHOR_ONLY;
+    
+    console.log(`[Pipeline] 使用兼容模式: ${mode}`);
+    
+    switch (mode) {
+      case COMPATIBILITY_MODE.ANCHOR_ONLY:
+        // 模式1: 纯锚点模式（新系统）
+        console.log('[Pipeline] 模式: 纯锚点驱动');
+        return await this._buildEntitiesWithAnchor(context, options, buildingOptions, tokenStatsBefore);
+      
+      case COMPATIBILITY_MODE.HYBRID:
+        // 模式2: 混合模式（过渡期）
+        console.log('[Pipeline] 模式: 混合模式（锚点优先，失败时降级）');
+        try {
+          return await this._buildEntitiesWithAnchor(context, options, buildingOptions, tokenStatsBefore);
+        } catch (error) {
+          console.warn(`[Pipeline] 锚点模式失败: ${error.message}`);
+          console.log('[Pipeline] 降级到传统模式');
+          
+          context.warnings.push({
+            step: 'entityBuilding',
+            error: `锚点模式失败，已降级到传统模式: ${error.message}`,
+            timestamp: Date.now()
+          });
+          
+          return await this._buildEntitiesLegacy(context, options, buildingOptions, tokenStatsBefore);
+        }
+      
+      case COMPATIBILITY_MODE.LEGACY:
+        // 模式3: 传统模式（旧系统）
+        console.log('[Pipeline] 模式: 传统模式（名称相似度）');
+        return await this._buildEntitiesLegacy(context, options, buildingOptions, tokenStatsBefore);
+      
+      default:
+        throw new Error(`未知的兼容模式: ${mode}`);
+    }
+  }
+  
+  /**
+   * 🆕 锚点驱动的实体构建（新模式）
+   * 
+   * 核心流程：
+   * 1. 生成Schema实例
+   * 2. 生成锚点指纹
+   * 3. 按锚点合并为实体
+   * 4. 冲突检测（可选）
+   */
+  async _buildEntitiesWithAnchor(context, options, buildingOptions, tokenStatsBefore) {
+    const { createSchemaInstance } = require('../schema/schema_instance');
+    const { generateAnchorFingerprint } = require('../entity/anchor_generator');
+    const { mergeInstancesByAnchor } = require('../entity/anchor_merger');
+    
+    // Step 1: 生成Schema实例
+    console.log('[Pipeline] 步骤1: 生成Schema实例');
+    const schemaInstances = [];
+    
+    for (const normalizedFieldSet of context.data.normalizedFields) {
+      try {
+        const schemaMatch = context.data.matchedSchemas.find(
+          sm => sm.schema.schema_name === normalizedFieldSet.schema.schema_name
+        );
+        
+        // Skip schemas with 0% completeness or 0 fields
+        if (schemaMatch.weightedCompleteness === 0 || normalizedFieldSet.fields.length === 0) {
+          console.log(`[Pipeline] 跳过空Schema: ${schemaMatch.schema_name}`);
+          continue;
+        }
+        
+        // 创建Schema实例
+        const instance = createSchemaInstance(
+          schemaMatch,
+          normalizedFieldSet.fields,
+          context.data.ckb
+        );
+        
+        schemaInstances.push(instance);
+        
+      } catch (error) {
+        console.warn(`[Pipeline] Schema实例创建失败 (${normalizedFieldSet.schema.schema_name}): ${error.message}`);
+        context.warnings.push({
+          step: 'entityBuilding',
+          error: `Schema ${normalizedFieldSet.schema.schema_name}: 实例创建失败 - ${error.message}`,
+          timestamp: Date.now()
+        });
+      }
+    }
+    
+    console.log(`[Pipeline] 生成 ${schemaInstances.length} 个Schema实例`);
+    
+    if (schemaInstances.length === 0) {
+      console.log('[Pipeline] 没有有效的Schema实例，跳过实体构建');
+      context.data.entities = [];
+      context.metrics.entityCount = 0;
+      
+      StepExecutor.recordMetrics('entityBuilding', {
+        entityCount: 0,
+        schemaInstanceCount: 0,
+        mode: 'anchor',
+        tokenUsage: 0,
+        apiCalls: 0
+      }, context);
+      
+      return [];
+    }
+    
+    // Step 2: 构建Schema映射（用于锚点生成）
+    console.log('[Pipeline] 步骤2: 构建Schema映射');
+    const schemaMap = new Map();
+    for (const schemaMatch of context.data.matchedSchemas) {
+      schemaMap.set(schemaMatch.schema.schema_id || schemaMatch.schema.schema_name, schemaMatch.schema);
+    }
+    
+    // Step 3: 按锚点合并为实体
+    console.log('[Pipeline] 步骤3: 按锚点合并Schema实例');
+    let entities = [];
+    
+    try {
+      entities = mergeInstancesByAnchor(schemaInstances, schemaMap);
+      console.log(`[Pipeline] 合并为 ${entities.length} 个实体`);
+    } catch (error) {
+      console.error(`[Pipeline] 锚点合并失败: ${error.message}`);
+      context.errors.push({
+        step: 'entityBuilding',
+        error: `锚点合并失败: ${error.message}`,
+        timestamp: Date.now()
+      });
+      
+      // 降级到传统模式
+      console.log('[Pipeline] 降级到传统实体构建模式');
+      return await this._buildEntitiesLegacy(context, options, buildingOptions, tokenStatsBefore);
+    }
+    
+    // Step 4: 冲突检测（可选）
+    if (options.entityBuilding.detectConflicts) {
+      console.log('[Pipeline] 步骤4: 检测锚点冲突');
+      // TODO: Implement conflict detection in Phase 4
+      // const conflictResults = await this._detectAnchorConflicts(entities, schemaInstances, schemaMap);
+      // context.data.anchor_conflicts = conflictResults;
+    }
+    
+    context.data.entities = entities;
+    context.metrics.entityCount = entities.length;
+    
+    // 记录结束时的token使用情况
+    const tokenStatsAfter = tokenTracker.getTokenStats();
+    const apiCallsAfter = tokenStatsAfter.total_records || 0;
+    const tokensAfter = tokenStatsAfter.total_tokens || 0;
+    
+    // 计算此步骤的token使用
+    const apiCallsBefore = tokenStatsBefore.total_records || 0;  // 🔧 添加这一行
+    const stepTokenUsage = tokensAfter - tokenStatsBefore.total_tokens;
+    const stepApiCalls = apiCallsAfter - apiCallsBefore;
+    
+    // 更新context中的token使用统计
+    context.metrics.tokenUsage += stepTokenUsage;
+    context.metrics.apiCalls += stepApiCalls;
+    
+    // 计算指标
+    const avgConfidence = entities.length > 0 ? 
+                         entities.reduce((sum, e) => sum + e.confidence, 0) / entities.length : 0;
+    
+    StepExecutor.recordMetrics('entityBuilding', {
+      entityCount: entities.length,
+      schemaInstanceCount: schemaInstances.length,
+      avgConfidence: avgConfidence,
+      mode: 'anchor',
+      tokenUsage: stepTokenUsage || 0,
+      apiCalls: stepApiCalls || 0
+    }, context);
+    
+    return entities;
+  }
+  
+  /**
+   * 传统实体构建模式（旧模式，保留用于向后兼容）
+   */
+  async _buildEntitiesLegacy(context, options, buildingOptions, tokenStatsBefore) {
     const entities = [];
     const buildingMetrics = [];
     
@@ -1567,7 +1875,7 @@ class UniversalDocumentPipeline {
     const tokensAfter = tokenStatsAfter.total_tokens || 0;
     
     // 计算此步骤的token使用
-    const stepTokenUsage = tokensAfter - tokensBefore;
+    const stepTokenUsage = tokensAfter - tokenStatsBefore.total_tokens;
     const stepApiCalls = apiCallsAfter - apiCallsBefore;
     
     // 更新context中的token使用统计
@@ -1587,6 +1895,7 @@ class UniversalDocumentPipeline {
       avgFieldCoverage: avgFieldCoverage,
       partialEntityCount: partialEntityCount,
       entityMetrics: buildingMetrics,
+      mode: 'legacy',
       tokenUsage: stepTokenUsage || 0,
       apiCalls: stepApiCalls || 0
     }, context);
@@ -1783,6 +2092,203 @@ class UniversalDocumentPipeline {
     }, context);
     
     return allRelations;
+  }
+  
+  /**
+   * 步骤6.5: 抽取层级关系
+   * 
+   * 使用HierarchicalRelationExtractor提取is_a, part_of, has_property等层级关系。
+   * 支持三种提取方法：pattern（模式匹配）、llm（LLM推理）、hybrid（混合模式）。
+   */
+  async _extractHierarchicalRelations(context, options) {
+    const hierarchicalOptions = options.relationExtraction;
+    
+    console.log(`[Pipeline] 开始层级关系抽取 (方法: ${hierarchicalOptions.hierarchicalMethod})`);
+    
+    // 记录开始时的token使用情况
+    const tokenStatsBefore = tokenTracker.getTokenStats();
+    const apiCallsBefore = tokenStatsBefore.total_records || 0;
+    const tokensBefore = tokenStatsBefore.total_tokens || 0;
+    
+    try {
+      // 获取文档文本
+      const documentText = context.data.ckb?.content?.text || '';
+      
+      if (!documentText) {
+        console.warn('[Pipeline] 文档文本为空，跳过层级关系抽取');
+        context.warnings.push({
+          step: 'hierarchicalExtraction',
+          error: '文档文本为空',
+          timestamp: Date.now()
+        });
+        return [];
+      }
+      
+      // 创建层级关系提取器实例
+      const extractor = new HierarchicalRelationExtractor();
+      
+      // 提取层级关系
+      const hierarchicalRelations = await extractor.extractHierarchicalRelations(
+        documentText,
+        context.data.entities,
+        {
+          method: hierarchicalOptions.hierarchicalMethod,
+          minConfidence: hierarchicalOptions.minConfidence || 0.5
+        }
+      );
+      
+      console.log(`[Pipeline] 提取到 ${hierarchicalRelations.length} 个层级关系`);
+      
+      // 按类型统计
+      const typeStats = {
+        is_a: hierarchicalRelations.filter(r => r.subtype === 'is_a').length,
+        part_of: hierarchicalRelations.filter(r => r.subtype === 'part_of').length,
+        has_property: hierarchicalRelations.filter(r => r.subtype === 'has_property').length
+      };
+      
+      console.log(`[Pipeline] 层级关系类型分布: is_a=${typeStats.is_a}, part_of=${typeStats.part_of}, has_property=${typeStats.has_property}`);
+      
+      // 合并到现有关系中
+      if (hierarchicalRelations.length > 0) {
+        context.data.relations = context.data.relations.concat(hierarchicalRelations);
+        context.metrics.relationCount += hierarchicalRelations.length;
+        
+        console.log(`[Pipeline] 总关系数量: ${context.data.relations.length}`);
+      }
+      
+      // 记录结束时的token使用情况
+      const tokenStatsAfter = tokenTracker.getTokenStats();
+      const apiCallsAfter = tokenStatsAfter.total_records || 0;
+      const tokensAfter = tokenStatsAfter.total_tokens || 0;
+      
+      // 计算此步骤的token使用
+      const stepTokenUsage = tokensAfter - tokensBefore;
+      const stepApiCalls = apiCallsAfter - apiCallsBefore;
+      
+      // 更新context中的token使用统计
+      context.metrics.tokenUsage += stepTokenUsage;
+      context.metrics.apiCalls += stepApiCalls;
+      
+      // 记录指标
+      StepExecutor.recordMetrics('hierarchicalExtraction', {
+        hierarchicalCount: hierarchicalRelations.length,
+        isACount: typeStats.is_a,
+        partOfCount: typeStats.part_of,
+        hasPropertyCount: typeStats.has_property,
+        method: hierarchicalOptions.hierarchicalMethod,
+        tokenUsage: stepTokenUsage || 0,
+        apiCalls: stepApiCalls || 0
+      }, context);
+      
+      return hierarchicalRelations;
+      
+    } catch (error) {
+      console.error(`[Pipeline] 层级关系抽取失败: ${error.message}`);
+      context.warnings.push({
+        step: 'hierarchicalExtraction',
+        error: `层级关系抽取失败: ${error.message}`,
+        timestamp: Date.now()
+      });
+      
+      // 记录失败指标
+      StepExecutor.recordMetrics('hierarchicalExtraction', {
+        hierarchicalCount: 0,
+        error: error.message,
+        tokenUsage: 0,
+        apiCalls: 0
+      }, context);
+      
+      return [];
+    }
+  }
+  
+  /**
+   * 步骤6.6: 验证人类可读性
+   * 
+   * 验证实体名称和关系描述的质量，生成质量报告。
+   * 这是一个非关键步骤，失败不会影响流水线继续执行。
+   */
+  async _validateReadability(context, options) {
+    console.log('[Pipeline] 开始人类可读性验证');
+    
+    try {
+      // 创建验证器实例
+      const validator = new HumanReadabilityValidator();
+      
+      // 构建知识图谱对象
+      const knowledgeGraph = {
+        entities: context.data.entities || [],
+        relations: context.data.relations || []
+      };
+      
+      // 执行验证
+      const validationResult = validator.validate(knowledgeGraph);
+      
+      console.log('[Pipeline] 验证完成');
+      console.log(`[Pipeline] 实体名称质量: ${(validationResult.details.entities.score * 100).toFixed(1)}% (${validationResult.details.entities.validCount}/${validationResult.details.entities.totalCount})`);
+      console.log(`[Pipeline] 关系描述质量: ${(validationResult.details.relations.score * 100).toFixed(1)}% (${validationResult.details.relations.validCount}/${validationResult.details.relations.totalCount})`);
+      console.log(`[Pipeline] 总体质量评分: ${(validationResult.score * 100).toFixed(1)}%`);
+      
+      // 输出警告和建议
+      if (validationResult.errors.length > 0) {
+        console.warn(`[Pipeline] 验证错误: ${validationResult.errors.length} 个`);
+        validationResult.errors.slice(0, 3).forEach(err => {
+          console.warn(`  - ${err}`);
+        });
+      }
+      
+      if (validationResult.warnings.length > 0) {
+        console.log(`[Pipeline] 验证警告: ${validationResult.warnings.length} 条`);
+        validationResult.warnings.slice(0, 3).forEach(warn => {
+          console.log(`  - ${warn}`);
+        });
+      }
+      
+      // 将验证结果添加到context
+      context.data.validationResult = validationResult;
+      
+      // 如果质量评分过低，添加警告
+      if (validationResult.score < 0.7) {
+        context.warnings.push({
+          step: 'validation',
+          error: `知识图谱质量评分较低 (${(validationResult.score * 100).toFixed(1)}%)，建议检查实体名称和关系描述`,
+          timestamp: Date.now()
+        });
+      }
+      
+      // 记录指标
+      StepExecutor.recordMetrics('validation', {
+        entityNameScore: validationResult.details.entities.score,
+        relationDescriptionScore: validationResult.details.relations.score,
+        overallScore: validationResult.score,
+        entityErrors: validationResult.details.entities.errors.length,
+        relationErrors: validationResult.details.relations.errors.length,
+        totalErrors: validationResult.errors.length,
+        totalWarnings: validationResult.warnings.length,
+        passed: validationResult.passed,
+        tokenUsage: 0,  // 验证不使用LLM
+        apiCalls: 0
+      }, context);
+      
+      return validationResult;
+      
+    } catch (error) {
+      console.error(`[Pipeline] 人类可读性验证失败: ${error.message}`);
+      context.warnings.push({
+        step: 'validation',
+        error: `验证失败: ${error.message}`,
+        timestamp: Date.now()
+      });
+      
+      // 记录失败指标
+      StepExecutor.recordMetrics('validation', {
+        error: error.message,
+        tokenUsage: 0,
+        apiCalls: 0
+      }, context);
+      
+      return null;
+    }
   }
   
   /**
@@ -1989,7 +2495,7 @@ class UniversalDocumentPipeline {
       
       // 记录token使用
       const tokens = response._meta?.tokens || 0;
-      await tokenTracker.recordUsage({
+      await tokenTracker.recordTokenUsage({
         module: 'pipeline',
         operation: 'llm_schema_match',
         tokens: tokens,
@@ -2012,9 +2518,10 @@ class UniversalDocumentPipeline {
    * @param {Array} algorithmResults - 算法匹配结果
    * @param {Map} llmMatchesBySchema - LLM匹配结果（按Schema组织）
    * @param {Array} schemas - 所有候选Schema
+   * @param {Array} unmatchedFields - 未匹配的原始字段（用于查找LLM匹配字段的值）
    * @returns {Array} 合并后的Schema匹配结果
    */
-  _mergeMatchResults(algorithmResults, llmMatchesBySchema, schemas) {
+  _mergeMatchResults(algorithmResults, llmMatchesBySchema, schemas, unmatchedFields = []) {
     console.log('[Pipeline] 阶段3: 合并算法和LLM匹配结果...');
     
     const mergedResults = new Map();
@@ -2025,6 +2532,7 @@ class UniversalDocumentPipeline {
       mergedResults.set(schemaName, {
         schema: result.schema,
         schema_name: schemaName,
+        score: result.weightedCompleteness || result.completeness || 0,  // 🔧 添加score字段
         algorithmMatches: result.mappedFields || 0,
         llmMatches: 0,
         totalMatches: result.mappedFields || 0,
@@ -2075,6 +2583,9 @@ class UniversalDocumentPipeline {
           }
         }
         
+        // 🔧 更新score字段
+        existing.score = existing.weightedCompleteness;
+        
         // 添加LLM匹配的字段到normalizedFields
         for (const match of llmMatches) {
           // 检查是否已存在（避免重复）
@@ -2083,13 +2594,22 @@ class UniversalDocumentPipeline {
           );
           
           if (!exists) {
+            // 从unmatchedFields中查找原始字段值
+            // 注意: LLM返回的是field_name,不是original_field_name
+            const fieldName = match.field_name || match.original_field_name;
+            const originalField = unmatchedFields.find(f => 
+              f.name === fieldName ||
+              f.name.toLowerCase() === fieldName?.toLowerCase()
+            );
+            
             existing.normalizedFields.push({
               name: match.schema_field,
               standardName: match.schema_field,
-              value: '', // LLM匹配没有具体值
+              value: originalField ? originalField.value : '', // 🔧 使用原始字段值
               mappingMethod: 'llm',
               confidence: match.confidence,
-              reason: match.reason
+              reason: match.reason,
+              originalName: originalField ? originalField.name : fieldName
             });
           }
         }
@@ -2112,19 +2632,31 @@ class UniversalDocumentPipeline {
         mergedResults.set(schemaName, {
           schema: schema,
           schema_name: schemaName,
+          score: weightedCompleteness,  // 🔧 添加score字段
           algorithmMatches: 0,
           llmMatches: llmMatchCount,
           totalMatches: llmMatchCount,
           completeness: completeness,
           weightedCompleteness: weightedCompleteness,
-          normalizedFields: llmMatches.map(match => ({
-            name: match.schema_field,
-            standardName: match.schema_field,
-            value: '',
-            mappingMethod: 'llm',
-            confidence: match.confidence,
-            reason: match.reason
-          })),
+          normalizedFields: llmMatches.map(match => {
+            // 从unmatchedFields中查找原始字段值
+            // 注意: LLM返回的是field_name,不是original_field_name
+            const fieldName = match.field_name || match.original_field_name;
+            const originalField = unmatchedFields.find(f => 
+              f.name === fieldName ||
+              f.name.toLowerCase() === fieldName?.toLowerCase()
+            );
+            
+            return {
+              name: match.schema_field,
+              standardName: match.schema_field,
+              value: originalField ? originalField.value : '', // 🔧 使用原始字段值
+              mappingMethod: 'llm',
+              confidence: match.confidence,
+              reason: match.reason,
+              originalName: originalField ? originalField.name : fieldName
+            };
+          }),
           threshold: schema.threshold || 0.6
         });
       }
@@ -2211,5 +2743,6 @@ module.exports = {
   StepExecutor,
   BatchProcessor,
   DEFAULT_OPTIONS,
-  DEFAULT_BATCH_OPTIONS
+  DEFAULT_BATCH_OPTIONS,
+  COMPATIBILITY_MODE  // 🆕 导出兼容模式枚举
 };

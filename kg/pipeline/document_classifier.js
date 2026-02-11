@@ -88,11 +88,29 @@ class DocumentClassifier {
       photography: {
         keywords: [
           '摄影', '拍摄', '相机', '镜头', '光圈', '快门', 'ISO',
-          '曝光', '对焦', '构图', '景深', '白平衡', '测光', '防抖'
+          '曝光', '对焦', '构图', '景深', '白平衡', '测光', '防抖',
+          // 新增摄影参数关键词
+          '焦距', '焦段', 'mm', 'f值', 'F值', '感光度', '快门速度',
+          '曝光时间', '虚化', '背景虚化', '浅景深', '深景深',
+          '定焦', '变焦', '广角', '长焦', '标准镜头', '微距',
+          '人像', '风光', '街拍', '夜景', '运动', '建筑',
+          // 相机品牌和型号
+          '索尼', '尼康', '佳能', '富士', '徕卡', '宾得', '松下',
+          'Sony', 'Nikon', 'Canon', 'Fuji', 'Leica', 'Pentax', 'Panasonic',
+          'A7', 'D850', 'Z9', '5D', 'R5', 'X-T5', 'GFX',
+          // 摄影技巧
+          '三分法', '黄金分割', '对角线', '引导线', '框架构图',
+          '对称', '追随', '长曝光', '慢门', '高速快门',
+          // 摄影场景
+          '布光', '打光', '自然光', '人造光', '闪光灯', '反光板'
         ],
         fieldNames: [
           'Camera', 'Lens', 'ISO', 'Aperture', 'Shutter', 'Exposure',
-          'Focus', 'Composition', 'Weather', 'Time', 'Scene'
+          'Focus', 'Composition', 'Weather', 'Time', 'Scene',
+          // 新增字段名
+          'FocalLength', 'ShutterSpeed', 'Value', 'Speed', 'ModelName',
+          'LensName', 'TechniqueName', 'RuleName', 'SettingName',
+          'Effect', 'UseCase', 'NoiseLevel', 'Sensor', 'Features', 'Price'
         ],
         weight: 1.0
       },
@@ -279,8 +297,8 @@ class DocumentClassifier {
       personal: ['个人生活', '个人生活/学术', '生活'],
       travel: ['旅行', '旅行/休闲', '旅行/运动', '休闲/旅行'],
       sports: ['运动', '运动/休闲', '运动/旅行', '休闲/运动'],
-      photography: ['摄影'],
-      post_processing: ['后期'],
+      photography: ['摄影', '摄影教程', '摄影教程/技巧', '摄影教程/设置', '摄影教程/器材', '摄影/技巧', '摄影/设置', '摄影/器材'],
+      post_processing: ['后期', '后期处理', '摄影/后期'],
       entertainment: ['娱乐', '娱乐/旅行'],
       general: ['全场景']
     };
