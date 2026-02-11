@@ -29,6 +29,9 @@ function extractFields(text) {
   
   const fields = [];
   
+  // Extract generic fields (title, content) for general documents
+  fields.push(...extractGenericFields(text));
+  
   // Extract semantic fields (with context) - FIRST
   fields.push(...extractSemanticFields(text));
   
@@ -43,6 +46,39 @@ function extractFields(text) {
   
   // Extract indicator fields
   fields.push(...extractIndicatorFields(text));
+  
+  return fields;
+}
+
+/**
+ * Extract generic fields (title, content) for general documents
+ * @param {string} text - Input text
+ * @returns {Array} Generic fields
+ */
+function extractGenericFields(text) {
+  const fields = [];
+  
+  // Extract title from first line
+  const lines = text.split('\n').filter(line => line.trim());
+  if (lines.length > 0) {
+    const firstLine = lines[0].trim();
+    // Use first line as title (limit to 50 chars)
+    const title = firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine;
+    fields.push({
+      name: 'title',
+      value: title,
+      type: 'text',
+      confidence: 0.9
+    });
+  }
+  
+  // Extract content (the full text)
+  fields.push({
+    name: 'content',
+    value: text,
+    type: 'text',
+    confidence: 0.95
+  });
   
   return fields;
 }

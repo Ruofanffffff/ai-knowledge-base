@@ -1,59 +1,39 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { ErrorProvider, setGlobalErrorHandler, useError } from './contexts/ErrorContext';
-import { ErrorModal } from './components/ErrorModal/ErrorModal';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
-import Login from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
-import { DocumentsList } from './pages/DocumentsList';
-import { Chat } from './pages/Chat';
+import Documents from './pages/Documents';
 import { Graph } from './pages/Graph';
 import { Community } from './pages/Community';
 import { Settings } from './pages/Settings';
-
-function AppContent() {
-  const { showError } = useError();
-
-  useEffect(() => {
-    // Set global error handler for API interceptors
-    setGlobalErrorHandler(showError);
-  }, [showError]);
-
-  return (
-    <>
-      <ErrorModal />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route element={<ProtectedRoute />}>
-          <Route element={<Layout />}>
-            <Route path="/dashboard" element={<Dashboard onNavigate={() => {}} />} />
-            <Route path="/documents" element={<DocumentsList onNavigate={() => {}} />} />
-            <Route path="/graph" element={<Graph />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/community" element={<Community />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          </Route>
-        </Route>
-      </Routes>
-    </>
-  );
-}
+import Login from './pages/Login';
+import Register from './pages/Register';
+import DocumentDetail from './pages/DocumentDetail';
+import CreateDocument from './pages/CreateDocument';
+import { Editor } from './pages/Editor';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
   return (
-    <ErrorBoundary>
-      <BrowserRouter>
-        <ErrorProvider>
-          <AuthProvider>
-            <AppContent />
-          </AuthProvider>
-        </ErrorProvider>
-      </BrowserRouter>
-    </ErrorBoundary>
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/documents" element={<Documents />} />
+            <Route path="/documents/:id" element={<DocumentDetail />} />
+            <Route path="/documents/new" element={<CreateDocument />} />
+            <Route path="/graph" element={<Graph />} />
+            <Route path="/community" element={<Community />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/editor" element={<Editor />} />
+          </Route>
+        </Route>
+      </Routes>
+    </Router>
   );
 }
 

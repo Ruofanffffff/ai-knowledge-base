@@ -12,7 +12,11 @@
  * 5. 去重和过滤
  */
 
-const nodejieba = require('nodejieba');
+const Segment = require('segment');
+const segment = new Segment();
+
+// 配置segment库
+segment.useDefault();
 
 class UniversalExtractor {
   constructor() {
@@ -153,8 +157,23 @@ class UniversalExtractor {
    * @returns {Array} 关键词字段列表
    */
   _extractKeywordFields(text, minScore = 0.01) {
-    // 分词
-    const words = nodejieba.extract(text, 50);  // 提取Top 50关键词
+    // 使用segment库分词
+    const segmentedWords = segment.doSegment(text);
+    
+    // 计算词频
+    const wordFreq = {};
+    for (const item of segmentedWords) {
+      const word = item.w;
+      if (word.length < 2) continue;
+      if (this.stopWords.has(word)) continue;
+      wordFreq[word] = (wordFreq[word] || 0) + 1;
+    }
+    
+    // 转换为数组并按词频排序
+    const words = Object.entries(wordFreq)
+      .map(([word, freq]) => ({ word, weight: freq }))
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 50);  // 提取Top 50关键词
     
     const fields = [];
     
@@ -162,9 +181,9 @@ class UniversalExtractor {
       const word = item.word;
       const score = item.weight;
       
-      // Normalize score to 0-1 range (nodejieba returns TF-IDF scores that can be > 1)
-      // We'll use a simple normalization: divide by max score in the batch
-      const normalizedScore = Math.min(score / 100, 1.0);  // Assume max TF-IDF is ~100
+      // Normalize score to 0-1 range
+      const maxFreq = words.length > 0 ? words[0].weight : 1;
+      const normalizedScore = Math.min(score / maxFreq, 1.0);
       
       // 过滤停用词和低分词
       if (this.stopWords.has(word)) continue;

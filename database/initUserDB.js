@@ -130,6 +130,19 @@ function createTables(db) {
       UNIQUE (user_id, category_id)
     )`);
 
+    db.run(`CREATE TABLE IF NOT EXISTS summaries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      document_id INTEGER NOT NULL,
+      model VARCHAR(50) NOT NULL,
+      content TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+      UNIQUE (user_id, document_id, model)
+    )`);
+
     console.log('Database tables created successfully.');
     
     createDefaultAdmin(db);

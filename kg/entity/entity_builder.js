@@ -244,6 +244,11 @@ async function generateCanonicalName(fields, schema, ckb, options = {}) {
  * @returns {string} Canonical name
  */
 function generateRuleBasedName(fields, schema) {
+  if (!schema) {
+    console.error('[EntityBuilder] Schema is undefined in generateRuleBasedName');
+    return 'Unknown_Entity';
+  }
+  
   const entityType = schema.entity_type || 'GeneralEntity';
   
   // Rule 1: EventEntity - combine location, indicator, time

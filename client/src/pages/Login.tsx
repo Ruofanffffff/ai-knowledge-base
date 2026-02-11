@@ -79,11 +79,11 @@ export default function Login() {
              <img src={logo} alt="BrainBase Logo" className="w-full h-full object-contain relative z-10" />
           </motion.div>
           
-          <h1 className="text-3xl font-bold text-slate-900 mb-2 h-[40px]">
-            <Typewriter text="欢迎回来" />
+          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 mb-2">
+            拾思
           </h1>
           <p className="text-slate-500">
-            登录以访问您的智能知识库
+            拾思相伴，登录收纳每一刻灵感与知识
           </p>
         </div>
 
@@ -140,12 +140,11 @@ export default function Login() {
             className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white font-semibold py-4 rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span>{isLoading ? '登录中...' : '登录'}</span>
-            {!isLoading && <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />}
           </button>
         </div>
 
         <div className="mt-8 text-center text-sm text-slate-500">
-          还没有账号？ <button className="text-purple-600 font-semibold hover:underline">创建知识库</button>
+          还没有账号？ <button onClick={() => navigate('/register')} className="text-purple-600 font-semibold hover:underline">注册账号</button>
         </div>
       </motion.div>
     </div>

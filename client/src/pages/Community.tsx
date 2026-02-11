@@ -174,23 +174,23 @@ export function Community() {
   return (
     <div className="flex-1 h-full flex flex-col bg-white overflow-hidden">
       {/* Header / Search */}
-      <div className="h-16 px-6 flex items-center gap-4 bg-white z-20 shrink-0">
+      <div className="h-14 md:h-16 px-4 md:px-6 flex items-center gap-2 md:gap-4 bg-white z-20 shrink-0">
         <div className="flex-1 relative max-w-4xl">
-           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 md:w-5 md:h-5" />
            <input 
              type="text" 
              placeholder="搜索提示词、风格或创作者..." 
-             className="w-full bg-slate-100 hover:bg-slate-50 focus:bg-white border-transparent focus:border-purple-200 border rounded-full pl-10 pr-4 py-2.5 outline-none transition-all placeholder:text-slate-500"
+             className="w-full bg-slate-100 hover:bg-slate-50 focus:bg-white border-transparent focus:border-purple-200 border rounded-full pl-10 pr-4 py-2 md:py-2.5 outline-none transition-all placeholder:text-slate-500 text-sm"
              value={searchQuery}
              onChange={(e) => setSearchQuery(e.target.value)}
            />
            <button className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-slate-200 rounded-full text-slate-500">
-             <SlidersHorizontal size={16} />
+             <SlidersHorizontal size={14} className="md:w-4 md:h-4" />
            </button>
         </div>
         <div className="flex items-center gap-2">
-           <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-full font-medium text-sm hover:bg-slate-800 transition-colors">
-              <Wand2 size={16} /> 开始创作
+           <button className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-slate-900 text-white rounded-full font-medium text-sm hover:bg-slate-800 transition-colors">
+              <Wand2 size={14} className="md:w-4 md:h-4" /> <span className="hidden md:inline">开始创作</span>
            </button>
         </div>
       </div>

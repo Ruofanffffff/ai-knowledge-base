@@ -1,82 +1,32 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { Search, Filter, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, Filter, ZoomIn, ZoomOut, RefreshCw, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useApiData } from '../hooks/useApiData';
-import { apiService, type GraphNode as ApiGraphNode, type GraphLink as ApiGraphLink } from '../services/api';
-import LoadingSpinner from '../components/LoadingSpinner';
-import ErrorDisplay from '../components/ErrorDisplay';
-import EmptyState from '../components/EmptyState';
-
-interface Node extends ApiGraphNode {
-  x: number;
-  y: number;
-  r?: number;
-  degree?: number;
-}
-
-interface Link extends ApiGraphLink {
-}
+import { useGraph } from '../hooks/useGraph';
 
 export function Graph() {
-  // 1. Fetch graph data using our custom hook
-  const { 
-    data: nodesData, 
-    loading: nodesLoading, 
-    error: nodesError,
-    refetch: refetchNodes
-  } = useApiData(() => apiService.getGraphNodes(), []);
-
-  const { 
-    data: linksData, 
-    loading: linksLoading, 
-    error: linksError,
-    refetch: refetchLinks
-  } = useApiData(() => apiService.getGraphLinks(), []);
-
-  // 2. Helper functions (must be defined before useMemo)
-  const getColorByType = (type: string): string => {
-    const colorMap: Record<string, string> = {
-      'main': '#8b5cf6',
-      'sub': '#ec4899',
-      'leaf': '#a855f7',
-      'concept': '#3b82f6',
-      'entity': '#10b981',
-      'EventEntity': '#3b82f6',
-      'LocationEntity': '#10b981',
-      'PersonEntity': '#f59e0b',
-      'OrganizationEntity': '#8b5cf6',
-      'default': '#6b7280'
-    };
-    return colorMap[type] || colorMap['default'];
-  };
-
-  // 3. Local state for UI interactions
+  const { graphData, isLoading, error, fetchGraphData, refresh } = useGraph({ autoRefresh: true });
+  
+  // 1. Initial State
+  const [graphNodes, setGraphNodes] = useState(graphData.nodes);
+  const [graphLinks, setGraphLinks] = useState(graphData.links);
   const [viewState, setViewState] = useState({ x: 0, y: 0, zoom: 1 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  
+  // 当组件挂载时，获取初始数据
+  useEffect(() => {
+    fetchGraphData();
+  }, [fetchGraphData]);
+  
+  // 当graphData更新时，更新本地状态
+  useEffect(() => {
+    setGraphNodes(graphData.nodes);
+    setGraphLinks(graphData.links);
+  }, [graphData]);
 
-  // 4. Transform API data to include positions
-  const graphNodes = useMemo<Node[]>(() => {
-    if (!nodesData) return [];
-    
-    return nodesData.map((node) => ({
-      ...node,
-      x: node.x || 400 + (Math.random() - 0.5) * 400,
-      y: node.y || 300 + (Math.random() - 0.5) * 300,
-      color: node.color || getColorByType(node.type),
-    }));
-  }, [nodesData]);
-
-  const graphLinks = useMemo<Link[]>(() => {
-    return linksData || [];
-  }, [linksData]);
-
-  const loading = nodesLoading || linksLoading;
-  const error = nodesError || linksError;
-
-  // 5. Calculate dynamic radius and combine with state
+  // 2. Calculate dynamic radius and combine with state
   const nodes = useMemo(() => {
     const degree: Record<string, number> = {};
     graphLinks.forEach(link => {
@@ -107,8 +57,9 @@ export function Graph() {
     const x = ((e.clientX - rect.left) / rect.width) * 800;
     const y = ((e.clientY - rect.top) / rect.height) * 600;
 
-    // Update node position in local state (not persisted)
-    // In a real app, you might want to save positions to backend
+    setGraphNodes(prev => prev.map(n => 
+      n.id === draggedNode ? { ...n, x, y } : n
+    ));
   };
 
   // Handle mouse up
@@ -121,53 +72,52 @@ export function Graph() {
   const handleZoomOut = () => setViewState(prev => ({ ...prev, zoom: Math.max(prev.zoom / 1.2, 0.2) }));
   const handleReset = () => {
     setViewState({ x: 0, y: 0, zoom: 1 });
-    refetchNodes();
-    refetchLinks();
+    refresh();
   };
-
-  // 6. Loading and error states
-  if (loading) {
-    return <LoadingSpinner size="large" message="加载知识图谱中..." />;
-  }
-
-  if (error) {
-    return (
-      <ErrorDisplay 
-        title="加载失败"
-        message={error} 
-        onRetry={() => {
-          refetchNodes();
-          refetchLinks();
-        }} 
-      />
-    );
-  }
-
-  if (!nodes || nodes.length === 0) {
-    return (
-      <EmptyState 
-        message="知识图谱为空。请上传文档以构建知识图谱。上传文档后,系统会自动提取实体和关系。"
-      />
-    );
-  }
 
   return (
     <div className="flex-1 h-full flex flex-col bg-slate-50 relative overflow-hidden">
       {/* Toolbar */}
-      <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
+      <div className="absolute top-4 left-4 right-4 md:right-6 z-10 flex justify-between pointer-events-none">
          <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl p-2 flex gap-2 pointer-events-auto">
-            <button onClick={handleZoomIn} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="放大"><ZoomIn size={20} /></button>
-            <button onClick={handleZoomOut} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="缩小"><ZoomOut size={20} /></button>
-            <button onClick={handleReset} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="重置"><RefreshCw size={20} /></button>
+            <button onClick={handleZoomIn} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="放大"><ZoomIn size={16} /></button>
+            <button onClick={handleZoomOut} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="缩小"><ZoomOut size={16} /></button>
+            <button onClick={handleReset} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="重置">
+              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            </button>
             <div className="w-px h-6 bg-slate-200 my-auto" />
-            <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="筛选"><Filter size={20} /></button>
+            <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="筛选"><Filter size={16} /></button>
          </div>
          
-         <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl px-4 py-2 flex items-center gap-2 pointer-events-auto w-64">
+         <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl px-4 py-2 flex items-center gap-2 pointer-events-auto w-48 md:w-64">
             <Search size={16} className="text-slate-400" />
             <input type="text" placeholder="搜索节点..." className="bg-transparent outline-none text-sm w-full" />
          </div>
       </div>
+      
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
+          <div className="text-center">
+            <Loader2 size={40} className="animate-spin text-purple-600 mx-auto mb-2" />
+            <p className="text-slate-600">加载知识图谱数据...</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Error Message */}
+      {error && (
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
+          <div className="text-center max-w-md px-4">
+            <div className="text-red-500 mb-2">❌</div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-1">加载失败</h3>
+            <p className="text-slate-600 mb-4">无法加载知识图谱数据，请检查网络连接或稍后重试。</p>
+            <button onClick={refresh} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+              重试
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Graph Area */}
       <div className="w-full h-full">
@@ -206,6 +156,9 @@ export function Graph() {
               {graphLinks.map((link, i) => {
                  const source = nodes.find(n => n.id === link.source)!;
                  const target = nodes.find(n => n.id === link.target)!;
+                 
+                 // 跳过找不到源或目标节点的链接
+                 if (!source || !target) return null;
                  
                  const midX = (source.x + target.x) / 2;
                  const midY = (source.y + target.y) / 2;

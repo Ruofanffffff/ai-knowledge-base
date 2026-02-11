@@ -346,10 +346,47 @@ function validateRelation(relation, options = {}) {
   };
 }
 
+/**
+ * Build built-in relations for multiple entities
+ * 
+ * @param {Array} entities - Array of entities
+ * @returns {Promise<Array>} Array of built-in relations
+ */
+async function buildBuiltinRelations(entities) {
+  const allRelations = [];
+  
+  for (const entity of entities) {
+    try {
+      // Get schema for this entity
+      const schema = entity.schemas && entity.schemas.length > 0 
+        ? entity.schemas[0] 
+        : null;
+      
+      if (!schema) continue;
+      
+      // Get fields from entity attributes
+      const fields = Object.entries(entity.attributes).map(([name, value]) => ({
+        name,
+        value,
+        type: 'text'
+      }));
+      
+      // Build relations
+      const relations = await buildRelations(entity, schema, fields, entity.supported_by);
+      allRelations.push(...relations);
+    } catch (error) {
+      console.error(`Error building built-in relations for entity ${entity.entity_id}:`, error);
+    }
+  }
+  
+  return allRelations;
+}
+
 module.exports = {
   buildRelations,
   buildRelationFromTemplate,
   buildRelationsBatch,
+  buildBuiltinRelations,
   validateRelation,
   // Export for testing
   findOrCreateTargetEntity,

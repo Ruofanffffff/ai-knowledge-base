@@ -6,16 +6,29 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Sync currentPage with URL
   useEffect(() => {
-    const path = location.pathname.slice(1); // Remove leading slash
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const syncCurrentPage = (path: string) => {
     if (path) {
       setCurrentPage(path);
     }
+  };
+
+  useEffect(() => {
+    const path = location.pathname.slice(1);
+    syncCurrentPage(path);
   }, [location.pathname]);
 
-  // Navigate when page changes
   const handlePageChange = (page: string) => {
     setCurrentPage(page);
     navigate(`/${page}`);
@@ -24,8 +37,10 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-slate-50">
       <Sidebar currentPage={currentPage} setCurrentPage={handlePageChange} />
-      <main className="flex-1 overflow-auto p-6">
-        <Outlet />
+      <main className="flex-1 overflow-auto">
+        <div className={isMobile ? 'p-0' : 'p-6'}>
+          <Outlet />
+        </div>
       </main>
     </div>
   );

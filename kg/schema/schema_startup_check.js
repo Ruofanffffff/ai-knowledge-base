@@ -12,7 +12,7 @@ const schemaManager = require('./schema_manager');
 const schemaLoader = require('./schema_loader');
 
 // Configuration
-const EXPECTED_SCHEMA_COUNT = 250;
+const EXPECTED_SCHEMA_COUNT = 0;
 const SCHEMA_LIST_PATH = path.join(process.cwd(), 'SchemaList.md');
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 2000;

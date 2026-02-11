@@ -7,7 +7,7 @@
         </trust-anchors>
     </base-config>
     <domain-config>
-        <domain includeSubdomains="true">192.168.0.122</domain>
+        <domain includeSubdomains="true">192.168.0.119</domain>
         <trust-anchors>
             <certificates src="@raw/server" />
         </trust-anchors>

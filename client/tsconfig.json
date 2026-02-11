@@ -27,5 +27,6 @@
     }
   },
   "include": ["src"],
+  "exclude": ["src/supabase/functions/server"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

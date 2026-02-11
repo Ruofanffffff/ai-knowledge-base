@@ -23,7 +23,7 @@ async function filterLowQualityEntities(options = {}) {
     dryRun = false
   } = options;
 
-  const allEntities = await entityStore.getEntities({});
+  const allEntities = await entityStore.getAllEntities();
 
   const stats = {
     total: allEntities.length,
@@ -42,8 +42,8 @@ async function filterLowQualityEntities(options = {}) {
 
       if (entity.confidence < deleteThreshold) {
         if (!dryRun) {
-          await entityStore.deleteEntity(entity.id);
-          await confidenceEngine.cascadeDeleteRelations(entity.id);
+          await entityStore.deleteEntity(entity.entity_id);
+          await confidenceEngine.cascadeDeleteRelations(entity.entity_id);
         }
         stats.deleted++;
         deletedEntities.push(entity);
@@ -72,7 +72,7 @@ async function filterLowQualityRelations(options = {}) {
     dryRun = false
   } = options;
 
-  const allRelations = await relationStore.getRelations({});
+  const allRelations = await relationStore.getAllRelations();
 
   const stats = {
     total: allRelations.length,
@@ -91,7 +91,7 @@ async function filterLowQualityRelations(options = {}) {
 
       if (relation.confidence < deleteThreshold) {
         if (!dryRun) {
-          await relationStore.deleteRelation(relation.id);
+          await relationStore.deleteRelation(relation.relation_id);
         }
         stats.deleted++;
         deletedRelations.push(relation);
@@ -261,7 +261,7 @@ function resolveByLatest(values) {
 async function cleanOrphanedEntities(options = {}) {
   const { dryRun = false } = options;
 
-  const allEntities = await entityStore.getEntities({});
+  const allEntities = await entityStore.getAllEntities();
 
   const stats = {
     total: allEntities.length,
@@ -277,8 +277,8 @@ async function cleanOrphanedEntities(options = {}) {
       orphanedEntities.push(entity);
 
       if (!dryRun) {
-        await entityStore.deleteEntity(entity.id);
-        await confidenceEngine.cascadeDeleteRelations(entity.id);
+        await entityStore.deleteEntity(entity.entity_id);
+        await confidenceEngine.cascadeDeleteRelations(entity.entity_id);
         stats.deleted++;
       }
     }
