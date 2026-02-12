@@ -103,6 +103,65 @@ async function saveRelation(relation, options = {}) {
 }
 
 /**
+ * Save multiple relations in batch (OPTIMIZED)
+ * 
+ * @param {Array} relations - Array of relation objects
+ * @param {Object} options - Save options
+ * @returns {Promise<Array>} Array of saved relations
+ */
+async function saveRelationsBatch(relations, options = {}) {
+  const { skipDuplicateCheck = false } = options;
+  const saved = [];
+  
+  // Process in parallel batches
+  const batchSize = 50;
+  for (let i = 0; i < relations.length; i += batchSize) {
+    const batch = relations.slice(i, i + batchSize);
+    
+    const batchPromises = batch.map(async (relation) => {
+      try {
+        // Skip duplicate check if requested for performance
+        if (!skipDuplicateCheck) {
+          const existing = await findDuplicate(relation);
+          if (existing) {
+            return existing;
+          }
+        }
+        
+        // Prepare data for database
+        const data = {
+          sourceId: relation.source_id,
+          targetId: relation.target_id,
+          type: relation.type,
+          subtype: relation.subtype || null,
+          weight: relation.weight || null,
+          confidence: relation.confidence,
+          evidenceCkb: typeof relation.evidence_ckb === 'string' 
+            ? relation.evidence_ckb 
+            : JSON.stringify(relation.evidence_ckb || []),
+          evidenceText: relation.evidence_text || null,
+          metadata: typeof relation.metadata === 'string'
+            ? relation.metadata
+            : JSON.stringify(relation.metadata || {})
+        };
+        
+        // Save to database
+        const savedRelation = await prisma.kGRelation.create({ data });
+        return formatRelation(savedRelation);
+      } catch (error) {
+        console.error(`Error saving relation:`, error);
+        return null;
+      }
+    });
+    
+    const batchResults = await Promise.all(batchPromises);
+    saved.push(...batchResults.filter(r => r !== null));
+  }
+  
+  return saved;
+}
+
+/**
  * Save multiple relations in batch
  * 
  * @param {Array} relations - Array of relation objects
@@ -487,9 +546,16 @@ function tryParseJSON(jsonString, defaultValue) {
   }
 }
 
+// Aliases for backward compatibility
+const createRelation = saveRelation;
+const createRelations = saveRelationsBatch;
+
 module.exports = {
   saveRelation,
   saveRelations,
+  saveRelationsBatch,
+  createRelation,
+  createRelations,
   getRelationById,
   getRelationsByEntity,
   getOutgoingRelations,

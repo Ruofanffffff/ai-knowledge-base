@@ -13,6 +13,36 @@
 const { calculateRuleBasedCompleteness } = require('../prompts/schema_score');
 const performanceMonitor = require('../utils/performance_monitor');
 
+// Schema matching cache
+const schemaMatchCache = new Map();
+const CACHE_MAX_SIZE = 1000; // 最多缓存1000个结果
+const CACHE_TTL = 60 * 60 * 1000; // 缓存1小时
+
+/**
+ * Generate cache key from fields
+ * @param {Array} fields - Extracted fields
+ * @param {Array} schemas - Schema array
+ * @returns {string} Cache key
+ */
+function generateCacheKey(fields, schemas) {
+  // 使用字段名称和schema ID生成缓存键
+  const fieldNames = fields.map(f => f.name).sort().join(',');
+  const schemaIds = schemas.map(s => s.id || s.name).sort().join(',');
+  return `${fieldNames}|${schemaIds}`;
+}
+
+/**
+ * Clear expired cache entries
+ */
+function clearExpiredCache() {
+  const now = Date.now();
+  for (const [key, value] of schemaMatchCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      schemaMatchCache.delete(key);
+    }
+  }
+}
+
 /**
  * Match fields against multiple schemas and calculate completeness scores
  * 
@@ -60,6 +90,25 @@ function matchSchemas(fields, schemas, sourceConfidence = 1.0) {
       return [];
     }
     
+    // Check cache
+    const cacheKey = generateCacheKey(fields, schemas);
+    const cached = schemaMatchCache.get(cacheKey);
+    
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      // Cache hit
+      performanceMonitor.recordLocalProcessing({
+        match_time: Date.now() - startTime,
+        metadata: {
+          method: 'schema_matching',
+          cache_hit: true,
+          schemas_checked: schemas.length,
+          fields_count: fields.length
+        }
+      });
+      
+      return cached.result;
+    }
+    
     // Calculate completeness for each schema (even with empty fields)
     const schemaScores = schemas.map(schema => {
       return calculateCompleteness(fields, schema, sourceConfidence);
@@ -68,11 +117,23 @@ function matchSchemas(fields, schemas, sourceConfidence = 1.0) {
     // Sort by completeness score (descending)
     schemaScores.sort((a, b) => b.completeness - a.completeness);
     
+    // Store in cache
+    schemaMatchCache.set(cacheKey, {
+      result: schemaScores,
+      timestamp: Date.now()
+    });
+    
+    // Clear expired cache if too large
+    if (schemaMatchCache.size > CACHE_MAX_SIZE) {
+      clearExpiredCache();
+    }
+    
     // Record performance
     performanceMonitor.recordLocalProcessing({
       match_time: Date.now() - startTime,
       metadata: {
         method: 'schema_matching',
+        cache_hit: false,
         schemas_checked: schemas.length,
         matches_found: schemaScores.filter(s => s.meets_threshold).length,
         fields_count: fields.length

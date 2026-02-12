@@ -387,7 +387,14 @@ function createImageAnalysisService(config = {}) {
 }
 
 // Export singleton instance
-const defaultService = createImageAnalysisService();
+const defaultService = createImageAnalysisService({
+  llm: {
+    apiKey: process.env.VOLCENGINE_API_KEY || process.env.QWEN_API_KEY,
+    provider: process.env.MULTIMODAL_LLM_PROVIDER || 'volcengine',
+    model: process.env.MULTIMODAL_LLM_MODEL || 'seed1.8',
+    timeout: parseInt(process.env.MULTIMODAL_LLM_TIMEOUT) || 30000
+  }
+});
 
 module.exports = {
   ImageAnalysisService,

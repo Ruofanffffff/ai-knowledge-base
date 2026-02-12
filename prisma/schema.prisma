@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:../data/knowledge_graph.db"
 }
 
 // 用户表
@@ -451,6 +451,85 @@ model RelationType {
 }
 
 // ============================================
+// LLM Document Index Preprocessing Models
+// ============================================
+
+// 文档索引表
+// 存储LLM生成的文档索引叙述文本
+model DocumentIndex {
+  id           String   @id @default(uuid())
+  docId        String   @map("doc_id")
+  indexedText  String   @map("indexed_text")  // 索引叙述文本
+  metadata     String                         // JSON string: {generated_at, llm_model, token_count, fact_count, etc.}
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  @@map("document_index")
+  @@index([docId])
+  @@index([createdAt])
+}
+
+// 矫正记录表
+// 存储各个处理阶段的矫正操作记录
+model CorrectionRecord {
+  id               String   @id @default(uuid())
+  docId            String   @map("doc_id")
+  stage            String   // cbk_correction, field_correction, schema_correction, merge_correction, relation_correction
+  correctionType   String   @map("correction_type")  // supplement, filter, verify, adjust
+  originalValue    String?  @map("original_value")   // JSON string
+  correctedValue   String?  @map("corrected_value")  // JSON string
+  confidenceBefore Float?   @map("confidence_before")
+  confidenceAfter  Float?   @map("confidence_after")
+  metadata         String?                           // JSON string: additional context
+  createdAt        DateTime @default(now()) @map("created_at")
+  
+  @@map("correction_record")
+  @@index([docId])
+  @@index([stage])
+  @@index([docId, stage])
+  @@index([createdAt])
+}
+
+// 矫正统计表
+// 存储各个处理阶段的矫正统计信息
+model CorrectionStats {
+  id               String   @id @default(uuid())
+  docId            String   @map("doc_id")
+  stage            String   // cbk_correction, field_correction, schema_correction, merge_correction, relation_correction
+  totalCorrections Int      @default(0) @map("total_corrections")
+  accuracyBefore   Float?   @map("accuracy_before")
+  accuracyAfter    Float?   @map("accuracy_after")
+  recallBefore     Float?   @map("recall_before")
+  recallAfter      Float?   @map("recall_after")
+  precisionBefore  Float?   @map("precision_before")
+  precisionAfter   Float?   @map("precision_after")
+  metadata         String?                          // JSON string: additional metrics
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  
+  @@map("correction_stats")
+  @@unique([docId, stage])
+  @@index([docId])
+  @@index([stage])
+}
+
+// 图谱描述表
+// 存储知识图谱的自然语言描述
+model GraphDescription {
+  id              String   @id @default(uuid())
+  docId           String   @map("doc_id")
+  descriptionType String   @map("description_type")  // brief, detailed
+  description     String                             // 图谱描述文本
+  metadata        String?                            // JSON string: {entity_count, relation_count, etc.}
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@map("graph_description")
+  @@index([docId])
+  @@index([descriptionType])
+}
+
+// ============================================
 // Notes Feature Models
 // ============================================
 
@@ -458,8 +537,8 @@ model RelationType {
 model Note {
   id          String       @id @default(uuid())
   userId      String       @map("user_id")
-  content     String       @db.Text
-  tags        String[]
+  content     String
+  tags        String       // JSON string for SQLite compatibility
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
   
@@ -468,22 +547,14 @@ model Note {
   
   @@map("notes")
   @@index([userId])
-  @@index([tags])
   @@index([createdAt])
-}
-
-// 附件类型枚举
-enum AttachmentType {
-  IMAGE
-  DOCUMENT
-  TABLE
 }
 
 // 附件表
 model Attachment {
   id          String              @id @default(uuid())
   noteId      String              @map("note_id")
-  type        AttachmentType
+  type        String              // Changed from enum to String for SQLite
   storageKey  String              @map("storage_key")  // S3对象键
   url         String
   size        Int
@@ -502,13 +573,52 @@ model Attachment {
 model AttachmentAnalysis {
   id           String     @id @default(uuid())
   attachmentId String     @unique @map("attachment_id")
-  textContent  String?    @map("text_content") @db.Text
-  description  String?    @db.Text
-  tags         String[]
-  metadata     Json
+  textContent  String?    @map("text_content")
+  description  String?
+  tags         String     // JSON string for SQLite compatibility
+  metadata     String     // JSON string for SQLite compatibility
   createdAt    DateTime   @default(now()) @map("created_at")
   
   attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
   
   @@map("attachment_analysis")
+}
+
+// ============================================
+// KG Post-Processing Cleaned Models (图谱字段表)
+// ============================================
+
+// 清洗实体表 — 图谱字段表的实体部分
+model CleanedEntity {
+  id              String   @id @default(uuid())
+  cleanedName     String   @map("cleaned_name")      // 清洗后名称，≤6个字
+  description     String                              // 清洗后描述，≤20个字
+  sourceEntityIds String   @map("source_entity_ids")  // JSON string: 关联的原始 KGEntity ID 列表
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  relationsAsSource CleanedRelation[] @relation("CleanedSourceEntity")
+  relationsAsTarget CleanedRelation[] @relation("CleanedTargetEntity")
+
+  @@map("cleaned_entities")
+  @@index([cleanedName])
+}
+
+// 清洗关系表 — 图谱字段表的关系部分
+model CleanedRelation {
+  id                String   @id @default(uuid())
+  cleanedName       String   @map("cleaned_name")        // 清洗后关系名称，≤4个字
+  description       String                                // 关系描述
+  sourceEntityId    String   @map("source_entity_id")     // 关联的 CleanedEntity（源）
+  targetEntityId    String   @map("target_entity_id")     // 关联的 CleanedEntity（目标）
+  sourceRelationIds String   @map("source_relation_ids")  // JSON string: 关联的原始 KGRelation ID 列表
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  source CleanedEntity @relation("CleanedSourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
+  target CleanedEntity @relation("CleanedTargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
+
+  @@map("cleaned_relations")
+  @@index([sourceEntityId])
+  @@index([targetEntityId])
 }

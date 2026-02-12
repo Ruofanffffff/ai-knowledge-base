@@ -685,6 +685,7 @@ router.get('/entities/:id', authMiddleware, async (req, res) => {
     if (includeCKBs && entity.supported_by && entity.supported_by.length > 0) {
       const ckbs = [];
       for (const ckbId of entity.supported_by) {
+        if (!ckbId) continue; // Skip null/undefined entries
         const ckb = await ckbStore.getCKB(ckbId);
         if (ckb) ckbs.push(ckb);
       }
@@ -2358,7 +2359,9 @@ router.get('/', authMiddleware, async (req, res) => {
       source: relation.source_id,
       target: relation.target_id,
       relation: relation.subtype || relation.type,
-      confidence: relation.confidence
+      confidence: relation.confidence,
+      // Include human-readable description if available
+      description: relation.metadata?.description || null
     }));
     
     res.json({

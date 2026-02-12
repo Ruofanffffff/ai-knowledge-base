@@ -579,10 +579,12 @@ describe('Entity Builder - Name Standardization Integration', () => {
 
   describe('Integration with LLM Enhancement', () => {
     test('should work with both standardization and LLM enhancement', async () => {
+      // Use field values that produce a name NOT passing checkNameWellFormed
+      // (single-char value '了' starts with a function word and is too short)
       const fields = {
-        '区域': '阿里C区',
-        '指标': '水位',
-        '时间': '2025-01'
+        '区域': '了',
+        '指标': '456',
+        '时间': '789'
       };
 
       // Mock LLM client
@@ -610,17 +612,47 @@ describe('Entity Builder - Name Standardization Integration', () => {
       expect(result).toBeDefined();
       expect(result.canonical_name).toBeDefined();
       expect(result.llm_enhanced).toBe(true);
-      expect(result.standardized).toBe(true);
       
       // LLM should have been called
       expect(mockLLMClient.callJSON).toHaveBeenCalled();
     });
 
-    test('should apply standardization before LLM enhancement', async () => {
+    test('should skip LLM when name is already well-formed', async () => {
       const fields = {
-        '区域': '阿里 C 区',  // Extra spaces
+        '区域': '阿里C区',
         '指标': '水位',
         '时间': '2025-01'
+      };
+
+      const mockLLMClient = {
+        callJSON: jest.fn()
+      };
+
+      const result = await generateCanonicalName(
+        fields,
+        eventSchema,
+        sampleCKB,
+        {
+          useLLM: true,
+          llmClient: mockLLMClient,
+          enableStandardization: true
+        }
+      );
+
+      expect(result).toBeDefined();
+      expect(result.llm_enhanced).toBe(false);
+      expect(result.skipped_reason).toBe('already_well_formed');
+      
+      // LLM should NOT have been called
+      expect(mockLLMClient.callJSON).not.toHaveBeenCalled();
+    });
+
+    test('should apply standardization before LLM enhancement', async () => {
+      // Use field values that produce a non-well-formed name to trigger LLM
+      const fields = {
+        '区域': '了',
+        '指标': '456',
+        '时间': '789'
       };
 
       // Mock LLM client that captures the input

@@ -182,7 +182,8 @@ async function extractFields(ckb, options = {}) {
         useUniversal,
         minFieldCount,
         forceLLM,
-        trackTokens
+        trackTokens,
+        llmClient: options.llmClient  // 🆕 传递 llmClient 参数
       }
     );
     const extractionTime = Date.now() - extractionStart;
@@ -288,8 +289,15 @@ async function executeStrategy(ckb, strategy, domain, schema, options) {
  * Rule+NER extraction first, LLM fallback if insufficient
  */
 async function executeRuleFirst(ckb, text, options) {
-  const { useRules, useNER, useLLM, useUniversal, minFieldCount } = options;
+  const { useRules, useNER, useLLM, useUniversal, minFieldCount, llmClient } = options;
   let allFields = [];
+  
+  // 🆕 提前检查 LLM client 是否可用
+  const llmAvailable = llmClient !== null && llmClient !== undefined;
+  
+  if (!llmAvailable && useLLM) {
+    console.log('[FieldExtractor] LLM client not available, skipping LLM fallback');
+  }
   
   // Step 0: Universal extraction (if enabled)
   if (useUniversal) {
@@ -321,8 +329,8 @@ async function executeRuleFirst(ckb, text, options) {
   // Deduplicate
   allFields = ruleExtractor.deduplicateFields(allFields);
   
-  // Step 3: LLM fallback if insufficient fields
-  if (useLLM && llmExtractor.shouldUseLLM(allFields, minFieldCount)) {
+  // Step 3: LLM fallback if insufficient fields (只有在 LLM 可用时才执行)
+  if (useLLM && llmAvailable && llmExtractor.shouldUseLLM(allFields, minFieldCount)) {
     console.log('Rule+NER extraction insufficient, using LLM fallback');
     
     try {
@@ -344,11 +352,14 @@ async function executeRuleFirst(ckb, text, options) {
  * LLM extraction first, Rule+NER fallback if LLM fails
  */
 async function executeLLMFirst(ckb, text, domain, schema, options) {
-  const { useRules, useNER, useLLM } = options;
+  const { useRules, useNER, useLLM, llmClient } = options;
   let allFields = [];
   
-  // Step 1: Try LLM extraction first
-  if (useLLM) {
+  // 🆕 提前检查 LLM client 是否可用
+  const llmAvailable = llmClient !== null && llmClient !== undefined;
+  
+  // Step 1: Try LLM extraction first (只有在 LLM 可用时)
+  if (useLLM && llmAvailable) {
     try {
       const llmFields = await llmExtractor.extractFieldsWithLLM(ckb, [], {
         domain,
@@ -375,6 +386,23 @@ async function executeLLMFirst(ckb, text, domain, schema, options) {
       
       allFields = ruleExtractor.deduplicateFields(allFields);
     }
+  } else if (!llmAvailable) {
+    console.log('[FieldExtractor] LLM client not available, using Rule+NER only');
+    
+    // Use Rule+NER directly
+    if (useRules) {
+      const ruleFields = ruleExtractor.extractFields(text);
+      console.log(`Rule extraction found ${ruleFields.length} fields`);
+      allFields = ruleFields;
+    }
+    
+    if (useNER) {
+      const nerEntities = nerExtractor.extractEntities(text);
+      console.log(`NER extraction found ${nerEntities.length} entities`);
+      allFields = nerExtractor.mergeWithRuleFields(allFields, nerEntities);
+    }
+    
+    allFields = ruleExtractor.deduplicateFields(allFields);
   }
   
   return allFields;
@@ -385,10 +413,13 @@ async function executeLLMFirst(ckb, text, domain, schema, options) {
  * LLM semantic extraction only, no rule-based methods
  */
 async function executeSemanticOnly(ckb, text, domain, schema, options) {
-  const { useRules, useNER, useLLM } = options;
+  const { useRules, useNER, useLLM, llmClient } = options;
   let allFields = [];
   
-  if (useLLM) {
+  // 🆕 提前检查 LLM client 是否可用
+  const llmAvailable = llmClient !== null && llmClient !== undefined;
+  
+  if (useLLM && llmAvailable) {
     try {
       const llmFields = await llmExtractor.extractFieldsWithLLM(ckb, [], {
         domain,
@@ -415,6 +446,23 @@ async function executeSemanticOnly(ckb, text, domain, schema, options) {
       
       allFields = ruleExtractor.deduplicateFields(allFields);
     }
+  } else if (!llmAvailable) {
+    console.log('[FieldExtractor] LLM client not available for semantic-only, falling back to Rule+NER');
+    
+    // Fallback to Rule+NER
+    if (useRules) {
+      const ruleFields = ruleExtractor.extractFields(text);
+      console.log(`Rule extraction found ${ruleFields.length} fields`);
+      allFields = ruleFields;
+    }
+    
+    if (useNER) {
+      const nerEntities = nerExtractor.extractEntities(text);
+      console.log(`NER extraction found ${nerEntities.length} entities`);
+      allFields = nerExtractor.mergeWithRuleFields(allFields, nerEntities);
+    }
+    
+    allFields = ruleExtractor.deduplicateFields(allFields);
   }
   
   return allFields;
@@ -425,7 +473,10 @@ async function executeSemanticOnly(ckb, text, domain, schema, options) {
  * Run Rule+NER and LLM in parallel, merge results
  */
 async function executeHybrid(ckb, text, domain, schema, options) {
-  const { useRules, useNER, useLLM } = options;
+  const { useRules, useNER, useLLM, llmClient } = options;
+  
+  // 🆕 提前检查 LLM client 是否可用
+  const llmAvailable = llmClient !== null && llmClient !== undefined;
   
   // Run Rule+NER and LLM in parallel
   const promises = [];
@@ -449,8 +500,8 @@ async function executeHybrid(ckb, text, domain, schema, options) {
   
   promises.push(ruleNerPromise);
   
-  // LLM extraction
-  if (useLLM) {
+  // LLM extraction (只有在 LLM 可用时)
+  if (useLLM && llmAvailable) {
     const llmPromise = llmExtractor.extractFieldsWithLLM(ckb, [], {
       domain,
       useSemantic: true,
@@ -461,6 +512,8 @@ async function executeHybrid(ckb, text, domain, schema, options) {
     });
     
     promises.push(llmPromise);
+  } else if (useLLM && !llmAvailable) {
+    console.log('[FieldExtractor] LLM client not available for hybrid mode, using Rule+NER only');
   }
   
   // Wait for both to complete

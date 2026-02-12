@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API 直接测试</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .info {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .success {
+      background: #e8f5e9;
+      border-left: 4px solid #4caf50;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .error {
+      background: #ffebee;
+      border-left: 4px solid #f44336;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .result {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background: #f5f5f5;
+      font-weight: 600;
+      color: #333;
+    }
+    tr:hover {
+      background: #fafafa;
+    }
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    pre {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .timestamp {
+      color: #999;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 API 直接测试工具</h1>
+    <p class="subtitle">绕过前端框架，直接测试后端 API 响应</p>
+
+    <div class="info">
+      <strong>📋 说明：</strong>
+      <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+        <li>此页面直接调用后端 API，不经过 React 组件</li>
+        <li>可以帮助确定问题是在后端还是前端缓存</li>
+        <li>每次点击都会发送新的请求，不使用任何缓存</li>
+      </ul>
+    </div>
+
+    <div>
+      <button onclick="testDocumentsAPI()">📄 测试 /api/documents</button>
+      <button onclick="clearAllCache()">🗑️ 清除所有缓存</button>
+      <button onclick="checkToken()">🔑 检查 Token</button>
+      <button onclick="location.reload()">🔄 刷新页面</button>
+    </div>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const resultDiv = document.getElementById('result');
+
+    function showLoading(message) {
+      resultDiv.innerHTML = `
+        <div class="info">
+          <div class="loading"></div>
+          <strong>${message}</strong>
+        </div>
+      `;
+    }
+
+    function showSuccess(title, content) {
+      resultDiv.innerHTML = `
+        <div class="success">
+          <strong>✅ ${title}</strong>
+        </div>
+        ${content}
+        <div class="timestamp">测试时间: ${new Date().toLocaleString('zh-CN')}</div>
+      `;
+    }
+
+    function showError(title, message) {
+      resultDiv.innerHTML = `
+        <div class="error">
+          <strong>❌ ${title}</strong>
+          <p style="margin: 10px 0 0 0;">${message}</p>
+        </div>
+        <div class="timestamp">测试时间: ${new Date().toLocaleString('zh-CN')}</div>
+      `;
+    }
+
+    async function testDocumentsAPI() {
+      showLoading('正在请求 /api/documents...');
+
+      try {
+        const token = localStorage.getItem('auth_token');
+        
+        if (!token) {
+          showError('未找到认证 Token', '请先登录系统');
+          return;
+        }
+
+        // 添加随机参数防止缓存
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/documents?_t=${timestamp}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        // 显示结果
+        let tableHTML = '';
+        if (Array.isArray(data) && data.length > 0) {
+          tableHTML = `
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>标题</th>
+                  <th>类型</th>
+                  <th>创建时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.map(doc => `
+                  <tr>
+                    <td>${doc.id}</td>
+                    <td>${doc.title}</td>
+                    <td>${doc.fileType || doc.type || 'N/A'}</td>
+                    <td>${new Date(doc.createdAt).toLocaleString('zh-CN')}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+        } else {
+          tableHTML = '<p style="color: #999; margin-top: 15px;">没有找到文档</p>';
+        }
+
+        const jsonHTML = `
+          <details style="margin-top: 20px;">
+            <summary style="cursor: pointer; font-weight: 600; margin-bottom: 10px;">
+              📋 查看完整 JSON 响应
+            </summary>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          </details>
+        `;
+
+        showSuccess(
+          `成功获取 ${Array.isArray(data) ? data.length : 0} 个文档`,
+          `<div class="result">${tableHTML}${jsonHTML}</div>`
+        );
+
+      } catch (error) {
+        showError('请求失败', error.message);
+        console.error('API 测试错误:', error);
+      }
+    }
+
+    async function clearAllCache() {
+      showLoading('正在清除所有缓存...');
+
+      try {
+        // 清除 localStorage
+        const itemsCleared = [];
+        const keysToKeep = ['auth_token']; // 保留 token
+        
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && !keysToKeep.includes(key)) {
+            localStorage.removeItem(key);
+            itemsCleared.push(key);
+          }
+        }
+
+        // 清除 sessionStorage
+        sessionStorage.clear();
+
+        // 尝试清除 Service Worker 缓存
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+          }
+        }
+
+        // 尝试清除 Cache API
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map(name => caches.delete(name)));
+        }
+
+        showSuccess(
+          '缓存清除完成',
+          `
+            <div class="result">
+              <p><strong>已清除：</strong></p>
+              <ul>
+                <li>LocalStorage 项: ${itemsCleared.length > 0 ? itemsCleared.join(', ') : '无'}</li>
+                <li>SessionStorage: 已清除</li>
+                <li>Service Workers: 已注销</li>
+                <li>Cache API: 已清除</li>
+              </ul>
+              <p style="margin-top: 15px; color: #666;">
+                <strong>注意：</strong>auth_token 已保留，无需重新登录
+              </p>
+            </div>
+          `
+        );
+
+      } catch (error) {
+        showError('清除缓存失败', error.message);
+        console.error('清除缓存错误:', error);
+      }
+    }
+
+    function checkToken() {
+      const token = localStorage.getItem('auth_token');
+      
+      if (token) {
+        // 尝试解析 JWT
+        try {
+          const parts = token.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            const exp = payload.exp ? new Date(payload.exp * 1000) : null;
+            const isExpired = exp && exp < new Date();
+            
+            showSuccess(
+              'Token 信息',
+              `
+                <div class="result">
+                  <p><strong>Token 状态：</strong>${isExpired ? '❌ 已过期' : '✅ 有效'}</p>
+                  <p><strong>用户 ID：</strong>${payload.userId || 'N/A'}</p>
+                  <p><strong>用户名：</strong>${payload.username || 'N/A'}</p>
+                  ${exp ? `<p><strong>过期时间：</strong>${exp.toLocaleString('zh-CN')}</p>` : ''}
+                  <details style="margin-top: 15px;">
+                    <summary style="cursor: pointer; font-weight: 600;">查看完整 Token</summary>
+                    <pre>${token}</pre>
+                  </details>
+                </div>
+              `
+            );
+          } else {
+            showError('Token 格式错误', 'Token 不是有效的 JWT 格式');
+          }
+        } catch (error) {
+          showError('Token 解析失败', error.message);
+        }
+      } else {
+        showError('未找到 Token', '请先登录系统');
+      }
+    }
+
+    // 页面加载时自动检查 token
+    window.addEventListener('load', () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        resultDiv.innerHTML = `
+          <div class="error">
+            <strong>⚠️ 未登录</strong>
+            <p style="margin: 10px 0 0 0;">请先登录系统，然后再访问此页面</p>
+          </div>
+        `;
+      } else {
+        resultDiv.innerHTML = `
+          <div class="info">
+            <strong>✅ 已登录</strong>
+            <p style="margin: 10px 0 0 0;">点击上方按钮开始测试</p>
+          </div>
+        `;
+      }
+    });
+  </script>
+</body>
+</html>

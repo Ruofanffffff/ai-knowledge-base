@@ -59,8 +59,16 @@ export default function DocumentDetail() {
       setIsLoading(true);
       const response = await apiClient.get(`/documents/${documentId}`);
       setDocument(response.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('加载文档失败:', error);
+      
+      // If document not found (404), redirect to documents list
+      if (error.response?.status === 404 || error.message?.includes('404') || error.message?.includes('not found')) {
+        console.warn('Document not found, redirecting to documents list');
+        setTimeout(() => {
+          navigate('/documents');
+        }, 2000); // Give user time to see the error message
+      }
     } finally {
       setIsLoading(false);
     }
@@ -161,7 +169,10 @@ export default function DocumentDetail() {
   if (!document) {
     return (
       <div className="flex-1 h-full flex items-center justify-center bg-slate-50/50">
-        <div className="text-slate-500">文档不存在</div>
+        <div className="text-center">
+          <div className="text-slate-500 text-lg mb-2">文档不存在</div>
+          <div className="text-slate-400 text-sm">正在返回文档列表...</div>
+        </div>
       </div>
     );
   }

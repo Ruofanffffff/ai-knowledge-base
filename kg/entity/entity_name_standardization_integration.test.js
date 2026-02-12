@@ -313,9 +313,10 @@ describe('Entity Name Standardization Integration', () => {
         }
       };
 
-      // Mock standardizer response
+      // Mock standardizer response — return a non-well-formed name (only digits/special chars)
+      // so that LLM enhancement is triggered
       mockStandardizer.standardizeName.mockReturnValue({
-        name: 'ISO_100_Sensitivity',
+        name: '100_',
         confidence: 0.9,
         method: 'algorithm'
       });
@@ -340,15 +341,62 @@ describe('Entity Name Standardization Integration', () => {
       // Verify standardizer was called first
       expect(mockStandardizer.standardizeName).toHaveBeenCalled();
 
-      // Verify LLM received standardized name
+      // Verify LLM received standardized name (non-well-formed triggers LLM)
       expect(mockLLMClient.callJSON).toHaveBeenCalled();
       const llmPrompt = mockLLMClient.callJSON.mock.calls[0][0];
-      expect(llmPrompt).toContain('ISO_100_Sensitivity');
+      expect(llmPrompt).toContain('100_');
 
       // Verify final result uses LLM-enhanced name
       expect(result.canonical_name).toBe('ISO_100_Sensitivity_Enhanced');
       expect(result.llm_enhanced).toBe(true);
-      expect(result.standardized).toBe(true);
+    });
+
+    test('should skip LLM when standardized name is already well-formed', async () => {
+      const fields = {
+        'ISO': '100'
+      };
+
+      const schema = {
+        schema_name: 'Photography',
+        entity_type: 'PhotographyEntity',
+        core_fields: [
+          { name: 'ISO', weight: 1.0 }
+        ]
+      };
+
+      const ckb = {
+        ckb_id: 'ckb1',
+        doc_id: 'doc1',
+        content: {
+          text: 'ISO 100 setting'
+        }
+      };
+
+      // Mock standardizer response — return a well-formed name
+      mockStandardizer.standardizeName.mockReturnValue({
+        name: 'ISO_100_Sensitivity',
+        confidence: 0.9,
+        method: 'algorithm'
+      });
+
+      const mockLLMClient = {
+        callJSON: jest.fn()
+      };
+
+      const result = await generateCanonicalName(fields, schema, ckb, {
+        useLLM: true,
+        llmClient: mockLLMClient,
+        enableStandardization: true
+      });
+
+      // Verify standardizer was called
+      expect(mockStandardizer.standardizeName).toHaveBeenCalled();
+
+      // LLM should NOT be called — name is already well-formed
+      expect(mockLLMClient.callJSON).not.toHaveBeenCalled();
+      expect(result.llm_enhanced).toBe(false);
+      expect(result.skipped_reason).toBe('already_well_formed');
+      expect(result.canonical_name).toBe('ISO_100_Sensitivity');
     });
   });
 

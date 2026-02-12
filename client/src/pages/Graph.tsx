@@ -2,9 +2,10 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Search, Filter, ZoomIn, ZoomOut, RefreshCw, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useGraph } from '../hooks/useGraph';
+import apiClient from '../api/client';
 
 export function Graph() {
-  const { graphData, isLoading, error, fetchGraphData, refresh } = useGraph({ autoRefresh: true });
+  const { graphData, isLoading, error, fetchGraphData, refresh } = useGraph({ autoRefresh: false });
   
   // 1. Initial State
   const [graphNodes, setGraphNodes] = useState(graphData.nodes);
@@ -14,16 +15,22 @@ export function Graph() {
   const [isDragging, setIsDragging] = useState(false);
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const savedViewState = useRef({ x: 0, y: 0, zoom: 1 });
   
   // 当组件挂载时，获取初始数据
   useEffect(() => {
     fetchGraphData();
-  }, [fetchGraphData]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
-  // 当graphData更新时，更新本地状态
+  // 当graphData更新时，更新本地状态并恢复视图
   useEffect(() => {
     setGraphNodes(graphData.nodes);
     setGraphLinks(graphData.links);
+    
+    // Restore view state if it was saved
+    if (savedViewState.current.zoom !== 1 || savedViewState.current.x !== 0 || savedViewState.current.y !== 0) {
+      setViewState(savedViewState.current);
+    }
   }, [graphData]);
 
   // 2. Calculate dynamic radius and combine with state
@@ -36,8 +43,21 @@ export function Graph() {
 
     return graphNodes.map(node => {
       const count = degree[node.id] || 0;
-      const r = 25 + (count * 8); 
-      return { ...node, r, degree: count };
+      const r = 25 + (count * 8);
+      
+      // 截断长标签，保留前20个字符
+      const truncateLabel = (label: string, maxLength: number = 20) => {
+        if (label.length <= maxLength) return label;
+        return label.substring(0, maxLength) + '...';
+      };
+      
+      return { 
+        ...node, 
+        r, 
+        degree: count,
+        displayLabel: truncateLabel(node.label),
+        fullLabel: node.label
+      };
     });
   }, [graphNodes, graphLinks]);
 
@@ -118,7 +138,7 @@ export function Graph() {
           </div>
         </div>
       )}
-
+      
       {/* Graph Area */}
       <div className="w-full h-full">
          <svg 
@@ -197,7 +217,7 @@ export function Graph() {
                         className="pointer-events-none select-none font-sans font-medium"
                         opacity={hoveredNode && (hoveredNode !== source.id && hoveredNode !== target.id) ? 0.2 : 1}
                       >
-                        {link.relation}
+                        {link.description || link.relation}
                       </text>
                     </g>
                  );
@@ -252,7 +272,7 @@ export function Graph() {
                           fontWeight="600"
                           className="pointer-events-none select-none font-sans"
                        >
-                          {node.label}
+                          {node.displayLabel}
                        </text>
                     </g>
                  );
@@ -263,9 +283,9 @@ export function Graph() {
 
       {/* Info Panel */}
       {hoveredNode && (
-         <div className="absolute bottom-6 right-6 w-64 bg-white/90 backdrop-blur rounded-xl shadow-lg border border-slate-200 p-4 animate-in fade-in slide-in-from-bottom-4 pointer-events-none">
-            <h3 className="font-bold text-slate-800">
-               {nodes.find(n => n.id === hoveredNode)?.label}
+         <div className="absolute bottom-6 right-6 w-80 bg-white/90 backdrop-blur rounded-xl shadow-lg border border-slate-200 p-4 animate-in fade-in slide-in-from-bottom-4 pointer-events-none">
+            <h3 className="font-bold text-slate-800 break-words">
+               {nodes.find(n => n.id === hoveredNode)?.fullLabel}
             </h3>
             <p className="text-xs text-slate-500 mt-1">
                {nodes.find(n => n.id === hoveredNode)?.type === 'main' ? '核心概念' : '相关主题'}

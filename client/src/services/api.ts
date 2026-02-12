@@ -1,5 +1,10 @@
 import apiClient from '../api/client';
 import type { ApiResponse } from '../api/types';
+import type { 
+  KGStatus, 
+  KGStatusResponse, 
+  RebuildResponse 
+} from '../types/kg-status';
 
 // ============================================================================
 // Type Definitions
@@ -79,14 +84,72 @@ export interface Recommendation {
 }
 
 // ============================================================================
+// Cache Interface
+// ============================================================================
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+// ============================================================================
 // API Service Class
 // ============================================================================
 
 class ApiService {
-  private baseURL: string;
+  // Cache for KG status responses (1 second TTL)
+  private statusCache: Map<string, CacheEntry<ApiResponse<KGStatus>>> = new Map();
+  private batchStatusCache: Map<string, CacheEntry<ApiResponse<KGStatus[]>>> = new Map();
+  private readonly CACHE_TTL = 1000; // 1 second in milliseconds
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+    // API base URL is configured in apiClient
+  }
+
+  /**
+   * Get cached response if available and not expired
+   */
+  private getCachedResponse<T>(
+    cache: Map<string, CacheEntry<ApiResponse<T>>>,
+    key: string
+  ): ApiResponse<T> | null {
+    const entry = cache.get(key);
+    if (!entry) {
+      return null;
+    }
+
+    const now = Date.now();
+    if (now - entry.timestamp > this.CACHE_TTL) {
+      // Cache expired, remove it
+      cache.delete(key);
+      return null;
+    }
+
+    return entry.data;
+  }
+
+  /**
+   * Set cached response
+   */
+  private setCachedResponse<T>(
+    cache: Map<string, CacheEntry<ApiResponse<T>>>,
+    key: string,
+    data: ApiResponse<T>
+  ): void {
+    cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Invalidate cache for a specific key
+   */
+  private invalidateCache(docId: string): void {
+    this.statusCache.delete(docId);
+    // Also invalidate batch cache entries that might contain this docId
+    // For simplicity, we clear the entire batch cache
+    this.batchStatusCache.clear();
   }
 
   /**
@@ -250,18 +313,124 @@ class ApiService {
   }
 
   /**
-   * Upload a document to the backend
+   * Upload a document to the backend with real progress tracking
    */
-  async uploadDocument(file: File): Promise<ApiResponse<Document>> {
-    try {
+  async uploadDocument(
+    file: File,
+    onProgress?: (progress: number, speed: number, estimatedTime: number) => void
+  ): Promise<ApiResponse<Document | any>> {
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await apiClient.post('/documents/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      let lastLoaded = 0;
+      let lastTime = Date.now();
+
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && onProgress) {
+          const progress = (e.loaded / e.total) * 100;
+          
+          // Calculate upload speed (bytes per second)
+          const currentTime = Date.now();
+          const timeDiff = (currentTime - lastTime) / 1000; // seconds
+          const bytesDiff = e.loaded - lastLoaded;
+          const speed = timeDiff > 0 ? bytesDiff / timeDiff : 0;
+          
+          // Calculate estimated time remaining (seconds)
+          const bytesRemaining = e.total - e.loaded;
+          const estimatedTime = speed > 0 ? bytesRemaining / speed : 0;
+          
+          lastLoaded = e.loaded;
+          lastTime = currentTime;
+          
+          onProgress(progress, speed, estimatedTime);
+        }
       });
+
+      // Handle completion
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            
+            // 后端现在返回 { success: true, document: {...} } 格式
+            // 提取 document 字段作为数据
+            if (response.success && response.document) {
+              resolve({ success: true, data: response.document });
+            }
+            // 如果是重复文件检测响应，返回完整响应数据
+            else if (response.duplicate) {
+              resolve({ 
+                success: false, 
+                data: response,
+                isDuplicate: true 
+              });
+            }
+            else {
+              resolve({ success: true, data: response });
+            }
+          } catch (error) {
+            resolve({
+              success: false,
+              error: 'Failed to parse server response',
+            });
+          }
+        } else {
+          resolve({
+            success: false,
+            error: `Upload failed with status ${xhr.status}`,
+          });
+        }
+      });
+
+      // Handle errors
+      xhr.addEventListener('error', () => {
+        resolve({
+          success: false,
+          error: 'Network error occurred during upload',
+        });
+      });
+
+      // Handle abort
+      xhr.addEventListener('abort', () => {
+        resolve({
+          success: false,
+          error: 'Upload was cancelled',
+        });
+      });
+
+      // Get auth token from localStorage
+      const token = localStorage.getItem('token');
+      
+      // Open connection and send request
+      xhr.open('POST', `${apiClient.defaults.baseURL}/documents/upload`);
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+      xhr.send(formData);
+    });
+  }
+
+  /**
+   * Resolve duplicate file upload
+   */
+  async resolveDuplicate(
+    action: 'replace' | 'keep-both' | 'cancel',
+    tempFileId: string,
+    existingFileId?: string
+  ): Promise<ApiResponse<Document>> {
+    try {
+      const response = await apiClient.post('/documents/upload/resolve-duplicate', {
+        action,
+        tempFileId,
+        existingFileId,
+      });
+
+      if (response.data.success && response.data.document) {
+        return { success: true, data: response.data.document };
+      }
 
       return { success: true, data: response.data };
     } catch (error) {
@@ -396,6 +565,148 @@ class ApiService {
         success: false, 
         data: [], 
         error: this.handleError(error) 
+      };
+    }
+  }
+
+  // ==========================================================================
+  // Knowledge Graph Status API Methods
+  // ==========================================================================
+
+  /**
+   * Get KG build status for a single document
+   */
+  async getKGStatus(docId: string): Promise<ApiResponse<KGStatus>> {
+    // Check cache first
+    const cached = this.getCachedResponse(this.statusCache, docId);
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const response = await apiClient.get<KGStatusResponse>(`/kg/status/${docId}?detailed=true`);
+      
+      let result: ApiResponse<KGStatus>;
+      if (response.data.success) {
+        result = { success: true, data: response.data.data };
+      } else {
+        result = {
+          success: false,
+          error: response.data.error || 'Failed to fetch KG status'
+        };
+      }
+
+      // Cache the response
+      this.setCachedResponse(this.statusCache, docId, result);
+      return result;
+    } catch (error) {
+      const result = {
+        success: false,
+        error: this.handleError(error)
+      };
+      // Don't cache error responses
+      return result;
+    }
+  }
+
+  /**
+   * Get KG build status for multiple documents
+   */
+  async getBatchKGStatus(docIds: string[]): Promise<ApiResponse<KGStatus[]>> {
+    // Create cache key from sorted docIds
+    const cacheKey = [...docIds].sort().join(',');
+    
+    // Check cache first
+    const cached = this.getCachedResponse(this.batchStatusCache, cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      // Use individual status calls since batch endpoint may not be implemented yet
+      const statusPromises = docIds.map(docId => this.getKGStatus(docId));
+      const results = await Promise.all(statusPromises);
+      
+      const data = results
+        .filter(r => r.success && r.data)
+        .map(r => r.data!);
+      
+      const result: ApiResponse<KGStatus[]> = {
+        success: true,
+        data
+      };
+
+      // Cache the response
+      this.setCachedResponse(this.batchStatusCache, cacheKey, result);
+      return result;
+    } catch (error) {
+      const result = {
+        success: false,
+        data: [],
+        error: this.handleError(error)
+      };
+      // Don't cache error responses
+      return result;
+    }
+  }
+
+  /**
+   * Trigger KG rebuild for a document
+   */
+  async rebuildKG(docId: string): Promise<ApiResponse<string>> {
+    try {
+      const response = await apiClient.post<RebuildResponse>(`/kg/rebuild/${docId}`, {
+        options: { async: true }
+      });
+      
+      if (response.data.success) {
+        // Invalidate cache for this document
+        this.invalidateCache(docId);
+        return { success: true, data: response.data.message || 'KG rebuild initiated' };
+      } else {
+        return {
+          success: false,
+          error: response.data.error || 'Failed to trigger KG rebuild'
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error)
+      };
+    }
+  }
+
+  /**
+   * Trigger KG build for a document (manual trigger)
+   */
+  async buildKG(docId: string, options?: { force?: boolean }): Promise<ApiResponse<string>> {
+    try {
+      const response = await apiClient.post(`/kg/build`, {
+        docId,
+        options: {
+          force: options?.force || false,
+          async: true
+        }
+      });
+      
+      if (response.data.success) {
+        // Invalidate cache for this document
+        this.invalidateCache(docId);
+        return { 
+          success: true, 
+          data: response.data.data?.message || 'KG build initiated' 
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.error || 'Failed to trigger KG build'
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error)
       };
     }
   }

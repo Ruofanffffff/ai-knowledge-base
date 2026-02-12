@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 import { DocumentWithSummary, Category } from '../types';
 import apiClient from '../api/client';
+import { useBatchKGStatus } from '../hooks/useBatchKGStatus';
+import KGStatusIndicator from '../components/KGStatusIndicator';
+import apiService from '../services/api';
 
 export default function Documents() {
   const navigate = useNavigate();
@@ -22,13 +25,28 @@ export default function Documents() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Get document IDs for batch status query
+  const documentIds = documents.map(doc => doc.id);
+  const { statuses, isLoading: statusesLoading } = useBatchKGStatus(documentIds);
+
   const loadDocuments = async () => {
     try {
       setIsLoading(true);
+      console.log('=== 开始加载文档 ===');
       const response = await apiClient.get('/documents');
-      setDocuments(response.data);
+      console.log('=== API 响应 ===');
+      console.log('状态码:', response.status);
+      console.log('数据类型:', typeof response.data);
+      console.log('数据长度:', Array.isArray(response.data) ? response.data.length : 'N/A');
+      console.log('完整数据:', response.data);
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        console.table(response.data.map(d => ({ ID: d.id, 标题: d.title, 类型: d.fileType })));
+      }
+      setDocuments(response.data || []);
+      console.log('=== 文档加载完成 ===');
     } catch (error) {
       console.error('加载文档失败:', error);
+      setDocuments([]);
     } finally {
       setIsLoading(false);
     }
@@ -37,7 +55,7 @@ export default function Documents() {
   const loadCategories = async () => {
     try {
       const response = await apiClient.get('/categories');
-      const data = response.data.categories;
+      const data = response.data?.categories || response.data;
       const categories = Array.isArray(data) ? data : [];
       setCategories(categories);
     } catch (error) {
@@ -47,6 +65,8 @@ export default function Documents() {
   };
 
   useEffect(() => {
+    // Clear any stale document cache on mount
+    console.log('[Documents] Component mounted, loading fresh data');
     loadDocuments();
     loadCategories();
   }, []);
@@ -65,10 +85,13 @@ export default function Documents() {
           'Content-Type': 'multipart/form-data',
         },
       });
-      loadDocuments();
-      loadCategories();
+      // 等待一小段时间确保后端处理完成
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await loadDocuments();
+      await loadCategories();
     } catch (error) {
       console.error('上传失败:', error);
+      alert('文件上传失败，请重试');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -85,6 +108,17 @@ export default function Documents() {
       loadCategories();
     } catch (error) {
       console.error('自动分类失败:', error);
+    }
+  };
+
+  const handleRebuildKG = async (documentId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent document click
+    try {
+      await apiService.rebuildKG(documentId);
+      // Status will be updated automatically via polling
+    } catch (error) {
+      console.error('重建知识图谱失败:', error);
+      alert('重建知识图谱失败，请重试');
     }
   };
 
@@ -217,7 +251,10 @@ export default function Documents() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchFilteredDocuments.map((document) => (
+                {searchFilteredDocuments.map((document) => {
+                  const kgStatus = statuses.get(document.id);
+                  
+                  return (
                   <motion.div
                     key={document.id}
                     whileHover={{ y: -4, boxShadow: '0 10px 30px -15px rgba(0, 0, 0, 0.15)' }}
@@ -240,13 +277,23 @@ export default function Documents() {
                       {document.content.substring(0, 100)}...
                     </p>
                     
-                    <div className="flex items-center justify-between text-xs text-slate-400">
+                    <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
                       <span className="flex items-center gap-1">
                         <Clock size={12} />
                         {formatTimeAgo(document.updatedAt)}
                       </span>
                       <span>{document.fileType}</span>
                     </div>
+                    
+                    {/* KG Status Indicator */}
+                    {kgStatus && (
+                      <div className="mb-3">
+                        <KGStatusIndicator
+                          status={kgStatus}
+                          onRetry={(e) => handleRebuildKG(document.id, e)}
+                        />
+                      </div>
+                    )}
                     
                     {/* Tags */}
                     {document.tags && document.tags.length > 0 && (
@@ -259,7 +306,8 @@ export default function Documents() {
                       </div>
                     )}
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

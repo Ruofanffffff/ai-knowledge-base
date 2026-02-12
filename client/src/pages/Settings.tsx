@@ -16,8 +16,8 @@ const getAvatarUrl = (avatar: string | null | undefined): string => {
     return avatar;
   }
   
-  // 如果是相对路径，添加后端服务器地址
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+  // 如果是相对路径,添加后端服务器地址
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
   const baseUrl = API_BASE_URL.replace('/api', '');
   return `${baseUrl}${avatar}`;
 };

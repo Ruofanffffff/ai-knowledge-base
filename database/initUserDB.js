@@ -110,10 +110,16 @@ function createTables(db) {
       file_type VARCHAR(50) DEFAULT '.md',
       metadata TEXT,
       tags TEXT,
+      hash VARCHAR(64),
+      size INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`);
+
+    // Create indexes for duplicate detection optimization
+    db.run(`CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(hash)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_documents_user_filename ON documents(user_id, title)`);
 
     db.run(`CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

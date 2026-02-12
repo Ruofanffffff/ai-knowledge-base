@@ -4,6 +4,7 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
   message?: string;
+  isDuplicate?: boolean; // For duplicate file detection
 }
 
 // Authentication types
@@ -115,6 +116,7 @@ export interface GraphLink {
   subtype?: string;
   weight?: number;
   confidence: number;
+  description?: string | null; // Human-readable description
 }
 
 export interface FrontendGraphData {

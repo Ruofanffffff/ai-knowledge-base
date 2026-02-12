@@ -1,0 +1,95 @@
+{
+  "metadata": {
+    "timestamp": "2026-02-11T13:38:25.902Z",
+    "testConfig": {
+      "enableLLM": false,
+      "enableSemanticRelations": false,
+      "enableQualityFilter": true
+    }
+  },
+  "summary": {
+    "totalTests": 1,
+    "totalTime": 24786,
+    "totalCKBs": 241,
+    "totalEntities": 39,
+    "totalRelations": 29,
+    "totalErrors": 0,
+    "byDocument": {
+      "20210824海南省海口市美兰机场智慧防疫项目测试方案": {
+        "tests": [
+          {
+            "testName": "测试文档: 20210824海南省海口市美兰机场智慧防疫项目测试方案",
+            "timestamp": "2026-02-11T13:38:25.853Z",
+            "documentId": 2,
+            "documentName": "20210824海南省海口市美兰机场智慧防疫项目测试方案",
+            "documentType": "government",
+            "doc_id": 2,
+            "ckbs_created": 241,
+            "entities_created": 39,
+            "relations_created": {
+              "builtin": 29,
+              "cooccurrence": 0,
+              "semantic": 0
+            },
+            "processing_time": 24717,
+            "errors": [],
+            "classification": {
+              "documentType": "project",
+              "confidence": 0.2,
+              "entityTypes": [
+                "ProjectEntity",
+                "OrganizationEntity",
+                "LocationEntity",
+                "EventEntity",
+                "DocumentEntity"
+              ],
+              "matchedKeywords": [
+                "项目",
+                "方案"
+              ]
+            }
+          }
+        ],
+        "totalCKBs": 241,
+        "totalEntities": 39,
+        "totalRelations": 29,
+        "totalTime": 24717,
+        "errors": []
+      }
+    }
+  },
+  "details": [
+    {
+      "testName": "测试文档: 20210824海南省海口市美兰机场智慧防疫项目测试方案",
+      "timestamp": "2026-02-11T13:38:25.853Z",
+      "documentId": 2,
+      "documentName": "20210824海南省海口市美兰机场智慧防疫项目测试方案",
+      "documentType": "government",
+      "doc_id": 2,
+      "ckbs_created": 241,
+      "entities_created": 39,
+      "relations_created": {
+        "builtin": 29,
+        "cooccurrence": 0,
+        "semantic": 0
+      },
+      "processing_time": 24717,
+      "errors": [],
+      "classification": {
+        "documentType": "project",
+        "confidence": 0.2,
+        "entityTypes": [
+          "ProjectEntity",
+          "OrganizationEntity",
+          "LocationEntity",
+          "EventEntity",
+          "DocumentEntity"
+        ],
+        "matchedKeywords": [
+          "项目",
+          "方案"
+        ]
+      }
+    }
+  ]
+}

@@ -288,7 +288,9 @@ describe('Built-in Relation Builder', () => {
         confidence: 0.9
       };
       
-      expect(builtinRelationBuilder.validateRelation(validRelation)).toBe(true);
+      const result = builtinRelationBuilder.validateRelation(validRelation);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
     });
     
     test('should reject relation without source_id', () => {
@@ -298,7 +300,9 @@ describe('Built-in Relation Builder', () => {
         confidence: 0.9
       };
       
-      expect(builtinRelationBuilder.validateRelation(invalidRelation)).toBe(false);
+      const result = builtinRelationBuilder.validateRelation(invalidRelation);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing source_id or target_id');
     });
     
     test('should reject relation without target_id', () => {
@@ -308,7 +312,9 @@ describe('Built-in Relation Builder', () => {
         confidence: 0.9
       };
       
-      expect(builtinRelationBuilder.validateRelation(invalidRelation)).toBe(false);
+      const result = builtinRelationBuilder.validateRelation(invalidRelation);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing source_id or target_id');
     });
     
     test('should reject self-referencing relation', () => {
@@ -319,7 +325,9 @@ describe('Built-in Relation Builder', () => {
         confidence: 0.9
       };
       
-      expect(builtinRelationBuilder.validateRelation(selfRelation)).toBe(false);
+      const result = builtinRelationBuilder.validateRelation(selfRelation);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Source and target cannot be the same');
     });
     
     test('should reject relation with invalid confidence', () => {
@@ -337,8 +345,169 @@ describe('Built-in Relation Builder', () => {
         confidence: 1.5
       };
       
-      expect(builtinRelationBuilder.validateRelation(invalidConfidence1)).toBe(false);
-      expect(builtinRelationBuilder.validateRelation(invalidConfidence2)).toBe(false);
+      const result1 = builtinRelationBuilder.validateRelation(invalidConfidence1);
+      expect(result1.valid).toBe(false);
+      expect(result1.errors).toContain('Confidence must be between 0 and 1');
+      
+      const result2 = builtinRelationBuilder.validateRelation(invalidConfidence2);
+      expect(result2.valid).toBe(false);
+      expect(result2.errors).toContain('Confidence must be between 0 and 1');
+    });
+  });
+  
+  describe('findTargetField - Field Alias Support', () => {
+    test('should find field by exact name match', () => {
+      const fields = [
+        { name: '地点', value: '北京市', type: 'location' },
+        { name: '时间', value: '2025-01', type: 'time' }
+      ];
+      
+      const result = builtinRelationBuilder.findTargetField(fields, '地点', []);
+      
+      expect(result).toBeDefined();
+      expect(result.name).toBe('地点');
+      expect(result.value).toBe('北京市');
+    });
+    
+    test('should find field by alias when exact match not found', () => {
+      const fields = [
+        { name: '位置', value: '上海市', type: 'location' },
+        { name: '时间', value: '2025-01', type: 'time' }
+      ];
+      
+      const result = builtinRelationBuilder.findTargetField(fields, '地点', ['位置', 'location']);
+      
+      expect(result).toBeDefined();
+      expect(result.name).toBe('位置');
+      expect(result.value).toBe('上海市');
+    });
+    
+    test('should prioritize exact match over alias', () => {
+      const fields = [
+        { name: '地点', value: '北京市', type: 'location' },
+        { name: '位置', value: '上海市', type: 'location' }
+      ];
+      
+      const result = builtinRelationBuilder.findTargetField(fields, '地点', ['位置']);
+      
+      expect(result).toBeDefined();
+      expect(result.name).toBe('地点');
+      expect(result.value).toBe('北京市');
+    });
+    
+    test('should return null when field not found', () => {
+      const fields = [
+        { name: '时间', value: '2025-01', type: 'time' }
+      ];
+      
+      const result = builtinRelationBuilder.findTargetField(fields, '地点', ['位置']);
+      
+      expect(result).toBeNull();
+    });
+    
+    test('should extract from content field as fallback', () => {
+      const fields = [
+        { name: 'content', value: '项目地点：深圳市南山区', type: 'text' }
+      ];
+      
+      const result = builtinRelationBuilder.findTargetField(fields, '地点', []);
+      
+      expect(result).toBeDefined();
+      expect(result.value).toBe('深圳市南山区');
+      expect(result.source).toBe('content_extraction');
+    });
+  });
+  
+  describe('extractFromContent - Content Extraction', () => {
+    test('should extract location from content', () => {
+      const content = '项目地点：海南省海口市\n执行单位：某某公司';
+      
+      const result = builtinRelationBuilder.extractFromContent(content, '地点', []);
+      
+      expect(result).toBe('海南省海口市');
+    });
+    
+    test('should extract organization from content', () => {
+      const content = '执行单位：上海商汤智能科技有限公司\n时间：2025-01';
+      
+      const result = builtinRelationBuilder.extractFromContent(content, '执行单位', []);
+      
+      expect(result).toBe('上海商汤智能科技有限公司');
+    });
+    
+    test('should extract using alias patterns', () => {
+      const content = '位置：广州市天河区\n时间：2025-01';
+      
+      const result = builtinRelationBuilder.extractFromContent(content, '地点', ['位置']);
+      
+      expect(result).toBe('广州市天河区');
+    });
+    
+    test('should return null when pattern not found', () => {
+      const content = '这是一段没有特定格式的文本';
+      
+      const result = builtinRelationBuilder.extractFromContent(content, '地点', []);
+      
+      expect(result).toBeNull();
+    });
+    
+    test('should handle multiple colons correctly', () => {
+      const content = '地点：北京市：朝阳区';
+      
+      const result = builtinRelationBuilder.extractFromContent(content, '地点', []);
+      
+      expect(result).toBe('北京市：朝阳区');
+    });
+  });
+  
+  describe('buildRelationFromTemplate - With Field Aliases', () => {
+    test('should build relation using field alias', async () => {
+      const relTemplate = {
+        type: 'located_in',
+        target_field: '地点',
+        field_aliases: ['位置', 'location'],
+        direction: 'outgoing'
+      };
+      
+      const fieldsWithAlias = [
+        { name: '位置', value: '杭州市', type: 'location', confidence: 0.9 },
+        { name: '时间', value: '2025-01', type: 'time', confidence: 0.9 }
+      ];
+      
+      const relation = await builtinRelationBuilder.buildRelationFromTemplate(
+        testEntity,
+        relTemplate,
+        fieldsWithAlias,
+        ['ckb-001']
+      );
+      
+      expect(relation).toBeDefined();
+      expect(relation.source_id).toBe(testEntity.entity_id);
+      expect(relation.type).toBe('builtin');
+    });
+    
+    test('should build relation by extracting from content', async () => {
+      const relTemplate = {
+        type: 'located_in',
+        target_field: '地点',
+        field_aliases: ['位置'],
+        direction: 'outgoing'
+      };
+      
+      const fieldsWithContent = [
+        { name: 'content', value: '项目地点：成都市武侯区', type: 'text' },
+        { name: '时间', value: '2025-01', type: 'time', confidence: 0.9 }
+      ];
+      
+      const relation = await builtinRelationBuilder.buildRelationFromTemplate(
+        testEntity,
+        relTemplate,
+        fieldsWithContent,
+        ['ckb-001']
+      );
+      
+      expect(relation).toBeDefined();
+      expect(relation.source_id).toBe(testEntity.entity_id);
     });
   });
 });

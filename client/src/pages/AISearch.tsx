@@ -187,7 +187,7 @@ export function AISearch() {
     setInput('');
 
     try {
-      const response = await fetch('http://localhost:3000/api/ai/search', {
+      const response = await fetch('/api/ai/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

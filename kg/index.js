@@ -195,6 +195,9 @@ const llmConflictAdvisor = require('./entity/llm_conflict_advisor');
 const anchorMetrics = require('./entity/anchor_metrics');
 const schemaInstance = require('./schema/schema_instance');
 
+// Schema Validation
+const SchemaValidator = require('./validation/schema_validator');
+
 module.exports = {
   // CKB Layer
   ckbParser,
@@ -251,24 +254,71 @@ module.exports = {
   initialize: async function() {
     console.log('[KG Module] Initializing Knowledge Graph system...');
     
-    // Perform schema startup check
+    // Step 1: Validate schemas from JSON file
+    console.log('[KG Module] Validating schemas from JSON file...');
+    const schemaValidator = new SchemaValidator();
+    const validationResult = schemaValidator.validateAllSchemas();
+    
+    if (!validationResult.success) {
+      console.error('[KG Module] ❌ Schema validation FAILED');
+      console.error(`[KG Module] Found ${validationResult.errors.length} validation error(s):`);
+      
+      // Log first 10 errors for debugging
+      const errorsToShow = validationResult.errors.slice(0, 10);
+      errorsToShow.forEach((error, index) => {
+        console.error(`  ${index + 1}. ${error}`);
+      });
+      
+      if (validationResult.errors.length > 10) {
+        console.error(`  ... and ${validationResult.errors.length - 10} more errors`);
+      }
+      
+      // Set KG_ENABLED to false
+      process.env.KG_ENABLED = 'false';
+      console.error('[KG Module] KG_ENABLED set to false due to schema validation failure');
+      console.error('[KG Module] Knowledge Graph functionality is DISABLED');
+      
+      return {
+        success: false,
+        schemaValidation: validationResult,
+        message: 'Schema validation failed, KG functionality disabled'
+      };
+    }
+    
+    // Step 2: Load schemas into memory
+    console.log(`[KG Module] ✅ Schema validation PASSED: ${validationResult.schemaCount} schemas validated`);
+    console.log(`[KG Module] Loading ${validationResult.schemaCount} schemas into memory...`);
+    
+    // Schemas are already loaded by the validator, just confirm
+    const schemas = schemaValidator.schemas;
+    if (schemas) {
+      console.log(`[KG Module] ✅ Successfully loaded ${Object.keys(schemas).length} schemas into memory`);
+    }
+    
+    // Step 3: Perform schema startup check (database-related checks)
     let schemaCheckResult = { success: true };
     if (schemaStartupCheck) {
       try {
         schemaCheckResult = await schemaStartupCheck.performStartupCheck();
       } catch (error) {
-        console.warn('Schema startup check failed:', error.message);
+        console.warn('[KG Module] Schema startup check failed:', error.message);
         schemaCheckResult = { success: false };
       }
     } else {
-      console.warn('Schema Startup Check not available, skipping initialization');
+      console.warn('[KG Module] Schema Startup Check not available, skipping database initialization');
     }
     
     if (!schemaCheckResult.success) {
       console.warn('[KG Module] Schema startup check failed, but system will continue');
     }
     
-    console.log('[KG Module] Knowledge Graph system initialized');
-    return schemaCheckResult;
+    console.log('[KG Module] ✅ Knowledge Graph system initialized successfully');
+    
+    return {
+      success: true,
+      schemaValidation: validationResult,
+      schemaStartupCheck: schemaCheckResult,
+      message: `KG system initialized with ${validationResult.schemaCount} schemas`
+    };
   }
 };

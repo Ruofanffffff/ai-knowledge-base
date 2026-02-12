@@ -70,7 +70,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         setIsLoadingStats(true);
         setStatsError(null);
         
-        const response = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:3000/api'}/knowledge-graph/stats`);
+        const response = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || '/api'}/knowledge-graph/stats`);
         const data = await response.json();
         
         if (data.success && data.data) {

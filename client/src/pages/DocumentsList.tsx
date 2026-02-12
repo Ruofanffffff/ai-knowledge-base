@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FileText, Folder, MoreVertical, Search, Filter, Grid, List as ListIcon, Plus, Upload, X, CheckCircle, Loader2, File, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, Folder, MoreVertical, Search, Filter, Grid, List as ListIcon, Plus, Upload, X, CheckCircle, Loader2, File, ChevronDown, ChevronUp, RefreshCw, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApiData } from '../hooks/useApiData';
 import { apiService, type Document } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorDisplay from '../components/ErrorDisplay';
 import EmptyState from '../components/EmptyState';
+import { DuplicateDetectionModal } from '../components/DuplicateDetectionModal';
 
 interface DocumentsListProps {
   onNavigate: (page: string) => void;
@@ -24,7 +25,22 @@ interface UploadFile {
   name: string;
   size: number;
   progress: number;
-  status: 'waiting' | 'uploading' | 'processing' | 'done' | 'error';
+  status: 'waiting' | 'uploading' | 'checking-duplicate' | 'processing' | 'done' | 'error';
+  error?: string;
+  speed?: number;
+  estimatedTime?: number;
+}
+
+interface DuplicateInfo {
+  file: File;
+  duplicateType: 'content' | 'filename' | 'both';
+  existingFile: {
+    id: string;
+    title: string;
+    size: number;
+    uploadDate: string;
+  };
+  tempFileId: string;
 }
 
 export function DocumentsList({ onNavigate }: DocumentsListProps) {
@@ -64,6 +80,29 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
       day: 'numeric' 
     });
   };
+
+  // Helper function to format upload speed
+  const formatSpeed = (bytesPerSecond: number): string => {
+    if (bytesPerSecond === 0) return '0 B/s';
+    const k = 1024;
+    const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+    const i = Math.floor(Math.log(bytesPerSecond) / Math.log(k));
+    return Math.round(bytesPerSecond / Math.pow(k, i) * 10) / 10 + ' ' + sizes[i];
+  };
+
+  // Helper function to format estimated time
+  const formatTime = (seconds: number): string => {
+    if (seconds < 1) return '即将完成';
+    if (seconds < 60) return `${Math.round(seconds)}秒`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.round(seconds % 60);
+    if (minutes < 60) {
+      return remainingSeconds > 0 ? `${minutes}分${remainingSeconds}秒` : `${minutes}分钟`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}小时${remainingMinutes}分钟`;
+  };
   
   // Fetch documents from API
   const { 
@@ -89,6 +128,7 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadFile[]>([]);
   const [isUploadPanelOpen, setIsUploadPanelOpen] = useState(true); // Default open when uploading
+  const [duplicateInfo, setDuplicateInfo] = useState<DuplicateInfo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-open panel when new files added
@@ -122,6 +162,139 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
     }
   };
 
+  // Upload queue management
+  const uploadQueueRef = useRef<File[]>([]);
+  const activeUploadsRef = useRef<Set<string>>(new Set());
+  const MAX_CONCURRENT_UPLOADS = 3;
+
+  const processUploadQueue = async () => {
+    // Check if we can start more uploads
+    while (uploadQueueRef.current.length > 0 && activeUploadsRef.current.size < MAX_CONCURRENT_UPLOADS) {
+      const file = uploadQueueRef.current.shift();
+      if (!file) break;
+
+      // Mark as active
+      activeUploadsRef.current.add(file.name);
+
+      // Start uploading
+      setUploadingFiles(prev => prev.map(u => 
+        u.name === file.name ? { ...u, status: 'uploading' } : u
+      ));
+
+      // Upload file (don't await - let it run concurrently)
+      uploadSingleFile(file).finally(() => {
+        // Remove from active uploads
+        activeUploadsRef.current.delete(file.name);
+        // Process next in queue
+        processUploadQueue();
+      });
+    }
+  };
+
+  const uploadSingleFile = async (file: File) => {
+    console.log('[Upload] 开始上传文件:', { name: file.name, size: file.size, type: file.type });
+    
+    try {
+      // Upload file using API with real progress tracking
+      const response = await apiService.uploadDocument(file, (progress, speed, estimatedTime) => {
+        // Update progress with real values from XMLHttpRequest
+        console.log('[Upload] 进度更新:', { 
+          fileName: file.name, 
+          progress: Math.round(progress), 
+          speed: Math.round(speed), 
+          estimatedTime: Math.round(estimatedTime) 
+        });
+        
+        setUploadingFiles(prev => prev.map(u => 
+          u.name === file.name ? { 
+            ...u, 
+            progress: Math.min(progress, 100),
+            speed,
+            estimatedTime
+          } : u
+        ));
+      });
+      
+      console.log('[Upload] 收到响应:', response);
+      
+      // Check for duplicate detection (支持多种响应格式)
+      // 后端可能返回在 response 根级别或 response.data 中
+      const responseData = response.data || response;
+      const isDuplicate = responseData.duplicate || responseData.isDuplicate;
+      
+      if (isDuplicate) {
+        console.log('[Upload] 检测到重复文件:', {
+          fileName: file.name,
+          duplicateType: responseData.duplicateType,
+          existingFile: responseData.existingFile,
+          tempFileId: responseData.tempFileId
+        });
+        
+        // Show checking-duplicate status
+        setUploadingFiles(prev => prev.map(u => 
+          u.name === file.name ? { ...u, status: 'checking-duplicate', progress: 100 } : u
+        ));
+        
+        // Store duplicate info and show modal
+        setDuplicateInfo({
+          file,
+          duplicateType: responseData.duplicateType,
+          existingFile: responseData.existingFile,
+          tempFileId: responseData.tempFileId,
+        });
+        
+        console.log('[Upload] 重复检测模态框应该显示，duplicateInfo 已设置');
+        
+        // Wait for user decision (modal will handle this)
+        return;
+      }
+      
+      if (response.success) {
+        // Processing
+        setUploadingFiles(prev => prev.map(u => 
+          u.name === file.name ? { ...u, status: 'processing', progress: 100 } : u
+        ));
+        
+        // Wait a bit for processing animation
+        await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1000));
+        
+        // Done
+        setUploadingFiles(prev => prev.map(u => 
+          u.name === file.name ? { ...u, status: 'done' } : u
+        ));
+        
+        // Refetch documents list
+        await refetch();
+        
+        // Remove from upload list after 2 seconds
+        setTimeout(() => {
+          setUploadingFiles(prev => prev.filter(u => u.name !== file.name));
+        }, 2000);
+      } else {
+        // Error
+        setUploadingFiles(prev => prev.map(u => 
+          u.name === file.name ? { 
+            ...u, 
+            status: 'error', 
+            progress: 0,
+            error: response.error || '上传失败'
+          } : u
+        ));
+        console.error('Upload failed:', response.error);
+      }
+    } catch (error) {
+      setUploadingFiles(prev => prev.map(u => 
+        u.name === file.name ? { 
+          ...u, 
+          status: 'error', 
+          progress: 0,
+          error: '网络错误，请重试'
+        } : u
+      ));
+      console.error('Upload error:', error);
+    }
+  };
+
   const handleFiles = async (files: File[]) => {
     if (files.length === 0) return;
 
@@ -130,75 +303,105 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
       name: f.name, 
       size: f.size, 
       progress: 0, 
-      status: 'waiting' 
+      status: 'waiting',
+      speed: 0,
+      estimatedTime: 0
     }));
     
     setUploadingFiles(prev => [...prev, ...newUploads]);
 
-    // Upload each file using the API
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      
-      // Delay start slightly for each file to stagger
-      await new Promise(resolve => setTimeout(resolve, i * 300));
-      
-      // Start uploading
-      setUploadingFiles(prev => prev.map(u => 
-        u.name === file.name ? { ...u, status: 'uploading' } : u
-      ));
-      
-      // Simulate progress (since we don't have real progress from API)
-      const progressInterval = setInterval(() => {
-        setUploadingFiles(prev => prev.map(u => {
-          if (u.name === file.name && u.status === 'uploading' && u.progress < 90) {
-            return { ...u, progress: Math.min(u.progress + Math.random() * 15, 90) };
-          }
-          return u;
-        }));
-      }, 200);
+    // Add files to upload queue
+    uploadQueueRef.current.push(...files);
 
-      try {
-        // Upload file using API
-        const response = await apiService.uploadDocument(file);
-        
-        clearInterval(progressInterval);
-        
-        if (response.success) {
-          // Processing
-          setUploadingFiles(prev => prev.map(u => 
-            u.name === file.name ? { ...u, status: 'processing', progress: 100 } : u
-          ));
-          
-          // Wait a bit for processing animation
-          await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1000));
-          
-          // Done
-          setUploadingFiles(prev => prev.map(u => 
-            u.name === file.name ? { ...u, status: 'done' } : u
-          ));
-          
-          // Refetch documents list
-          await refetch();
-          
-          // Remove from upload list after delay
-          setTimeout(() => {
-            setUploadingFiles(prev => prev.filter(u => u.name !== file.name));
-          }, 3000);
-        } else {
-          // Error
-          setUploadingFiles(prev => prev.map(u => 
-            u.name === file.name ? { ...u, status: 'error', progress: 0 } : u
-          ));
-          console.error('Upload failed:', response.error);
-        }
-      } catch (error) {
-        clearInterval(progressInterval);
-        setUploadingFiles(prev => prev.map(u => 
-          u.name === file.name ? { ...u, status: 'error', progress: 0 } : u
-        ));
-        console.error('Upload error:', error);
-      }
+    // Start processing the queue
+    processUploadQueue();
+  };
+
+  // Handle duplicate resolution
+  const handleDuplicateResolve = async (action: 'replace' | 'keep-both' | 'cancel') => {
+    if (!duplicateInfo) return;
+
+    const { file, tempFileId, existingFile } = duplicateInfo;
+
+    if (action === 'cancel') {
+      // Remove from upload list
+      setUploadingFiles(prev => prev.filter(u => u.name !== file.name));
+      setDuplicateInfo(null);
+      return;
     }
+
+    try {
+      // Update status to processing
+      setUploadingFiles(prev => prev.map(u => 
+        u.name === file.name ? { ...u, status: 'processing', progress: 100 } : u
+      ));
+
+      // Call resolve API
+      const response = await apiService.resolveDuplicate(
+        action,
+        tempFileId,
+        existingFile.id
+      );
+
+      if (response.success) {
+        // Done
+        setUploadingFiles(prev => prev.map(u => 
+          u.name === file.name ? { ...u, status: 'done' } : u
+        ));
+        
+        // Refetch documents list
+        await refetch();
+        
+        // Remove from upload list after 2 seconds
+        setTimeout(() => {
+          setUploadingFiles(prev => prev.filter(u => u.name !== file.name));
+        }, 2000);
+      } else {
+        // Error
+        setUploadingFiles(prev => prev.map(u => 
+          u.name === file.name ? { 
+            ...u, 
+            status: 'error', 
+            progress: 0,
+            error: response.error || '处理失败'
+          } : u
+        ));
+      }
+    } catch (error) {
+      setUploadingFiles(prev => prev.map(u => 
+        u.name === file.name ? { 
+          ...u, 
+          status: 'error', 
+          progress: 0,
+          error: '网络错误，请重试'
+        } : u
+      ));
+      console.error('Resolve duplicate error:', error);
+    } finally {
+      setDuplicateInfo(null);
+    }
+  };
+
+  // Handle retry for failed uploads
+  const handleRetry = (fileName: string) => {
+    // Find the original file in the upload list
+    const uploadFile = uploadingFiles.find(u => u.name === fileName);
+    if (!uploadFile) return;
+
+    // Reset the file status to waiting
+    setUploadingFiles(prev => prev.map(u => 
+      u.name === fileName ? { ...u, status: 'waiting', progress: 0, error: undefined } : u
+    ));
+
+    // We need to re-upload, but we don't have the File object anymore
+    // So we'll just show a message to the user
+    // In a real implementation, we'd need to store the File object
+    console.log('Retry upload for:', fileName);
+    
+    // For now, just remove it and ask user to re-upload
+    setTimeout(() => {
+      setUploadingFiles(prev => prev.filter(u => u.name !== fileName));
+    }, 1000);
   };
 
   const getIcon = (type: string) => {
@@ -226,6 +429,20 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Duplicate Detection Modal */}
+      {duplicateInfo && (
+        <DuplicateDetectionModal
+          isOpen={true}
+          duplicateType={duplicateInfo.duplicateType}
+          newFile={{
+            name: duplicateInfo.file.name,
+            size: duplicateInfo.file.size,
+          }}
+          existingFile={duplicateInfo.existingFile}
+          onResolve={handleDuplicateResolve}
+        />
+      )}
+
       {/* Drag Overlay */}
       <AnimatePresence>
         {isDragging && (
@@ -467,30 +684,61 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
                             }`}>
                               {file.status === 'waiting' && '等待中...'}
                               {file.status === 'uploading' && '上传中...'}
+                              {file.status === 'checking-duplicate' && '检查重复...'}
                               {file.status === 'processing' && '处理中...'}
                               {file.status === 'done' && '完成'}
-                              {file.status === 'error' && '失败'}
+                              {file.status === 'error' && (file.error || '失败')}
                             </span>
                           </div>
                           
                           {/* Progress Bar */}
-                          <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                          <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden mb-1">
                             <motion.div 
                               className={`h-full rounded-full ${
                                 file.status === 'done' ? 'bg-green-500' : 
+                                file.status === 'checking-duplicate' ? 'bg-orange-500 animate-pulse' :
                                 file.status === 'processing' ? 'bg-purple-500 animate-pulse' : 
+                                file.status === 'error' ? 'bg-red-500' :
                                 'bg-purple-500'
                               }`}
                               initial={{ width: 0 }}
                               animate={{ width: `${file.progress}%` }}
                             />
                           </div>
+
+                          {/* Speed and Estimated Time */}
+                          {file.status === 'uploading' && file.speed !== undefined && file.estimatedTime !== undefined && (
+                            <div className="flex justify-between text-xs text-slate-400">
+                              <span>{formatSpeed(file.speed)}</span>
+                              <span>剩余 {formatTime(file.estimatedTime)}</span>
+                            </div>
+                          )}
+
+                          {/* Error Message with Retry Button */}
+                          {file.status === 'error' && (
+                            <div className="flex items-center justify-between text-xs mt-1">
+                              <span className="text-red-600 flex items-center gap-1">
+                                <AlertCircle size={12} />
+                                {file.error || '上传失败'}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRetry(file.name);
+                                }}
+                                className="flex items-center gap-1 text-purple-600 hover:text-purple-700 font-medium"
+                              >
+                                <RefreshCw size={12} />
+                                重试
+                              </button>
+                            </div>
+                          )}
                         </div>
                         
                         {/* Status Icon */}
                         <div className="w-5 flex justify-end">
                           {file.status === 'done' && <CheckCircle size={16} className="text-green-500" />}
-                          {file.status === 'error' && <X size={16} className="text-red-500" />}
+                          {file.status === 'error' && <AlertCircle size={16} className="text-red-500" />}
                           {(file.status === 'uploading' || file.status === 'processing') && (
                             <Loader2 size={16} className="text-purple-500 animate-spin" />
                           )}

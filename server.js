@@ -15,6 +15,16 @@ require('dotenv').config();
 const kg = require('./kg');
 const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require('./kg/hooks/document_hooks');
 
+// Import TempFileManager for automatic cleanup
+const tempFileManager = require('./services/tempFileManager');
+
+// Import FileHashService for file deduplication
+const fileHashService = require('./services/fileHashService');
+
+// Import DocumentStorageService and DeduplicationService
+const DocumentStorageService = require('./services/documentStorageService');
+const DeduplicationService = require('./services/deduplicationService');
+
 // 导入监控系统
 const { logger, accessLogMiddleware, errorHandlerMiddleware, getLogStatus, cleanOldLogs } = require('./utils/logger');
 
@@ -38,6 +48,10 @@ const userDb = initDatabase();
 const authRouter = authRoutes.initAuthRoutes();
 const userCenterRouter = userCenterRoutes.initUserCenterRoutes();
 const adminRouter = adminRoutes.initAdminRoutes();
+
+// Initialize storage and deduplication services
+const documentStorageService = new DocumentStorageService(userDb);
+const deduplicationService = new DeduplicationService(documentStorageService);
 
 // Ollama配置
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api';
@@ -481,7 +495,7 @@ app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 提供client目录下的静态文件服务（用于React应用）
-app.use(express.static(path.join(__dirname, 'client')));
+app.use(express.static(path.join(__dirname, 'client/dist')));
 
 // 提供根目录下的静态文件服务
 app.use(express.static(path.join(__dirname)));
@@ -489,6 +503,15 @@ app.use(express.static(path.join(__dirname)));
 // API路由
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
+});
+
+// 添加缓存控制中间件 - 禁用所有 API 响应的缓存
+app.use('/api', (req, res, next) => {
+  // 禁用缓存
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
 });
 
 // 认证路由
@@ -528,6 +551,18 @@ app.use('/api/ai', aiEnhancementRoutes);
 const searchRoutes = require('./routes/searchRoutes');
 app.use('/api/search', searchRoutes);
 
+// 知识图谱状态路由
+const kgStatusRoutes = require('./routes/kgStatusRoutes');
+app.use('/api', kgStatusRoutes);
+
+// 知识图谱API路由（新的分离架构）
+const kgRoutes = require('./routes/kgRoutes');
+app.use('/api/kg', kgRoutes);
+
+// LLM文档索引预处理路由
+const preprocessingRoutes = require('./routes/preprocessingRoutes');
+app.use('/api/preprocessing', preprocessingRoutes);
+
 const mockTags = [
   { id: '1', name: '前端', color: '#1890ff', description: '前端开发相关内容' },
   { id: '2', name: '后端', color: '#52c41a', description: '后端开发相关内容' },
@@ -538,6 +573,14 @@ const mockTags = [
 
 // 文档相关路由
 app.get('/api/documents', authMiddleware, (req, res) => {
+  // 禁用缓存，确保始终获取最新数据
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'Surrogate-Control': 'no-store'
+  });
+  
   try {
     const userId = req.userId;
     userDb.all('SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC', [userId], (err, rows) => {
@@ -819,14 +862,33 @@ app.post('/api/tags', (req, res) => {
   }
 });
 
-// 文件上传API
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+// 文件上传处理函数
+const handleFileUpload = async (req, res) => {
   try {
+    // 检查数据库连接是否已初始化
+    if (!userDb) {
+      console.error('Database connection not initialized');
+      return res.status(500).json({ 
+        error: 'Database connection not available',
+        message: '数据库连接未初始化，请稍后重试'
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
     const { filename, path: filePath, originalname, size, mimetype } = req.file;
+    const userId = req.userId; // 从认证中间件获取用户ID
+    
+    // 验证用户ID
+    if (!userId) {
+      console.error('User ID not found in request');
+      return res.status(401).json({ 
+        error: 'Unauthorized',
+        message: '用户未认证'
+      });
+    }
     
     // 根据文件类型进行解析
     let content = '';
@@ -855,49 +917,473 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       content = '旧版.doc文件暂不支持直接预览，建议转换为.docx格式';
     }
     
-    // 创建文档记录（使用模拟数据）
     // 修复中文文件名乱码问题
     let title = originalname.replace(fileType, '');
     // 确保标题正确处理中文
-    title = Buffer.from(title, 'latin1').toString('utf8');
+    try {
+      title = Buffer.from(title, 'latin1').toString('utf8');
+    } catch (e) {
+      // 如果转换失败，使用原始标题
+      title = originalname.replace(fileType, '');
+    }
     
-    const document = {
-      id: (mockDocuments.length + 1).toString(),
+    // 计算文件 hash 值用于去重
+    let fileHash = null;
+    try {
+      console.log('[Upload] 开始计算文件 hash:', filePath);
+      fileHash = await fileHashService.calculateHash(filePath);
+      if (fileHash) {
+        console.log('[Upload] 文件 hash 计算成功:', fileHash);
+      } else {
+        console.warn('[Upload] 文件 hash 计算失败，将继续上传但不进行去重检查');
+      }
+    } catch (error) {
+      // 优雅降级：hash 计算失败不应阻止文件上传
+      console.error('[Upload] 文件 hash 计算异常:', error.message);
+      console.warn('[Upload] 将继续上传但不进行去重检查');
+    }
+    
+    // 检查文件是否重复
+    let duplicateCheck = null;
+    if (fileHash) {
+      try {
+        console.log('[Upload] 开始检查文件重复:', { hash: fileHash, filename: title, userId });
+        duplicateCheck = await deduplicationService.checkDuplicate(fileHash, title, userId);
+        console.log('[Upload] 重复检查结果:', duplicateCheck);
+      } catch (error) {
+        console.error('[Upload] 重复检查异常:', error.message);
+        // 优雅降级：重复检查失败不应阻止文件上传
+      }
+    }
+    
+    // 如果检测到重复，返回重复信息而不是立即保存
+    if (duplicateCheck && duplicateCheck.isDuplicate) {
+      console.log('[Upload] 检测到重复文件，类型:', duplicateCheck.duplicateType);
+      
+      // 生成临时文件 ID 并存储临时文件信息
+      const tempFileId = tempFileManager.storeTempFile({
+        originalName: originalname,
+        path: filePath,
+        size: size,
+        hash: fileHash,
+        userId: userId
+      });
+      
+      console.log('[Upload] 临时文件已存储，ID:', tempFileId);
+      
+      // 返回重复信息，让前端显示模态框
+      return res.status(200).json({
+        success: false,
+        duplicate: true,
+        duplicateType: duplicateCheck.duplicateType,
+        existingFile: duplicateCheck.existingFile,
+        tempFileId: tempFileId,
+        newFile: {
+          name: originalname,
+          size: size,
+          title: title,
+          fileType: fileType,
+          content: content
+        }
+      });
+    }
+    
+    const metadata = JSON.stringify({
+      filename,
+      originalname: originalname,
+      size,
+      mimetype,
+      filePath
+    });
+    
+    // 保存到SQLite数据库，包含 hash 和 size 字段
+    userDb.run(
+      'INSERT INTO documents (user_id, title, content, type, file_type, metadata, hash, size) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, title, content, 'document', fileType, metadata, fileHash, size],
+      function(err) {
+        if (err) {
+          console.error('Error saving document to database:', err);
+          return res.status(500).json({ 
+            error: 'Failed to save document',
+            message: '保存文档到数据库失败',
+            details: err.message
+          });
+        }
+        
+        const documentId = this.lastID.toString();
+        
+        const document = {
+          id: documentId,
+          title: title,
+          content,
+          type: 'document',
+          fileType: fileType,
+          metadata: JSON.parse(metadata),
+          hash: fileHash,
+          size: size,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        console.log('[Upload] 文档上传成功，ID:', documentId, '开始触发知识图谱构建...');
+        
+        // 触发知识图谱构建钩子 (异步)
+        onDocumentCreated(document, { async: true, skipIfExists: false })
+          .then(result => {
+            console.log('[KG Hook] 文档上传后知识图谱构建结果:', result);
+          })
+          .catch(error => {
+            console.error('[KG Hook] 文档上传后知识图谱构建失败:', error);
+          });
+        
+        // 返回成功响应，包含 success 标志和文档元数据
+        res.status(201).json({
+          success: true,
+          document: document
+        });
+      }
+    );
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    res.status(500).json({ 
+      error: 'Failed to upload file',
+      message: '文件上传失败',
+      details: error.message
+    });
+  }
+};
+
+// 文件上传API - 支持两个路径（需要认证）
+app.post('/api/upload', authMiddleware, upload.single('file'), handleFileUpload);
+app.post('/api/documents/upload', authMiddleware, upload.single('file'), handleFileUpload);
+
+// 处理重复文件解决方案的端点（需要认证）
+app.post('/api/documents/upload/resolve-duplicate', authMiddleware, async (req, res) => {
+  try {
+    const { action, tempFileId, existingFileId } = req.body;
+    const userId = req.userId; // 从认证中间件获取用户ID
+    
+    // 验证用户ID
+    if (!userId) {
+      console.error('[ResolveDuplicate] User ID not found in request');
+      return res.status(401).json({ 
+        error: 'Unauthorized',
+        message: '用户未认证'
+      });
+    }
+    
+    // 验证必需参数
+    if (!action || !tempFileId) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters',
+        message: '缺少必需参数：action 和 tempFileId'
+      });
+    }
+    
+    // 验证 action 值
+    const validActions = ['replace', 'keep-both', 'cancel'];
+    if (!validActions.includes(action)) {
+      return res.status(400).json({ 
+        error: 'Invalid action',
+        message: `无效的操作：${action}。有效值为：${validActions.join(', ')}`
+      });
+    }
+    
+    // 如果是 replace 动作，需要 existingFileId
+    if (action === 'replace' && !existingFileId) {
+      return res.status(400).json({ 
+        error: 'Missing existingFileId',
+        message: 'replace 操作需要提供 existingFileId'
+      });
+    }
+    
+    console.log('[ResolveDuplicate] 处理重复文件解决方案:', { action, tempFileId, existingFileId, userId });
+    
+    // 从内存中检索临时文件信息
+    const tempFile = tempFileManager.getTempFile(tempFileId);
+    
+    if (!tempFile) {
+      return res.status(404).json({ 
+        error: 'Temporary file not found',
+        message: '临时文件未找到或已过期'
+      });
+    }
+    
+    // 验证临时文件属于当前用户
+    if (tempFile.userId !== userId) {
+      console.error('[ResolveDuplicate] User ID mismatch:', { tempFileUserId: tempFile.userId, requestUserId: userId });
+      return res.status(403).json({ 
+        error: 'Forbidden',
+        message: '无权访问此临时文件'
+      });
+    }
+    
+    // 准备文件元数据
+    const fileType = path.extname(tempFile.originalName).toLowerCase();
+    let title = tempFile.originalName.replace(fileType, '');
+    
+    // 处理中文文件名
+    try {
+      title = Buffer.from(title, 'latin1').toString('utf8');
+    } catch (e) {
+      title = tempFile.originalName.replace(fileType, '');
+    }
+    
+    // 读取文件内容（如果是文本文件）
+    let content = '';
+    if (fileType === '.txt' || fileType === '.md') {
+      try {
+        content = fs.readFileSync(tempFile.path, 'utf8');
+      } catch (error) {
+        console.error('[ResolveDuplicate] Error reading file content:', error);
+      }
+    } else if (fileType === '.docx') {
+      try {
+        const data = fs.readFileSync(tempFile.path);
+        const zip = await JSZip.loadAsync(data);
+        const docXml = await zip.file('word/document.xml').async('string');
+        const textMatches = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+        if (textMatches) {
+          content = textMatches.map(match => match.replace(/<[^>]*>/g, '')).join('\n');
+        }
+      } catch (error) {
+        console.error('[ResolveDuplicate] Error parsing docx file:', error);
+        content = '无法解析docx文件内容';
+      }
+    }
+    
+    const metadata = {
+      userId: userId,
       title: title,
-      content,
+      content: content,
       type: 'document',
       fileType: fileType,
       metadata: {
-        filename,
-        originalname: Buffer.from(originalname, 'latin1').toString('utf8'),
-        size,
-        mimetype,
-        filePath
+        filename: path.basename(tempFile.path),
+        originalname: tempFile.originalName,
+        size: tempFile.size,
+        mimetype: 'application/octet-stream'
       },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      hash: tempFile.hash,
+      size: tempFile.size
     };
     
-    mockDocuments.push(document);
+    // 调用 DeduplicationService 处理用户选择
+    const newFile = {
+      tempFilePath: tempFile.path,
+      metadata: metadata
+    };
     
-    // 保存到文件
-    saveDocuments(mockDocuments);
+    console.log('[ResolveDuplicate] 调用 DeduplicationService.handleDuplicateAction');
+    const result = await deduplicationService.handleDuplicateAction(action, newFile, existingFileId);
     
-    console.log('[Upload] 文档上传成功，开始触发知识图谱构建...');
+    // 清理临时文件信息（从内存中删除）
+    await tempFileManager.deleteTempFile(tempFileId);
+    console.log('[ResolveDuplicate] 临时文件信息已清理');
+    
+    // 如果用户选择取消，返回成功但无文档
+    if (action === 'cancel') {
+      return res.status(200).json({
+        success: true,
+        cancelled: true,
+        message: '上传已取消'
+      });
+    }
+    
+    // 返回最终文档元数据
+    console.log('[ResolveDuplicate] 操作成功，文档ID:', result.id);
     
     // 触发知识图谱构建钩子 (异步)
-    onDocumentCreated(document, { async: true, skipIfExists: false })
-      .then(result => {
-        console.log('[KG Hook] 文档上传后知识图谱构建结果:', result);
-      })
-      .catch(error => {
-        console.error('[KG Hook] 文档上传后知识图谱构建失败:', error);
-      });
+    if (result && result.id) {
+      onDocumentCreated(result, { async: true, skipIfExists: false })
+        .then(kgResult => {
+          console.log('[KG Hook] 重复文件解决后知识图谱构建结果:', kgResult);
+        })
+        .catch(error => {
+          console.error('[KG Hook] 重复文件解决后知识图谱构建失败:', error);
+        });
+    }
     
-    res.status(201).json(document);
+    res.status(200).json({
+      success: true,
+      document: {
+        id: result.id,
+        title: result.title,
+        content: result.content,
+        type: result.type,
+        fileType: result.fileType,
+        metadata: result.metadata,
+        hash: result.hash,
+        size: result.size,
+        uploadDate: result.updatedAt || result.createdAt
+      }
+    });
+    
   } catch (error) {
-    console.error('Error uploading file:', error);
-    res.status(500).json({ error: 'Failed to upload file' });
+    console.error('[ResolveDuplicate] Error resolving duplicate:', error);
+    res.status(500).json({ 
+      error: 'Failed to resolve duplicate',
+      message: '处理重复文件失败',
+      details: error.message
+    });
+  }
+});
+
+// 同时支持另一个路径（兼容性）
+app.post('/api/upload/resolve-duplicate', authMiddleware, async (req, res) => {
+  try {
+    const { action, tempFileId, existingFileId } = req.body;
+    const userId = req.userId;
+    
+    if (!userId) {
+      console.error('[ResolveDuplicate] User ID not found in request');
+      return res.status(401).json({ 
+        error: 'Unauthorized',
+        message: '用户未认证'
+      });
+    }
+    
+    if (!action || !tempFileId) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters',
+        message: '缺少必需参数：action 和 tempFileId'
+      });
+    }
+    
+    const validActions = ['replace', 'keep-both', 'cancel'];
+    if (!validActions.includes(action)) {
+      return res.status(400).json({ 
+        error: 'Invalid action',
+        message: `无效的操作：${action}。有效值为：${validActions.join(', ')}`
+      });
+    }
+    
+    if (action === 'replace' && !existingFileId) {
+      return res.status(400).json({ 
+        error: 'Missing existingFileId',
+        message: 'replace 操作需要提供 existingFileId'
+      });
+    }
+    
+    console.log('[ResolveDuplicate] 处理重复文件解决方案:', { action, tempFileId, existingFileId, userId });
+    
+    const tempFile = tempFileManager.getTempFile(tempFileId);
+    
+    if (!tempFile) {
+      return res.status(404).json({ 
+        error: 'Temporary file not found',
+        message: '临时文件未找到或已过期'
+      });
+    }
+    
+    if (tempFile.userId !== userId) {
+      console.error('[ResolveDuplicate] User ID mismatch:', { tempFileUserId: tempFile.userId, requestUserId: userId });
+      return res.status(403).json({ 
+        error: 'Forbidden',
+        message: '无权访问此临时文件'
+      });
+    }
+    
+    const fileType = path.extname(tempFile.originalName).toLowerCase();
+    let title = tempFile.originalName.replace(fileType, '');
+    
+    try {
+      title = Buffer.from(title, 'latin1').toString('utf8');
+    } catch (e) {
+      title = tempFile.originalName.replace(fileType, '');
+    }
+    
+    let content = '';
+    if (fileType === '.txt' || fileType === '.md') {
+      try {
+        content = fs.readFileSync(tempFile.path, 'utf8');
+      } catch (error) {
+        console.error('[ResolveDuplicate] Error reading file content:', error);
+      }
+    } else if (fileType === '.docx') {
+      try {
+        const data = fs.readFileSync(tempFile.path);
+        const zip = await JSZip.loadAsync(data);
+        const docXml = await zip.file('word/document.xml').async('string');
+        const textMatches = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+        if (textMatches) {
+          content = textMatches.map(match => match.replace(/<[^>]*>/g, '')).join('\n');
+        }
+      } catch (error) {
+        console.error('[ResolveDuplicate] Error parsing docx file:', error);
+        content = '无法解析docx文件内容';
+      }
+    }
+    
+    const metadata = {
+      userId: userId,
+      title: title,
+      content: content,
+      type: 'document',
+      fileType: fileType,
+      metadata: {
+        filename: path.basename(tempFile.path),
+        originalname: tempFile.originalName,
+        size: tempFile.size,
+        mimetype: 'application/octet-stream'
+      },
+      hash: tempFile.hash,
+      size: tempFile.size
+    };
+    
+    const newFile = {
+      tempFilePath: tempFile.path,
+      metadata: metadata
+    };
+    
+    console.log('[ResolveDuplicate] 调用 DeduplicationService.handleDuplicateAction');
+    const result = await deduplicationService.handleDuplicateAction(action, newFile, existingFileId);
+    
+    await tempFileManager.deleteTempFile(tempFileId);
+    console.log('[ResolveDuplicate] 临时文件信息已清理');
+    
+    if (action === 'cancel') {
+      return res.status(200).json({
+        success: true,
+        cancelled: true,
+        message: '上传已取消'
+      });
+    }
+    
+    console.log('[ResolveDuplicate] 操作成功，文档ID:', result.id);
+    
+    if (result && result.id) {
+      onDocumentCreated(result, { async: true, skipIfExists: false })
+        .then(kgResult => {
+          console.log('[KG Hook] 重复文件解决后知识图谱构建结果:', kgResult);
+        })
+        .catch(error => {
+          console.error('[KG Hook] 重复文件解决后知识图谱构建失败:', error);
+        });
+    }
+    
+    res.status(200).json({
+      success: true,
+      document: {
+        id: result.id,
+        title: result.title,
+        content: result.content,
+        type: result.type,
+        fileType: result.fileType,
+        metadata: result.metadata,
+        hash: result.hash,
+        size: result.size,
+        uploadDate: result.updatedAt || result.createdAt
+      }
+    });
+    
+  } catch (error) {
+    console.error('[ResolveDuplicate] Error resolving duplicate:', error);
+    res.status(500).json({ 
+      error: 'Failed to resolve duplicate',
+      message: '处理重复文件失败',
+      details: error.message
+    });
   }
 });
 
@@ -2920,6 +3406,9 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
   console.log(`Server is running on http://localhost:${PORT}`);
   console.log(`Server is accessible on network: http://${localIP}:${PORT}`);
+  
+  // Initialize TempFileManager (cleanup task already started in constructor)
+  console.log('[TempFileManager] Automatic cleanup enabled (runs every 15 minutes)');
   
   // Initialize KG module (includes schema startup check)
   try {

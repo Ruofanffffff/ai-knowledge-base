@@ -223,3 +223,49 @@ describe('Knowledge Graph Service', () => {
     });
   });
 });
+
+describe('normalizePunctuation', () => {
+  const { normalizePunctuation } = require('./kg_service');
+
+  test('should convert Chinese colon to ASCII colon', () => {
+    expect(normalizePunctuation('标题：副标题')).toBe('标题:副标题');
+  });
+
+  test('should convert double em-dash to hyphen', () => {
+    expect(normalizePunctuation('标题——副标题')).toBe('标题-副标题');
+  });
+
+  test('should convert single em-dash to hyphen', () => {
+    expect(normalizePunctuation('标题—副标题')).toBe('标题-副标题');
+  });
+
+  test('should convert Chinese semicolon to ASCII semicolon', () => {
+    expect(normalizePunctuation('项目；版本')).toBe('项目;版本');
+  });
+
+  test('should convert Chinese comma to ASCII comma', () => {
+    expect(normalizePunctuation('名称，描述')).toBe('名称,描述');
+  });
+
+  test('should convert Chinese period to ASCII period', () => {
+    expect(normalizePunctuation('结束。开始')).toBe('结束.开始');
+  });
+
+  test('should handle multiple punctuation types in one string', () => {
+    expect(normalizePunctuation('标题：内容——说明；备注，附加。结束')).toBe('标题:内容-说明;备注,附加.结束');
+  });
+
+  test('should handle double em-dash before single em-dash (no partial match)', () => {
+    expect(normalizePunctuation('A——B—C')).toBe('A-B-C');
+  });
+
+  test('should return empty string for null/undefined/empty input', () => {
+    expect(normalizePunctuation(null)).toBe('');
+    expect(normalizePunctuation(undefined)).toBe('');
+    expect(normalizePunctuation('')).toBe('');
+  });
+
+  test('should not modify strings without Chinese punctuation', () => {
+    expect(normalizePunctuation('hello-world:test')).toBe('hello-world:test');
+  });
+});

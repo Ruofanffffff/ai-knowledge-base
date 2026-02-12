@@ -159,15 +159,26 @@ async function generateCanonicalName(fields, schema, ckb, options = {}) {
   // Step 3: Check if name is well-formed
   const isWellFormed = checkNameWellFormed(canonicalName);
   
-  // Step 4: LLM作为兜底方案 - 100%启动验证和优化
-  // LLM Enhancement: ALWAYS used as fallback to validate and optimize
-  // - If name is NOT well-formed: LLM MUST fix it (强制修正)
-  // - If name IS well-formed: LLM validates and may optimize (验证并优化)
-  if (useLLM) {
+  // Step 4: If name is already well-formed, skip LLM enhancement entirely (需求 12.1, 12.3, 12.4)
+  if (canonicalName && isWellFormed) {
+    console.log(`[EntityBuilder] Skipping LLM enhancement — name already well-formed: "${canonicalName}"`);
+    return {
+      canonical_name: canonicalName,
+      aliases: [],
+      llm_enhanced: false,
+      skipped_reason: 'already_well_formed',
+      needs_fixing: false,
+      standardized: enableStandardization,
+      original_name: originalName
+    };
+  }
+  
+  // Step 5: Name is NOT well-formed — attempt LLM enhancement if available (需求 12.2)
+  if (useLLM && (llmClient || getLLMClient())) {
     try {
       const llmStart = Date.now();
       
-      // 🆕 Create temporary entity object for evidence location
+      // Create temporary entity object for evidence location
       const tempEntity = {
         canonical_name: canonicalName,
         fields: fields,
@@ -179,7 +190,7 @@ async function generateCanonicalName(fields, schema, ckb, options = {}) {
         schema,
         ckb,
         llmClient,
-        !isWellFormed, // Pass flag: true if name needs fixing
+        true, // Name needs fixing
         tempEntity // Pass entity for evidence location
       );
       
@@ -198,7 +209,7 @@ async function generateCanonicalName(fields, schema, ckb, options = {}) {
           canonical_name: llmResult.canonical_name,
           aliases: llmResult.aliases || [],
           llm_enhanced: true,
-          needs_fixing: !isWellFormed,
+          needs_fixing: true,
           standardized: enableStandardization,
           original_name: originalName
         };
@@ -216,10 +227,7 @@ async function generateCanonicalName(fields, schema, ckb, options = {}) {
         doc_id: ckb.doc_id
       });
       
-      // If name is NOT well-formed and LLM failed, this is critical
-      if (!isWellFormed) {
-        console.warn('[EntityBuilder] Name is not well-formed and LLM failed to fix it:', canonicalName);
-      }
+      console.warn('[EntityBuilder] Name is not well-formed and LLM failed to fix it:', canonicalName);
       // Fall back to rule-based name
     }
   }
@@ -248,82 +256,123 @@ function generateRuleBasedName(fields, schema) {
     console.error('[EntityBuilder] Schema is undefined in generateRuleBasedName');
     return 'Unknown_Entity';
   }
-  
+
   const entityType = schema.entity_type || 'GeneralEntity';
-  
+
+  // Helper: clean a field value for use as entity name
+  function cleanFieldValue(value) {
+    if (!value || typeof value !== 'string') return null;
+    let cleaned = value.trim();
+    // Remove leading/trailing punctuation and function words
+    cleaned = cleaned.replace(/^[，。；！？、\s了的地得在从而且并但是]+/, '');
+    cleaned = cleaned.replace(/[，。；！？、\s了的地得在从而且并但是]+$/, '');
+    // Skip if too short or too long
+    if (cleaned.length < 2 || cleaned.length > 80) return null;
+    // Skip if it looks like a sentence fragment (starts with function words)
+    if (/^[了而且并但从通过由于为了更极大地从而]/.test(cleaned)) return null;
+    return cleaned;
+  }
+
   // Rule 1: EventEntity - combine location, indicator, time
   if (entityType === 'EventEntity' || entityType === 'ResearchEntity') {
     const parts = [];
-    
-    // Try common field names for events
+
     if (fields['区域'] || fields['Entity']) {
-      parts.push(fields['区域'] || fields['Entity']);
+      const v = cleanFieldValue(fields['区域'] || fields['Entity']);
+      if (v) parts.push(v);
     }
     if (fields['指标'] || fields['Indicator']) {
-      parts.push(fields['指标'] || fields['Indicator']);
+      const v = cleanFieldValue(fields['指标'] || fields['Indicator']);
+      if (v) parts.push(v);
     }
     if (fields['时间'] || fields['Time']) {
-      parts.push(fields['时间'] || fields['Time']);
+      const v = cleanFieldValue(fields['时间'] || fields['Time']);
+      if (v) parts.push(v);
     }
-    
+
     if (parts.length > 0) {
       return parts.join('_');
     }
   }
-  
+
   // Rule 2: LocationEntity - use location field
   if (entityType === 'LocationEntity') {
-    return fields['区域'] || fields['Location'] || fields['Entity'] || 'Unknown_Location';
+    const v = cleanFieldValue(fields['区域'] || fields['Location'] || fields['Entity'] || fields['地点']);
+    return v || 'Unknown_Location';
   }
-  
+
   // Rule 3: TravelEntity - combine location and time
   if (entityType === 'TravelEntity') {
     const parts = [];
-    if (fields['Location']) parts.push(fields['Location']);
-    if (fields['Timestamp'] || fields['Time']) parts.push(fields['Timestamp'] || fields['Time']);
-    
+    const loc = cleanFieldValue(fields['Location'] || fields['地点']);
+    if (loc) parts.push(loc);
+    const time = cleanFieldValue(fields['Timestamp'] || fields['Time'] || fields['时间']);
+    if (time) parts.push(time);
+
     if (parts.length > 0) {
       return parts.join('_');
     }
   }
-  
+
   // Rule 4: PhotographyEntity - combine camera and lens
   if (entityType === 'PhotographyEntity') {
     const parts = [];
-    if (fields['Camera']) parts.push(fields['Camera']);
-    if (fields['Lens']) parts.push(fields['Lens']);
-    
+    const camera = cleanFieldValue(fields['Camera'] || fields['相机']);
+    if (camera) parts.push(camera);
+    const lens = cleanFieldValue(fields['Lens'] || fields['LensModel'] || fields['镜头']);
+    if (lens) parts.push(lens);
+
     if (parts.length > 0) {
       return parts.join('_');
     }
   }
-  
+
   // Rule 5: SportsEntity - combine activity and date
   if (entityType === 'SportsEntity') {
     const parts = [];
-    if (fields['Activity']) parts.push(fields['Activity']);
-    if (fields['Date'] || fields['Time']) parts.push(fields['Date'] || fields['Time']);
-    
+    const activity = cleanFieldValue(fields['Activity']);
+    if (activity) parts.push(activity);
+    const date = cleanFieldValue(fields['Date'] || fields['Time'] || fields['时间']);
+    if (date) parts.push(date);
+
     if (parts.length > 0) {
       return parts.join('_');
     }
   }
-  
+
   // Rule 6: LifeEntity - use most important field
   if (entityType === 'LifeEntity' || entityType === 'EntertainmentEntity') {
-    // Find the field with highest weight
     const topField = findTopWeightField(fields, schema);
     if (topField) {
-      return topField.value;
+      const v = cleanFieldValue(topField.value);
+      if (v) return v;
     }
   }
-  
-  // Rule 7: Generic fallback - use top weighted field
+
+  // Rule 7: DocumentEntity - use title field preferentially
+  if (entityType === 'DocumentEntity') {
+    const title = cleanFieldValue(fields['title'] || fields['标题'] || fields['项目名称']);
+    if (title) return title;
+  }
+
+  // Rule 8: Generic fallback - try named entity fields first (organizations, projects, people)
+  // These are more likely to be proper entity names than generic field values
+  const namedEntityFields = ['项目名称', '公司', '执行单位', '负责单位', '政府机构', '政府部门',
+                              '合同名称', '政策', 'Entity', 'Camera', 'LensModel'];
+  for (const fieldName of namedEntityFields) {
+    if (fields[fieldName]) {
+      const v = cleanFieldValue(fields[fieldName]);
+      if (v) return v;
+    }
+  }
+
+  // Rule 9: Try top weighted field as last resort
   const topField = findTopWeightField(fields, schema);
   if (topField) {
-    return topField.value;
+    const v = cleanFieldValue(topField.value);
+    if (v) return v;
   }
-  
+
   // Last resort: use schema name + timestamp
   return `${schema.schema_name}_${Date.now()}`;
 }
@@ -339,16 +388,24 @@ function findTopWeightField(fields, schema) {
   if (!schema.core_fields || schema.core_fields.length === 0) {
     return null;
   }
-  
+
   // Sort fields by weight (descending)
   const sortedFields = schema.core_fields
-    .filter(f => fields[f.name])
+    .filter(f => {
+      const value = fields[f.name];
+      if (!value) return false;
+      // Skip fields with very long values (likely raw text content, not entity names)
+      if (typeof value === 'string' && value.length > 80) return false;
+      // Skip generic fields that shouldn't be entity names
+      if (f.name === 'content' || f.name === '内容') return false;
+      return true;
+    })
     .sort((a, b) => b.weight - a.weight);
-  
+
   if (sortedFields.length === 0) {
     return null;
   }
-  
+
   const topField = sortedFields[0];
   return {
     name: topField.name,
@@ -374,27 +431,43 @@ function checkNameWellFormed(name) {
   if (!name || typeof name !== 'string') {
     return false;
   }
-  
-  // Check length
-  if (name.length === 0 || name.length > 100) {
+
+  // Check length — too short or too long names are bad
+  if (name.length < 2 || name.length > 100) {
     return false;
   }
-  
+
   // Check if contains at least some alphanumeric or Chinese characters
   if (!/[a-zA-Z\u4e00-\u9fa5]/.test(name)) {
     return false;
   }
-  
+
   // Check for excessive whitespace
   if (/\s{3,}/.test(name)) {
     return false;
   }
-  
+
   // Check for common placeholder patterns
   if (/^(unknown|unnamed|untitled|无名|未命名)/i.test(name)) {
     return false;
   }
-  
+
+  // Reject names that start with common Chinese function/auxiliary words
+  if (/^[了而且并但从通过由于为了更极大地从而所以因为虽然如果对于关于]/.test(name)) {
+    return false;
+  }
+
+  // Reject names that end with common Chinese particles/auxiliary words (likely fragments)
+  if (/[了的地得而且并但从带着]$/.test(name) && name.length < 15) {
+    return false;
+  }
+
+  // Reject names with too many function words relative to length
+  const functionWordCount = (name.match(/[了的地得在从而且并但是因为所以通过由于为了对于关于虽然如果更极大]/g) || []).length;
+  if (functionWordCount > name.length * 0.4) {
+    return false;
+  }
+
   return true;
 }
 
@@ -428,11 +501,14 @@ async function enhanceNameWithLLM(rawName, schema, ckb, llmClient, needsFixing =
     const response = await client.callJSON(prompt, {
       temperature: 0.3,
       maxTokens: 300,
-      systemPrompt: '你是一个实体名称标准化专家。'
+      systemPrompt: '你是一个实体名称标准化专家。请只输出JSON，不要输出其他内容。'
     });
     
+    // callJSON returns { data: {...}, metadata: {...} }
+    const result = response.data || response;
+    
     // Extract token usage from metadata
-    const tokens = response._meta?.tokens || Math.ceil(prompt.length / 4);
+    const tokens = response.metadata?.tokens || Math.ceil(prompt.length / 4);
     
     // Record token usage
     await tokenBudgetManager.recordUsage({
@@ -445,13 +521,13 @@ async function enhanceNameWithLLM(rawName, schema, ckb, llmClient, needsFixing =
     });
     
     // Validate response
-    if (!response || !response.canonical_name) {
+    if (!result || !result.canonical_name) {
       return null;
     }
     
     return {
-      canonical_name: response.canonical_name,
-      aliases: response.aliases || []
+      canonical_name: result.canonical_name,
+      aliases: result.aliases || []
     };
   } catch (error) {
     console.error('[EntityBuilder] LLM call failed:', error);
@@ -473,36 +549,38 @@ async function enhanceNameWithLLM(rawName, schema, ckb, llmClient, needsFixing =
  * @returns {string} LLM prompt
  */
 function buildNameEnhancementPrompt(rawName, schema, ckb, needsFixing = false, entity = null) {
-  const taskDescription = needsFixing 
+  const taskDescription = needsFixing
     ? '⚠️ 当前名称不规范，需要修正！请生成一个规范的实体名称。'
     : '✅ 当前名称基本规范，请验证并优化（如有必要）。';
-  
-  // 🆕 Use Evidence Locator to get optimized context
+
+  // Use Evidence Locator to get optimized context
   let contextText = ckb.content?.text || '';
-  
+
   if (process.env.ENABLE_CONTEXT_OPTIMIZATION === 'true' && entity) {
     try {
       const locator = initEvidenceLocator();
       const contextResult = locator.getEntityContext(entity, [ckb], {
-        contextWindow: 150 // Slightly larger window for name enhancement
+        contextWindow: 150
       });
-      
+
       if (contextResult.contexts && contextResult.contexts.length > 0) {
-        // Use the first context (most relevant)
         contextText = contextResult.contexts[0].text;
-        
-        // Log optimization
+
         const originalTokens = Math.ceil((ckb.content?.text || '').length / 4);
         const optimizedTokens = Math.ceil(contextText.length / 4);
         console.log(`[EntityBuilder] Context optimization: ${optimizedTokens}/${originalTokens} tokens (${Math.round(optimizedTokens/originalTokens*100)}%)`);
       }
     } catch (error) {
       console.error('[EntityBuilder] Evidence locator failed, using full text:', error);
-      // Fall back to full text on error
       contextText = ckb.content?.text || '';
     }
   }
-    
+
+  // Truncate context to avoid exceeding LLM token limits (max ~2000 chars)
+  if (contextText.length > 2000) {
+    contextText = contextText.substring(0, 2000) + '...';
+  }
+
   return `你是一个实体名称标准化专家。请标准化以下实体名称。
 
 ${taskDescription}
@@ -1061,7 +1139,7 @@ function buildEnrichmentPrompt(entity, ckb) {
 
 实体名称: ${entity.canonical_name}
 实体类型: ${entity.entity_type}
-原始文本: ${ckb.content?.text || ''}
+原始文本: ${(ckb.content?.text || '').substring(0, 2000)}
 
 已知属性:
 ${JSON.stringify(entity.attributes, null, 2)}
@@ -1119,35 +1197,63 @@ ${JSON.stringify(entity.attributes, null, 2)}
 async function buildEntity(schemaScore, fields, ckb, options = {}) {
   const {
     useLLM = true,
-    llmProbability = 0.5
+    llmProbability = 0.5,
+    llmClient = null
   } = options;
-  
+
   // Convert fields array to object
   const fieldsObj = {};
   for (const field of fields) {
     fieldsObj[field.name] = field.value;
   }
-  
-  // Generate canonical name
+
+  // Generate canonical name — pass llmClient through
   const nameResult = await generateCanonicalName(
     fieldsObj,
     schemaScore.schema,
     ckb,
-    { useLLM, llmProbability }
+    { useLLM, llmProbability, llmClient }
+  );
+
+  // Skip entity if name is still not well-formed after all attempts
+  const badNamePatterns = [
+    'Unknown_Entity', 'Unknown_Location', '未知地点', '未知位置',
+    /^[A-Za-z\-]+Entity$/,  // Schema type names like "Time-Event-Entity"
+    /^[A-Za-z\-]+Entity[_\-]\d+$/,  // Schema name + timestamp like "Document-Entity-1770895157949"
+    /^[A-Za-z\-]+-Entity-\d+$/,  // Hyphenated schema name + timestamp
+    /^.+_\d{13}$/,  // Any name ending with 13-digit timestamp
+    /^Generic-Text-Content$/,  // Generic schema name
+  ];
+  
+  const name = nameResult.canonical_name;
+  const isBadName = !name || badNamePatterns.some(pattern => {
+    if (typeof pattern === 'string') return name === pattern;
+    return pattern.test(name);
+  });
+  
+  // Additional quality checks
+  const isLowQuality = name && (
+    name.length <= 1 ||  // Single character
+    /^[了而且并但从通过由于为了更极大地从而]/.test(name) ||  // Starts with function words
+    (name.length <= 3 && /^[\u4e00-\u9fa5]+$/.test(name) && /^(密度|速度|距离|破局|温度|湿度|压力|流量|强度|频率|电压|电流|功率|能耗|产量|销量|收入|利润|面积|体积|重量|长度|宽度|高度|深度|厚度|时长|次数)$/.test(name))  // Generic indicator words as entity names
   );
   
+  if (isBadName || isLowQuality) {
+    return null;
+  }
+
   // Build entity object
   const entity = {
     entity_id: `entity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     entity_type: schemaScore.schema.entity_type || 'GeneralEntity',
-    schema_name: schemaScore.schema.schema_name,  // 添加顶层schema_name字段
+    schema_name: schemaScore.schema.schema_name,
     canonical_name: nameResult.canonical_name,
     aliases: nameResult.aliases || [],
     schemas: [{
       schema_name: schemaScore.schema.schema_name,
       confidence: schemaScore.completeness
     }],
-    fields: fieldsObj,  // 添加fields字段以便显示
+    fields: fieldsObj,
     supported_by: [ckb.ckb_id],
     attributes: fieldsObj,
     confidence: schemaScore.completeness,
@@ -1155,7 +1261,7 @@ async function buildEntity(schemaScore, fields, ckb, options = {}) {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
-  
+
   return entity;
 }
 

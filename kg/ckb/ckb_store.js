@@ -35,7 +35,7 @@ async function saveCKB(ckb) {
     const saved = await prisma.cKB.create({
       data: {
         id: ckb.ckb_id,
-        docId: ckb.doc_id,
+        docId: String(ckb.doc_id), // Convert to string for Prisma schema compatibility
         sourceType: ckb.source_type,
         sourceMeta: JSON.stringify(ckb.source_meta),
         structure: JSON.stringify(ckb.structure),
@@ -65,7 +65,7 @@ async function saveCKBs(ckbs) {
         prisma.cKB.create({
           data: {
             id: ckb.ckb_id,
-            docId: ckb.doc_id,
+            docId: String(ckb.doc_id), // Convert to string for Prisma schema compatibility
             sourceType: ckb.source_type,
             sourceMeta: JSON.stringify(ckb.source_meta),
             structure: JSON.stringify(ckb.structure),
@@ -111,7 +111,7 @@ async function getCKB(ckbId) {
 async function getCKBsByDocument(docId) {
   try {
     const ckbs = await prisma.cKB.findMany({
-      where: { docId: docId },
+      where: { docId: String(docId) }, // Convert to string for Prisma schema compatibility
       orderBy: { createdAt: 'asc' }
     });
     
@@ -165,7 +165,7 @@ async function deleteCKB(ckbId) {
 async function deleteCKBsByDocument(docId) {
   try {
     await prisma.cKB.deleteMany({
-      where: { docId: docId }
+      where: { docId: String(docId) } // Convert to string for Prisma schema compatibility
     });
   } catch (error) {
     console.error('Error deleting CKBs by document:', error);

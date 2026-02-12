@@ -33,6 +33,32 @@ const mappingCache = getGlobalCache({
 // Create global mapping-based normalizer instance
 const mappingNormalizer = new MappingBasedNormalizer();
 
+// Field normalization result cache
+const normalizationCache = new Map();
+const NORM_CACHE_MAX_SIZE = 1000;
+const NORM_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Generate cache key for normalization
+ */
+function generateNormCacheKey(rawFields, schema) {
+  const fieldNames = rawFields.map(f => f.name).sort().join(',');
+  const schemaId = schema.id || schema.schema_name;
+  return `${schemaId}|${fieldNames}`;
+}
+
+/**
+ * Clear expired normalization cache
+ */
+function clearExpiredNormCache() {
+  const now = Date.now();
+  for (const [key, value] of normalizationCache.entries()) {
+    if (now - value.timestamp > NORM_CACHE_TTL) {
+      normalizationCache.delete(key);
+    }
+  }
+}
+
 /**
  * Normalize fields to match schema-defined field names
  * 
@@ -82,6 +108,16 @@ async function normalizeFields(rawFields, schema, options = {}) {
     throw new Error('schema must have schema_name and core_fields array');
   }
   
+  // Check cache
+  if (useCache) {
+    const cacheKey = generateNormCacheKey(rawFields, schema);
+    const cached = normalizationCache.get(cacheKey);
+    
+    if (cached && (Date.now() - cached.timestamp < NORM_CACHE_TTL)) {
+      return cached.result;
+    }
+  }
+  
   // Use mapping-based normalizer (algorithm + LLM fallback)
   if (useAlgorithm) {
     try {
@@ -105,7 +141,23 @@ async function normalizeFields(rawFields, schema, options = {}) {
         }
       }
       
-      return result.normalizedFields || [];
+      const normalizedFields = result.normalizedFields || [];
+      
+      // Store in cache
+      if (useCache) {
+        const cacheKey = generateNormCacheKey(rawFields, schema);
+        normalizationCache.set(cacheKey, {
+          result: normalizedFields,
+          timestamp: Date.now()
+        });
+        
+        // Clear expired cache if too large
+        if (normalizationCache.size > NORM_CACHE_MAX_SIZE) {
+          clearExpiredNormCache();
+        }
+      }
+      
+      return normalizedFields;
       
     } catch (error) {
       console.warn('[FieldNormalizer] Mapping-based normalization failed, falling back to legacy method:', error.message);

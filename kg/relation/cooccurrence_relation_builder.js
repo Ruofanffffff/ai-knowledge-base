@@ -54,21 +54,29 @@ async function buildCooccurrenceRelations(ckbs, options = {}) {
         const entity1 = entities[i];
         const entity2 = entities[j];
 
-        // Store entity objects for later use
-        if (!entityMap.has(entity1.id)) {
-          entityMap.set(entity1.id, entity1);
+        // Use entity_id (the actual property name on entity objects)
+        const id1 = entity1.entity_id || entity1.id;
+        const id2 = entity2.entity_id || entity2.id;
+        
+        if (!id1 || !id2) {
+          continue; // Skip if either entity has no valid ID
         }
-        if (!entityMap.has(entity2.id)) {
-          entityMap.set(entity2.id, entity2);
+
+        // Store entity objects for later use
+        if (!entityMap.has(id1)) {
+          entityMap.set(id1, entity1);
+        }
+        if (!entityMap.has(id2)) {
+          entityMap.set(id2, entity2);
         }
 
         // Create bidirectional pair key
-        const pairKey = createPairKey(entity1.id, entity2.id);
+        const pairKey = createPairKey(id1, id2);
 
         if (!cooccurrenceMap.has(pairKey)) {
           cooccurrenceMap.set(pairKey, {
-            entity1_id: entity1.id,
-            entity2_id: entity2.id,
+            entity1_id: id1,
+            entity2_id: id2,
             count: 0,
             ckb_ids: [],
             source_weights: []

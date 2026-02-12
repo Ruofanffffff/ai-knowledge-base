@@ -270,6 +270,7 @@ async function getCKBsForEntity(entity) {
 
   const ckbs = [];
   for (const ckbId of entity.supported_by) {
+    if (!ckbId) continue; // Skip null/undefined entries
     try {
       const ckb = await ckbStore.getCKB(ckbId);
       if (ckb) {
