@@ -158,6 +158,20 @@ export default function DocumentDetail() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!document) return;
+    
+    if (window.confirm('确定要删除这篇文档吗？此操作无法撤销。')) {
+      try {
+        await apiClient.delete(`/documents/${document.id}`);
+        navigate('/documents');
+      } catch (error) {
+        console.error('删除文档失败:', error);
+        alert('删除失败，请重试');
+      }
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex-1 h-full flex items-center justify-center bg-slate-50/50">
@@ -194,21 +208,29 @@ export default function DocumentDetail() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <button 
-            onClick={() => setShowChatPanel(true)}
+            onClick={() => setShowChatPanel(!showChatPanel)}
             disabled={isGeneratingSummary}
-            className="text-purple-500 hover:text-purple-600 p-2 relative"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200 ${
+              showChatPanel ? 'ring-2 ring-purple-300 ring-offset-1 bg-purple-100' : ''
+            }`}
           >
-            <Brain size={18} />
+            <Brain size={16} />
+            <span>AI 总结</span>
           </button>
-          <button className="text-slate-400 hover:text-slate-600 p-2">
+          <div className="w-px h-6 bg-slate-200 mx-2"></div>
+          <button className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors" title="下载">
             <Download size={18} />
           </button>
-          <button className="text-slate-400 hover:text-slate-600 p-2">
+          <button className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors" title="编辑">
             <Edit size={18} />
           </button>
-          <button className="text-slate-400 hover:text-slate-600 p-2">
+          <button 
+            onClick={handleDelete}
+            className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors" 
+            title="删除"
+          >
             <Trash2 size={18} />
           </button>
         </div>
@@ -216,30 +238,15 @@ export default function DocumentDetail() {
       
       <div className="flex-1 flex min-h-0">
         <div className={`flex-1 overflow-y-auto p-8 transition-all duration-300 ${showChatPanel ? 'w-1/2' : 'w-full'}`}>
-          <div className="max-w-4xl mx-auto">
-            <div className="prose max-w-none">
-              <p className="text-slate-700 whitespace-pre-wrap">{document.content}</p>
-            </div>
-            
-            {document.summaries && document.summaries.length > 0 && (
-              <div className="mt-12">
-                <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2 text-xl">
-                  <Brain size={20} />
-                  文档总结
-                </h3>
-                <div className="space-y-4">
-                  {document.summaries.map((summary) => (
-                    <div key={summary.id} className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium text-slate-500">模型: {summary.model}</span>
-                        <span className="text-sm text-slate-400">{new Date(summary.createdAt).toLocaleString('zh-CN')}</span>
-                      </div>
-                      <p className="text-slate-700">{summary.content}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div 
+            className="max-w-[850px] mx-auto bg-white shadow-lg min-h-[1100px] rounded-sm text-slate-800 leading-relaxed font-serif text-justify text-lg break-words"
+            style={{ padding: '60px 72px' }}
+          >
+            {document.content.split('\n').map((paragraph, index) => (
+              <p key={index} className="min-h-[1.5em] my-1 indent-8">
+                {paragraph || <br />}
+              </p>
+            ))}
           </div>
         </div>
         
@@ -247,16 +254,44 @@ export default function DocumentDetail() {
           {showChatPanel && (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: '50%', opacity: 1 }}
+              animate={{ width: '400px', opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="border-l border-slate-200 bg-white flex flex-col min-h-0"
+              className="border-l border-slate-200 bg-white flex flex-col min-h-0 shadow-xl z-10"
             >
-              <div className="p-4 border-b border-slate-200 flex-shrink-0">
-                <h3 className="font-semibold text-slate-900">AI 总结助手</h3>
+              <div className="p-4 border-b border-slate-200 flex-shrink-0 flex justify-between items-center bg-slate-50">
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <Brain size={18} className="text-purple-500" />
+                  AI 总结助手
+                </h3>
+                <button 
+                  onClick={() => setShowChatPanel(false)}
+                  className="p-1 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <XCircle size={18} />
+                </button>
               </div>
               
               <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+                {/* 现有总结展示区 */}
+                {document.summaries && document.summaries.length > 0 && (
+                  <div className="mb-6">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">历史总结</div>
+                    <div className="space-y-3">
+                      {document.summaries.map((summary) => (
+                        <div key={summary.id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">{summary.model}</span>
+                            <span className="text-xs text-slate-400">{new Date(summary.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <p className="text-sm text-slate-700 leading-relaxed">{summary.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="my-4 border-t border-slate-100"></div>
+                  </div>
+                )}
+
                 {chatMessages.map((message, index) => (
                   <div key={index} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                     {message.type === 'loading' && (

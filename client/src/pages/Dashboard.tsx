@@ -87,11 +87,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     fetchStats();
   }, []);
 
-  const recentDocs = documents.slice(0, 4).map((doc: any) => ({
+  const recentDocs = documents.slice(0, 6).map((doc: any) => ({
     id: doc.id,
     title: doc.title,
     type: doc.type,
-    updated: formatTimeAgo(doc.updated_at || doc.created_at),
+    updated: formatTimeAgo(doc.lastViewedAt || doc.updatedAt || doc.created_at),
     tags: doc.tags || []
   }));
 

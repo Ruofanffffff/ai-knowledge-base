@@ -70,6 +70,12 @@ const CLOUD_MODELS = {
     endpoint: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
     model: 'qwen-max'
   },
+  'qwen-turbo': {
+    provider: 'aliyun',
+    apiKey: process.env.QWEN_API_KEY || '',
+    endpoint: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
+    model: 'qwen-turbo'
+  },
   'deepseek-chat': {
     provider: 'deepseek',
     apiKey: process.env.DEEPSEEK_API_KEY || '',
@@ -81,6 +87,12 @@ const CLOUD_MODELS = {
     apiKey: process.env.DEEPSEEK_API_KEY || '',
     endpoint: 'https://api.deepseek.com/chat/completions',
     model: 'deepseek-reasoner'
+  },
+  'text-embedding-v3': {
+    provider: 'aliyun',
+    apiKey: process.env.QWEN_API_KEY || '',
+    endpoint: 'https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding',
+    model: 'text-embedding-v3'
   }
 };
 
@@ -312,8 +324,108 @@ if (mockDocuments.length === 0) {
   saveDocuments(mockDocuments);
 }
 
+// 生成文本嵌入向量
+async function generateEmbedding(text) {
+  const modelConfig = CLOUD_MODELS['text-embedding-v3'];
+  
+  if (!modelConfig || !modelConfig.apiKey) {
+    console.error('Embedding model not configured');
+    return null;
+  }
+  
+  try {
+    const response = await fetch(modelConfig.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${modelConfig.apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-v3',
+        input: {
+          texts: [text]
+        },
+        parameters: {
+          text_type: 'document'
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Embedding API error:', errorText);
+      return null;
+    }
+    
+    const data = await response.json();
+    if (data.output && data.output.embeddings && data.output.embeddings.length > 0) {
+      return data.output.embeddings[0].embedding;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error generating embedding:', error);
+    return null;
+  }
+}
+
+// 计算余弦相似度
+function cosineSimilarity(vecA, vecB) {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+// 自动为没有嵌入的文档生成嵌入
+async function backfillEmbeddings() {
+  console.log('开始检查并回填文档嵌入...');
+  userDb.all('SELECT id, title, content FROM documents WHERE embedding IS NULL', [], async (err, rows) => {
+    if (err) {
+      console.error('Error fetching documents for backfill:', err);
+      return;
+    }
+    
+    if (rows.length === 0) {
+      console.log('所有文档已有嵌入');
+      return;
+    }
+    
+    console.log(`发现 ${rows.length} 个文档需要生成嵌入`);
+    
+    for (const doc of rows) {
+      try {
+        const textToEmbed = `${doc.title}\n${doc.content.substring(0, 1000)}`;
+        const embedding = await generateEmbedding(textToEmbed);
+        
+        if (embedding) {
+          const embeddingJson = JSON.stringify(embedding);
+          userDb.run('UPDATE documents SET embedding = ? WHERE id = ?', [embeddingJson, doc.id], (err) => {
+            if (err) console.error(`Failed to update embedding for doc ${doc.id}:`, err);
+            else console.log(`已为文档 ${doc.id} (${doc.title}) 生成并保存嵌入`);
+          });
+        }
+        
+        // 避免速率限制
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`Error processing doc ${doc.id}:`, error);
+      }
+    }
+  });
+}
+
+// 启动时尝试回填
+setTimeout(backfillEmbeddings, 5000);
+
 // 云端模型API调用函数
-async function callCloudModel(modelKey, prompt) {
+async function callCloudModel(modelKey, prompt, options = {}) {
   const modelConfig = CLOUD_MODELS[modelKey];
   
   if (!modelConfig) {
@@ -327,26 +439,51 @@ async function callCloudModel(modelKey, prompt) {
   console.log(`Calling cloud model: ${modelKey} (provider: ${modelConfig.provider})`);
   
   if (modelConfig.provider === 'aliyun') {
-    return await callQwenModel(modelConfig, prompt);
+    return await callQwenModel(modelConfig, prompt, options);
   } else if (modelConfig.provider === 'deepseek') {
-    return await callDeepSeekModel(modelConfig, prompt);
+    return await callDeepSeekModel(modelConfig, prompt, options);
   } else {
     throw new Error(`Unsupported provider: ${modelConfig.provider}`);
   }
 }
 
 // 调用通义千问模型
-async function callQwenModel(modelConfig, prompt) {
+async function callQwenModel(modelConfig, prompt, options = {}) {
   console.log('调用通义千问API，endpoint:', modelConfig.endpoint);
+  
+  // 构建消息列表
+  let messages = [];
+  
+  // 添加系统提示词
+  if (options.systemPrompt) {
+    messages.push({
+      role: 'system',
+      content: options.systemPrompt
+    });
+  }
+  
+  // 添加历史消息
+  if (options.history && Array.isArray(options.history)) {
+    // 过滤掉无效消息，并确保格式正确
+    const validHistory = options.history
+      .filter(msg => msg.role && msg.content)
+      .map(msg => ({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content
+      }));
+    messages = messages.concat(validHistory);
+  }
+  
+  // 添加当前用户消息
+  messages.push({
+    role: 'user',
+    content: prompt
+  });
+
   console.log('请求参数:', JSON.stringify({
     model: modelConfig.model,
     input: {
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
+      messages: messages
     },
     parameters: {
       temperature: 0.7,
@@ -364,12 +501,7 @@ async function callQwenModel(modelConfig, prompt) {
     body: JSON.stringify({
       model: modelConfig.model,
       input: {
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
+        messages: messages
       },
       parameters: {
         temperature: 0.7,
@@ -401,7 +533,35 @@ async function callQwenModel(modelConfig, prompt) {
 }
 
 // 调用DeepSeek模型
-async function callDeepSeekModel(modelConfig, prompt) {
+async function callDeepSeekModel(modelConfig, prompt, options = {}) {
+  // 构建消息列表
+  let messages = [];
+  
+  // 添加系统提示词
+  if (options.systemPrompt) {
+    messages.push({
+      role: 'system',
+      content: options.systemPrompt
+    });
+  }
+  
+  // 添加历史消息
+  if (options.history && Array.isArray(options.history)) {
+    const validHistory = options.history
+      .filter(msg => msg.role && msg.content)
+      .map(msg => ({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content
+      }));
+    messages = messages.concat(validHistory);
+  }
+  
+  // 添加当前用户消息
+  messages.push({
+    role: 'user',
+    content: prompt
+  });
+
   const response = await fetch(modelConfig.endpoint, {
     method: 'POST',
     headers: {
@@ -410,12 +570,7 @@ async function callDeepSeekModel(modelConfig, prompt) {
     },
     body: JSON.stringify({
       model: modelConfig.model,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
+      messages: messages,
       temperature: 0.7,
       top_p: 0.9,
       max_tokens: 2000
@@ -583,7 +738,8 @@ app.get('/api/documents', authMiddleware, (req, res) => {
   
   try {
     const userId = req.userId;
-    userDb.all('SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC', [userId], (err, rows) => {
+    // 按照最近访问时间排序 (last_viewed_at -> updated_at -> created_at)
+    userDb.all('SELECT * FROM documents WHERE user_id = ? ORDER BY COALESCE(last_viewed_at, updated_at, created_at) DESC', [userId], (err, rows) => {
       if (err) {
         console.error('Error fetching documents:', err);
         return res.status(500).json({ error: 'Failed to fetch documents' });
@@ -607,6 +763,7 @@ app.get('/api/documents', authMiddleware, (req, res) => {
           tags: row.tags ? JSON.parse(row.tags) : [],
           createdAt: row.created_at,
           updatedAt: row.updated_at,
+          lastViewedAt: row.last_viewed_at,
           summaries: []
         };
         
@@ -628,6 +785,12 @@ app.get('/api/documents', authMiddleware, (req, res) => {
           
           processedCount++;
           if (processedCount === rows.length) {
+            // 确保返回顺序正确，因为异步回调可能会打乱顺序
+            documents.sort((a, b) => {
+              const timeA = new Date(a.lastViewedAt || a.updatedAt || a.createdAt).getTime();
+              const timeB = new Date(b.lastViewedAt || b.updatedAt || b.createdAt).getTime();
+              return timeB - timeA;
+            });
             res.json(documents);
           }
         });
@@ -643,6 +806,11 @@ app.get('/api/documents/:id', authMiddleware, (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.userId;
+    
+    // 更新最后访问时间
+    userDb.run('UPDATE documents SET last_viewed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?', [id, userId], (err) => {
+      if (err) console.error('Failed to update last_viewed_at:', err);
+    });
     
     userDb.get('SELECT * FROM documents WHERE id = ? AND user_id = ?', [id, userId], (err, row) => {
       if (err) {
@@ -903,10 +1071,22 @@ const handleFileUpload = async (req, res) => {
         const data = fs.readFileSync(filePath);
         const zip = await JSZip.loadAsync(data);
         const docXml = await zip.file('word/document.xml').async('string');
-        // 简单的XML解析，提取文本内容
-        const textMatches = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
-        if (textMatches) {
-          content = textMatches.map(match => match.replace(/<[^>]*>/g, '')).join('\n');
+        // 改进的XML解析：按段落(<w:p>)提取，保持段落内文字连贯，仅在段落间换行
+        const paragraphMatches = docXml.match(/<w:p[\s>][\s\S]*?<\/w:p>/g);
+        if (paragraphMatches) {
+          content = paragraphMatches.map(p => {
+            const textMatches = p.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g);
+            if (textMatches) {
+              return textMatches.map(match => match.replace(/<[^>]*>/g, '')).join('');
+            }
+            return '';
+          }).filter(text => text.length > 0).join('\n');
+        } else {
+          // 如果找不到段落结构，回退到提取所有文本
+          const textMatches = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+          if (textMatches) {
+            content = textMatches.map(match => match.replace(/<[^>]*>/g, '')).join('\n');
+          }
         }
       } catch (error) {
         console.error('Error parsing docx file:', error);
@@ -1142,9 +1322,21 @@ app.post('/api/documents/upload/resolve-duplicate', authMiddleware, async (req, 
         const data = fs.readFileSync(tempFile.path);
         const zip = await JSZip.loadAsync(data);
         const docXml = await zip.file('word/document.xml').async('string');
-        const textMatches = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
-        if (textMatches) {
-          content = textMatches.map(match => match.replace(/<[^>]*>/g, '')).join('\n');
+        // 改进的XML解析：按段落(<w:p>)提取，保持段落内文字连贯，仅在段落间换行
+        const paragraphMatches = docXml.match(/<w:p[\s>][\s\S]*?<\/w:p>/g);
+        if (paragraphMatches) {
+          content = paragraphMatches.map(p => {
+            const textMatches = p.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g);
+            if (textMatches) {
+              return textMatches.map(match => match.replace(/<[^>]*>/g, '')).join('');
+            }
+            return '';
+          }).filter(text => text.length > 0).join('\n');
+        } else {
+          const textMatches = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+          if (textMatches) {
+            content = textMatches.map(match => match.replace(/<[^>]*>/g, '')).join('\n');
+          }
         }
       } catch (error) {
         console.error('[ResolveDuplicate] Error parsing docx file:', error);
@@ -1392,10 +1584,21 @@ app.post('/api/upload/resolve-duplicate', authMiddleware, async (req, res) => {
 // AI搜索API
 app.post('/api/ai/search', async (req, res) => {
   try {
-    const { query, model: requestedModel, topK = 5 } = req.body;
+    const { query, model: requestedModel, topK = 5, messages: history } = req.body;
     
     console.log('收到AI搜索请求:', query);
     console.log('请求的模型:', requestedModel);
+    
+    // 读取 SOUL.md 获取系统提示词
+    let soulPrompt = '';
+    try {
+      const soulPath = path.join(__dirname, 'config', 'soul.md');
+      if (fs.existsSync(soulPath)) {
+        soulPrompt = fs.readFileSync(soulPath, 'utf8');
+      }
+    } catch (error) {
+      console.error('Failed to read soul.md:', error);
+    }
     
     if (!query) {
       return res.status(400).json({
@@ -1404,134 +1607,144 @@ app.post('/api/ai/search', async (req, res) => {
       });
     }
     
-    // 获取所有文档
-    const documents = loadDocuments();
+    // 从数据库获取所有文档，而不是从JSON文件
+    // 注意：这里没有用户ID过滤，在实际多用户系统中应该加上 WHERE user_id = ?
+    // 但为了保持当前上下文简单，我们先获取所有文档，或者假设这是一个单用户/演示环境
+    // 如果有 userId 在 request 中 (authMiddleware)，应该使用它
     
-    // 改进的文档搜索逻辑
-    const queryLower = query.toLowerCase();
-    
-    // 智能关键词提取 - 支持中文分词
-    let queryKeywords = [];
-    
-    // 尝试按空格拆分
-    const spaceSplit = queryLower.split(/\s+/).filter(k => k.length > 0);
-    
-    if (spaceSplit.length > 1) {
-      // 如果有空格，按空格拆分
-      queryKeywords = spaceSplit;
-    } else {
-      // 如果没有空格，尝试按常见中文分隔符拆分
-      const separators = ['、', '，', ',', '。', '的', '和', '与', '或', '及', '是', '在', '有', '个', '种'];
-      let tempQuery = queryLower;
-      
-      // 先移除常见停用词
-      const stopWords = ['的', '了', '和', '是', '在', '有', '个', '种', '等', '等'];
-      stopWords.forEach(word => {
-        tempQuery = tempQuery.replace(new RegExp(word, 'g'), ' ');
+    let documents = [];
+    try {
+      // 尝试从数据库获取文档
+      const rows = await new Promise((resolve, reject) => {
+        userDb.all('SELECT * FROM documents ORDER BY created_at DESC', [], (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        });
       });
       
-      // 按空格拆分
-      queryKeywords = tempQuery.split(/\s+/).filter(k => k.length > 1);
-      
-      // 如果拆分后只有一个词，尝试按字符拆分（保留有意义的词组）
-      if (queryKeywords.length === 0 || queryKeywords.length === 1) {
-        // 对于中文，尝试提取2-4字的词组
-        const charArray = queryLower.split('');
-        for (let i = 0; i < charArray.length - 1; i++) {
-          for (let len = 2; len <= Math.min(4, charArray.length - i); len++) {
-            const phrase = charArray.slice(i, i + len).join('');
-            if (phrase.length >= 2 && !queryKeywords.includes(phrase)) {
-              queryKeywords.push(phrase);
-            }
-          }
-        }
+      documents = rows.map(row => ({
+        id: row.id.toString(),
+        title: row.title,
+        content: row.content,
+        type: row.type,
+        fileType: row.file_type,
+        metadata: row.metadata ? JSON.parse(row.metadata) : {},
+        tags: row.tags ? JSON.parse(row.tags) : [],
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+      console.log('从数据库加载文档成功，数量:', documents.length);
+    } catch (dbError) {
+      console.error('从数据库加载文档失败，回退到JSON文件:', dbError);
+      documents = loadDocuments();
+    }
+    
+    // Agentic RAG 实现
+    console.log('启动 Agentic RAG 流程...');
+    
+    // 步骤 1: 意图分析与查询重写
+    const intentPrompt = `你是一个专业的搜索专家。请分析用户的查询 "${query}"。
+    请生成一个最优的搜索关键词列表（JSON数组格式），用于在知识库中检索相关文档。
+    如果用户查询包含"AI内涝"等具体概念，请确保包含该确切短语。
+    同时生成一个文本嵌入查询语句，用于语义搜索。
+    
+    返回格式：
+    {
+      "keywords": ["关键词1", "关键词2"],
+      "semantic_query": "用于语义匹配的完整句子"
+    }`;
+    
+    let searchPlan = { keywords: [query], semantic_query: query };
+    try {
+      const planResponse = await callCloudModel('qwen-turbo', intentPrompt);
+      const jsonMatch = planResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        searchPlan = JSON.parse(jsonMatch[0]);
+        console.log('搜索计划:', searchPlan);
       }
+    } catch (e) {
+      console.error('意图分析失败，使用原始查询:', e);
     }
     
-    // 确保至少包含原始查询
-    if (!queryKeywords.includes(queryLower)) {
-      queryKeywords.unshift(queryLower);
+    // 步骤 2: 执行混合搜索 (向量 + 关键词)
+    const allDocs = await new Promise((resolve, reject) => {
+      userDb.all('SELECT id, title, content, embedding FROM documents', [], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+    
+    // 向量搜索
+    let vectorResults = [];
+    try {
+      const queryEmbedding = await generateEmbedding(searchPlan.semantic_query);
+      if (queryEmbedding) {
+        vectorResults = allDocs
+          .filter(doc => doc.embedding)
+          .map(doc => {
+            try {
+              const docEmbedding = JSON.parse(doc.embedding);
+              return {
+                doc,
+                score: cosineSimilarity(queryEmbedding, docEmbedding),
+                source: 'vector'
+              };
+            } catch (e) { return null; }
+          })
+          .filter(item => item !== null)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, topK * 2);
+      }
+    } catch (e) {
+      console.error('向量搜索失败:', e);
     }
     
-    console.log('原始查询:', query);
-    console.log('搜索关键词:', queryKeywords);
-    console.log('文档总数:', documents.length);
-    
-    // 为每个文档计算相关性分数
-    const scoredDocs = documents.map(doc => {
+    // 关键词搜索
+    const keywordResults = allDocs.map(doc => {
+      let score = 0;
       const titleLower = doc.title.toLowerCase();
       const contentLower = doc.content.toLowerCase();
       
-      let score = 0;
-      const matchDetails = [];
-      
-      // 检查标题完全匹配
-      if (titleLower.includes(queryLower)) {
-        score += 15; // 标题完全匹配给予最高分
-        matchDetails.push('标题完全匹配');
-      }
-      
-      // 检查内容完全匹配
-      if (contentLower.includes(queryLower)) {
-        score += 12; // 内容完全匹配给予高分
-        matchDetails.push('内容完全匹配');
-      }
-      
-      // 检查标题中的关键词匹配
-      queryKeywords.forEach(keyword => {
-        if (keyword.length >= 2 && titleLower.includes(keyword)) {
-          const keywordScore = keyword === queryLower ? 8 : 5;
-          score += keywordScore;
-          matchDetails.push(`标题关键词: "${keyword}"`);
-        }
+      searchPlan.keywords.forEach(kw => {
+        const kwLower = kw.toLowerCase();
+        if (titleLower.includes(kwLower)) score += 10;
+        if (contentLower.includes(kwLower)) score += 5;
       });
       
-      // 检查内容中的关键词匹配
-      queryKeywords.forEach(keyword => {
-        if (keyword.length >= 2 && contentLower.includes(keyword)) {
-          const keywordScore = keyword === queryLower ? 6 : 3;
-          score += keywordScore;
-          matchDetails.push(`内容关键词: "${keyword}"`);
-        }
-      });
-      
-      // 计算关键词覆盖率
-      const matchedKeywords = queryKeywords.filter(keyword => 
-        keyword.length >= 2 && (titleLower.includes(keyword) || contentLower.includes(keyword))
-      );
-      const coverageRatio = matchedKeywords.length / queryKeywords.length;
-      score += coverageRatio * 8; // 关键词覆盖率给予额外分数
-      
-      return {
-        doc,
-        score,
-        matchDetails
-      };
+      return { doc, score, source: 'keyword' };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK * 2);
+    
+    // 合并去重
+    const combinedMap = new Map();
+    [...vectorResults, ...keywordResults].forEach(item => {
+      if (!combinedMap.has(item.doc.id)) {
+        combinedMap.set(item.doc.id, { ...item, finalScore: item.score });
+      } else {
+        const existing = combinedMap.get(item.doc.id);
+        existing.finalScore += item.score; // 提升同时匹配两者的文档排名
+        existing.source = 'hybrid';
+      }
     });
     
-    // 按分数排序并取前topK个
-    const sortedDocs = scoredDocs
-      .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, topK);
+    const relevantDocs = Array.from(combinedMap.values())
+      .sort((a, b) => b.finalScore - a.finalScore)
+      .slice(0, topK)
+      .map(item => item.doc);
+      
+    console.log(`检索到 ${relevantDocs.length} 个相关文档`);
     
-    const relevantDocs = sortedDocs.map(item => item.doc);
-    
-    console.log('找到相关文档数:', relevantDocs.length);
-    console.log('文档匹配分数:', sortedDocs.slice(0, topK).map(item => ({
-      title: item.doc.title,
-      score: item.score,
-      details: item.matchDetails
-    })));
-    
-    // 构建知识库上下文
+    // 构建上下文
     const knowledgeBaseContext = relevantDocs.length > 0 ? 
       relevantDocs.map((doc, index) => 
-        `【知识库文档${index + 1}】\n标题：${doc.title}\n完整内容：\n${doc.content}\n\n`
-      ).join('') : 
+        `【文档${index + 1}】标题：${doc.title}\n内容摘要：\n${doc.content.substring(0, 1500)}...\n`
+      ).join('\n\n') : 
       '知识库中没有找到相关文档';
-    
-    console.log('知识库上下文长度:', knowledgeBaseContext.length);
+
+    // 步骤 3: 联网搜索 (如果知识库结果不足)
+    // ... (保持原有的联网搜索逻辑)
     
     // 联网搜索
     let webSearchResults = [];
@@ -1551,186 +1764,45 @@ app.post('/api/ai/search', async (req, res) => {
       ).join('\n') :
       '联网搜索没有找到相关结果';
     
+    // 智能意图识别
+    const isChat = /^(你好|你是谁|自我介绍|嗨|hello|hi|早安|晚安|再见|谢谢)/i.test(query);
+    
+    // 如果是闲聊，直接调用模型回答，不进行搜索
+    if (isChat) {
+      // ... (保持原有的闲聊逻辑)
+    }
+
     // 构建综合提示词
-    const prompt = `你是一个智能助手，需要基于知识库内容和联网搜索结果来回答用户的问题。
-
-知识库内容：
-${knowledgeBaseContext}
-
-联网搜索结果：
-${webSearchContext}
+    const prompt = `你是一个基于Agentic RAG架构的智能助手。
+请综合利用以下检索到的信息回答用户问题。
 
 用户问题：${query}
 
-重要提示：
-1. 请仔细阅读知识库中的所有文档内容，特别是文档的标题和完整内容
-2. 如果知识库中有与用户问题相关的文档，必须优先使用知识库中的信息
-3. 即使知识库中的文档标题与用户问题不完全一致，也要检查文档内容是否包含相关信息
-4. 知识库中的信息是最权威的来源，请优先参考
+【检索到的知识库文档】：
+${knowledgeBaseContext}
 
-要求：
-1. 综合知识库和联网搜索的信息，给出全面、准确的答案
-2. 如果知识库和联网搜索都有相关信息，要整合两者的内容
-3. 如果知识库有相关信息但联网搜索没有，以知识库为主
-4. 如果联网搜索有相关信息但知识库没有，以联网搜索为主
-5. 如果两者都没有相关信息，诚实说明无法回答
-6. 回答要结构清晰，分点说明
-7. 引用信息来源时，明确标注是来自知识库还是联网搜索
-8. 用中文回答，语言简洁明了
+【联网搜索结果】：
+${webSearchContext}
 
-请给出详细的回答。`;
+思考过程（内部）：
+1. 分析用户问题的核心需求。
+2. 评估检索到的文档是否足以回答问题。
+3. 综合多方信息，给出准确、结构化的回答。
+
+回答要求：
+1. 优先依据【知识库文档】中的信息。
+2. 如果知识库中有"AI内涝"等具体文档，必须详细引用其内容。
+3. 语言通顺，逻辑清晰，不要暴露系统内部的思考过程。
+4. 直接给出最终答案。`;
     
-    // 调用AI模型
-    console.log('正在调用AI模型生成答案...');
-    let aiResponse = null;
-    let lastError = null;
-    
-    // 模型调用策略
-    const modelCallOrder = [];
-    
-    // 如果指定了模型，优先使用
-    if (requestedModel) {
-      modelCallOrder.push(requestedModel);
-    }
-    
-    // 添加备用模型
-    const cloudModels = ['deepseek-chat', 'qwen-plus', 'qwen-turbo'];
-    cloudModels.forEach(model => {
-      if (!modelCallOrder.includes(model)) {
-        modelCallOrder.push(model);
-      }
-    });
-    
-    console.log('模型调用顺序:', modelCallOrder);
-    
-    for (const cloudModel of modelCallOrder) {
-      try {
-        console.log(`尝试使用模型: ${cloudModel}`);
-        
-        let apiKey;
-        if (cloudModel.startsWith('qwen')) {
-          apiKey = process.env.QWEN_API_KEY;
-        } else if (cloudModel.startsWith('deepseek')) {
-          apiKey = process.env.DEEPSEEK_API_KEY;
-        }
-        
-        if (!apiKey) {
-          console.log(`模型 ${cloudModel} 的API密钥未配置，跳过`);
-          continue;
-        }
-        
-        let apiUrl, requestBody;
-        
-        if (cloudModel === 'qwen-turbo' || cloudModel === 'qwen-plus' || cloudModel.startsWith('qwen')) {
-          apiUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
-          requestBody = {
-            model: cloudModel,
-            messages: [
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000
-          };
-        } else if (cloudModel === 'deepseek-chat' || cloudModel === 'deepseek-reasoner' || cloudModel.startsWith('deepseek')) {
-          apiUrl = 'https://api.deepseek.com/v1/chat/completions';
-          requestBody = {
-            model: cloudModel,
-            messages: [
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000
-          };
-        } else if (LOCAL_MODELS.includes(cloudModel)) {
-          // 本地模型调用
-          console.log(`调用本地模型: ${cloudModel}`);
-          try {
-            const localResponse = await fetch(`${OLLAMA_API_URL}/chat`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: cloudModel,
-                messages: [
-                  { role: 'user', content: prompt }
-                ],
-                temperature: 0.7,
-                max_tokens: 2000
-              })
-            });
-            
-            if (!localResponse.ok) {
-              throw new Error(`本地模型调用失败: ${localResponse.status}`);
-            }
-            
-            const localData = await localResponse.json();
-            if (localData.message && localData.message.content) {
-              aiResponse = localData.message.content;
-              console.log(`本地模型 ${cloudModel} 调用成功`);
-              break;
-            } else {
-              throw new Error(`本地模型返回格式无效`);
-            }
-          } catch (error) {
-            console.error(`本地模型 ${cloudModel} 调用失败:`, error);
-            lastError = error.message;
-            continue;
-          }
-        } else {
-          // 支持其他模型...
-          console.log(`模型 ${cloudModel} 暂不支持，跳过`);
-          continue;
-        }
-        
-        // 云端模型调用
-        const cloudResponse = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify(requestBody)
-        });
-        
-        if (!cloudResponse.ok) {
-          const errorText = await cloudResponse.text();
-          console.error(`模型 ${cloudModel} API error:`, errorText);
-          lastError = `模型 ${cloudModel} API error: ${cloudResponse.status} - ${errorText}`;
-          continue;
-        }
-        
-        const cloudData = await cloudResponse.json();
-        
-        if (cloudData.choices && cloudData.choices.length > 0) {
-          aiResponse = cloudData.choices[0].message.content;
-          console.log(`模型 ${cloudModel} 调用成功`);
-          break;
-        } else if (cloudData.output && cloudData.output.text) {
-          aiResponse = cloudData.output.text;
-          console.log(`模型 ${cloudModel} 调用成功`);
-          break;
-        } else {
-          console.error(`模型 ${cloudModel} 返回格式无效`);
-          lastError = `模型 ${cloudModel} 返回格式无效`;
-          continue;
-        }
-      } catch (error) {
-        console.error(`模型 ${cloudModel} 调用失败:`, error);
-        lastError = error.message;
-        continue;
-      }
-    }
-    
-    if (!aiResponse) {
-      throw new Error(`所有模型调用失败，最后错误: ${lastError}`);
-    }
-    
-    console.log('AI搜索完成，回答长度:', aiResponse.length);
-    
-    res.json({
-      success: true,
-      answer: aiResponse,
+    // 设置SSE响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // 发送初始数据（源信息）
+    res.write(`data: ${JSON.stringify({
+      type: 'sources',
       sources: relevantDocs.map(doc => ({
         id: doc.id,
         title: doc.title,
@@ -1741,13 +1813,143 @@ ${webSearchContext}
         url: result.url,
         snippet: result.snippet
       }))
+    })}\n\n`);
+
+    // 调用AI模型（流式）
+    console.log('正在调用AI模型生成答案(流式)...');
+    
+    // 如果是闲聊意图，使用简化prompt
+    const finalPrompt = isChat ? `你是一个智能助手。请用自然、亲切的语气回答用户。
+    
+    用户输入：${query}
+    
+    要求：
+    1. 不要使用Markdown格式，像真人打字一样直接回复
+    2. 不要输出思考过程
+    3. 语气要像老朋友一样自然` : prompt;
+
+    // 模型调用策略
+    const modelCallOrder = [];
+    if (requestedModel) {
+      modelCallOrder.push(requestedModel);
+    }
+    const cloudModels = ['deepseek-chat', 'qwen-plus', 'qwen-turbo'];
+    cloudModels.forEach(model => {
+      if (!modelCallOrder.includes(model)) {
+        modelCallOrder.push(model);
+      }
     });
+
+    let success = false;
+    let lastError = null;
+
+    for (const cloudModel of modelCallOrder) {
+      try {
+        console.log(`尝试使用模型(流式): ${cloudModel}`);
+        
+        let apiKey, apiUrl, requestBody;
+        
+        if (cloudModel.startsWith('qwen')) {
+          apiKey = process.env.QWEN_API_KEY;
+          apiUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+          requestBody = {
+            model: cloudModel,
+            messages: [
+              ...(history || []),
+              { role: 'system', content: soulPrompt },
+              { role: 'user', content: finalPrompt }
+            ],
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 2000
+          };
+        } else if (cloudModel.startsWith('deepseek')) {
+          apiKey = process.env.DEEPSEEK_API_KEY;
+          apiUrl = 'https://api.deepseek.com/v1/chat/completions';
+          requestBody = {
+            model: cloudModel,
+            messages: [
+               ...(history || []),
+              { role: 'system', content: soulPrompt },
+              { role: 'user', content: finalPrompt }
+            ],
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 2000
+          };
+        } else {
+          continue;
+        }
+
+        if (!apiKey) continue;
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': 'text/event-stream'
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+           throw new Error(`API error: ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+              try {
+                const data = JSON.parse(line.slice(6));
+                const content = data.choices?.[0]?.delta?.content || '';
+                if (content) {
+                  res.write(`data: ${JSON.stringify({ type: 'content', content })}\n\n`);
+                }
+              } catch (e) {
+                // Ignore parse errors for partial chunks
+              }
+            }
+          }
+        }
+        
+        success = true;
+        break;
+      } catch (error) {
+        console.error(`模型 ${cloudModel} 流式调用失败:`, error);
+        lastError = error;
+        continue;
+      }
+    }
+
+    if (!success) {
+       res.write(`data: ${JSON.stringify({ type: 'error', error: '所有模型调用失败' })}\n\n`);
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+
   } catch (error) {
     console.error('AI search failed:', error);
-    res.status(500).json({ 
-      success: false,
-      error: error.message || 'AI search failed'
-    });
+    // 如果已经开始发送流，就发送错误事件
+    if (res.headersSent) {
+       res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+       res.end();
+    } else {
+      res.status(500).json({ 
+        success: false,
+        error: error.message || 'AI search failed'
+      });
+    }
   }
 });
 

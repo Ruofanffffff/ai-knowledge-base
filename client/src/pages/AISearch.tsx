@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Send, Mic, Bot, User, FileText, Sparkles, Clock, Link, Database, Plus, Trash2, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -41,17 +41,26 @@ export function AISearch() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('deepseek-chat');
+  const [selectedModel, setSelectedModel] = useState('qwen-plus');
   const [models, setModels] = useState<Model[]>([
-    { id: 'deepseek-chat', name: 'DeepSeek Chat (默认)', type: 'cloud' },
-    { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', type: 'cloud' },
     { id: 'qwen-plus', name: 'Qwen Plus (千问)', type: 'cloud' },
+    { id: 'deepseek-chat', name: 'DeepSeek Chat', type: 'cloud' },
+    { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', type: 'cloud' },
     { id: 'qwen-max', name: 'Qwen Max (千问)', type: 'cloud' },
     { id: 'llama2:7b', name: 'Llama 2 (本地)', type: 'local' },
     { id: 'mistral:7b', name: 'Mistral (本地)', type: 'local' },
     { id: 'deepseek-r1:7b', name: 'DeepSeek R1 (本地)', type: 'local' }
   ]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isSearching]);
 
   const generateTitle = (firstUserMessage: string): string => {
     const maxLength = 30;
@@ -90,7 +99,7 @@ export function AISearch() {
         {
           id: 1,
           role: 'assistant',
-          content: '你好！我是你的智能助手 Hi Brain。我可以帮助你搜索知识库中的内容，回答你的问题，或者生成新的文档。请输入你的问题或指令。',
+          content: '你好！我是你的智能助手 Hi Brain。\n\n我可以帮你：\n1. 搜索知识库：快速查找你上传的文档和笔记内容\n2. 智能问答：基于你的个人知识库和互联网信息回答问题\n3. 辅助创作：帮你撰写文档、总结内容或激发灵感\n\n随时告诉我你需要什么，我会尽力协助你。',
           timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
         }
       ]
@@ -187,6 +196,28 @@ export function AISearch() {
     setInput('');
 
     try {
+      // 格式化历史消息
+      const history = messages
+        .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+
+      // 创建空的助手消息
+      const assistantMsgId = Date.now() + 1;
+      const initialAssistantMsg: Message = {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        sources: [],
+        webSources: [],
+        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+      };
+      
+      let currentMessages = [...updatedMessages, initialAssistantMsg];
+      setMessages(currentMessages);
+
       const response = await fetch('/api/ai/search', {
         method: 'POST',
         headers: {
@@ -195,28 +226,65 @@ export function AISearch() {
         body: JSON.stringify({
           query: input,
           model: selectedModel,
-          limit: 10
-        })
+          limit: 10,
+          messages: history // 发送历史消息用于上下文记忆
+        }),
       });
 
       if (!response.ok) {
         throw new Error('搜索失败');
       }
 
-      const data = await response.json();
+      // 处理流式响应
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
       
-      const assistantMsg: Message = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: data.answer || data.summary || `找到 ${data.sources?.length || 0} 个相关结果`,
-        sources: data.sources || [],
-        webSources: data.webSources || [],
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-      };
+      if (!reader) throw new Error('无法读取响应流');
+
+      let accumulatedContent = '';
       
-      const finalMessages = [...updatedMessages, assistantMsg];
-      setMessages(finalMessages);
-      updateCurrentSession(finalMessages);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            if (line === 'data: [DONE]') continue;
+            
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === 'sources') {
+                // 更新来源信息
+                currentMessages = currentMessages.map(msg => 
+                  msg.id === assistantMsgId 
+                    ? { ...msg, sources: data.sources, webSources: data.webSources }
+                    : msg
+                );
+                setMessages(currentMessages);
+              } else if (data.type === 'content') {
+                // 更新内容
+                accumulatedContent += data.content;
+                currentMessages = currentMessages.map(msg => 
+                  msg.id === assistantMsgId 
+                    ? { ...msg, content: accumulatedContent }
+                    : msg
+                );
+                setMessages(currentMessages);
+              } else if (data.type === 'error') {
+                throw new Error(data.error);
+              }
+            } catch (e) {
+              console.error('Error parsing SSE data:', e);
+            }
+          }
+        }
+      }
+      
+      updateCurrentSession(currentMessages);
     } catch (error) {
       console.error('搜索错误:', error);
       const errorMsg: Message = {
@@ -225,6 +293,8 @@ export function AISearch() {
         content: '抱歉，搜索时出现错误。请稍后再试。',
         timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
       };
+      // 如果已经有部分内容，保留它并在最后追加错误提示，而不是完全替换
+      // 这里简化处理，直接追加一条错误消息
       const finalMessages = [...updatedMessages, errorMsg];
       setMessages(finalMessages);
       updateCurrentSession(finalMessages);
@@ -320,7 +390,7 @@ export function AISearch() {
       </AnimatePresence>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
         <div className="h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white shrink-0">
           <div className="flex items-center gap-3">
@@ -383,7 +453,14 @@ export function AISearch() {
                      ? 'bg-slate-900 text-white rounded-tr-sm' 
                      : 'bg-white border border-slate-200 shadow-sm text-slate-700 rounded-tl-sm'
                  }`}>
-                   <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                   {msg.content ? (
+                     <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                   ) : (
+                     <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent animate-spin rounded-full" />
+                       <span>正在思考...</span>
+                     </div>
+                   )}
                  </div>
                  
                  {msg.sources && msg.sources.length > 0 && (
@@ -423,65 +500,50 @@ export function AISearch() {
             </motion.div>
           ))}
           
-          {isSearching && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex gap-3"
-            >
-              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-purple-100 text-purple-600">
-                <Bot size={14} />
-              </div>
-              <div className="flex flex-col gap-2 max-w-[85%]">
-                <div className="p-3 rounded-2xl text-sm bg-white border border-slate-200 shadow-sm text-slate-700 rounded-tl-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent animate-spin rounded-full" />
-                    <span>正在处理...</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
-        <div className="p-4 border-t border-slate-100 bg-white">
-          <div className="relative flex gap-2">
-             <div className="flex-1 relative">
-               <textarea 
-                 value={input}
-                 onChange={(e) => setInput(e.target.value)}
-                 onKeyPress={handleKeyPress}
-                 placeholder="输入你的问题或指令..." 
-                 disabled={isSearching}
-                 className="w-full pl-4 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all disabled:opacity-50 min-h-[80px] resize-none"
-               />
-             </div>
-             <div className="flex flex-col gap-2 shrink-0">
+        <div className="p-4 bg-white border-t border-slate-100">
+          <div className="max-w-4xl mx-auto relative bg-slate-50 border border-slate-200 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-purple-500/20 focus-within:border-purple-500 transition-all">
+             <textarea 
+               value={input}
+               onChange={(e) => setInput(e.target.value)}
+               onKeyPress={handleKeyPress}
+               disabled={isSearching}
+               className="w-full pl-6 pr-12 py-4 bg-transparent border-none outline-none focus:ring-0 resize-none min-h-[50px] max-h-[200px] text-sm text-slate-700 placeholder:text-slate-400 leading-relaxed"
+               style={{ height: 'auto', minHeight: '56px' }}
+             />
+             
+             <div className="absolute bottom-2 right-2 flex items-center gap-1">
                <button
-                 onClick={handleSend}
-                 disabled={isSearching || !input.trim()}
-                 className="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
-               >
-                 {isSearching ? (
-                   <>
-                     <div className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full" />
-                     <span>处理中</span>
-                   </>
-                 ) : (
-                   <>
-                     <span>发送</span>
-                     <Send size={16} />
-                   </>
-                 )}
-               </button>
-               <button
-                 className="w-12 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors shrink-0"
+                 className="p-2 rounded-xl text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-all"
                  title="语音输入"
                >
                  <Mic size={18} />
                </button>
+               
+               <button
+                 onClick={handleSend}
+                 disabled={isSearching || !input.trim()}
+                 className={`p-2 rounded-xl transition-all ${
+                   isSearching || !input.trim() 
+                     ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+                     : 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md hover:shadow-lg hover:shadow-purple-500/30'
+                 }`}
+               >
+                 {isSearching ? (
+                   <div className="w-4 h-4 border-2 border-white/50 border-t-white animate-spin rounded-full" />
+                 ) : (
+                   <Send size={18} />
+                 )}
+               </button>
              </div>
+          </div>
+          <div className="text-center mt-2">
+            <p className="text-[10px] text-slate-400">
+              Hi Brain 可能会产生不准确的信息，请核对重要信息。
+            </p>
           </div>
         </div>
       </div>
