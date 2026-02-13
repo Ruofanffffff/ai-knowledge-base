@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Save, XCircle, Bold, Italic, List, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ChevronLeft, Save, XCircle } from 'lucide-react';
 import apiClient from '../api/client';
 import KGPipelineModal from '../components/KGPipelineModal';
+import RichTextEditor, { RichTextEditorHandle } from '../components/editor/RichTextEditor';
 
 export default function CreateDocument() {
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [kgModalDocId, setKgModalDocId] = useState<string | null>(null);
+  const editorRef = useRef<RichTextEditorHandle>(null);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -23,9 +23,10 @@ export default function CreateDocument() {
     setSaveStatus('saving');
 
     try {
+      const contentJSON = editorRef.current?.getJSON() ?? { type: 'doc', content: [] };
       const response = await apiClient.post('/documents', {
         title: title.trim(),
-        content: content.trim(),
+        content: JSON.stringify(contentJSON),
         type: 'document',
         fileType: '.md'
       });
@@ -33,7 +34,6 @@ export default function CreateDocument() {
       const newDocument = response.data;
       setSaveStatus('saved');
       
-      // 显示 KG Pipeline 进度模态框
       if (newDocument.id) {
         setKgModalDocId(newDocument.id.toString());
       } else {
@@ -99,36 +99,27 @@ export default function CreateDocument() {
       </div>
       
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col max-w-5xl mx-auto w-full bg-white">
-          <div className="px-8 py-3 border-b border-slate-100 flex items-center gap-1 sticky top-0 bg-white z-10">
-             <button className="p-1.5 rounded hover:bg-slate-100 text-slate-600"><Bold size={18} /></button>
-             <button className="p-1.5 rounded hover:bg-slate-100 text-slate-600"><Italic size={18} /></button>
-             <div className="w-px h-4 bg-slate-200 mx-2" />
-             <button className="p-1.5 rounded hover:bg-slate-100 text-slate-600"><List size={18} /></button>
-             <button className="p-1.5 rounded hover:bg-slate-100 text-slate-600"><LinkIcon size={18} /></button>
-             <button className="p-1.5 rounded hover:bg-slate-100 text-slate-600"><ImageIcon size={18} /></button>
-          </div>
+        {/* Scrollable document area — like a Word page */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl mx-auto w-full bg-white min-h-full shadow-sm">
+            {/* Title input */}
+            <div className="px-12 pt-8">
+              <input 
+                type="text" 
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full text-4xl font-bold text-slate-900 outline-none placeholder:text-slate-300 mb-4"
+                placeholder="无标题文档"
+              />
+            </div>
 
-          <div className="flex-1 overflow-y-auto px-12 py-8">
-             <input 
-               type="text" 
-               value={title}
-               onChange={(e) => setTitle(e.target.value)}
-               className="w-full text-4xl font-bold text-slate-900 outline-none placeholder:text-slate-300 mb-8"
-               placeholder="无标题文档"
-             />
-             <textarea 
-               className="w-full h-full resize-none outline-none text-lg text-slate-700 leading-relaxed font-serif"
-               value={content}
-               onChange={(e) => setContent(e.target.value)}
-               placeholder="开始输入内容..."
-               spellCheck={false}
-             />
-          </div>
-          
-          <div className="px-6 py-2 border-t border-slate-100 text-xs text-slate-400 flex justify-between">
-            <span>{content.split(/\s+/).length} 字</span>
-            <span>Markdown 模式</span>
+            {/* RichTextEditor — flows naturally below title */}
+            <RichTextEditor ref={editorRef} />
+            
+            <div className="px-6 py-2 border-t border-slate-100 text-xs text-slate-400 flex justify-between">
+              <span>富文本模式</span>
+              <span>支持图片粘贴和拖拽</span>
+            </div>
           </div>
         </div>
 
@@ -151,11 +142,11 @@ export default function CreateDocument() {
              <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                    <div className="w-2 h-2 rounded-full bg-blue-500" />
-                   <span className="text-xs font-bold text-blue-700 uppercase">Markdown 支持</span>
+                   <span className="text-xs font-bold text-blue-700 uppercase">图片支持</span>
                 </div>
-                <h4 className="font-medium text-slate-800 text-sm mb-1">格式化文本</h4>
+                <h4 className="font-medium text-slate-800 text-sm mb-1">插入图片</h4>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                   支持 Markdown 语法，包括加粗、斜体、链接等。
+                   点击工具栏图片按钮上传，或直接粘贴/拖拽图片到编辑器。
                 </p>
              </div>
 
@@ -173,7 +164,6 @@ export default function CreateDocument() {
         </div>
       </div>
 
-      {/* KG Pipeline Progress Modal */}
       {kgModalDocId && (
         <KGPipelineModal
           docId={kgModalDocId}

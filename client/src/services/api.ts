@@ -456,6 +456,41 @@ class ApiService {
     }
   }
 
+  /**
+   * Update a document's metadata (e.g., title)
+   */
+  async updateDocument(
+    documentId: string,
+    data: { title?: string }
+  ): Promise<ApiResponse<Document>> {
+    try {
+      const response = await apiClient.put(`/documents/${documentId}`, data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+  async batchDeleteDocuments(
+    documentIds: string[]
+  ): Promise<ApiResponse<{ deletedCount: number; failed: string[] }>> {
+    try {
+      const response = await apiClient.post('/documents/batch-delete', {
+        ids: documentIds,
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+
   // ==========================================================================
   // Chat API Methods
   // ==========================================================================

@@ -40,9 +40,10 @@ model Document {
   updatedAt DateTime @updatedAt
   
   // 关联关系
-  user        User?            @relation(fields: [userId], references: [id])
-  tags        DocumentTag[]
-  searchItems SearchHistory[]
+  user           User?            @relation(fields: [userId], references: [id])
+  tags           DocumentTag[]
+  searchItems    SearchHistory[]
+  imageAnalyses  ImageAnalysis[]
   
   @@map("documents")
 }
@@ -317,4 +318,31 @@ model UnificationLog {
 
   @@map("unification_logs")
   @@index([startedAt])
+}
+
+
+// ============================================
+// Image Analysis Models (图片 AI 识别)
+// ============================================
+
+// 图片分析表 — 存储 LLM 对图片的识别结果
+model ImageAnalysis {
+  id          String   @id @default(uuid())
+  imageKey    String   @map("image_key")
+  imageUrl    String   @map("image_url")
+  description String?
+  elements    String?
+  theme       String?
+  status      String   @default("pending")
+  error       String?
+  documentId  String?  @map("document_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  document    Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@map("image_analyses")
+  @@index([imageKey])
+  @@index([documentId])
+  @@index([status])
 }

@@ -8,7 +8,10 @@ import {
   MoreVertical,
   Clock,
   Search,
+  Edit3,
+  Trash2,
 } from 'lucide-react';
+import { Dropdown, Modal, message } from 'antd';
 import { DocumentWithSummary, Category } from '../types';
 import apiClient from '../api/client';
 import { useBatchKGStatus } from '../hooks/useBatchKGStatus';
@@ -27,6 +30,18 @@ export default function Documents() {
   const [isUploading, setIsUploading] = useState(false);
   const [kgModalDocId, setKgModalDocId] = useState<string | null>(null);
   const [kgModalDocTitle, setKgModalDocTitle] = useState<string>('');
+
+  // 内联编辑状态
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+
+  // 删除确认状态
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+
+  // 批量选择模式
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
 
   // Get document IDs for batch status query
   const documentIds = documents.map(doc => doc.id);
@@ -133,8 +148,120 @@ export default function Documents() {
     }
   };
 
-  const handleDocumentClick = (document: DocumentWithSummary) => {
+  // 防止 Dropdown 菜单点击后冒泡导致导航
+  const menuClickedRef = useRef(false);
+
+  const handleDocumentClick = (document: DocumentWithSummary, e: React.MouseEvent) => {
+    // 如果刚刚点击了菜单项，跳过导航
+    if (menuClickedRef.current) {
+      menuClickedRef.current = false;
+      return;
+    }
+    // 如果点击的是 Ant Design Dropdown overlay 内的元素，跳过导航
+    const target = e.target as HTMLElement;
+    if (target.closest('.ant-dropdown') || target.closest('.ant-dropdown-menu')) {
+      return;
+    }
+    if (isSelectMode) {
+      toggleSelect(document.id);
+      return;
+    }
     navigate(`/documents/${document.id}`);
+  };
+
+  // 操作菜单
+  const getMenuItems = (doc: DocumentWithSummary) => ({
+    items: [
+      { key: 'edit', label: '编辑', icon: <Edit3 size={14} /> },
+      { key: 'delete', label: '删除', icon: <Trash2 size={14} />, danger: true as const },
+    ],
+    onClick: ({ key, domEvent }: { key: string; domEvent: React.MouseEvent | React.KeyboardEvent }) => {
+      domEvent.stopPropagation();
+      domEvent.preventDefault();
+      menuClickedRef.current = true;
+      // 重置标记，防止影响后续正常点击
+      setTimeout(() => { menuClickedRef.current = false; }, 300);
+      if (key === 'edit') {
+        setEditingId(doc.id);
+        setEditingTitle(doc.title);
+      }
+      if (key === 'delete') {
+        setDeleteTarget({ id: doc.id, title: doc.title });
+      }
+    },
+  });
+
+  // 内联编辑
+  const handleSaveEdit = async (docId: string) => {
+    const trimmed = editingTitle.trim();
+    if (!trimmed) {
+      setEditingId(null);
+      return;
+    }
+    const result = await apiService.updateDocument(docId, { title: trimmed });
+    if (result.success) {
+      message.success('标题已更新');
+      loadDocuments();
+    } else {
+      message.error('更新失败：' + result.error);
+    }
+    setEditingId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+  };
+
+  // 删除确认
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const result = await apiService.deleteDocument(deleteTarget.id);
+    if (result.success) {
+      message.success('文档已删除');
+      loadDocuments();
+    } else {
+      message.error('删除失败：' + result.error);
+    }
+    setDeleteTarget(null);
+  };
+
+  // 批量选择
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.size === searchFilteredDocuments.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(searchFilteredDocuments.map(d => d.id)));
+    }
+  };
+
+  // 批量删除
+  const handleBatchDelete = async () => {
+    const ids = Array.from(selectedIds);
+    const result = await apiService.batchDeleteDocuments(ids);
+    if (result.success) {
+      const { deletedCount, failed } = result.data!;
+      if (failed.length > 0) {
+        message.warning(`成功删除 ${deletedCount} 个文档，${failed.length} 个删除失败`);
+        setSelectedIds(new Set(failed));
+      } else {
+        message.success(`成功删除 ${deletedCount} 个文档`);
+        setSelectedIds(new Set());
+        setIsSelectMode(false);
+      }
+      loadDocuments();
+    } else {
+      message.error('批量删除失败：' + result.error);
+    }
+    setBatchDeleteConfirm(false);
   };
 
   const filteredDocuments = selectedCategory 
@@ -166,32 +293,71 @@ export default function Documents() {
       <div className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 shrink-0 border-b border-slate-200">
         <div className="flex-1 min-w-0">
           <h1 className="text-xl md:text-2xl font-bold text-slate-900">思库</h1>
-          <p className="text-slate-500 mt-1 text-sm md:text-base">管理和组织你的文档</p>
+          {!isSelectMode && <p className="text-slate-500 mt-1 text-sm md:text-base">管理和组织你的文档</p>}
         </div>
-        <div className="flex items-center gap-2 md:gap-3">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
-          >
-            <Upload size={16} className="text-slate-500" />
-            <span className="text-sm md:text-base font-medium text-slate-700">上传文件</span>
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleUpload}
-            className="hidden"
-            accept=".txt,.md,.docx,.pdf"
-          />
-          <motion.button
-            whileHover={{ y: -2 }}
-            onClick={() => navigate('/documents/new')}
-            className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all text-sm md:text-base"
-          >
-            <Plus size={16} />
-            <span className="text-sm md:text-base">新建文档</span>
-          </motion.button>
+        <div className="flex items-center gap-2 md:gap-3 shrink-0">
+          {!isSelectMode ? (
+            <>
+              <button
+                onClick={() => setIsSelectMode(true)}
+                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-sm md:text-base"
+              >
+                <span className="text-sm md:text-base font-medium text-slate-700">选择</span>
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
+              >
+                <Upload size={16} className="text-slate-500" />
+                <span className="text-sm md:text-base font-medium text-slate-700">上传文件</span>
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleUpload}
+                className="hidden"
+                accept=".txt,.md,.docx,.pdf"
+              />
+              <motion.button
+                whileHover={{ y: -2 }}
+                onClick={() => navigate('/documents/new')}
+                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all text-sm md:text-base"
+              >
+                <Plus size={16} />
+                <span className="text-sm md:text-base">新建文档</span>
+              </motion.button>
+            </>
+          ) : (
+            <>
+              <span className="text-sm text-slate-600">已选择 {selectedIds.size} 项</span>
+              <button
+                onClick={handleToggleSelectAll}
+                className="px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                {selectedIds.size === searchFilteredDocuments.length ? '取消全选' : '全选'}
+              </button>
+              <button
+                onClick={() => setBatchDeleteConfirm(true)}
+                disabled={selectedIds.size === 0}
+                style={selectedIds.size > 0 ? { backgroundColor: '#ef4444', color: '#ffffff' } : undefined}
+                className={`flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  selectedIds.size === 0
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'hover:bg-red-600'
+                }`}
+              >
+                <Trash2 size={14} />
+                删除选中
+              </button>
+              <button
+                onClick={() => { setIsSelectMode(false); setSelectedIds(new Set()); }}
+                className="px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                取消
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -305,19 +471,49 @@ export default function Documents() {
                   <motion.div
                     key={document.id}
                     whileHover={{ y: -4, boxShadow: '0 10px 30px -15px rgba(0, 0, 0, 0.15)' }}
-                    onClick={() => handleDocumentClick(document)}
-                    className="bg-white rounded-xl border border-slate-200 p-4 cursor-pointer transition-all duration-200 hover:border-purple-300"
+                    onClick={(e) => handleDocumentClick(document, e)}
+                    className="bg-white rounded-xl border border-slate-200 p-4 cursor-pointer transition-all duration-200 hover:border-purple-300 relative"
                   >
+                    {isSelectMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(document.id)}
+                        onChange={() => toggleSelect(document.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-3 left-3 w-4 h-4 accent-purple-600 cursor-pointer z-10"
+                      />
+                    )}
                     <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="p-2 rounded-lg bg-blue-50 text-blue-400">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="p-2 rounded-lg bg-blue-50 text-blue-400 shrink-0">
                           <FileText size={16} />
                         </div>
-                        <h3 className="font-medium text-slate-800 line-clamp-1">{document.title}</h3>
+                        {editingId === document.id ? (
+                          <input
+                            autoFocus
+                            ref={(el) => el?.select()}
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit(document.id);
+                              if (e.key === 'Escape') handleCancelEdit();
+                            }}
+                            onBlur={() => handleSaveEdit(document.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-medium text-slate-800 text-sm w-full border border-purple-300 rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-purple-400"
+                          />
+                        ) : (
+                          <h3 className="font-medium text-slate-800 line-clamp-1">{document.title}</h3>
+                        )}
                       </div>
-                      <button className="text-slate-400 hover:text-slate-600 p-1">
-                        <MoreVertical size={16} />
-                      </button>
+                      <Dropdown menu={getMenuItems(document)} trigger={['click']}>
+                        <button
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-slate-400 hover:text-slate-600 p-1"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                      </Dropdown>
                     </div>
                     
                     <p className="text-sm text-slate-500 line-clamp-3 mb-4">
@@ -369,6 +565,32 @@ export default function Documents() {
           onClose={() => setKgModalDocId(null)}
         />
       )}
+
+      {/* 删除确认对话框 */}
+      <Modal
+        open={!!deleteTarget}
+        title="确认删除"
+        onOk={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+        okText="确认"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+      >
+        <p>确定要删除文档 "{deleteTarget?.title}" 吗？此操作不可撤销。</p>
+      </Modal>
+
+      {/* 批量删除确认对话框 */}
+      <Modal
+        open={batchDeleteConfirm}
+        title="确认批量删除"
+        onOk={handleBatchDelete}
+        onCancel={() => setBatchDeleteConfirm(false)}
+        okText="确认"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+      >
+        <p>确定要删除选中的 {selectedIds.size} 个文档吗？此操作不可撤销。</p>
+      </Modal>
     </div>
   );
 }

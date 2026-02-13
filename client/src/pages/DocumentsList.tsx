@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FileText, Folder, MoreVertical, Search, Filter, Grid, List as ListIcon, Plus, Upload, X, CheckCircle, Loader2, File, ChevronDown, ChevronUp, RefreshCw, AlertCircle, BookOpen } from 'lucide-react';
+import { FileText, Folder, MoreVertical, Search, Filter, Grid, List as ListIcon, Plus, Upload, X, CheckCircle, Loader2, File, ChevronDown, ChevronUp, RefreshCw, AlertCircle, BookOpen, Edit3, Trash2 } from 'lucide-react';
+import { Dropdown, Modal, message } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApiData } from '../hooks/useApiData';
 import { apiService, type Document } from '../services/api';
@@ -48,7 +49,111 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [indexDrawerDocId, setIndexDrawerDocId] = useState<string | null>(null);
   const [indexDrawerDocTitle, setIndexDrawerDocTitle] = useState<string | undefined>(undefined);
-  
+
+  // 内联编辑状态
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+
+  // 删除确认状态
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+
+  // 批量选择模式
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
+
+  // 操作菜单
+  const getMenuItems = (doc: Doc) => ({
+    items: [
+      { key: 'edit', label: '编辑', icon: <Edit3 size={14} /> },
+      { key: 'delete', label: '删除', icon: <Trash2 size={14} />, danger: true as const },
+    ],
+    onClick: ({ key, domEvent }: { key: string; domEvent: React.MouseEvent | React.KeyboardEvent }) => {
+      domEvent.stopPropagation();
+      if (key === 'edit') {
+        setEditingId(doc.id);
+        setEditingTitle(doc.title);
+      }
+      if (key === 'delete') {
+        setDeleteTarget({ id: doc.id, title: doc.title });
+      }
+    },
+  });
+
+  // 内联编辑操作
+  const handleSaveEdit = async (docId: string) => {
+    const trimmed = editingTitle.trim();
+    if (!trimmed) {
+      setEditingId(null);
+      return;
+    }
+    const result = await apiService.updateDocument(docId, { title: trimmed });
+    if (result.success) {
+      message.success('标题已更新');
+      refetch();
+    } else {
+      message.error('更新失败：' + result.error);
+    }
+    setEditingId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+  };
+
+  // 删除确认操作
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const result = await apiService.deleteDocument(deleteTarget.id);
+    if (result.success) {
+      message.success('文档已删除');
+      refetch();
+    } else {
+      message.error('删除失败：' + result.error);
+    }
+    setDeleteTarget(null);
+  };
+
+  // 批量选择操作
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.size === docs.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(docs.map(d => d.id)));
+    }
+  };
+
+  // 批量删除操作
+  const handleBatchDelete = async () => {
+    const ids = Array.from(selectedIds);
+    const result = await apiService.batchDeleteDocuments(ids);
+    if (result.success) {
+      const { deletedCount, failed } = result.data!;
+      if (failed.length > 0) {
+        message.warning(`成功删除 ${deletedCount} 个文档，${failed.length} 个删除失败`);
+        // Remove only successfully deleted docs from selection
+        setSelectedIds(new Set(failed));
+      } else {
+        message.success(`成功删除 ${deletedCount} 个文档`);
+        setSelectedIds(new Set());
+        setIsSelectMode(false);
+      }
+      refetch();
+    } else {
+      message.error('批量删除失败：' + result.error);
+    }
+    setBatchDeleteConfirm(false);
+  };
+
   // Helper function to determine document type from file extension
   const getDocType = (fileType: string): 'doc' | 'folder' | 'image' | 'pdf' => {
     const type = fileType.toLowerCase();
@@ -475,39 +580,76 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
 
       <div className="h-16 border-b border-slate-200 flex items-center justify-between px-8 bg-white shrink-0 z-10">
         <h1 className="text-xl font-bold text-slate-900">文档中心</h1>
-        <div className="flex gap-2">
-           <button 
-             onClick={() => setViewMode('list')}
-             className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-purple-50 text-purple-600' : 'text-slate-400 hover:bg-slate-50'}`}
-           >
-             <ListIcon size={20} />
-           </button>
-           <button 
-             onClick={() => setViewMode('grid')}
-             className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-purple-50 text-purple-600' : 'text-slate-400 hover:bg-slate-50'}`}
-           >
-             <Grid size={20} />
-           </button>
-           
-           <input 
-             type="file" 
-             ref={fileInputRef} 
-             onChange={handleFileSelect} 
-             className="hidden" 
-             multiple 
-           />
-           <button 
-             onClick={() => fileInputRef.current?.click()} 
-             className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-2 active:scale-95 transition-transform"
-           >
-              <Upload size={16} /> 上传文件
-           </button>
-           <button 
-             onClick={() => onNavigate('editor')} 
-             className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 flex items-center gap-2 active:scale-95 transition-transform"
-           >
-              <Plus size={16} /> 创建便签
-           </button>
+        <div className="flex gap-2 items-center">
+           {!isSelectMode ? (
+             <>
+               <button
+                 onClick={() => setIsSelectMode(true)}
+                 className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all"
+               >
+                 选择
+               </button>
+               <button 
+                 onClick={() => setViewMode('list')}
+                 className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-purple-50 text-purple-600' : 'text-slate-400 hover:bg-slate-50'}`}
+               >
+                 <ListIcon size={20} />
+               </button>
+               <button 
+                 onClick={() => setViewMode('grid')}
+                 className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-purple-50 text-purple-600' : 'text-slate-400 hover:bg-slate-50'}`}
+               >
+                 <Grid size={20} />
+               </button>
+               
+               <input 
+                 type="file" 
+                 ref={fileInputRef} 
+                 onChange={handleFileSelect} 
+                 className="hidden" 
+                 multiple 
+               />
+               <button 
+                 onClick={() => fileInputRef.current?.click()} 
+                 className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-2 active:scale-95 transition-transform"
+               >
+                  <Upload size={16} /> 上传文件
+               </button>
+               <button 
+                 onClick={() => onNavigate('editor')} 
+                 className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 flex items-center gap-2 active:scale-95 transition-transform"
+               >
+                  <Plus size={16} /> 创建便签
+               </button>
+             </>
+           ) : (
+             <>
+               <span className="text-sm text-slate-600">已选择 {selectedIds.size} 项</span>
+               <button
+                 onClick={handleToggleSelectAll}
+                 className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all"
+               >
+                 {selectedIds.size === docs.length ? '取消全选' : '全选'}
+               </button>
+               <button
+                 onClick={() => setBatchDeleteConfirm(true)}
+                 disabled={selectedIds.size === 0}
+                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                   selectedIds.size === 0
+                     ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                     : 'bg-red-500 text-white hover:bg-red-600 active:scale-95 transition-transform'
+                 }`}
+               >
+                 删除
+               </button>
+               <button
+                 onClick={() => { setIsSelectMode(false); setSelectedIds(new Set()); }}
+                 className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all"
+               >
+                 取消
+               </button>
+             </>
+           )}
         </div>
       </div>
 
@@ -565,9 +707,24 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
                    initial={{ scale: 0.9, opacity: 0 }}
                    animate={{ scale: 1, opacity: 1 }}
                    key={doc.id} 
-                   onClick={() => doc.type !== 'folder' && onNavigate('editor')}
+                   onClick={() => {
+                     if (isSelectMode) {
+                       toggleSelect(doc.id);
+                     } else {
+                       doc.type !== 'folder' && onNavigate('editor');
+                     }
+                   }}
                    className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-purple-200 transition-all cursor-pointer group relative flex flex-col"
                  >
+                    {isSelectMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(doc.id)}
+                        onChange={() => toggleSelect(doc.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-3 left-3 w-4 h-4 accent-purple-600 cursor-pointer"
+                      />
+                    )}
                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                        <button
                          title="查看索引"
@@ -580,12 +737,35 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
                        >
                          <BookOpen size={16} />
                        </button>
-                       <button className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600"><MoreVertical size={16} /></button>
+                       <Dropdown menu={getMenuItems(doc)} trigger={['click']}>
+                         <button
+                           onClick={(e) => e.stopPropagation()}
+                           className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600"
+                         >
+                           <MoreVertical size={16} />
+                         </button>
+                       </Dropdown>
                     </div>
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${getIconBg(doc.type)}`}>
                        {getIcon(doc.type)}
                     </div>
-                    <h3 className="font-semibold text-slate-700 mb-1 truncate text-sm" title={doc.title}>{doc.title}</h3>
+                    {editingId === doc.id ? (
+                      <input
+                        autoFocus
+                        ref={(el) => el?.select()}
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEdit(doc.id);
+                          if (e.key === 'Escape') handleCancelEdit();
+                        }}
+                        onBlur={() => handleSaveEdit(doc.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-semibold text-slate-700 mb-1 text-sm w-full border border-purple-300 rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-purple-400"
+                      />
+                    ) : (
+                      <h3 className="font-semibold text-slate-700 mb-1 truncate text-sm" title={doc.title}>{doc.title}</h3>
+                    )}
                     <div className="flex justify-between items-center text-xs text-slate-400 mt-auto pt-2">
                        <span>{doc.size}</span>
                        <span>{doc.updated}</span>
@@ -610,6 +790,7 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
              <table className="w-full text-left text-sm text-slate-600">
                <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
                  <tr>
+                   {isSelectMode && <th className="px-3 py-4 w-10"></th>}
                    <th className="px-6 py-4">名称</th>
                    <th className="px-6 py-4">大小</th>
                    <th className="px-6 py-4">修改时间</th>
@@ -619,12 +800,45 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
                </thead>
                <tbody className="divide-y divide-slate-100">
                  {docs.map((doc) => (
-                   <tr key={doc.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => doc.type !== 'folder' && onNavigate('editor')}>
+                   <tr key={doc.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => {
+                     if (isSelectMode) {
+                       toggleSelect(doc.id);
+                     } else {
+                       doc.type !== 'folder' && onNavigate('editor');
+                     }
+                   }}>
+                     {isSelectMode && (
+                       <td className="px-3 py-3">
+                         <input
+                           type="checkbox"
+                           checked={selectedIds.has(doc.id)}
+                           onChange={() => toggleSelect(doc.id)}
+                           onClick={(e) => e.stopPropagation()}
+                           className="w-4 h-4 accent-purple-600 cursor-pointer"
+                         />
+                       </td>
+                     )}
                      <td className="px-6 py-3 flex items-center gap-3 font-medium text-slate-700">
                         <div className={`p-2 rounded-lg ${getIconBg(doc.type)}`}>
                           {React.cloneElement(getIcon(doc.type) as React.ReactElement, { size: 16 })}
                         </div>
-                        {doc.title}
+                        {editingId === doc.id ? (
+                          <input
+                            autoFocus
+                            ref={(el) => el?.select()}
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit(doc.id);
+                              if (e.key === 'Escape') handleCancelEdit();
+                            }}
+                            onBlur={() => handleSaveEdit(doc.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-medium text-slate-700 text-sm border border-purple-300 rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-purple-400"
+                          />
+                        ) : (
+                          <span className="truncate" title={doc.title}>{doc.title}</span>
+                        )}
                      </td>
                      <td className="px-6 py-3">{doc.size}</td>
                      <td className="px-6 py-3">{doc.updated}</td>
@@ -649,7 +863,14 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
                          >
                            <BookOpen size={16} />
                          </button>
-                         <button className="p-1 hover:bg-slate-200 rounded text-slate-400"><MoreVertical size={16} /></button>
+                         <Dropdown menu={getMenuItems(doc)} trigger={['click']}>
+                           <button
+                             onClick={(e) => e.stopPropagation()}
+                             className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600"
+                           >
+                             <MoreVertical size={16} />
+                           </button>
+                         </Dropdown>
                        </div>
                      </td>
                    </tr>
@@ -789,6 +1010,32 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 删除确认对话框 */}
+      <Modal
+        open={!!deleteTarget}
+        title="确认删除"
+        onOk={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+        okText="确认"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+      >
+        <p>确定要删除文档 "{deleteTarget?.title}" 吗？此操作不可撤销。</p>
+      </Modal>
+
+      {/* 批量删除确认对话框 */}
+      <Modal
+        open={batchDeleteConfirm}
+        title="确认批量删除"
+        onOk={handleBatchDelete}
+        onCancel={() => setBatchDeleteConfirm(false)}
+        okText="确认"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+      >
+        <p>确定要删除选中的 {selectedIds.size} 个文档吗？此操作不可撤销。</p>
+      </Modal>
     </div>
   );
 }

@@ -641,7 +641,10 @@ const storage = multer.diskStorage({
     cb(null, path.join(__dirname, 'uploads'));
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
+    // 使用时间戳 + 随机数 + 原始扩展名，避免中文文件名编码问题
+    const ext = path.extname(file.originalname) || '';
+    const safeName = Date.now() + '-' + Math.random().toString(36).substring(2, 8) + ext;
+    cb(null, safeName);
   }
 });
 
@@ -726,6 +729,10 @@ app.use('/api/attachments', attachmentRoutes);
 const imageAnalysisRoutes = require('./routes/imageAnalysisRoutes');
 app.use('/api/image-analysis', imageAnalysisRoutes);
 
+// 图片上传/代理/识别路由（MinIO + AI 识别）
+const imageRoutes = require('./routes/imageRoutes');
+app.use('/api/images', imageRoutes);
+
 // AI增强路由
 const aiEnhancementRoutes = require('./routes/aiEnhancementRoutes');
 app.use('/api/ai', aiEnhancementRoutes);
@@ -795,6 +802,94 @@ const mockTags = [
   { id: '4', name: '数据库', color: '#f5222d', description: '数据库相关内容' },
   { id: '5', name: '笔记', color: '#722ed1', description: '个人笔记' }
 ];
+
+// === 文档 API 辅助函数 ===
+
+/**
+ * 安全解析 JSON 字符串字段，失败时返回默认值
+ */
+function parseJsonField(value, defaultValue) {
+  if (!value) return defaultValue;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return defaultValue;
+  }
+}
+
+/**
+ * 从 DocumentContentJSON（Tiptap JSON）中提取所有 imageBlock 的 analysisId
+ * 递归遍历 content 数组查找 type === 'imageBlock' 的节点
+ */
+function extractAnalysisIds(contentStr) {
+  const ids = [];
+  try {
+    const doc = typeof contentStr === 'string' ? JSON.parse(contentStr) : contentStr;
+    if (!doc || !Array.isArray(doc.content)) return ids;
+    
+    function walk(nodes) {
+      for (const node of nodes) {
+        if (node.type === 'imageBlock' && node.attrs && node.attrs.analysisId) {
+          ids.push(node.attrs.analysisId);
+        }
+        if (Array.isArray(node.content)) {
+          walk(node.content);
+        }
+      }
+    }
+    walk(doc.content);
+  } catch {
+    // content 不是有效 JSON，忽略
+  }
+  return ids;
+}
+
+/**
+ * 将 ImageAnalysis 记录关联到指定文档（设置 documentId）
+ * 根据文档内容中的 analysisId 列表批量更新
+ */
+async function linkImageAnalysesToDocument(documentId, contentStr) {
+  const analysisIds = extractAnalysisIds(contentStr);
+  if (analysisIds.length === 0) return;
+  
+  try {
+    await kgPrisma.imageAnalysis.updateMany({
+      where: { id: { in: analysisIds } },
+      data: { documentId: documentId.toString() }
+    });
+  } catch (err) {
+    console.error('Error linking imageAnalyses to document:', err);
+  }
+}
+
+/**
+ * 文档保存后，对所有 pending 状态的图片触发 AI 识别
+ */
+async function triggerPendingImageRecognition(contentStr) {
+  const analysisIds = extractAnalysisIds(contentStr);
+  if (analysisIds.length === 0) return;
+
+  try {
+    const pendingRecords = await kgPrisma.imageAnalysis.findMany({
+      where: { id: { in: analysisIds }, status: 'pending' },
+    });
+
+    if (pendingRecords.length === 0) return;
+
+    const { getImageRecognitionService } = require('./services/imageRecognitionService');
+    const recognitionService = getImageRecognitionService();
+
+    for (const record of pendingRecords) {
+      recognitionService.analyzeImage(record.imageKey).catch((err) => {
+        console.error(`[ImageRecognition] 识别失败 [${record.imageKey}]:`, err.message);
+      });
+    }
+
+    console.log(`[ImageRecognition] 已触发 ${pendingRecords.length} 张图片的 AI 识别`);
+  } catch (err) {
+    console.error('Error triggering image recognition:', err);
+  }
+}
 
 // 文档相关路由
 app.get('/api/documents', authMiddleware, (req, res) => {
@@ -902,18 +997,15 @@ app.get('/api/documents/:id', authMiddleware, (req, res) => {
         tags: row.tags ? JSON.parse(row.tags) : [],
         createdAt: row.created_at,
         updatedAt: row.updated_at,
-        summaries: []
+        summaries: [],
+        imageAnalyses: []
       };
       
       // 获取文档的总结
       userDb.all('SELECT model, content, created_at FROM summaries WHERE user_id = ? AND document_id = ?', [userId, id], (err, summaryRows) => {
         if (err) {
           console.error('Error fetching summaries:', err);
-          // 即使获取总结失败，也返回文档
-          return res.json(document);
-        }
-        
-        if (summaryRows && summaryRows.length > 0) {
+        } else if (summaryRows && summaryRows.length > 0) {
           document.summaries = summaryRows.map(summaryRow => ({
             id: `${document.id}_${summaryRow.model}`,
             model: summaryRow.model,
@@ -922,7 +1014,28 @@ app.get('/api/documents/:id', authMiddleware, (req, res) => {
           }));
         }
         
-        res.json(document);
+        // 获取关联的图片识别结果
+        kgPrisma.imageAnalysis.findMany({
+          where: { documentId: id.toString() }
+        }).then(analyses => {
+          document.imageAnalyses = analyses.map(a => ({
+            id: a.id,
+            imageKey: a.imageKey,
+            imageUrl: a.imageUrl,
+            description: a.description,
+            elements: parseJsonField(a.elements, []),
+            theme: a.theme,
+            status: a.status,
+            error: a.error,
+            createdAt: a.createdAt,
+            updatedAt: a.updatedAt
+          }));
+          res.json(document);
+        }).catch(prismaErr => {
+          console.error('Error fetching imageAnalyses:', prismaErr);
+          // 即使获取图片分析失败，也返回文档
+          res.json(document);
+        });
       });
     });
   } catch (error) {
@@ -962,6 +1075,12 @@ app.post('/api/documents', authMiddleware, (req, res) => {
         };
         
         console.log('创建新文档:', newDocument);
+        
+        // 关联图片分析记录到新文档（异步）
+        linkImageAnalysesToDocument(newDocument.id, content);
+        
+        // 触发 pending 图片的 AI 识别（异步，保存时才识别）
+        triggerPendingImageRecognition(content);
         
         // 触发知识图谱构建钩子 (异步)
         if (onDocumentCreated) onDocumentCreated(newDocument, { async: true, skipIfExists: false })
@@ -1005,6 +1124,12 @@ app.put('/api/documents/:id', authMiddleware, (req, res) => {
           return res.status(404).json({ error: 'Document not found' });
         }
         
+        // 更新图片分析记录关联（异步）
+        linkImageAnalysesToDocument(id, content);
+        
+        // 触发 pending 图片的 AI 识别（异步，保存时才识别）
+        triggerPendingImageRecognition(content);
+        
         userDb.get('SELECT * FROM documents WHERE id = ?', [id], (err, row) => {
           if (err || !row) {
             return res.status(500).json({ error: 'Failed to fetch updated document' });
@@ -1038,6 +1163,48 @@ app.put('/api/documents/:id', authMiddleware, (req, res) => {
   } catch (error) {
     console.error('Error updating document:', error);
     res.status(500).json({ error: 'Failed to update document' });
+  }
+});
+
+app.post('/api/documents/batch-delete', authMiddleware, (req, res) => {
+  try {
+    const userId = req.userId;
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids 数组不能为空' });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const params = [...ids, userId];
+
+    userDb.run(
+      `DELETE FROM documents WHERE id IN (${placeholders}) AND user_id = ?`,
+      params,
+      function(err) {
+        if (err) {
+          console.error('Error batch deleting documents:', err);
+          return res.status(500).json({ error: 'Failed to batch delete documents' });
+        }
+
+        // 对每个 ID 触发 KG 清理钩子
+        ids.forEach(id => {
+          if (onDocumentDeleted) {
+            onDocumentDeleted(id, { async: true }).catch(e =>
+              console.error('[KG Hook] 批量删除钩子失败:', e)
+            );
+          }
+        });
+
+        res.json({
+          deletedCount: this.changes,
+          failed: []
+        });
+      }
+    );
+  } catch (error) {
+    console.error('Error batch deleting documents:', error);
+    res.status(500).json({ error: 'Failed to batch delete documents' });
   }
 });
 
@@ -1302,6 +1469,26 @@ const handleFileUpload = async (req, res) => {
     });
   }
 };
+
+// 图片上传API（轻量级，仅保存文件并返回URL）
+app.post('/api/images/upload', authMiddleware, upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const { filename, originalname, mimetype } = req.file;
+    if (!mimetype.startsWith('image/')) {
+      // 删除非图片文件
+      const filePath = path.join(__dirname, 'uploads', filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      return res.status(400).json({ error: 'Only image files are allowed' });
+    }
+    res.json({ success: true, url: `/uploads/${filename}`, filename: originalname });
+  } catch (error) {
+    console.error('Image upload error:', error);
+    res.status(500).json({ error: 'Image upload failed' });
+  }
+});
 
 // 文件上传API - 支持两个路径（需要认证）
 app.post('/api/upload', authMiddleware, upload.single('file'), handleFileUpload);
@@ -3866,6 +4053,15 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   console.log(`Server is running on http://localhost:${PORT}`);
   console.log(`Server is accessible on network: http://${localIP}:${PORT}`);
   
+  // Initialize MinIO bucket
+  try {
+    const minioService = require('./services/minioService');
+    await minioService.ensureBucket();
+    console.log('[MinIO] Bucket initialized successfully');
+  } catch (err) {
+    console.warn('[MinIO] Bucket initialization failed (MinIO may not be running):', err.message);
+  }
+  
   // Initialize TempFileManager (cleanup task already started in constructor)
   console.log('[TempFileManager] Automatic cleanup enabled (runs every 15 minutes)');
   
@@ -3919,6 +4115,9 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   console.log('- GET /api/categories/:id/documents - 获取分类文档');
   console.log('- POST /api/ai/recommendations - 生成AI搜索推荐');
   console.log('- GET /api/ai/recommendations - 获取AI搜索推荐');
+  console.log('- POST /api/images/upload - 上传图片到MinIO');
+  console.log('- GET /api/images/:id/analysis - 查询图片AI识别结果');
+  console.log('- GET /api/images/proxy/* - 代理MinIO图片访问');
   
   console.log('\n=== 网络访问信息 ===');
   console.log(`本地访问: http://localhost:${PORT}`);

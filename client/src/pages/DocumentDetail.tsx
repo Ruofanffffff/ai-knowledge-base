@@ -2,13 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Download, Edit, Trash2, Brain, XCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
 import apiClient from '../api/client';
+import RichTextEditor from '../components/editor/RichTextEditor';
 
 interface Summary {
   id: string;
   model: string;
   content: string;
   createdAt: string;
+}
+
+interface ImageAnalysis {
+  id: string;
+  imageKey: string;
+  imageUrl: string;
+  description: string | null;
+  elements: string | null;
+  theme: string | null;
+  status: string;
 }
 
 interface Document {
@@ -22,10 +34,24 @@ interface Document {
   createdAt: string;
   updatedAt: string;
   summaries?: Summary[];
+  imageAnalyses?: ImageAnalysis[];
 }
 
 interface DocumentWithSummary extends Document {
   summaries?: Summary[];
+}
+
+/**
+ * Detect whether a content string is Tiptap JSON (has `type: 'doc'`).
+ * Returns false for plain text / markdown content (backward compat).
+ */
+function isJsonContent(content: string): boolean {
+  try {
+    const parsed = JSON.parse(content);
+    return parsed && typeof parsed === 'object' && parsed.type === 'doc';
+  } catch {
+    return false;
+  }
 }
 
 export default function DocumentDetail() {
@@ -254,15 +280,36 @@ export default function DocumentDetail() {
       <div className="flex-1 overflow-hidden relative flex">
         {/* Main Document Content */}
         <div className={`flex-1 overflow-y-auto transition-all duration-300 ${showChatPanel && !isMobile ? 'w-1/2' : 'w-full'}`}>
-          <div 
-            className="max-w-[850px] mx-auto bg-white shadow-lg min-h-[1100px] rounded-sm text-slate-800 leading-relaxed font-serif text-justify text-lg break-words px-5 py-8 md:px-[72px] md:py-[60px]"
-          >
-            {document.content.split('\n').map((paragraph, index) => (
-              <p key={index} className="mb-6 indent-8">
-                {paragraph}
-              </p>
-            ))}
-          </div>
+          {isJsonContent(document.content) ? (
+            <div className="max-w-[850px] mx-auto bg-white shadow-lg min-h-[1100px] rounded-sm">
+              <RichTextEditor
+                content={JSON.parse(document.content)}
+                editable={false}
+              />
+            </div>
+          ) : (
+            <div 
+              className="max-w-[850px] mx-auto bg-white shadow-lg min-h-[1100px] rounded-sm text-slate-800 leading-relaxed font-serif text-justify text-lg break-words px-5 py-8 md:px-[72px] md:py-[60px] prose prose-slate prose-lg max-w-none"
+            >
+              <ReactMarkdown
+                components={{
+                  img: ({ src, alt, ...props }) => (
+                    <img
+                      src={src}
+                      alt={alt || ''}
+                      style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', margin: '16px 0' }}
+                      {...props}
+                    />
+                  ),
+                  p: ({ children, ...props }) => (
+                    <p className="mb-6 indent-8" {...props}>{children}</p>
+                  ),
+                }}
+              >
+                {document.content}
+              </ReactMarkdown>
+            </div>
+          )}
         </div>
 
         {/* AI Summary Panel */}
