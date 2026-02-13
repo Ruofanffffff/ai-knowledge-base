@@ -54,3 +54,11 @@ prisma/*.db-journal
 
 # 统计和缓存文件
 kg/field_normalizer/.synonym_dict_stats.json
+
+# 缓存和工具目录
+.cache/
+.trae/
+
+# 备份目录
+*.backup/
+*_backup/
