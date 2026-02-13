@@ -37,6 +37,8 @@ interface Model {
   type: 'cloud' | 'local';
 }
 
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+
 export function AISearch() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -44,6 +46,18 @@ export function AISearch() {
   const [input, setInput] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [selectedModel, setSelectedModel] = useState('qwen-plus');
+  
+  const { isListening, isSupported, toggleListening } = useSpeechRecognition({
+    onResult: (text, isFinal) => {
+      if (isFinal) {
+        setInput(prev => prev + text);
+      }
+    },
+    onError: (err) => {
+      console.error('Speech recognition error:', err);
+    }
+  });
+
   const [models, setModels] = useState<Model[]>([
     { id: 'qwen-plus', name: 'Qwen Plus (千问)', type: 'cloud' },
     { id: 'deepseek-chat', name: 'DeepSeek Chat', type: 'cloud' },
@@ -656,12 +670,20 @@ export function AISearch() {
              />
              
              <div className="absolute bottom-2 right-2 flex items-center gap-1">
-               <button
-                 className="p-2 rounded-xl text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-all"
-                 title="语音输入"
-               >
-                 <Mic size={18} />
-               </button>
+               {isSupported && (
+                 <button
+                   type="button"
+                   onClick={toggleListening}
+                   className={`p-2 rounded-xl transition-all ${
+                     isListening 
+                       ? 'text-red-500 bg-red-50 ring-2 ring-red-100 animate-pulse' 
+                       : 'text-slate-400 hover:text-purple-600 hover:bg-purple-50'
+                   }`}
+                   title={isListening ? "停止录音" : "语音输入"}
+                 >
+                   <Mic size={18} className={isListening ? "animate-bounce" : ""} />
+                 </button>
+               )}
                
                <button
                  onClick={handleSend}

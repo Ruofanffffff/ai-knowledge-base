@@ -186,6 +186,142 @@ export default function DocumentDetail() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const contentRef = React.useRef(editContent);
+  const isEditingRef = React.useRef(isEditing);
+  const documentRef = React.useRef(document);
+  const prevDocIdRef = React.useRef<string | null>(null);
+  const isMountedRef = React.useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    contentRef.current = editContent;
+  }, [editContent]);
+
+  useEffect(() => {
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
+
+  useEffect(() => {
+    documentRef.current = document;
+    // Only reset content if document ID changes (loaded new document)
+    // This prevents resetting content when saving (which updates document but keeps same ID)
+    if (document && document.id !== prevDocIdRef.current) {
+      setEditContent(document.content);
+      prevDocIdRef.current = document.id;
+    }
+  }, [document]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [editContent, isEditing]);
+
+  const saveContent = React.useCallback(async (content: string) => {
+    const currentDoc = documentRef.current;
+    if (!currentDoc || content === currentDoc.content) return;
+    
+    setSaveStatus('saving');
+    try {
+      // Send all required fields to ensure backend updates correctly
+      // Backend uses PUT which typically requires full object replacement or at least required fields
+      await apiClient.put(`/documents/${currentDoc.id}`, { 
+        title: currentDoc.title,
+        content: content,
+        type: currentDoc.type,
+        fileType: currentDoc.fileType,
+        metadata: currentDoc.metadata,
+        tags: currentDoc.tags
+      });
+      
+      if (isMountedRef.current) {
+        setDocument(prev => prev ? ({ ...prev, content }) : null);
+        setSaveStatus('saved');
+      }
+    } catch (error) {
+      console.error('保存失败:', error);
+      if (isMountedRef.current) {
+        setSaveStatus('error');
+      }
+    }
+  }, []);
+
+  // Debounced auto-save
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const timer = setTimeout(() => {
+      // Check against ref to ensure we're comparing with latest saved content
+      if (editContent !== documentRef.current?.content) {
+        saveContent(editContent);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [editContent, isEditing, saveContent]);
+
+  // Save on unmount or when editing stops
+  useEffect(() => {
+    return () => {
+      const currentDoc = documentRef.current;
+      if (isEditingRef.current && currentDoc && contentRef.current !== currentDoc.content) {
+        // We cannot use saveContent here because it's a closure from initial render
+        // But we can call apiClient directly
+        apiClient.put(`/documents/${currentDoc.id}`, { 
+          title: currentDoc.title,
+          content: contentRef.current,
+          type: currentDoc.type,
+          fileType: currentDoc.fileType,
+          metadata: currentDoc.metadata,
+          tags: currentDoc.tags
+        })
+          .catch(err => console.error('Exit save failed:', err));
+      }
+    };
+  }, []);
+
+  const handleDoubleClick = () => {
+    if (!isEditing) {
+      setIsEditing(true);
+      setEditContent(document?.content || '');
+    }
+  };
+
+  const exitEditing = () => {
+    if (!document) return;
+    
+    // 1. Trigger background save with current content
+    saveContent(editContent);
+    
+    // 2. Optimistic update: Update local state immediately so UI reflects changes
+    // This prevents "flicker" where old content is shown before save completes
+    setDocument(prev => prev ? ({ ...prev, content: editContent }) : null);
+    
+    // 3. Exit edit mode
+    setIsEditing(false);
+  };
+
+  // Click outside to exit editing
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isEditing && textareaRef.current && !textareaRef.current.contains(event.target as Node)) {
+        exitEditing();
+      }
+    };
+
+    window.document.addEventListener('mousedown', handleClickOutside);
+    return () => window.document.removeEventListener('mousedown', handleClickOutside);
+  }, [isEditing, editContent, saveContent]);
   const handleDelete = async () => {
     if (!document) return;
     
@@ -269,37 +405,86 @@ export default function DocumentDetail() {
       {/* Content Area */}
       <div className="flex-1 overflow-hidden relative flex">
         {/* Main Document Content */}
-        <div className={`flex-1 overflow-y-auto transition-all duration-300 ${showChatPanel && !isMobile ? 'w-1/2' : 'w-full'}`}>
-          {isJsonContent(document.content) ? (
-            <div className="max-w-[850px] mx-auto bg-white shadow-lg min-h-[1100px] rounded-sm">
-              <RichTextEditor
-                content={JSON.parse(document.content)}
-                editable={false}
-              />
+        <div className={`flex-1 overflow-y-auto transition-all duration-300 p-4 md:p-8 bg-slate-100 ${showChatPanel && !isMobile ? 'w-1/2' : 'w-full'}`}>
+          <div className="max-w-[850px] mx-auto bg-white shadow-md min-h-[1100px] rounded-sm px-8 py-10 md:px-16 md:py-14">
+            {/* Document Header */}
+            <div className="mb-10 border-b border-slate-100 pb-6">
+              <h1 className="text-3xl font-bold text-slate-800 mb-3 leading-tight">{document.title}</h1>
+              <div className="flex items-center gap-4 text-xs text-slate-400">
+                <span>更新于 {new Date(document.updatedAt).toLocaleDateString()}</span>
+                {document.tags && document.tags.length > 0 && (
+                  <>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                    <div className="flex gap-2">
+                      {document.tags.map((tag, i) => (
+                        <span key={i} className="bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full">{tag}</span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          ) : (
-            <div 
-              className="max-w-[850px] mx-auto bg-white shadow-lg min-h-[1100px] rounded-sm text-slate-800 leading-relaxed font-serif text-justify text-lg break-words px-5 py-8 md:px-[72px] md:py-[60px] prose prose-slate prose-lg max-w-none"
-            >
-              <ReactMarkdown
-                components={{
-                  img: ({ src, alt, ...props }) => (
-                    <img
-                      src={src}
-                      alt={alt || ''}
-                      style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', margin: '16px 0' }}
-                      {...props}
-                    />
-                  ),
-                  p: ({ children, ...props }) => (
-                    <p className="mb-6 indent-8" {...props}>{children}</p>
-                  ),
-                }}
+
+            {isJsonContent(document.content) ? (
+              <div onDoubleClick={handleDoubleClick}>
+                <RichTextEditor
+                  content={JSON.parse(document.content)}
+                  editable={isEditing}
+                  onChange={(json) => setEditContent(JSON.stringify(json))}
+                />
+              </div>
+            ) : isEditing ? (
+              <div className="relative min-h-[800px] flex flex-col">
+                 <textarea
+                   ref={textareaRef}
+                   value={editContent}
+                   onChange={(e) => setEditContent(e.target.value)}
+                   className="w-full min-h-[800px] p-0 border-0 outline-none resize-none overflow-hidden text-slate-700 leading-8 text-base font-sans bg-transparent"
+                   autoFocus
+                 />
+                 <div className="fixed bottom-8 right-8 z-50 transition-opacity duration-300">
+                    <span className={`px-4 py-2 rounded-full text-sm font-medium shadow-sm backdrop-blur-sm
+                      ${saveStatus === 'saving' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' : 
+                        saveStatus === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 
+                        'bg-green-50 text-green-600 border border-green-100 opacity-0 group-hover:opacity-100'}`}
+                    >
+                      {saveStatus === 'saving' ? '保存中...' : saveStatus === 'error' ? '保存失败' : '已自动保存'}
+                    </span>
+                 </div>
+              </div>
+            ) : (
+              <div 
+                onDoubleClick={handleDoubleClick}
+                className="text-slate-700 leading-8 text-base break-words prose prose-slate prose-lg max-w-none 
+                prose-headings:font-bold prose-headings:text-slate-800 prose-headings:mt-8 prose-headings:mb-4 
+                prose-p:mb-6 prose-p:leading-8 
+                prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                prose-blockquote:border-l-4 prose-blockquote:border-slate-300 prose-blockquote:bg-slate-50 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r
+                prose-code:bg-slate-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-slate-600 prose-code:font-mono prose-code:text-sm
+                prose-pre:bg-slate-900 prose-pre:rounded-lg prose-pre:p-4
+                prose-li:marker:text-slate-400 cursor-text"
+                title="双击编辑"
               >
-                {document.content}
-              </ReactMarkdown>
-            </div>
-          )}
+                <ReactMarkdown
+                  components={{
+                    img: ({ src, alt, ...props }) => (
+                      <img
+                        src={src}
+                        alt={alt || ''}
+                        style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', margin: '16px 0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                        {...props}
+                      />
+                    ),
+                    p: ({ children, ...props }) => (
+                      <p className="mb-6 whitespace-pre-wrap" {...props}>{children}</p>
+                    ),
+                  }}
+                >
+                  {document.content}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* AI Summary Panel */}
