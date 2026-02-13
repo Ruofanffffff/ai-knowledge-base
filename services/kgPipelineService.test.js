@@ -8,6 +8,14 @@ const mockTx = {
     deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     create: jest.fn(),
   },
+  docRelation: {
+    deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    create: jest.fn().mockResolvedValue({ id: 'doc-rel-id' }),
+  },
+  docEntity: {
+    deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    create: jest.fn(),
+  },
 };
 
 const mockPrisma = {
@@ -24,6 +32,12 @@ const mockPrisma = {
     findMany: jest.fn().mockResolvedValue([]),
   },
   cleanedRelation: {
+    findMany: jest.fn().mockResolvedValue([]),
+  },
+  docEntity: {
+    findMany: jest.fn().mockResolvedValue([]),
+  },
+  docRelation: {
     findMany: jest.fn().mockResolvedValue([]),
   },
 };
@@ -57,6 +71,10 @@ describe('kgPipelineService', () => {
     mockTx.cleanedRelation.create.mockReset().mockResolvedValue({ id: 'rel-id' });
     mockTx.cleanedEntity.deleteMany.mockReset().mockResolvedValue({ count: 0 });
     mockTx.cleanedRelation.deleteMany.mockReset().mockResolvedValue({ count: 0 });
+    mockTx.docEntity.create.mockReset();
+    mockTx.docRelation.create.mockReset().mockResolvedValue({ id: 'doc-rel-id' });
+    mockTx.docEntity.deleteMany.mockReset().mockResolvedValue({ count: 0 });
+    mockTx.docRelation.deleteMany.mockReset().mockResolvedValue({ count: 0 });
     mockPrisma.$transaction.mockReset().mockImplementation((fn) => fn(mockTx));
     mockPrisma.documentIndex.findFirst.mockReset();
     mockPrisma.documentIndex.create.mockReset();
@@ -64,6 +82,8 @@ describe('kgPipelineService', () => {
     mockPrisma.document.findUnique.mockReset();
     mockPrisma.cleanedEntity.findMany.mockReset().mockResolvedValue([]);
     mockPrisma.cleanedRelation.findMany.mockReset().mockResolvedValue([]);
+    mockPrisma.docEntity.findMany.mockReset().mockResolvedValue([]);
+    mockPrisma.docRelation.findMany.mockReset().mockResolvedValue([]);
   });
 
   describe('truncateEntity', () => {
@@ -353,13 +373,7 @@ describe('kgPipelineService', () => {
   });
 
   describe('mergeIncremental', () => {
-    const existingEntities = [
-      { name: '实体A', description: '已有描述A' },
-      { name: '实体B', description: '已有描述B' },
-    ];
-    const existingRelations = [
-      { source: '实体A', target: '实体B', name: '属于', description: '已有关系' },
-    ];
+    const docId = 'test-doc-123';
     const newEntities = [
       { name: '实体C', description: '新描述C' },
     ];
@@ -367,17 +381,50 @@ describe('kgPipelineService', () => {
       { source: '实体A', target: '实体C', name: '关联', description: '新关系' },
     ];
 
+    beforeEach(() => {
+      // Mock existing DocEntity records for the document
+      mockPrisma.docEntity.findMany.mockResolvedValue([
+        { cleanedName: '实体A', description: '已有描述A' },
+        { cleanedName: '实体B', description: '已有描述B' },
+      ]);
+      
+      // Mock existing DocRelation records for the document
+      mockPrisma.docRelation.findMany.mockResolvedValue([
+        {
+          cleanedName: '属于',
+          description: '已有关系',
+          source: { cleanedName: '实体A' },
+          target: { cleanedName: '实体B' },
+        },
+      ]);
+    });
+
+    it('fetches existing entities and relations for the specific docId only', async () => {
+      llmClient.callJSON
+        .mockResolvedValueOnce([{ name: '实体A', description: '更新A' }])
+        .mockResolvedValueOnce([]);
+
+      await kgPipelineService.mergeIncremental(newEntities, newRelations, docId);
+
+      expect(mockPrisma.docEntity.findMany).toHaveBeenCalledWith({ where: { docId } });
+      expect(mockPrisma.docRelation.findMany).toHaveBeenCalledWith({
+        where: { docId },
+        include: { source: true, target: true },
+      });
+    });
+
     it('builds entity merge prompt with existing and new entities as JSON', async () => {
       llmClient.callJSON
         .mockResolvedValueOnce([{ name: '实体A', description: '更新A' }])
         .mockResolvedValueOnce([]);
 
-      await kgPipelineService.mergeIncremental(newEntities, newRelations, existingEntities, existingRelations);
+      await kgPipelineService.mergeIncremental(newEntities, newRelations, docId);
 
       const entityPrompt = llmClient.callJSON.mock.calls[0][0];
       expect(entityPrompt).toContain('新提取的实体与已有实体进行合并');
-      expect(entityPrompt).toContain(JSON.stringify(existingEntities));
-      expect(entityPrompt).toContain(JSON.stringify(newEntities));
+      expect(entityPrompt).toContain('"name":"实体A"');
+      expect(entityPrompt).toContain('"name":"实体B"');
+      expect(entityPrompt).toContain('"name":"实体C"');
     });
 
     it('builds relation merge prompt with merged entity names and relations', async () => {
@@ -390,13 +437,11 @@ describe('kgPipelineService', () => {
         .mockResolvedValueOnce(mergedEntities)
         .mockResolvedValueOnce([]);
 
-      await kgPipelineService.mergeIncremental(newEntities, newRelations, existingEntities, existingRelations);
+      await kgPipelineService.mergeIncremental(newEntities, newRelations, docId);
 
       const relationPrompt = llmClient.callJSON.mock.calls[1][0];
       expect(relationPrompt).toContain('新提取的关系与已有关系进行合并');
       expect(relationPrompt).toContain(JSON.stringify(['实体A', '实体B', '实体C']));
-      expect(relationPrompt).toContain(JSON.stringify(existingRelations));
-      expect(relationPrompt).toContain(JSON.stringify(newRelations));
     });
 
     it('applies truncation to merged entities', async () => {
@@ -406,7 +451,7 @@ describe('kgPipelineService', () => {
         ])
         .mockResolvedValueOnce([]);
 
-      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, existingEntities, existingRelations);
+      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, docId);
 
       expect(result.entities[0].name).toBe('一二三四五六');
       expect(result.entities[0].description).toBe('一二三四五六七八九十一二三四五六七八九十');
@@ -419,7 +464,7 @@ describe('kgPipelineService', () => {
           { source: '实体A', target: '实体A', name: '一二三四五六', description: '一二三四五六七八九十一二三四五六七八九十额外' },
         ]);
 
-      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, existingEntities, existingRelations);
+      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, docId);
 
       expect(result.relations[0].name).toBe('一二三四');
       expect(result.relations[0].description).toBe('一二三四五六七八九十一二三四五六七八九十');
@@ -434,7 +479,7 @@ describe('kgPipelineService', () => {
           { source: '不存在', target: '实体A', name: '无效', description: '无效源' },
         ]);
 
-      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, existingEntities, existingRelations);
+      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, docId);
 
       expect(result.relations).toHaveLength(1);
       expect(result.relations[0].name).toBe('自引');
@@ -445,7 +490,7 @@ describe('kgPipelineService', () => {
         .mockResolvedValueOnce('not an array')
         .mockResolvedValueOnce([]);
 
-      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, existingEntities, existingRelations);
+      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, docId);
 
       expect(result.entities).toEqual([]);
     });
@@ -455,7 +500,7 @@ describe('kgPipelineService', () => {
         .mockResolvedValueOnce([{ name: '实体A', description: '描述' }])
         .mockResolvedValueOnce(null);
 
-      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, existingEntities, existingRelations);
+      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, docId);
 
       expect(result.relations).toEqual([]);
     });
@@ -465,7 +510,7 @@ describe('kgPipelineService', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
-      await kgPipelineService.mergeIncremental(newEntities, newRelations, existingEntities, existingRelations);
+      await kgPipelineService.mergeIncremental(newEntities, newRelations, docId);
 
       expect(llmClient.callJSON.mock.calls[0][1].temperature).toBe(0.3);
       expect(llmClient.callJSON.mock.calls[1][1].temperature).toBe(0.3);
@@ -475,8 +520,22 @@ describe('kgPipelineService', () => {
       llmClient.callJSON.mockRejectedValue(new Error('Qwen API error'));
 
       await expect(
-        kgPipelineService.mergeIncremental(newEntities, newRelations, existingEntities, existingRelations)
+        kgPipelineService.mergeIncremental(newEntities, newRelations, docId)
       ).rejects.toThrow('Qwen API error');
+    });
+
+    it('handles empty existing entities and relations', async () => {
+      mockPrisma.docEntity.findMany.mockResolvedValue([]);
+      mockPrisma.docRelation.findMany.mockResolvedValue([]);
+
+      llmClient.callJSON
+        .mockResolvedValueOnce([{ name: '实体C', description: '新描述C' }])
+        .mockResolvedValueOnce([]);
+
+      const result = await kgPipelineService.mergeIncremental(newEntities, newRelations, docId);
+
+      expect(result.entities).toHaveLength(1);
+      expect(result.entities[0].name).toBe('实体C');
     });
   });
 
@@ -485,18 +544,28 @@ describe('kgPipelineService', () => {
 
     beforeEach(() => {
       let entityCounter = 0;
-      mockTx.cleanedEntity.create.mockImplementation(({ data }) => {
+      mockTx.docEntity.create.mockImplementation(({ data }) => {
         entityCounter++;
         return Promise.resolve({ id: `entity-${entityCounter}`, ...data });
       });
+      
+      // Mock documentIndex for lastPipelineAt update
+      mockTx.documentIndex = {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'index-1',
+          docId,
+          metadata: JSON.stringify({}),
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      };
     });
 
     it('deletes existing relations and entities inside a transaction', async () => {
       await kgPipelineService.persistToDatabase([], [], docId);
 
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-      expect(mockTx.cleanedRelation.deleteMany).toHaveBeenCalledTimes(1);
-      expect(mockTx.cleanedEntity.deleteMany).toHaveBeenCalledTimes(1);
+      expect(mockTx.docRelation.deleteMany).toHaveBeenCalledWith({ where: { docId } });
+      expect(mockTx.docEntity.deleteMany).toHaveBeenCalledWith({ where: { docId } });
     });
 
     it('creates entities with correct fields', async () => {
@@ -507,19 +576,19 @@ describe('kgPipelineService', () => {
 
       await kgPipelineService.persistToDatabase(entities, [], docId);
 
-      expect(mockTx.cleanedEntity.create).toHaveBeenCalledTimes(2);
-      expect(mockTx.cleanedEntity.create).toHaveBeenCalledWith({
+      expect(mockTx.docEntity.create).toHaveBeenCalledTimes(2);
+      expect(mockTx.docEntity.create).toHaveBeenCalledWith({
         data: {
+          docId,
           cleanedName: '实体A',
           description: '描述A',
-          sourceEntityIds: JSON.stringify([docId]),
         },
       });
-      expect(mockTx.cleanedEntity.create).toHaveBeenCalledWith({
+      expect(mockTx.docEntity.create).toHaveBeenCalledWith({
         data: {
+          docId,
           cleanedName: '实体B',
           description: '描述B',
-          sourceEntityIds: JSON.stringify([docId]),
         },
       });
     });
@@ -535,14 +604,14 @@ describe('kgPipelineService', () => {
 
       await kgPipelineService.persistToDatabase(entities, relations, docId);
 
-      expect(mockTx.cleanedRelation.create).toHaveBeenCalledTimes(1);
-      expect(mockTx.cleanedRelation.create).toHaveBeenCalledWith({
+      expect(mockTx.docRelation.create).toHaveBeenCalledTimes(1);
+      expect(mockTx.docRelation.create).toHaveBeenCalledWith({
         data: {
+          docId,
           cleanedName: '属于',
           description: '关系描述',
           sourceEntityId: 'entity-1',
           targetEntityId: 'entity-2',
-          sourceRelationIds: JSON.stringify([docId]),
         },
       });
     });
@@ -555,7 +624,7 @@ describe('kgPipelineService', () => {
 
       await kgPipelineService.persistToDatabase(entities, relations, docId);
 
-      expect(mockTx.cleanedRelation.create).not.toHaveBeenCalled();
+      expect(mockTx.docRelation.create).not.toHaveBeenCalled();
     });
 
     it('skips relations where target entity is not found', async () => {
@@ -566,7 +635,7 @@ describe('kgPipelineService', () => {
 
       await kgPipelineService.persistToDatabase(entities, relations, docId);
 
-      expect(mockTx.cleanedRelation.create).not.toHaveBeenCalled();
+      expect(mockTx.docRelation.create).not.toHaveBeenCalled();
     });
 
     it('rolls back on transaction error', async () => {
@@ -580,8 +649,18 @@ describe('kgPipelineService', () => {
     it('handles empty entities and relations', async () => {
       await kgPipelineService.persistToDatabase([], [], docId);
 
-      expect(mockTx.cleanedEntity.create).not.toHaveBeenCalled();
-      expect(mockTx.cleanedRelation.create).not.toHaveBeenCalled();
+      expect(mockTx.docEntity.create).not.toHaveBeenCalled();
+      expect(mockTx.docRelation.create).not.toHaveBeenCalled();
+    });
+
+    it('updates DocumentIndex metadata with lastPipelineAt timestamp', async () => {
+      await kgPipelineService.persistToDatabase([], [], docId);
+
+      expect(mockTx.documentIndex.findFirst).toHaveBeenCalledWith({ where: { docId } });
+      expect(mockTx.documentIndex.update).toHaveBeenCalledWith({
+        where: { id: 'index-1' },
+        data: { metadata: expect.stringContaining('lastPipelineAt') },
+      });
     });
   });
 
@@ -674,14 +753,23 @@ describe('kgPipelineService', () => {
         .mockResolvedValueOnce([{ name: '实体A', description: '合并描述A' }]) // mergeIncremental entities
         .mockResolvedValueOnce([{ source: '实体A', target: '实体A', name: '自引', description: '合并关系' }]); // mergeIncremental relations
       // existing entities/relations for merge
-      mockPrisma.cleanedEntity.findMany.mockResolvedValue([]);
-      mockPrisma.cleanedRelation.findMany.mockResolvedValue([]);
+      mockPrisma.docEntity.findMany.mockResolvedValue([]);
+      mockPrisma.docRelation.findMany.mockResolvedValue([]);
       // persistToDatabase
       let entityCounter = 0;
-      mockTx.cleanedEntity.create.mockImplementation(() => {
+      mockTx.docEntity.create.mockImplementation(() => {
         entityCounter++;
         return Promise.resolve({ id: `entity-${entityCounter}` });
       });
+      // Mock documentIndex for lastPipelineAt update in persistToDatabase
+      mockTx.documentIndex = {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'idx-1',
+          docId,
+          metadata: JSON.stringify({}),
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      };
     }
 
     it('calls all pipeline steps in correct order', async () => {
@@ -701,8 +789,11 @@ describe('kgPipelineService', () => {
       // 4. extractEntities (1st callJSON)
       expect(llmClient.callJSON).toHaveBeenCalledTimes(4);
       // 5. Read existing entities/relations for merge
-      expect(mockPrisma.cleanedEntity.findMany).toHaveBeenCalled();
-      expect(mockPrisma.cleanedRelation.findMany).toHaveBeenCalledWith({ include: { source: true, target: true } });
+      expect(mockPrisma.docEntity.findMany).toHaveBeenCalled();
+      expect(mockPrisma.docRelation.findMany).toHaveBeenCalledWith({ 
+        where: { docId },
+        include: { source: true, target: true } 
+      });
       // 6. persistToDatabase (transaction)
       expect(mockPrisma.$transaction).toHaveBeenCalled();
     });
@@ -794,8 +885,8 @@ describe('kgPipelineService', () => {
           target: { cleanedName: '已有实体' },
         },
       ];
-      mockPrisma.cleanedEntity.findMany.mockResolvedValue(existingEntities);
-      mockPrisma.cleanedRelation.findMany.mockResolvedValue(existingRelations);
+      mockPrisma.docEntity.findMany.mockResolvedValue(existingEntities);
+      mockPrisma.docRelation.findMany.mockResolvedValue(existingRelations);
 
       llmClient.callJSON
         .mockResolvedValueOnce([{ name: '实体A', description: '描述A' }]) // extractEntities
@@ -804,10 +895,20 @@ describe('kgPipelineService', () => {
         .mockResolvedValueOnce([]); // mergeIncremental relations
 
       let entityCounter = 0;
-      mockTx.cleanedEntity.create.mockImplementation(() => {
+      mockTx.docEntity.create.mockImplementation(() => {
         entityCounter++;
         return Promise.resolve({ id: `entity-${entityCounter}` });
       });
+      
+      // Mock documentIndex for lastPipelineAt update
+      mockTx.documentIndex = {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'idx-1',
+          docId,
+          metadata: JSON.stringify({}),
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      };
 
       await kgPipelineService.runPipeline(docId);
 

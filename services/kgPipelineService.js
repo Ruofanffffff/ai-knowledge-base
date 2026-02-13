@@ -151,14 +151,31 @@ ${indexText}`;
 
   /** Step 4: 增量合并（待实现） */
   /**
-     * Step 4: 增量合并新旧实体和关系
+     * Step 4: 增量合并新旧实体和关系（仅在同一文档范围内）
      * @param {Array} newEntities - 新提取的实体 [{name, description}]
      * @param {Array} newRelations - 新提取的关系 [{source, target, name, description}]
-     * @param {Array} existingEntities - 已有的CleanedEntity [{name, description}]
-     * @param {Array} existingRelations - 已有的CleanedRelation [{source, target, name, description}]
+     * @param {string} docId - 文档ID
      * @returns {Promise<{entities: Array, relations: Array}>} 合并后的完整列表
      */
-    async mergeIncremental(newEntities, newRelations, existingEntities, existingRelations) {
+    async mergeIncremental(newEntities, newRelations, docId) {
+      // Fetch existing DocEntity and DocRelation for this specific document only
+      const existingEntitiesRaw = await prisma.docEntity.findMany({ where: { docId } });
+      const existingEntities = existingEntitiesRaw.map((e) => ({
+        name: e.cleanedName,
+        description: e.description,
+      }));
+
+      const existingRelationsRaw = await prisma.docRelation.findMany({
+        where: { docId },
+        include: { source: true, target: true },
+      });
+      const existingRelations = existingRelationsRaw.map((r) => ({
+        source: r.source.cleanedName,
+        target: r.target.cleanedName,
+        name: r.cleanedName,
+        description: r.description,
+      }));
+
       // Step 4a: Merge entities via LLM
       const entityPrompt = `请将新提取的实体与已有实体进行合并。
   要求：
@@ -204,18 +221,18 @@ ${indexText}`;
   /** Step 5: 持久化保存到数据库 */
   async persistToDatabase(mergedEntities, mergedRelations, docId) {
     await prisma.$transaction(async (tx) => {
-      // Delete existing data (relations first due to FK constraints)
-      await tx.cleanedRelation.deleteMany();
-      await tx.cleanedEntity.deleteMany();
+      // Delete existing DocEntity and DocRelation for this docId (relations first due to FK constraints)
+      await tx.docRelation.deleteMany({ where: { docId } });
+      await tx.docEntity.deleteMany({ where: { docId } });
 
       // Create entities and build name→id map
       const nameToId = new Map();
       for (const entity of mergedEntities) {
-        const created = await tx.cleanedEntity.create({
+        const created = await tx.docEntity.create({
           data: {
+            docId,
             cleanedName: entity.name,
             description: entity.description,
-            sourceEntityIds: JSON.stringify([docId]),
           },
         });
         nameToId.set(entity.name, created.id);
@@ -227,14 +244,26 @@ ${indexText}`;
         const targetId = nameToId.get(relation.target);
         if (!sourceId || !targetId) continue;
 
-        await tx.cleanedRelation.create({
+        await tx.docRelation.create({
           data: {
+            docId,
             cleanedName: relation.name,
             description: relation.description,
             sourceEntityId: sourceId,
             targetEntityId: targetId,
-            sourceRelationIds: JSON.stringify([docId]),
           },
+        });
+      }
+
+      // Update DocumentIndex metadata with lastPipelineAt timestamp
+      const existingIndex = await tx.documentIndex.findFirst({ where: { docId } });
+      if (existingIndex) {
+        const metadata = JSON.parse(existingIndex.metadata || '{}');
+        metadata.lastPipelineAt = new Date().toISOString();
+        
+        await tx.documentIndex.update({
+          where: { id: existingIndex.id },
+          data: { metadata: JSON.stringify(metadata) },
         });
       }
     });
@@ -316,23 +345,7 @@ ${indexText}`;
 
         // merging
         updateStatus('merging');
-        const existingEntitiesRaw = await prisma.cleanedEntity.findMany();
-        const existingEntities = existingEntitiesRaw.map((e) => ({
-          name: e.cleanedName,
-          description: e.description,
-        }));
-
-        const existingRelationsRaw = await prisma.cleanedRelation.findMany({
-          include: { source: true, target: true },
-        });
-        const existingRelations = existingRelationsRaw.map((r) => ({
-          source: r.source.cleanedName,
-          target: r.target.cleanedName,
-          name: r.cleanedName,
-          description: r.description,
-        }));
-
-        const merged = await this.mergeIncremental(entities, relations, existingEntities, existingRelations);
+        const merged = await this.mergeIncremental(entities, relations, docId);
 
         // saving
         updateStatus('saving');

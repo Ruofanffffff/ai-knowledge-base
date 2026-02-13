@@ -9,6 +9,7 @@ const router = express.Router();
 const { authMiddleware } = require('../services/authService');
 const kgPipelineService = require('../services/kgPipelineService');
 const { pipelineStatus, prisma } = require('../services/kgPipelineService');
+const unificationService = require('../services/unificationService');
 
 // 正在执行中的Pipeline状态（收到重复请求时应拒绝）
 const ACTIVE_STATUSES = ['pending', 'indexing', 'extracting_entities', 'extracting_relations', 'merging', 'saving'];
@@ -67,12 +68,12 @@ router.post('/build', authMiddleware, async (req, res) => {
 
 /**
  * GET /api/kg/graph
- * 获取完整图谱数据（CleanedEntity + CleanedRelation）
+ * 获取完整图谱数据（兼容旧接口，返回统一图谱数据）
  */
 router.get('/graph', authMiddleware, async (req, res) => {
   try {
-    const entities = await prisma.cleanedEntity.findMany();
-    const relations = await prisma.cleanedRelation.findMany();
+    const entities = await prisma.unifiedEntity.findMany();
+    const relations = await prisma.unifiedRelation.findMany();
 
     res.json({
       success: true,
@@ -133,6 +134,165 @@ router.get('/status/:docId', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting KG status:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/kg/unified/graph
+ * 获取统一图谱数据（UnifiedEntity + UnifiedRelation）
+ */
+router.get('/unified/graph', authMiddleware, async (req, res) => {
+  try {
+    const entities = await prisma.unifiedEntity.findMany();
+    const relations = await prisma.unifiedRelation.findMany();
+
+    res.json({
+      success: true,
+      data: {
+        entities: entities.map(e => ({
+          id: e.id,
+          name: e.cleanedName,
+          description: e.description
+        })),
+        relations: relations.map(r => ({
+          id: r.id,
+          source: r.sourceEntityId,
+          target: r.targetEntityId,
+          name: r.cleanedName,
+          description: r.description
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching unified graph data:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/kg/doc/:docId/graph
+ * 获取指定文档的分文章图谱数据（DocEntity + DocRelation）
+ */
+router.get('/doc/:docId/graph', authMiddleware, async (req, res) => {
+  try {
+    const { docId } = req.params;
+
+    const entities = await prisma.docEntity.findMany({
+      where: { docId }
+    });
+
+    const relations = await prisma.docRelation.findMany({
+      where: { docId }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        docId,
+        entities: entities.map(e => ({
+          id: e.id,
+          name: e.cleanedName,
+          description: e.description
+        })),
+        relations: relations.map(r => ({
+          id: r.id,
+          source: r.sourceEntityId,
+          target: r.targetEntityId,
+          name: r.cleanedName,
+          description: r.description
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching doc graph data:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/kg/unified/trigger
+ * 手动触发统一归纳（检查是否已在执行中）
+ */
+router.post('/unified/trigger', authMiddleware, async (req, res) => {
+  try {
+    // 检查是否有正在执行的归纳
+    const latestLog = await unificationService.getLatestLog();
+    if (latestLog && latestLog.status === 'running') {
+      return res.status(409).json({
+        success: false,
+        error: '统一归纳正在执行中，请勿重复触发',
+        data: {
+          status: latestLog.status,
+          startedAt: latestLog.startedAt
+        }
+      });
+    }
+
+    // 异步启动统一归纳（不等待完成）
+    unificationService.runUnification('manual').then((result) => {
+      console.log('Manual unification completed:', result);
+    }).catch((err) => {
+      console.error('Manual unification failed:', err.message);
+    });
+
+    res.json({
+      success: true,
+      data: {
+        status: 'running',
+        message: '统一归纳已启动'
+      }
+    });
+  } catch (error) {
+    console.error('Error triggering unification:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/kg/unified/status
+ * 获取统一归纳状态（返回最近一条 UnificationLog）
+ */
+router.get('/unified/status', authMiddleware, async (req, res) => {
+  try {
+    const latestLog = await unificationService.getLatestLog();
+
+    if (!latestLog) {
+      return res.json({
+        success: true,
+        data: {
+          status: 'idle',
+          message: '尚未执行过统一归纳'
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        status: latestLog.status,
+        entityCount: latestLog.entityCount,
+        relationCount: latestLog.relationCount,
+        triggeredBy: latestLog.triggeredBy,
+        startedAt: latestLog.startedAt,
+        completedAt: latestLog.completedAt,
+        error: latestLog.error
+      }
+    });
+  } catch (error) {
+    console.error('Error getting unification status:', error);
     res.status(500).json({
       success: false,
       error: error.message

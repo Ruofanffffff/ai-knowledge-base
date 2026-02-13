@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, XCircle, Bold, Italic, List, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import apiClient from '../api/client';
+import KGPipelineModal from '../components/KGPipelineModal';
 
 export default function CreateDocument() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export default function CreateDocument() {
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [kgModalDocId, setKgModalDocId] = useState<string | null>(null);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -31,9 +33,14 @@ export default function CreateDocument() {
       const newDocument = response.data;
       setSaveStatus('saved');
       
-      setTimeout(() => {
-        navigate(`/documents/${newDocument.id}`);
-      }, 500);
+      // 显示 KG Pipeline 进度模态框
+      if (newDocument.id) {
+        setKgModalDocId(newDocument.id.toString());
+      } else {
+        setTimeout(() => {
+          navigate(`/documents/${newDocument.id}`);
+        }, 500);
+      }
     } catch (error) {
       console.error('创建文档失败:', error);
       setSaveStatus('error');
@@ -165,6 +172,18 @@ export default function CreateDocument() {
           </div>
         </div>
       </div>
+
+      {/* KG Pipeline Progress Modal */}
+      {kgModalDocId && (
+        <KGPipelineModal
+          docId={kgModalDocId}
+          docTitle={title}
+          onClose={() => {
+            setKgModalDocId(null);
+            navigate('/documents');
+          }}
+        />
+      )}
     </div>
   );
 }

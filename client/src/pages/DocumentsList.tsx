@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FileText, Folder, MoreVertical, Search, Filter, Grid, List as ListIcon, Plus, Upload, X, CheckCircle, Loader2, File, ChevronDown, ChevronUp, RefreshCw, AlertCircle } from 'lucide-react';
+import { FileText, Folder, MoreVertical, Search, Filter, Grid, List as ListIcon, Plus, Upload, X, CheckCircle, Loader2, File, ChevronDown, ChevronUp, RefreshCw, AlertCircle, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApiData } from '../hooks/useApiData';
 import { apiService, type Document } from '../services/api';
@@ -7,6 +7,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorDisplay from '../components/ErrorDisplay';
 import EmptyState from '../components/EmptyState';
 import { DuplicateDetectionModal } from '../components/DuplicateDetectionModal';
+import DocumentIndexDrawer from '../components/DocumentIndexDrawer';
 
 interface DocumentsListProps {
   onNavigate: (page: string) => void;
@@ -45,6 +46,8 @@ interface DuplicateInfo {
 
 export function DocumentsList({ onNavigate }: DocumentsListProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [indexDrawerDocId, setIndexDrawerDocId] = useState<string | null>(null);
+  const [indexDrawerDocTitle, setIndexDrawerDocTitle] = useState<string | undefined>(undefined);
   
   // Helper function to determine document type from file extension
   const getDocType = (fileType: string): 'doc' | 'folder' | 'image' | 'pdf' => {
@@ -443,6 +446,16 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
         />
       )}
 
+      {/* Document Index Drawer */}
+      <DocumentIndexDrawer
+        docId={indexDrawerDocId}
+        docTitle={indexDrawerDocTitle}
+        onClose={() => {
+          setIndexDrawerDocId(null);
+          setIndexDrawerDocTitle(undefined);
+        }}
+      />
+
       {/* Drag Overlay */}
       <AnimatePresence>
         {isDragging && (
@@ -555,7 +568,18 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
                    onClick={() => doc.type !== 'folder' && onNavigate('editor')}
                    className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-purple-200 transition-all cursor-pointer group relative flex flex-col"
                  >
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                       <button
+                         title="查看索引"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           setIndexDrawerDocId(doc.id);
+                           setIndexDrawerDocTitle(doc.title);
+                         }}
+                         className="p-1 hover:bg-purple-50 rounded text-slate-400 hover:text-purple-600 transition-colors"
+                       >
+                         <BookOpen size={16} />
+                       </button>
                        <button className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600"><MoreVertical size={16} /></button>
                     </div>
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${getIconBg(doc.type)}`}>
@@ -613,7 +637,20 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
                        </div>
                      </td>
                      <td className="px-6 py-3">
-                       <button className="p-1 hover:bg-slate-200 rounded text-slate-400"><MoreVertical size={16} /></button>
+                       <div className="flex items-center gap-1">
+                         <button
+                           title="查看索引"
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             setIndexDrawerDocId(doc.id);
+                             setIndexDrawerDocTitle(doc.title);
+                           }}
+                           className="p-1 hover:bg-purple-50 rounded text-slate-400 hover:text-purple-600 transition-colors"
+                         >
+                           <BookOpen size={16} />
+                         </button>
+                         <button className="p-1 hover:bg-slate-200 rounded text-slate-400"><MoreVertical size={16} /></button>
+                       </div>
                      </td>
                    </tr>
                  ))}

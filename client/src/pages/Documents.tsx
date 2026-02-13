@@ -13,6 +13,7 @@ import { DocumentWithSummary, Category } from '../types';
 import apiClient from '../api/client';
 import { useBatchKGStatus } from '../hooks/useBatchKGStatus';
 import KGStatusIndicator from '../components/KGStatusIndicator';
+import KGPipelineModal from '../components/KGPipelineModal';
 import apiService from '../services/api';
 
 export default function Documents() {
@@ -24,6 +25,8 @@ export default function Documents() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [kgModalDocId, setKgModalDocId] = useState<string | null>(null);
+  const [kgModalDocTitle, setKgModalDocTitle] = useState<string>('');
 
   // Get document IDs for batch status query
   const documentIds = documents.map(doc => doc.id);
@@ -77,10 +80,11 @@ export default function Documents() {
 
     const formData = new FormData();
     formData.append('file', files[0]);
+    const fileName = files[0].name;
 
     try {
       setIsUploading(true);
-      await apiClient.post('/documents/upload', formData, {
+      const response = await apiClient.post('/documents/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -89,6 +93,13 @@ export default function Documents() {
       await new Promise(resolve => setTimeout(resolve, 500));
       await loadDocuments();
       await loadCategories();
+      
+      // 显示 KG Pipeline 进度模态框
+      const newDocId = response.data?.document?.id?.toString() || response.data?.id?.toString();
+      if (newDocId) {
+        setKgModalDocId(newDocId);
+        setKgModalDocTitle(response.data?.document?.title || response.data?.title || fileName);
+      }
     } catch (error) {
       console.error('上传失败:', error);
       alert('文件上传失败，请重试');
@@ -349,6 +360,15 @@ export default function Documents() {
           </div>
         </div>
       </div>
+
+      {/* KG Pipeline Progress Modal */}
+      {kgModalDocId && (
+        <KGPipelineModal
+          docId={kgModalDocId}
+          docTitle={kgModalDocTitle}
+          onClose={() => setKgModalDocId(null)}
+        />
+      )}
     </div>
   );
 }

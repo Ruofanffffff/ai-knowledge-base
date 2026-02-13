@@ -14,6 +14,10 @@ require('dotenv').config();
 // KG Pipeline Service (redesigned)
 const kgPipelineService = require('./services/kgPipelineService');
 const kg = null;
+
+// Unification Scheduler (dual-layer graph)
+const unificationScheduler = require('./services/unificationScheduler');
+const unificationService = require('./services/unificationService');
 const onDocumentCreated = async (document) => {
   const autoBuild = process.env.AUTO_BUILD_KG !== 'false';
   if (!autoBuild) {
@@ -24,6 +28,16 @@ const onDocumentCreated = async (document) => {
   try {
     const result = await kgPipelineService.runPipeline(String(document.id));
     console.log('[KG Hook] Pipeline completed for doc:', document.id, result);
+    
+    // 自动触发统一归纳，让用户立即看到统一图谱
+    try {
+      console.log('[KG Hook] Auto-triggering unification after pipeline...');
+      const unifyResult = await unificationService.runUnification('auto');
+      console.log('[KG Hook] Unification completed:', unifyResult);
+    } catch (unifyErr) {
+      console.error('[KG Hook] Unification failed (non-fatal):', unifyErr.message);
+    }
+    
     return result;
   } catch (err) {
     console.error('[KG Hook] Pipeline failed for doc:', document.id, err.message);
@@ -719,6 +733,60 @@ app.use('/api/ai', aiEnhancementRoutes);
 // 搜索路由
 const searchRoutes = require('./routes/searchRoutes');
 app.use('/api/search', searchRoutes);
+
+// LLM预处理路由（文档索引查询）
+const { PrismaClient } = require('@prisma/client');
+const kgPrisma = new PrismaClient();
+
+app.get('/api/preprocessing/index/:docId', authMiddleware, async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const { version } = req.query;
+
+    if (!docId) {
+      return res.status(400).json({ success: false, error: 'Document ID is required' });
+    }
+
+    const where = { docId };
+    const orderBy = { version: 'desc' };
+
+    let documentIndex;
+    if (version) {
+      where.version = parseInt(version);
+      documentIndex = await kgPrisma.documentIndex.findFirst({ where });
+    } else {
+      documentIndex = await kgPrisma.documentIndex.findFirst({ where, orderBy });
+    }
+
+    if (!documentIndex) {
+      return res.status(404).json({
+        success: false,
+        error: `No document index found for document ${docId}`
+      });
+    }
+
+    let metadata = {};
+    try {
+      metadata = documentIndex.metadata ? JSON.parse(documentIndex.metadata) : {};
+    } catch { metadata = {}; }
+
+    res.json({
+      success: true,
+      data: {
+        id: documentIndex.id,
+        docId: documentIndex.docId,
+        indexedText: documentIndex.indexedText,
+        version: documentIndex.version,
+        metadata,
+        createdAt: documentIndex.createdAt,
+        updatedAt: documentIndex.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error('[Preprocessing] Error getting document index:', error);
+    res.status(500).json({ success: false, error: 'Internal server error', details: error.message });
+  }
+});
 
 const mockTags = [
   { id: '1', name: '前端', color: '#1890ff', description: '前端开发相关内容' },
@@ -3801,6 +3869,10 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   // Initialize TempFileManager (cleanup task already started in constructor)
   console.log('[TempFileManager] Automatic cleanup enabled (runs every 15 minutes)');
   
+  // Start UnificationScheduler
+  unificationScheduler.start();
+  console.log('[UnificationScheduler] Started (checking every hour for new documents)');
+  
   // KG module removed — pending redesign
   console.log('[KG Module] Knowledge Graph module removed, pending redesign');
   console.log('Available APIs:');
@@ -3853,6 +3925,24 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   console.log(`局域网访问: http://${localIP}:${PORT}`);
   console.log(`请确保防火墙允许端口 ${PORT} 的访问`);
 });
+
+// Graceful shutdown handlers
+const gracefulShutdown = (signal) => {
+  console.log(`\n${signal} received, shutting down gracefully...`);
+  
+  // Stop UnificationScheduler
+  unificationScheduler.stop();
+  console.log('[UnificationScheduler] Stopped');
+  
+  // Close Prisma connection if needed
+  // prisma.$disconnect() can be called here if needed
+  
+  process.exit(0);
+};
+
+// Handle various shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // 导出app对象，用于测试
 module.exports = app;

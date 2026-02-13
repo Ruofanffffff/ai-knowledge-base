@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, Folder, Clock, MoreVertical, Sparkles, Network } from 'lucide-react';
+import { Plus, FileText, Folder, Clock, MoreVertical, Sparkles, Network, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AISearch } from './AISearch';
 import { useAuth } from '../contexts/AuthContext';
 import { useDocuments } from '../hooks/useDocuments';
 import { formatTimeAgo, getAvatarUrl } from '../utils/transformers';
+import DocumentIndexDrawer from '../components/DocumentIndexDrawer';
 
 interface DashboardProps {
   onNavigate?: (page: string) => void;
@@ -45,6 +46,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [knowledgeNodeCount, setKnowledgeNodeCount] = useState<number>(0);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [indexDrawerDocId, setIndexDrawerDocId] = useState<string | null>(null);
+  const [indexDrawerDocTitle, setIndexDrawerDocTitle] = useState<string | undefined>(undefined);
   
   useEffect(() => {
     const loadUserInfo = async () => {
@@ -224,6 +227,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                          ))}
                       </div>
                     </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIndexDrawerDocId(doc.id);
+                        setIndexDrawerDocTitle(doc.title);
+                      }}
+                      title="查看索引"
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-purple-50 rounded text-slate-400 hover:text-purple-600 transition-colors"
+                    >
+                      <BookOpen size={14} />
+                    </button>
                     <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-50 rounded text-slate-400">
                       <MoreVertical size={14} />
                     </button>
@@ -235,6 +249,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
         </div>
       </div>
+
+      {/* Document Index Drawer */}
+      <DocumentIndexDrawer
+        docId={indexDrawerDocId}
+        docTitle={indexDrawerDocTitle}
+        onClose={() => {
+          setIndexDrawerDocId(null);
+          setIndexDrawerDocTitle(undefined);
+        }}
+      />
     </div>
   );
 }
