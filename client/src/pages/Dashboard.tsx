@@ -113,17 +113,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       {/* Main Content Grid */}
-      <div className="flex-1 overflow-hidden px-4 md:px-8 pb-4 md:pb-8 grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
+      <div className="flex-1 overflow-y-auto lg:overflow-hidden px-4 md:px-8 pb-20 md:pb-8 grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
         
         {/* Left Column: AI Assistant (Prominent) */}
-        <div className="lg:col-span-7 xl:col-span-8 flex flex-col h-full min-h-0">
+        <div className="lg:col-span-7 xl:col-span-8 flex flex-col h-[600px] lg:h-full min-h-0 order-2 lg:order-1">
           <div className="flex-1 h-full min-h-0 rounded-2xl shadow-sm border border-slate-200 overflow-hidden bg-white">
              <AISearch />
           </div>
         </div>
 
         {/* Right Column: Widgets */}
-        <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 overflow-y-auto pr-1">
+        <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 lg:overflow-y-auto pr-1 order-1 lg:order-2 shrink-0">
           
           {/* Quick Actions / Create */}
           <motion.div 

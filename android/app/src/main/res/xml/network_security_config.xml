@@ -3,13 +3,11 @@
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="@raw/server" />
         </trust-anchors>
     </base-config>
-    <domain-config>
-        <domain includeSubdomains="true">192.168.0.119</domain>
-        <trust-anchors>
-            <certificates src="@raw/server" />
-        </trust-anchors>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">192.168.0.103</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
     </domain-config>
 </network-security-config>

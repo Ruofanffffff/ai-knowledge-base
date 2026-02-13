@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">拾思</string>
-    <string name="title_activity_main">拾思</string>
+    <string name="app_name">Personal Knowledge Base</string>
+    <string name="title_activity_main">Personal Knowledge Base</string>
     <string name="package_name">com.personal.knowledgebase</string>
     <string name="custom_url_scheme">com.personal.knowledgebase</string>
 </resources>

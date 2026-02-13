@@ -1579,10 +1579,197 @@ app.post('/api/upload/resolve-duplicate', authMiddleware, async (req, res) => {
   }
 });
 
+// Chat History Routes
+app.get('/api/chat/sessions', authMiddleware, (req, res) => {
+  const userId = req.userId;
+  userDb.all('SELECT * FROM chat_sessions WHERE user_id = ? ORDER BY updated_at DESC', [userId], (err, rows) => {
+    if (err) {
+      console.error('Error fetching chat sessions:', err);
+      return res.status(500).json({ error: 'Failed to fetch chat sessions' });
+    }
+    
+    // For each session, fetch the last message or just return the session info
+    // The frontend might need messages for preview, but let's keep it simple for now
+    const sessions = rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      messages: [] // Messages will be loaded on demand or we can load them here if needed
+    }));
+    
+    res.json(sessions);
+  });
+});
+
+app.post('/api/chat/sessions', authMiddleware, (req, res) => {
+  const userId = req.userId;
+  const { id, title, messages } = req.body;
+  
+  // Use provided ID or generate one if not provided (though frontend usually generates ID for optimistic UI)
+  const sessionId = id || Date.now().toString();
+  const sessionTitle = title || '新对话';
+  const initialMessages = messages || [];
+  
+  userDb.serialize(() => {
+    userDb.run(
+      'INSERT INTO chat_sessions (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
+      [sessionId, userId, sessionTitle],
+      function(err) {
+        if (err) {
+          console.error('Error creating chat session:', err);
+          return res.status(500).json({ error: 'Failed to create chat session' });
+        }
+        
+        // If there are initial messages, insert them
+        if (initialMessages.length > 0) {
+          const stmt = userDb.prepare('INSERT INTO chat_messages (session_id, role, content, sources, web_sources, timestamp, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)');
+          
+          initialMessages.forEach(msg => {
+            stmt.run([
+              sessionId, 
+              msg.role, 
+              msg.content, 
+              JSON.stringify(msg.sources || []), 
+              JSON.stringify(msg.webSources || []),
+              msg.timestamp
+            ]);
+          });
+          
+          stmt.finalize();
+        }
+        
+        res.status(201).json({
+          id: sessionId,
+          title: sessionTitle,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          messages: initialMessages
+        });
+      }
+    );
+  });
+});
+
+app.delete('/api/chat/sessions/:id', authMiddleware, (req, res) => {
+  const userId = req.userId;
+  const { id } = req.params;
+  
+  userDb.run('DELETE FROM chat_sessions WHERE id = ? AND user_id = ?', [id, userId], function(err) {
+    if (err) {
+      console.error('Error deleting chat session:', err);
+      return res.status(500).json({ error: 'Failed to delete chat session' });
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    
+    // Cascading delete should handle messages, but let's be safe if foreign keys aren't enabled
+    userDb.run('DELETE FROM chat_messages WHERE session_id = ?', [id]);
+    
+    res.json({ success: true });
+  });
+});
+
+app.get('/api/chat/sessions/:id', authMiddleware, (req, res) => {
+  const userId = req.userId;
+  const { id } = req.params;
+  
+  userDb.get('SELECT * FROM chat_sessions WHERE id = ? AND user_id = ?', [id, userId], (err, session) => {
+    if (err) {
+      console.error('Error fetching chat session:', err);
+      return res.status(500).json({ error: 'Failed to fetch chat session' });
+    }
+    
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    
+    userDb.all('SELECT * FROM chat_messages WHERE session_id = ? ORDER BY id ASC', [id], (err, messages) => {
+      if (err) {
+        console.error('Error fetching chat messages:', err);
+        return res.status(500).json({ error: 'Failed to fetch chat messages' });
+      }
+      
+      const formattedMessages = messages.map(msg => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        sources: JSON.parse(msg.sources || '[]'),
+        webSources: JSON.parse(msg.web_sources || '[]'),
+        timestamp: msg.timestamp
+      }));
+      
+      res.json({
+        id: session.id,
+        title: session.title,
+        createdAt: session.created_at,
+        updatedAt: session.updated_at,
+        messages: formattedMessages
+      });
+    });
+  });
+});
+
+app.post('/api/chat/sessions/:id/messages', authMiddleware, (req, res) => {
+  const userId = req.userId;
+  const { id } = req.params;
+  const { role, content, sources, webSources, timestamp } = req.body;
+  
+  // Verify session belongs to user
+  userDb.get('SELECT id FROM chat_sessions WHERE id = ? AND user_id = ?', [id, userId], (err, session) => {
+    if (err || !session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    
+    userDb.run(
+      'INSERT INTO chat_messages (session_id, role, content, sources, web_sources, timestamp, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+      [id, role, content, JSON.stringify(sources || []), JSON.stringify(webSources || []), timestamp],
+      function(err) {
+        if (err) {
+          console.error('Error adding message:', err);
+          return res.status(500).json({ error: 'Failed to add message' });
+        }
+        
+        // Update session timestamp
+        userDb.run('UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+        
+        res.status(201).json({
+          id: this.lastID,
+          role,
+          content,
+          sources: sources || [],
+          webSources: webSources || [],
+          timestamp
+        });
+      }
+    );
+  });
+});
+
+app.put('/api/chat/sessions/:id', authMiddleware, (req, res) => {
+  const userId = req.userId;
+  const { id } = req.params;
+  const { title } = req.body;
+  
+  userDb.run(
+    'UPDATE chat_sessions SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+    [title, id, userId],
+    function(err) {
+      if (err) {
+        console.error('Error updating session:', err);
+        return res.status(500).json({ error: 'Failed to update session' });
+      }
+      res.json({ success: true, title });
+    }
+  );
+});
+
 // AI功能相关API（模拟实现）
 
 // AI搜索API
-app.post('/api/ai/search', async (req, res) => {
+app.post('/api/ai/search', authMiddleware, async (req, res) => {
   try {
     const { query, model: requestedModel, topK = 5, messages: history } = req.body;
     

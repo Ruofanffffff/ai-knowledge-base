@@ -3,7 +3,7 @@ const { CapacitorConfig } = require('@capacitor/cli');
 const config = {
   appId: 'com.personal.knowledgebase',
   appName: 'Personal Knowledge Base',
-  webDir: 'web',
+  webDir: 'client/dist',
   bundledWebRuntime: false,
   server: {
     androidScheme: "http"

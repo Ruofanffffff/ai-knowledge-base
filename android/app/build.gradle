@@ -3,10 +3,6 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.personal.knowledgebase"
     compileSdk = rootProject.ext.compileSdkVersion
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
     defaultConfig {
         applicationId "com.personal.knowledgebase"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -23,7 +19,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
 }

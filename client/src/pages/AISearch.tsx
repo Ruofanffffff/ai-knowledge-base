@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Mic, Bot, User, FileText, Sparkles, Clock, Link, Database, Plus, Trash2, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import apiClient from '../api/client';
+
+// Get API base URL from environment variables or use default
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 interface Message {
   id: number;
@@ -33,8 +37,6 @@ interface Model {
   type: 'cloud' | 'local';
 }
 
-const STORAGE_KEY = 'hibrain_chat_history';
-
 export function AISearch() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -52,7 +54,36 @@ export function AISearch() {
     { id: 'deepseek-r1:7b', name: 'DeepSeek R1 (本地)', type: 'local' }
   ]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        setIsSidebarOpen(false);
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    // Click outside to close model dropdown
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -69,29 +100,31 @@ export function AISearch() {
       : firstUserMessage;
   };
 
-  const saveSessionsToStorage = (updatedSessions: ChatSession[]) => {
+  const fetchSessions = async () => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSessions));
-    } catch (error) {
-      console.error('Failed to save sessions to localStorage:', error);
-    }
-  };
-
-  const loadSessionsFromStorage = (): ChatSession[] => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
+      const response = await apiClient.get('/chat/sessions');
+      const loadedSessions = response.data;
+      if (loadedSessions.length > 0) {
+        setSessions(loadedSessions);
+        if (!currentSessionId) {
+            switchSession(loadedSessions[0].id);
+        }
+      } else {
+        createNewSession();
       }
     } catch (error) {
-      console.error('Failed to load sessions from localStorage:', error);
+      console.error('Failed to fetch sessions:', error);
+      // Fallback to creating a new session locally if offline or error, 
+      // but ideally we should show an error. For now, create empty session to avoid UI break
+      setSessions([]);
+      createNewSession();
     }
-    return [];
   };
 
-  const createNewSession = () => {
+  const createNewSession = async () => {
+    const tempId = Date.now().toString();
     const newSession: ChatSession = {
-      id: Date.now().toString(),
+      id: tempId,
       title: '新对话',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -105,68 +138,62 @@ export function AISearch() {
       ]
     };
 
-    const updatedSessions = [newSession, ...sessions];
-    setSessions(updatedSessions);
-    setCurrentSessionId(newSession.id);
-    setMessages(newSession.messages);
-    saveSessionsToStorage(updatedSessions);
-  };
-
-  const updateCurrentSession = (updatedMessages: Message[]) => {
-    if (!currentSessionId) return;
-
-    const updatedSessions = sessions.map(session => {
-      if (session.id === currentSessionId) {
-        const firstUserMessage = updatedMessages.find(m => m.role === 'user');
-        const title = firstUserMessage ? generateTitle(firstUserMessage.content) : '新对话';
-        
-        return {
-          ...session,
-          title,
-          messages: updatedMessages,
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return session;
-    });
-
-    setSessions(updatedSessions);
-    saveSessionsToStorage(updatedSessions);
-  };
-
-  const switchSession = (sessionId: string) => {
-    const session = sessions.find(s => s.id === sessionId);
-    if (session) {
-      setCurrentSessionId(sessionId);
-      setMessages(session.messages);
+    try {
+      await apiClient.post('/chat/sessions', newSession);
+      setSessions([newSession, ...sessions]);
+      setCurrentSessionId(newSession.id);
+      setMessages(newSession.messages);
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      // Fallback local update
+      setSessions([newSession, ...sessions]);
+      setCurrentSessionId(newSession.id);
+      setMessages(newSession.messages);
     }
   };
 
-  const deleteSession = (sessionId: string, e: React.MouseEvent) => {
+  const switchSession = async (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    // Find session title/date from list
+    const session = sessions.find(s => s.id === sessionId);
+    
+    try {
+      const response = await apiClient.get(`/chat/sessions/${sessionId}`);
+      setMessages(response.data.messages);
+      
+      // Update session in list if needed (e.g. title changed elsewhere)
+      if (session && session.title !== response.data.title) {
+          setSessions(sessions.map(s => s.id === sessionId ? { ...s, title: response.data.title } : s));
+      }
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+      // If fetch fails, we might still have the session in the list but no messages
+      setMessages([]);
+    }
+  };
+
+  const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    const updatedSessions = sessions.filter(s => s.id !== sessionId);
-    setSessions(updatedSessions);
-    saveSessionsToStorage(updatedSessions);
+    try {
+      await apiClient.delete(`/chat/sessions/${sessionId}`);
+      const updatedSessions = sessions.filter(s => s.id !== sessionId);
+      setSessions(updatedSessions);
 
-    if (currentSessionId === sessionId) {
-      if (updatedSessions.length > 0) {
-        switchSession(updatedSessions[0].id);
-      } else {
-        createNewSession();
+      if (currentSessionId === sessionId) {
+        if (updatedSessions.length > 0) {
+          switchSession(updatedSessions[0].id);
+        } else {
+          createNewSession();
+        }
       }
+    } catch (error) {
+      console.error('Failed to delete session:', error);
     }
   };
 
   useEffect(() => {
-    const loadedSessions = loadSessionsFromStorage();
-    if (loadedSessions.length > 0) {
-      setSessions(loadedSessions);
-      setCurrentSessionId(loadedSessions[0].id);
-      setMessages(loadedSessions[0].messages);
-    } else {
-      createNewSession();
-    }
+    fetchSessions();
 
     setModels([
       { id: 'deepseek-chat', name: 'DeepSeek Chat (默认)', type: 'cloud' },
@@ -181,6 +208,7 @@ export function AISearch() {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+    if (!currentSessionId) return;
     
     setIsSearching(true);
     
@@ -196,6 +224,29 @@ export function AISearch() {
     setInput('');
 
     try {
+      // 1. Save user message to backend
+      try {
+        await apiClient.post(`/chat/sessions/${currentSessionId}/messages`, {
+          role: 'user',
+          content: userMsg.content,
+          timestamp: userMsg.timestamp
+        });
+      } catch (err) {
+        console.error('Failed to save user message:', err);
+      }
+
+      // 2. Update title if needed
+      const userMessages = updatedMessages.filter(m => m.role === 'user');
+      if (userMessages.length === 1) {
+        const newTitle = generateTitle(userMsg.content);
+        try {
+          await apiClient.put(`/chat/sessions/${currentSessionId}`, { title: newTitle });
+          setSessions(sessions.map(s => s.id === currentSessionId ? { ...s, title: newTitle } : s));
+        } catch (err) {
+          console.error('Failed to update session title:', err);
+        }
+      }
+
       // 格式化历史消息
       const history = messages
         .filter(msg => msg.role === 'user' || msg.role === 'assistant')
@@ -218,13 +269,15 @@ export function AISearch() {
       let currentMessages = [...updatedMessages, initialAssistantMsg];
       setMessages(currentMessages);
 
-      const response = await fetch('/api/ai/search', {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/ai/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          query: input,
+          query: userMsg.content,
           model: selectedModel,
           limit: 10,
           messages: history // 发送历史消息用于上下文记忆
@@ -242,6 +295,8 @@ export function AISearch() {
       if (!reader) throw new Error('无法读取响应流');
 
       let accumulatedContent = '';
+      let finalSources: any[] = [];
+      let finalWebSources: any[] = [];
       
       while (true) {
         const { done, value } = await reader.read();
@@ -259,6 +314,8 @@ export function AISearch() {
               
               if (data.type === 'sources') {
                 // 更新来源信息
+                finalSources = data.sources;
+                finalWebSources = data.webSources;
                 currentMessages = currentMessages.map(msg => 
                   msg.id === assistantMsgId 
                     ? { ...msg, sources: data.sources, webSources: data.webSources }
@@ -284,7 +341,19 @@ export function AISearch() {
         }
       }
       
-      updateCurrentSession(currentMessages);
+      // Save assistant message to backend
+      try {
+        await apiClient.post(`/chat/sessions/${currentSessionId}/messages`, {
+          role: 'assistant',
+          content: accumulatedContent,
+          sources: finalSources,
+          webSources: finalWebSources,
+          timestamp: initialAssistantMsg.timestamp
+        });
+      } catch (err) {
+        console.error('Failed to save assistant message:', err);
+      }
+
     } catch (error) {
       console.error('搜索错误:', error);
       const errorMsg: Message = {
@@ -297,7 +366,18 @@ export function AISearch() {
       // 这里简化处理，直接追加一条错误消息
       const finalMessages = [...updatedMessages, errorMsg];
       setMessages(finalMessages);
-      updateCurrentSession(finalMessages);
+      
+      // Save error message to backend?
+      try {
+        await apiClient.post(`/chat/sessions/${currentSessionId}/messages`, {
+          role: 'assistant',
+          content: errorMsg.content,
+          timestamp: errorMsg.timestamp
+        });
+      } catch (err) {
+        console.error('Failed to save error message:', err);
+      }
+
     } finally {
       setIsSearching(false);
     }
@@ -316,11 +396,13 @@ export function AISearch() {
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 280, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
+            initial={isMobile ? { x: -280, opacity: 0 } : { width: 0, opacity: 0 }}
+            animate={isMobile ? { x: 0, opacity: 1 } : { width: 280, opacity: 1 }}
+            exit={isMobile ? { x: -280, opacity: 0 } : { width: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="border-r border-slate-200 bg-slate-50/50 flex flex-col min-w-0"
+            className={`border-r border-slate-200 bg-slate-50/50 flex flex-col min-w-0 ${
+              isMobile ? 'fixed inset-y-0 left-0 z-50 w-[280px] bg-white shadow-xl' : ''
+            }`}
           >
             <div className="p-4 border-b border-slate-200">
               <button
@@ -389,40 +471,98 @@ export function AISearch() {
         )}
       </AnimatePresence>
 
+      {/* Mobile Overlay */}
+      {isMobile && isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/20 z-40 backdrop-blur-sm"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <div className="h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white shrink-0 gap-2">
+          <div className="flex items-center gap-3 min-w-0 shrink">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+              className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors shrink-0"
               title={isSidebarOpen ? '收起历史' : '展开历史'}
             >
               {isSidebarOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white shrink-0">
                 <Sparkles size={16} />
               </div>
-              <div>
-                <h1 className="font-bold text-slate-900 text-sm">Hi Brain</h1>
-                <p className="text-[10px] text-slate-500">智能助手</p>
+              <div className="min-w-0">
+                <h1 className="font-bold text-slate-900 text-sm whitespace-nowrap">Hi Brain</h1>
+                <p className="text-[10px] text-slate-500 whitespace-nowrap">智能助手</p>
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
-            <select 
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-xs rounded-lg px-2 py-1 outline-none focus:border-purple-500"
+          <div className="flex gap-2 min-w-0 shrink relative" ref={modelDropdownRef}>
+            <button
+              onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+              className="flex items-center gap-2 bg-slate-50 border border-slate-200 text-xs rounded-lg px-3 py-1.5 outline-none hover:border-purple-500 transition-colors max-w-[160px]"
             >
-              {models.map(model => (
-                <option key={model.id} value={model.id}>
-                  {model.name} {model.type === 'local' ? '(本地)' : '(云端)'}
-                </option>
-              ))}
-            </select>
+              <span className="truncate flex-1 text-left">
+                {models.find(m => m.id === selectedModel)?.name || selectedModel}
+              </span>
+              <ChevronDown size={14} className={`shrink-0 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            <AnimatePresence>
+              {isModelDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                  transition={{ duration: 0.1 }}
+                  className="absolute top-full right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden"
+                >
+                  <div className="py-1 max-h-[300px] overflow-y-auto">
+                    <div className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      云端模型
+                    </div>
+                    {models.filter(m => m.type === 'cloud').map(model => (
+                      <button
+                        key={model.id}
+                        onClick={() => {
+                          setSelectedModel(model.id);
+                          setIsModelDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center justify-between ${
+                          selectedModel === model.id ? 'text-purple-600 bg-purple-50' : 'text-slate-700'
+                        }`}
+                      >
+                        <span className="truncate">{model.name}</span>
+                        {selectedModel === model.id && <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />}
+                      </button>
+                    ))}
+                    
+                    <div className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-t border-slate-100 mt-1">
+                      本地模型
+                    </div>
+                    {models.filter(m => m.type === 'local').map(model => (
+                      <button
+                        key={model.id}
+                        onClick={() => {
+                          setSelectedModel(model.id);
+                          setIsModelDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center justify-between ${
+                          selectedModel === model.id ? 'text-purple-600 bg-purple-50' : 'text-slate-700'
+                        }`}
+                      >
+                        <span className="truncate">{model.name}</span>
+                        {selectedModel === model.id && <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 

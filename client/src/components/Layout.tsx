@@ -1,5 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { MobileNav } from './MobileNav';
 import { useEffect, useState } from 'react';
 
 export default function Layout() {
@@ -36,11 +37,14 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar currentPage={currentPage} setCurrentPage={handlePageChange} />
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
-        <div className={`flex-1 flex flex-col min-h-0 ${isMobile ? 'p-0' : 'p-6'}`}>
+      {!isMobile && <Sidebar currentPage={currentPage} setCurrentPage={handlePageChange} />}
+      
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+        <div className={`flex-1 flex flex-col min-h-0 ${isMobile ? 'p-0 pb-20' : 'p-6'}`}>
           <Outlet />
         </div>
+        
+        {isMobile && <MobileNav currentPage={currentPage} setCurrentPage={handlePageChange} />}
       </main>
     </div>
   );

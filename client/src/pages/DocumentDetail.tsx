@@ -119,6 +119,18 @@ export default function DocumentDetail() {
     }
   };
 
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const handleSummaryComparison = async (keepNew: boolean) => {
     if (!document) return;
 
@@ -193,37 +205,39 @@ export default function DocumentDetail() {
 
   return (
     <div className="flex-1 h-full flex flex-col bg-slate-50/50">
-      <div className="flex items-center justify-between px-8 py-6 shrink-0 border-b border-slate-200 bg-white">
-        <div className="flex items-center gap-4">
+      {/* Header */}
+      <div className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 shrink-0 gap-4">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
           <button 
             onClick={() => navigate('/documents')}
-            className="p-2 hover:bg-slate-100 rounded-lg text-slate-400"
+            className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-700 transition-colors shrink-0"
           >
             <ChevronLeft size={20} />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">{document.title}</h1>
-            <p className="text-slate-500 text-sm mt-1">
-              最后更新: {new Date(document.updatedAt).toLocaleString('zh-CN')}
-            </p>
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <h1 className="text-lg md:text-2xl font-bold text-slate-900 truncate">{document.title}</h1>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-1 md:gap-2 shrink-0">
           <button 
             onClick={() => setShowChatPanel(!showChatPanel)}
-            disabled={isGeneratingSummary}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200 ${
-              showChatPanel ? 'ring-2 ring-purple-300 ring-offset-1 bg-purple-100' : ''
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
+              showChatPanel 
+                ? 'bg-purple-50 text-purple-600 border border-purple-200' 
+                : 'hover:bg-slate-100 text-slate-600 border border-transparent'
             }`}
           >
-            <Brain size={16} />
-            <span>AI 总结</span>
+            <Brain size={18} />
+            <span className="hidden md:inline">AI 总结</span>
           </button>
-          <div className="w-px h-6 bg-slate-200 mx-2"></div>
+          
+          <div className="w-px h-6 bg-slate-200 mx-1 md:mx-2"></div>
+          
           <button className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors" title="下载">
             <Download size={18} />
           </button>
-          <button className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors" title="编辑">
+          <button className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors hidden md:block" title="编辑">
             <Edit size={18} />
           </button>
           <button 
@@ -236,40 +250,53 @@ export default function DocumentDetail() {
         </div>
       </div>
       
-      <div className="flex-1 flex min-h-0">
-        <div className={`flex-1 overflow-y-auto p-8 transition-all duration-300 ${showChatPanel ? 'w-1/2' : 'w-full'}`}>
+      {/* Content Area */}
+      <div className="flex-1 overflow-hidden relative flex">
+        {/* Main Document Content */}
+        <div className={`flex-1 overflow-y-auto transition-all duration-300 ${showChatPanel && !isMobile ? 'w-1/2' : 'w-full'}`}>
           <div 
-            className="max-w-[850px] mx-auto bg-white shadow-lg min-h-[1100px] rounded-sm text-slate-800 leading-relaxed font-serif text-justify text-lg break-words"
-            style={{ padding: '60px 72px' }}
+            className="max-w-[850px] mx-auto bg-white shadow-lg min-h-[1100px] rounded-sm text-slate-800 leading-relaxed font-serif text-justify text-lg break-words px-5 py-8 md:px-[72px] md:py-[60px]"
           >
             {document.content.split('\n').map((paragraph, index) => (
-              <p key={index} className="min-h-[1.5em] my-1 indent-8">
-                {paragraph || <br />}
+              <p key={index} className="mb-6 indent-8">
+                {paragraph}
               </p>
             ))}
           </div>
         </div>
-        
+
+        {/* AI Summary Panel */}
         <AnimatePresence>
           {showChatPanel && (
             <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: '400px', opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="border-l border-slate-200 bg-white flex flex-col min-h-0 shadow-xl z-10"
+              initial={isMobile ? { y: '100%' } : { width: 0, opacity: 0 }}
+              animate={isMobile ? { y: 0 } : { width: '400px', opacity: 1 }}
+              exit={isMobile ? { y: '100%' } : { width: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className={`border-l border-slate-200 bg-white flex flex-col shadow-xl z-20 ${
+                isMobile ? 'fixed inset-0 w-full h-full' : 'relative h-full'
+              }`}
             >
-              <div className="p-4 border-b border-slate-200 flex-shrink-0 flex justify-between items-center bg-slate-50">
-                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                  <Brain size={18} className="text-purple-500" />
-                  AI 总结助手
-                </h3>
-                <button 
-                  onClick={() => setShowChatPanel(false)}
-                  className="p-1 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  <XCircle size={18} />
-                </button>
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white">
+                    <Brain size={18} />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-slate-900">AI 智能总结</h2>
+                    <p className="text-xs text-slate-500">
+                      {isGeneratingSummary ? '正在生成...' : '基于文档内容'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setShowChatPanel(false)}
+                    className="p-2 hover:bg-slate-200 rounded-lg text-slate-400 transition-colors"
+                  >
+                    <XCircle size={20} />
+                  </button>
+                </div>
               </div>
               
               <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">

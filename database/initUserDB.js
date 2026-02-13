@@ -168,6 +168,27 @@ function createTables(db) {
     db.run(`CREATE INDEX IF NOT EXISTS idx_kg_build_status_status ON kg_build_status(status)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_kg_build_status_updated_at ON kg_build_status(updated_at)`);
 
+    db.run(`CREATE TABLE IF NOT EXISTS chat_sessions (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      title TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      sources TEXT,
+      web_sources TEXT,
+      timestamp TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+    )`);
+
     console.log('Database tables created successfully.');
     
     createDefaultAdmin(db);

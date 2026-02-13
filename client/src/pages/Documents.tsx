@@ -184,10 +184,46 @@ export default function Documents() {
         </div>
       </div>
 
+      {/* Mobile Category Toggle */}
+      <div className="md:hidden border-b border-slate-200 bg-white overflow-x-auto">
+        <div className="flex p-2 gap-2">
+          <button
+            onClick={() => setSelectedCategory('all')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors text-sm ${
+              selectedCategory === 'all' 
+                ? 'bg-slate-900 text-white' 
+                : 'bg-slate-50 text-slate-600 border border-slate-200'
+            }`}
+          >
+            <span>全部文档</span>
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+              selectedCategory === 'all' ? 'bg-white/20' : 'bg-slate-200'
+            }`}>{documents.length}</span>
+          </button>
+          
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              onClick={() => setSelectedCategory(category.id)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors text-sm ${
+                selectedCategory === category.id 
+                  ? 'bg-slate-900 text-white' 
+                  : 'bg-slate-50 text-slate-600 border border-slate-200'
+              }`}
+            >
+              <span>{category.name}</span>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                selectedCategory === category.id ? 'bg-white/20' : 'bg-slate-200'
+              }`}>{category.documentCount}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="flex-1 overflow-hidden flex">
         {/* Sidebar - Categories */}
-        <div className="w-64 border-r border-slate-200 bg-white p-4 overflow-y-auto">
+        <div className="w-64 border-r border-slate-200 bg-white p-4 overflow-y-auto hidden md:block">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-slate-900">分类</h2>
             <button className="text-slate-400 hover:text-slate-600">

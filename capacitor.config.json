@@ -1,9 +1,15 @@
 {
   "appId": "com.personal.knowledgebase",
   "appName": "Personal Knowledge Base",
-  "webDir": "web",
+  "webDir": "client/dist",
   "server": {
-    "androidScheme": "http"
+    "androidScheme": "http",
+    "cleartext": true,
+    "allowNavigation": [
+      "192.168.0.103",
+      "localhost",
+      "10.0.2.2"
+    ]
   },
   "bundledWebRuntime": false,
   "plugins": {
