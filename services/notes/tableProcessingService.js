@@ -9,7 +9,8 @@
  * Validates: Requirements 4.1, 4.2, 4.3
  */
 
-const { parseDocument } = require('../../kg/ckb/ckb_parser');
+// KG ckb_parser removed — pending redesign
+const parseDocument = null;
 const { 
   uploadFileWithRetry, 
   generateFileUrl,

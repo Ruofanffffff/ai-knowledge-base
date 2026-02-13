@@ -1,48 +1,26 @@
 /**
- * KG API Routes
- * 
- * 提供统一的知识图谱管理API接口
- * 实现文档服务与KG服务的完全分离
+ * KG API Routes (Redesigned)
+ *
+ * 三个简洁的知识图谱API端点，基于新的LLM驱动Pipeline。
  */
 
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../services/authService');
-const { getInstance: getKGAdapter } = require('../kg/services/kg_service_adapter');
-const { getInstance: getBuildQueueManager } = require('../kg/services/build_queue_manager');
-const { getInstance: getKGConfig } = require('../kg/config/kg_config');
-const { handleKGError, ErrorCategory } = require('../kg/errors/kg_error');
-const { getInstance: getKGMonitor } = require('../kg/monitoring/kg_monitor');
+const kgPipelineService = require('../services/kgPipelineService');
+const { pipelineStatus, prisma } = require('../services/kgPipelineService');
+
+// 正在执行中的Pipeline状态（收到重复请求时应拒绝）
+const ACTIVE_STATUSES = ['pending', 'indexing', 'extracting_entities', 'extracting_relations', 'merging', 'saving'];
 
 /**
  * POST /api/kg/build
- * 触发单个文档的KG构建
- * 
- * Request body:
- * {
- *   docId: string (required),
- *   options: {
- *     force: boolean,  // 是否强制重建
- *     async: boolean   // 是否异步执行
- *   }
- * }
- * 
- * Response:
- * {
- *   success: boolean,
- *   data: {
- *     docId: string,
- *     status: string,
- *     queuePosition: number,
- *     message: string
- *   }
- * }
+ * 触发文档图谱构建（异步）
  */
 router.post('/build', authMiddleware, async (req, res) => {
   try {
-    const { docId, options = {} } = req.body;
+    const { docId } = req.body;
 
-    // 验证参数
     if (!docId) {
       return res.status(400).json({
         success: false,
@@ -50,92 +28,71 @@ router.post('/build', authMiddleware, async (req, res) => {
       });
     }
 
-    const kgAdapter = getKGAdapter();
-    const result = await kgAdapter.buildFromDatabase(docId, {
-      ...options,
-      async: true
-    });
-
-    res.json({
-      success: true,
-      data: result
-    });
-
-  } catch (error) {
-    console.error('Error building KG:', error);
-
-    // 使用统一的错误处理
-    const errorResponse = handleKGError(error);
-    
-    // 根据错误类别返回不同的状态码
-    let statusCode = 500;
-    if (errorResponse.category === ErrorCategory.DOCUMENT_NOT_FOUND) {
-      statusCode = 404;
-    } else if (errorResponse.category === ErrorCategory.DOCUMENT_INVALID ||
-               errorResponse.category === ErrorCategory.INVALID_PARAMETER) {
-      statusCode = 400;
-    } else if (errorResponse.category === ErrorCategory.UNAUTHORIZED) {
-      statusCode = 401;
-    } else if (errorResponse.category === ErrorCategory.FORBIDDEN) {
-      statusCode = 403;
-    }
-
-    res.status(statusCode).json(errorResponse);
-  }
-});
-
-/**
- * POST /api/kg/build/batch
- * 批量构建KG
- * 
- * Request body:
- * {
- *   docIds: string[] (required),
- *   options: {
- *     concurrency: number  // 并发数
- *   }
- * }
- * 
- * Response:
- * {
- *   success: boolean,
- *   data: {
- *     total: number,
- *     results: Array
- *   }
- * }
- */
-router.post('/build/batch', authMiddleware, async (req, res) => {
-  try {
-    const { docIds, options = {} } = req.body;
-
-    // 验证参数
-    if (!docIds || !Array.isArray(docIds) || docIds.length === 0) {
-      return res.status(400).json({
+    // 检查是否有正在进行的构建
+    const currentStatus = pipelineStatus.get(docId);
+    if (currentStatus && ACTIVE_STATUSES.includes(currentStatus.status)) {
+      return res.status(409).json({
         success: false,
-        error: 'Missing or invalid parameter: docIds (must be non-empty array)'
+        error: '该文档正在构建中，请勿重复请求',
+        data: {
+          docId,
+          status: currentStatus.status
+        }
       });
     }
 
-    const kgAdapter = getKGAdapter();
-    const results = await kgAdapter.buildBatch(docIds, options);
-
-    // 统计结果
-    const successCount = results.filter(r => r.success).length;
-    const failureCount = results.filter(r => !r.success).length;
+    // 异步启动Pipeline（不等待完成）
+    kgPipelineService.runPipeline(docId).then(() => {
+      console.log(`Pipeline completed for docId: ${docId}`);
+    }).catch((err) => {
+      console.error(`Pipeline failed for docId: ${docId}`, err.message);
+    });
 
     res.json({
       success: true,
       data: {
-        total: docIds.length,
-        successCount,
-        failureCount,
-        results
+        docId,
+        status: 'pending',
+        message: '图谱构建已启动'
       }
     });
-
   } catch (error) {
-    console.error('Error building batch KG:', error);
+    console.error('Error starting KG build:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/kg/graph
+ * 获取完整图谱数据（CleanedEntity + CleanedRelation）
+ */
+router.get('/graph', authMiddleware, async (req, res) => {
+  try {
+    const entities = await prisma.cleanedEntity.findMany();
+    const relations = await prisma.cleanedRelation.findMany();
+
+    res.json({
+      success: true,
+      data: {
+        entities: entities.map(e => ({
+          id: e.id,
+          name: e.cleanedName,
+          description: e.description
+        })),
+        relations: relations.map(r => ({
+          id: r.id,
+          source: r.sourceEntityId,
+          target: r.targetEntityId,
+          name: r.cleanedName,
+          description: r.description
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching graph data:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -145,332 +102,37 @@ router.post('/build/batch', authMiddleware, async (req, res) => {
 
 /**
  * GET /api/kg/status/:docId
- * 查询构建状态
- * 
- * Query params:
- *   - detailed: boolean (是否返回详细信息,包含进度)
- * 
- * Response:
- * {
- *   success: boolean,
- *   data: {
- *     docId: string,
- *     status: string,
- *     progress: number,
- *     entityCount: number,
- *     relationCount: number,
- *     ...
- *   }
- * }
+ * 获取Pipeline构建状态
  */
 router.get('/status/:docId', authMiddleware, async (req, res) => {
   try {
     const { docId } = req.params;
-    const { detailed = 'false' } = req.query;
-
-    const kgAdapter = getKGAdapter();
-    const status = detailed === 'true'
-      ? await kgAdapter.getDetailedStatus(docId)
-      : await kgAdapter.getStatus(docId);
+    const status = kgPipelineService.getStatus(docId);
 
     if (!status) {
-      return res.status(404).json({
-        success: false,
-        error: 'Document not found or KG status not available',
-        code: 'DOCUMENT_NOT_FOUND',
-        docId: docId
+      // 没有构建记录时返回idle状态，而不是404
+      return res.json({
+        success: true,
+        data: {
+          docId,
+          status: 'idle',
+          entityCount: 0,
+          relationCount: 0
+        }
       });
     }
 
     res.json({
       success: true,
-      data: status
+      data: {
+        docId: status.docId,
+        status: status.status,
+        entityCount: status.entityCount || 0,
+        relationCount: status.relationCount || 0
+      }
     });
-
   } catch (error) {
     console.error('Error getting KG status:', error);
-    
-    // Check if it's a document not found error
-    if (error.message && (error.message.includes('not found') || error.message.includes('does not exist'))) {
-      return res.status(404).json({
-        success: false,
-        error: 'Document not found or KG status not available',
-        code: 'DOCUMENT_NOT_FOUND',
-        docId: req.params.docId
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * DELETE /api/kg/:docId
- * 删除文档的KG
- * 
- * Response:
- * {
- *   success: boolean,
- *   data: {
- *     docId: string,
- *     deletedEntities: number,
- *     deletedRelations: number
- *   }
- * }
- */
-router.delete('/:docId', authMiddleware, async (req, res) => {
-  try {
-    const { docId } = req.params;
-
-    const kgAdapter = getKGAdapter();
-    const result = await kgAdapter.deleteKG(docId);
-
-    res.json({
-      success: true,
-      data: result,
-      message: 'KG deleted successfully'
-    });
-
-  } catch (error) {
-    console.error('Error deleting KG:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * POST /api/kg/rebuild/:docId
- * 重建文档的KG
- * 
- * Request body:
- * {
- *   options: {
- *     async: boolean
- *   }
- * }
- * 
- * Response:
- * {
- *   success: boolean,
- *   data: {
- *     docId: string,
- *     status: string,
- *     message: string
- *   }
- * }
- */
-router.post('/rebuild/:docId', authMiddleware, async (req, res) => {
-  try {
-    const { docId } = req.params;
-    const { options = {} } = req.body;
-
-    const kgAdapter = getKGAdapter();
-    const result = await kgAdapter.rebuildKG(docId, options);
-
-    res.json({
-      success: true,
-      data: result,
-      message: 'KG rebuild initiated'
-    });
-
-  } catch (error) {
-    console.error('Error rebuilding KG:', error);
-
-    if (error.category === 'document_not_found') {
-      return res.status(404).json({
-        success: false,
-        error: error.message,
-        category: error.category
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * POST /api/kg/cancel/:docId
- * 取消KG构建任务
- * 
- * Response:
- * {
- *   success: boolean,
- *   message: string
- * }
- */
-router.post('/cancel/:docId', authMiddleware, async (req, res) => {
-  try {
-    const { docId } = req.params;
-
-    const kgAdapter = getKGAdapter();
-    const result = await kgAdapter.cancelBuild(docId);
-
-    res.json({
-      success: result.success,
-      message: result.message
-    });
-
-  } catch (error) {
-    console.error('Error cancelling KG build:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * GET /api/kg/queue/stats
- * 获取队列统计信息
- * 
- * Response:
- * {
- *   success: boolean,
- *   data: {
- *     queued: number,
- *     running: number,
- *     completed: number,
- *     failed: number
- *   }
- * }
- */
-router.get('/queue/stats', authMiddleware, async (req, res) => {
-  try {
-    const kgAdapter = getKGAdapter();
-    const stats = kgAdapter.getQueueStats();
-
-    res.json({
-      success: true,
-      data: stats
-    });
-
-  } catch (error) {
-    console.error('Error getting queue stats:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * GET /api/kg/health
- * 健康检查
- * 
- * Response:
- * {
- *   success: boolean,
- *   data: {
- *     status: string,
- *     queueStats: Object
- *   }
- * }
- */
-router.get('/health', async (req, res) => {
-  try {
-    const kgAdapter = getKGAdapter();
-    const queueStats = kgAdapter.getQueueStats();
-
-    res.json({
-      success: true,
-      data: {
-        status: 'healthy',
-        queueStats,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-  } catch (error) {
-    console.error('Error checking health:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * GET /api/kg/metrics
- * 获取监控指标
- * 
- * Response:
- * {
- *   success: boolean,
- *   data: {
- *     current: Object,  // 当前指标
- *     realtime: Object  // 实时统计
- *   }
- * }
- */
-router.get('/metrics', authMiddleware, async (req, res) => {
-  try {
-    const monitor = getKGMonitor();
-    const metrics = monitor.getMetrics();
-    const realtime = monitor.getRealTimeStats();
-
-    res.json({
-      success: true,
-      data: {
-        current: metrics,
-        realtime
-      }
-    });
-
-  } catch (error) {
-    console.error('Error getting metrics:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-/**
- * GET /api/kg/metrics/history
- * 获取历史统计
- * 
- * Query params:
- *   - startDate: ISO date string
- *   - endDate: ISO date string
- *   - limit: number
- * 
- * Response:
- * {
- *   success: boolean,
- *   data: {
- *     period: Object,
- *     stats: Object,
- *     records: Array
- *   }
- * }
- */
-router.get('/metrics/history', authMiddleware, async (req, res) => {
-  try {
-    const { startDate, endDate, limit } = req.query;
-    
-    const options = {};
-    if (startDate) options.startDate = new Date(startDate);
-    if (endDate) options.endDate = new Date(endDate);
-    if (limit) options.limit = parseInt(limit);
-
-    const monitor = getKGMonitor();
-    const history = await monitor.getHistoricalStats(options);
-
-    res.json({
-      success: true,
-      data: history
-    });
-
-  } catch (error) {
-    console.error('Error getting historical metrics:', error);
     res.status(500).json({
       success: false,
       error: error.message

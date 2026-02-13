@@ -67,56 +67,42 @@ export interface UpdateDocumentRequest {
   tags?: string[];
 }
 
-// Knowledge Graph types (Backend format)
-export interface BackendEntity {
+// Knowledge Graph types (Backend API response format from GET /api/kg/graph)
+export interface CleanedEntityResponse {
   id: string;
-  canonical_name: string;
-  type: string;
-  confidence: number;
-  schemas: Array<{
-    schema_name: string;
-    confidence: number;
-  }>;
-  attributes?: Record<string, any>;
+  name: string;
+  description: string;
 }
 
-export interface BackendRelation {
+export interface CleanedRelationResponse {
   id: string;
-  source_id: string;
-  target_id: string;
-  type: string;
-  subtype?: string;
-  weight?: number;
-  confidence: number;
+  source: string;
+  target: string;
+  name: string;
+  description: string;
 }
 
 export interface BackendGraphData {
-  entities: BackendEntity[];
-  relations: BackendRelation[];
+  entities: CleanedEntityResponse[];
+  relations: CleanedRelationResponse[];
 }
 
 // Knowledge Graph types (Frontend format)
 export interface GraphNode {
   id: string;
   label: string;
-  type: string;
-  confidence: number;
-  schemas?: Array<{
-    schema_name: string;
-    confidence: number;
-  }>;
-  attributes?: Record<string, any>;
+  description: string;
+  x?: number;
+  y?: number;
+  color?: string;
 }
 
 export interface GraphLink {
   id: string;
   source: string;
   target: string;
-  relation: string;
-  subtype?: string;
-  weight?: number;
-  confidence: number;
-  description?: string | null; // Human-readable description
+  name: string;
+  description: string;
 }
 
 export interface FrontendGraphData {

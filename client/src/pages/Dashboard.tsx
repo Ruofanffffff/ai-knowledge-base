@@ -70,11 +70,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         setIsLoadingStats(true);
         setStatsError(null);
         
-        const response = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || '/api'}/knowledge-graph/stats`);
+        const response = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || '/api'}/kg/graph`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
+          },
+        });
         const data = await response.json();
         
         if (data.success && data.data) {
-          setKnowledgeNodeCount(data.data.entity_count || 0);
+          setKnowledgeNodeCount(data.data.entities?.length || 0);
         }
       } catch (err: any) {
         console.error('获取统计数据失败:', err);

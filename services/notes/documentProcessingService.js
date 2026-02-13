@@ -9,7 +9,8 @@
  * Validates: Requirements 3.1, 3.2, 3.3
  */
 
-const { processDocumentWithFullProcessing } = require('../../kg/document_processor');
+// KG document_processor removed — pending redesign
+const processDocumentWithFullProcessing = null;
 const { 
   uploadFileWithRetry, 
   generateFileUrl,

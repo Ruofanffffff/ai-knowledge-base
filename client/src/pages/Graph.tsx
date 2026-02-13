@@ -2,10 +2,9 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Search, Filter, ZoomIn, ZoomOut, RefreshCw, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useGraph } from '../hooks/useGraph';
-import apiClient from '../api/client';
 
 export function Graph() {
-  const { graphData, isLoading, error, fetchGraphData, refresh } = useGraph({ autoRefresh: false });
+  const { graphData, isLoading, error, fetchGraphData } = useGraph();
   
   // 1. Initial State
   const [graphNodes, setGraphNodes] = useState(graphData.nodes);
@@ -92,7 +91,7 @@ export function Graph() {
   const handleZoomOut = () => setViewState(prev => ({ ...prev, zoom: Math.max(prev.zoom / 1.2, 0.2) }));
   const handleReset = () => {
     setViewState({ x: 0, y: 0, zoom: 1 });
-    refresh();
+    fetchGraphData();
   };
 
   return (
@@ -132,9 +131,20 @@ export function Graph() {
             <div className="text-red-500 mb-2">❌</div>
             <h3 className="text-lg font-semibold text-slate-800 mb-1">加载失败</h3>
             <p className="text-slate-600 mb-4">无法加载知识图谱数据，请检查网络连接或稍后重试。</p>
-            <button onClick={refresh} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+            <button onClick={fetchGraphData} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
               重试
             </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Empty State */}
+      {!isLoading && !error && graphData.nodes.length === 0 && (
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
+          <div className="text-center max-w-md px-4">
+            <div className="text-slate-400 mb-2 text-4xl">📭</div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-1">暂无图谱数据</h3>
+            <p className="text-slate-600">请先上传文档并构建知识图谱</p>
           </div>
         </div>
       )}
@@ -180,8 +190,8 @@ export function Graph() {
                  // 跳过找不到源或目标节点的链接
                  if (!source || !target) return null;
                  
-                 const midX = (source.x + target.x) / 2;
-                 const midY = (source.y + target.y) / 2;
+                 const midX = ((source.x ?? 0) + (target.x ?? 0)) / 2;
+                 const midY = ((source.y ?? 0) + (target.y ?? 0)) / 2;
                  
                  return (
                     <g key={i}>
@@ -217,7 +227,7 @@ export function Graph() {
                         className="pointer-events-none select-none font-sans font-medium"
                         opacity={hoveredNode && (hoveredNode !== source.id && hoveredNode !== target.id) ? 0.2 : 1}
                       >
-                        {link.description || link.relation}
+                        {link.name}
                       </text>
                     </g>
                  );
@@ -265,7 +275,7 @@ export function Graph() {
                        />
                        
                        <text 
-                          x={node.x} y={node.y + node.r + 20} 
+                          x={node.x} y={(node.y ?? 0) + node.r + 20} 
                           textAnchor="middle" 
                           fill="#475569" 
                           fontSize="12"
@@ -287,8 +297,8 @@ export function Graph() {
             <h3 className="font-bold text-slate-800 break-words">
                {nodes.find(n => n.id === hoveredNode)?.fullLabel}
             </h3>
-            <p className="text-xs text-slate-500 mt-1">
-               {nodes.find(n => n.id === hoveredNode)?.type === 'main' ? '核心概念' : '相关主题'}
+            <p className="text-sm text-slate-600 mt-1">
+               {nodes.find(n => n.id === hoveredNode)?.description}
             </p>
             <div className="mt-2 text-xs text-slate-400">
                连接数: {nodes.find(n => n.id === hoveredNode)?.degree}

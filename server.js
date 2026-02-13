@@ -11,9 +11,27 @@ const { Document, Packer, Paragraph, TextRun } = require('docx');
 const JSZip = require('jszip');
 require('dotenv').config();
 
-// Import KG module for startup initialization
-const kg = require('./kg');
-const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require('./kg/hooks/document_hooks');
+// KG Pipeline Service (redesigned)
+const kgPipelineService = require('./services/kgPipelineService');
+const kg = null;
+const onDocumentCreated = async (document) => {
+  const autoBuild = process.env.AUTO_BUILD_KG !== 'false';
+  if (!autoBuild) {
+    console.log('[KG Hook] AUTO_BUILD_KG is disabled, skipping KG build for doc:', document.id);
+    return { skipped: true };
+  }
+  console.log('[KG Hook] Triggering KG pipeline for doc:', document.id);
+  try {
+    const result = await kgPipelineService.runPipeline(String(document.id));
+    console.log('[KG Hook] Pipeline completed for doc:', document.id, result);
+    return result;
+  } catch (err) {
+    console.error('[KG Hook] Pipeline failed for doc:', document.id, err.message);
+    throw err;
+  }
+};
+const onDocumentUpdated = null;
+const onDocumentDeleted = null;
 
 // Import TempFileManager for automatic cleanup
 const tempFileManager = require('./services/tempFileManager');
@@ -678,13 +696,9 @@ app.use('/api/user', userCenterRouter);
 // 管理员路由
 app.use('/api/admin', adminRouter);
 
-// 知识图谱路由
-const knowledgeGraphRoutes = require('./routes/knowledgeGraphRoutes');
-app.use('/api/knowledge-graph', knowledgeGraphRoutes);
-
-// 文档处理路由
-const documentProcessingRoutes = require('./routes/documentProcessingRoutes');
-app.use('/api', documentProcessingRoutes);
+// 知识图谱路由（重新设计后的LLM驱动Pipeline）
+const kgRoutes = require('./routes/kgRoutes');
+app.use('/api/kg', kgRoutes);
 
 // 便签路由
 const notesRoutes = require('./routes/notesRoutes');
@@ -705,18 +719,6 @@ app.use('/api/ai', aiEnhancementRoutes);
 // 搜索路由
 const searchRoutes = require('./routes/searchRoutes');
 app.use('/api/search', searchRoutes);
-
-// 知识图谱状态路由
-const kgStatusRoutes = require('./routes/kgStatusRoutes');
-app.use('/api', kgStatusRoutes);
-
-// 知识图谱API路由（新的分离架构）
-const kgRoutes = require('./routes/kgRoutes');
-app.use('/api/kg', kgRoutes);
-
-// LLM文档索引预处理路由
-const preprocessingRoutes = require('./routes/preprocessingRoutes');
-app.use('/api/preprocessing', preprocessingRoutes);
 
 const mockTags = [
   { id: '1', name: '前端', color: '#1890ff', description: '前端开发相关内容' },
@@ -894,7 +896,7 @@ app.post('/api/documents', authMiddleware, (req, res) => {
         console.log('创建新文档:', newDocument);
         
         // 触发知识图谱构建钩子 (异步)
-        onDocumentCreated(newDocument, { async: true, skipIfExists: false })
+        if (onDocumentCreated) onDocumentCreated(newDocument, { async: true, skipIfExists: false })
           .then(result => {
             console.log('[KG Hook] 文档创建钩子结果:', result);
           })
@@ -953,7 +955,7 @@ app.put('/api/documents/:id', authMiddleware, (req, res) => {
           };
           
           // 触发知识图谱增量更新钩子 (异步)
-          onDocumentUpdated(document, { async: true, fullRebuild: false })
+          if (onDocumentUpdated) onDocumentUpdated(document, { async: true, fullRebuild: false })
             .then(result => {
               console.log('[KG Hook] 文档更新钩子结果:', result);
             })
@@ -987,7 +989,7 @@ app.delete('/api/documents/:id', authMiddleware, (req, res) => {
       }
       
       // 触发知识图谱清理钩子 (异步)
-      onDocumentDeleted(id, { async: true })
+      if (onDocumentDeleted) onDocumentDeleted(id, { async: true })
         .then(result => {
           console.log('[KG Hook] 文档删除钩子结果:', result);
         })
@@ -1208,7 +1210,7 @@ const handleFileUpload = async (req, res) => {
         console.log('[Upload] 文档上传成功，ID:', documentId, '开始触发知识图谱构建...');
         
         // 触发知识图谱构建钩子 (异步)
-        onDocumentCreated(document, { async: true, skipIfExists: false })
+        if (onDocumentCreated) onDocumentCreated(document, { async: true, skipIfExists: false })
           .then(result => {
             console.log('[KG Hook] 文档上传后知识图谱构建结果:', result);
           })
@@ -1387,7 +1389,7 @@ app.post('/api/documents/upload/resolve-duplicate', authMiddleware, async (req, 
     
     // 触发知识图谱构建钩子 (异步)
     if (result && result.id) {
-      onDocumentCreated(result, { async: true, skipIfExists: false })
+      if (onDocumentCreated) onDocumentCreated(result, { async: true, skipIfExists: false })
         .then(kgResult => {
           console.log('[KG Hook] 重复文件解决后知识图谱构建结果:', kgResult);
         })
@@ -1545,7 +1547,7 @@ app.post('/api/upload/resolve-duplicate', authMiddleware, async (req, res) => {
     console.log('[ResolveDuplicate] 操作成功，文档ID:', result.id);
     
     if (result && result.id) {
-      onDocumentCreated(result, { async: true, skipIfExists: false })
+      if (onDocumentCreated) onDocumentCreated(result, { async: true, skipIfExists: false })
         .then(kgResult => {
           console.log('[KG Hook] 重复文件解决后知识图谱构建结果:', kgResult);
         })
@@ -3799,13 +3801,8 @@ http.createServer(app).listen(PORT, '0.0.0.0', async () => {
   // Initialize TempFileManager (cleanup task already started in constructor)
   console.log('[TempFileManager] Automatic cleanup enabled (runs every 15 minutes)');
   
-  // Initialize KG module (includes schema startup check)
-  try {
-    await kg.initialize();
-  } catch (error) {
-    console.error('KG module initialization failed:', error);
-    console.error('Server will continue, but KG functionality may be limited');
-  }
+  // KG module removed — pending redesign
+  console.log('[KG Module] Knowledge Graph module removed, pending redesign');
   console.log('Available APIs:');
   console.log('- GET /api/health - 健康检查');
   console.log('- GET /api/monitoring - 监控状态');
