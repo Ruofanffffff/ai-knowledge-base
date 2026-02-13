@@ -1,6 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, FileText, Network, Settings, Compass, Menu, X } from 'lucide-react';
 import logo from '../assets/600cc0a2e59f846c93e6529bc524d2ae023eb689.png';
+import apiClient from '../api/client';
+
+interface StorageStats {
+  usedFormatted: string;
+  totalFormatted: string;
+  percentage: number;
+}
 
 interface SidebarProps {
   currentPage: string;
@@ -10,6 +17,16 @@ interface SidebarProps {
 export function Sidebar({ currentPage, setCurrentPage }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [storage, setStorage] = useState<StorageStats>({ usedFormatted: '—', totalFormatted: '—', percentage: 0 });
+
+  useEffect(() => {
+    apiClient.get('/storage/stats')
+      .then(res => {
+        const d = res.data;
+        setStorage({ usedFormatted: d.usedFormatted, totalFormatted: d.totalFormatted, percentage: d.percentage });
+      })
+      .catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     const checkMobile = () => {
@@ -121,11 +138,11 @@ export function Sidebar({ currentPage, setCurrentPage }: SidebarProps) {
             <div className="bg-slate-50 rounded-xl p-4">
               <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">存储空间</div>
               <div className="w-full bg-slate-200 rounded-full h-1.5 mb-2 overflow-hidden">
-                <div className="bg-gradient-to-r from-pink-400 to-purple-500 h-1.5 rounded-full w-[75%]" />
+                <div className="bg-gradient-to-r from-pink-400 to-purple-500 h-1.5 rounded-full" style={{ width: `${storage.percentage}%` }} />
               </div>
               <div className="flex justify-between text-xs text-slate-500">
-                <span>7.5 GB</span>
-                <span>10 GB</span>
+                <span>{storage.usedFormatted}</span>
+                <span>{storage.totalFormatted}</span>
               </div>
             </div>
           </div>

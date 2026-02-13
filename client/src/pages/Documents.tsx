@@ -43,6 +43,13 @@ export default function Documents() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
 
+  // 每分钟刷新一次，让"X分钟前"等时间显示保持动态
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Get document IDs for batch status query
   const documentIds = documents.map(doc => doc.id);
   const { statuses, isLoading: statusesLoading } = useBatchKGStatus(documentIds);
@@ -275,11 +282,38 @@ export default function Documents() {
       )
     : filteredDocuments;
 
+  /** 从 Tiptap JSON / 纯文本中提取可读预览 */
+  const extractPreview = (raw: string, maxLen = 120): string => {
+    if (!raw) return '';
+    try {
+      const json = JSON.parse(raw);
+      const texts: string[] = [];
+      const walk = (node: any) => {
+        if (node.text) texts.push(node.text);
+        if (Array.isArray(node.content)) node.content.forEach(walk);
+      };
+      walk(json);
+      const plain = texts.join(' ').replace(/\s+/g, ' ').trim();
+      return plain.length > maxLen ? plain.substring(0, maxLen) + '…' : plain || '（空文档）';
+    } catch {
+      // 不是 JSON，当作纯文本
+      const plain = raw.replace(/\s+/g, ' ').trim();
+      return plain.length > maxLen ? plain.substring(0, maxLen) + '…' : plain;
+    }
+  };
+
   const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
+    if (!dateString) return '';
+    // SQLite CURRENT_TIMESTAMP 返回 UTC 时间但不带 'Z' 后缀，
+    // 需要补上 'Z' 让浏览器正确按 UTC 解析，否则会被当作本地时间导致偏差
+    const normalized = dateString.includes('T') || dateString.includes('Z')
+      ? dateString
+      : dateString.replace(' ', 'T') + 'Z';
+    const date = new Date(normalized);
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
+    if (diffInSeconds < 0) return '刚刚';
     if (diffInSeconds < 60) return '刚刚';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}分钟前`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}小时前`;
@@ -517,7 +551,7 @@ export default function Documents() {
                     </div>
                     
                     <p className="text-sm text-slate-500 line-clamp-3 mb-4">
-                      {document.content.substring(0, 100)}...
+                      {extractPreview(document.content)}
                     </p>
                     
                     <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
@@ -525,7 +559,7 @@ export default function Documents() {
                         <Clock size={12} />
                         {formatTimeAgo(document.updatedAt)}
                       </span>
-                      <span>{document.fileType}</span>
+                      <span>{document.fileType || '文档'}</span>
                     </div>
                     
                     {/* KG Status Indicator */}

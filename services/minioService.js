@@ -12,6 +12,7 @@ const {
   DeleteObjectCommand,
   HeadBucketCommand,
   CreateBucketCommand,
+  ListObjectsV2Command,
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { v4: uuidv4 } = require('uuid');
@@ -125,6 +126,37 @@ class MinioService {
       }));
     } catch (error) {
       throw new Error(`MinIO 存储服务不可用：文件删除失败。${error.message}`);
+    }
+  }
+
+  /**
+   * 列出存储桶中所有对象（用于统计存储用量）
+   * @param {string} [bucketName] - 存储桶名称
+   * @returns {Promise<Array<{key: string, size: number}>>}
+   */
+  async listObjects(bucketName) {
+    const bucket = bucketName || this.defaultBucket;
+    const objects = [];
+    let continuationToken;
+
+    try {
+      do {
+        const response = await this.client.send(new ListObjectsV2Command({
+          Bucket: bucket,
+          ContinuationToken: continuationToken,
+        }));
+        if (response.Contents) {
+          for (const obj of response.Contents) {
+            objects.push({ key: obj.Key, size: obj.Size || 0 });
+          }
+        }
+        continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+      } while (continuationToken);
+
+      return objects;
+    } catch (error) {
+      console.warn(`MinIO listObjects failed: ${error.message}`);
+      return [];
     }
   }
 

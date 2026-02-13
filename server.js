@@ -733,6 +733,54 @@ app.use('/api/image-analysis', imageAnalysisRoutes);
 const imageRoutes = require('./routes/imageRoutes');
 app.use('/api/images', imageRoutes);
 
+// 存储统计 API
+app.get('/api/storage/stats', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.userId;
+    // 统计文档数量和内容大小
+    const docStats = await new Promise((resolve, reject) => {
+      userDb.get(
+        `SELECT COUNT(*) as count, COALESCE(SUM(LENGTH(content)), 0) as totalBytes FROM documents WHERE user_id = ?`,
+        [userId],
+        (err, row) => err ? reject(err) : resolve(row || { count: 0, totalBytes: 0 })
+      );
+    });
+
+    // 尝试获取 MinIO 存储大小
+    let minioBytes = 0;
+    try {
+      const minioService = require('./services/minioService');
+      const objects = await minioService.listObjects();
+      if (Array.isArray(objects)) {
+        minioBytes = objects.reduce((sum, obj) => sum + (obj.size || 0), 0);
+      }
+    } catch { /* MinIO 不可用时忽略 */ }
+
+    const usedBytes = (docStats.totalBytes || 0) + minioBytes;
+    const totalBytes = 10 * 1024 * 1024 * 1024; // 10 GB 上限
+
+    res.json({
+      documentCount: docStats.count || 0,
+      usedBytes,
+      totalBytes,
+      usedFormatted: formatBytes(usedBytes),
+      totalFormatted: formatBytes(totalBytes),
+      percentage: Math.min(100, Math.round((usedBytes / totalBytes) * 100)),
+    });
+  } catch (error) {
+    console.error('获取存储统计失败:', error);
+    res.json({ documentCount: 0, usedBytes: 0, totalBytes: 10737418240, usedFormatted: '0 B', totalFormatted: '10 GB', percentage: 0 });
+  }
+});
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
 // AI增强路由
 const aiEnhancementRoutes = require('./routes/aiEnhancementRoutes');
 app.use('/api/ai', aiEnhancementRoutes);
