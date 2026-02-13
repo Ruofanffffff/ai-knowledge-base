@@ -1347,39 +1347,62 @@ const handleFileUpload = async (req, res) => {
     let content = '';
     let fileType = path.extname(originalname).toLowerCase();
     
+    // 辅助函数：将纯文本段落数组转换为 Tiptap JSON 格式
+    const textToTiptapJson = (paragraphs) => {
+      const doc = {
+        type: 'doc',
+        content: paragraphs.map(text => ({
+          type: 'paragraph',
+          content: text ? [{ type: 'text', text }] : []
+        }))
+      };
+      // 确保至少有一个段落
+      if (doc.content.length === 0) {
+        doc.content.push({ type: 'paragraph', content: [] });
+      }
+      return JSON.stringify(doc);
+    };
+
     // 简单的文本文件解析示例
-    if (fileType === '.txt' || fileType === '.md') {
+    if (fileType === '.txt') {
+      const rawText = fs.readFileSync(filePath, 'utf8');
+      const paragraphs = rawText.split(/\n/).map(line => line.trim());
+      content = textToTiptapJson(paragraphs);
+    } else if (fileType === '.md') {
+      // Markdown 保持原文，ReactMarkdown 渲染效果较好
       content = fs.readFileSync(filePath, 'utf8');
     } else if (fileType === '.docx') {
-      // 处理docx文件
+      // 处理docx文件，解析后转为 Tiptap JSON 格式
       try {
         const data = fs.readFileSync(filePath);
         const zip = await JSZip.loadAsync(data);
         const docXml = await zip.file('word/document.xml').async('string');
-        // 改进的XML解析：按段落(<w:p>)提取，保持段落内文字连贯，仅在段落间换行
+        // 按段落(<w:p>)提取，保持段落内文字连贯
         const paragraphMatches = docXml.match(/<w:p[\s>][\s\S]*?<\/w:p>/g);
+        let paragraphs = [];
         if (paragraphMatches) {
-          content = paragraphMatches.map(p => {
+          paragraphs = paragraphMatches.map(p => {
             const textMatches = p.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g);
             if (textMatches) {
               return textMatches.map(match => match.replace(/<[^>]*>/g, '')).join('');
             }
             return '';
-          }).filter(text => text.length > 0).join('\n');
+          });
         } else {
-          // 如果找不到段落结构，回退到提取所有文本
+          // 回退到提取所有文本
           const textMatches = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
           if (textMatches) {
-            content = textMatches.map(match => match.replace(/<[^>]*>/g, '')).join('\n');
+            paragraphs = textMatches.map(match => match.replace(/<[^>]*>/g, ''));
           }
         }
+        content = textToTiptapJson(paragraphs);
       } catch (error) {
         console.error('Error parsing docx file:', error);
-        content = '无法解析docx文件内容';
+        content = textToTiptapJson(['无法解析docx文件内容']);
       }
     } else if (fileType === '.doc') {
       // 对于旧版doc文件，提供提示信息
-      content = '旧版.doc文件暂不支持直接预览，建议转换为.docx格式';
+      content = textToTiptapJson(['旧版.doc文件暂不支持直接预览，建议转换为.docx格式']);
     }
     
     // 修复中文文件名乱码问题
@@ -2534,8 +2557,48 @@ app.post('/api/ai/summary', authMiddleware, async (req, res) => {
         content: row.content
       };
       
-      // 构建总结提示
-      const prompt = `请对以下文档内容进行详细总结，包括主要内容、关键观点和重要信息：\n\n${document.content}\n\n要求：\n1. 总结要全面准确，涵盖文档的核心内容\n2. 语言要简洁明了，逻辑清晰\n3. 重点突出，不要包含无关细节\n4. 用中文回答`;
+      // 提取纯文本内容（如果是 Tiptap JSON 格式）
+      let plainContent = document.content;
+      try {
+        const parsed = JSON.parse(document.content);
+        if (parsed && parsed.type === 'doc' && Array.isArray(parsed.content)) {
+          plainContent = parsed.content.map(node => {
+            if (node.content && Array.isArray(node.content)) {
+              return node.content.map(c => c.text || '').join('');
+            }
+            return '';
+          }).filter(t => t).join('\n');
+        }
+      } catch { /* 不是 JSON，使用原始内容 */ }
+
+      // 构建结构化总结提示
+      const prompt = `请对以下文档内容进行结构化分析，返回严格的JSON格式（不要包含markdown代码块标记）：
+
+文档标题：${document.title}
+文档内容：
+${plainContent.substring(0, 6000)}
+
+请返回如下JSON格式（必须是合法JSON，不要有多余文字）：
+{
+  "documentType": "文章类型（如：简历、技术文档、学术论文、会议纪要、产品文档、笔记等）",
+  "typeTags": ["类型标签1", "类型标签2"],
+  "overview": "一段话概括文档的主要内容（100-200字）",
+  "keyPoints": [
+    "要点1",
+    "要点2",
+    "要点3"
+  ],
+  "keywords": ["关键词1", "关键词2", "关键词3", "关键词4", "关键词5"],
+  "applications": [
+    "应用方向1：具体说明",
+    "应用方向2：具体说明"
+  ],
+  "quality": {
+    "completeness": 85,
+    "clarity": 90,
+    "comment": "对文档质量的简短评价"
+  }
+}`;
       
       // 模型调用策略
       const modelCallOrder = [];
@@ -2669,24 +2732,49 @@ app.post('/api/ai/summary', authMiddleware, async (req, res) => {
         });
       }
       
-      // 存储总结到数据库
+      // 尝试解析结构化 JSON
+      let structuredSummary = null;
+      try {
+        // 清理可能的 markdown 代码块标记
+        let cleaned = summary.trim();
+        if (cleaned.startsWith('```json')) cleaned = cleaned.slice(7);
+        if (cleaned.startsWith('```')) cleaned = cleaned.slice(3);
+        if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3);
+        cleaned = cleaned.trim();
+        structuredSummary = JSON.parse(cleaned);
+      } catch {
+        // 如果解析失败，包装为兼容格式
+        structuredSummary = {
+          documentType: '文档',
+          typeTags: [],
+          overview: summary,
+          keyPoints: [],
+          keywords: [],
+          applications: [],
+          quality: { completeness: 0, clarity: 0, comment: '' }
+        };
+      }
+      
+      // 存储总结到数据库（存储结构化 JSON）
+      const summaryToStore = JSON.stringify(structuredSummary);
       userDb.run(
         'INSERT OR REPLACE INTO summaries (user_id, document_id, model, content, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        [userId, documentId, requestedModel || 'qwen-plus', summary],
+        [userId, documentId, requestedModel || 'qwen-plus', summaryToStore],
         (err) => {
           if (err) {
             console.error('Error saving summary to database:', err);
-            // 即使存储失败，也返回总结结果
             return res.json({
               success: true,
-              summary
+              summary: summaryToStore,
+              structured: structuredSummary
             });
           }
           
           console.log('Summary saved to database successfully');
           res.json({
             success: true,
-            summary
+            summary: summaryToStore,
+            structured: structuredSummary
           });
         }
       );
