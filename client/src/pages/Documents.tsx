@@ -10,6 +10,7 @@ import {
   Search,
   Edit3,
   Trash2,
+  Send,
 } from 'lucide-react';
 import { Dropdown, Modal, message } from 'antd';
 import { DocumentWithSummary, Category } from '../types';
@@ -42,6 +43,7 @@ export default function Documents() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // 每分钟刷新一次，让"X分钟前"等时间显示保持动态
   const [, setTick] = useState(0);
@@ -361,6 +363,7 @@ export default function Documents() {
                 <Plus size={16} />
                 <span className="text-sm md:text-base">新建文档</span>
               </motion.button>
+
             </>
           ) : (
             <>
@@ -371,6 +374,38 @@ export default function Documents() {
               >
                 {selectedIds.size === searchFilteredDocuments.length ? '取消全选' : '全选'}
               </button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={async () => {
+                  if (selectedIds.size === 0) {
+                    message.info('请先选择要发布的文档');
+                    return;
+                  }
+                  setIsPublishing(true);
+                  try {
+                    const result = await apiService.publishToCommunity(Array.from(selectedIds));
+                    if (result.success) {
+                      message.success('发布成功');
+                      navigate('/community');
+                    } else {
+                      message.error(result.error || '发布失败');
+                    }
+                  } catch {
+                    message.error('发布失败');
+                  } finally {
+                    setIsPublishing(false);
+                  }
+                }}
+                disabled={selectedIds.size === 0 || isPublishing}
+                className={`flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  selectedIds.size === 0 || isPublishing
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                }`}
+              >
+                <Send size={14} className="-rotate-45" />
+                {isPublishing ? '发布中...' : '发布到思圈'}
+              </motion.button>
               <button
                 onClick={() => setBatchDeleteConfirm(true)}
                 disabled={selectedIds.size === 0}

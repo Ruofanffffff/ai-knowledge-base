@@ -68,6 +68,19 @@ const notesConfig = {
     apiKey: process.env.VOLCENGINE_API_KEY,
   },
 
+  // 封面图AI生成配置
+  // 使用字节火山引擎即梦AI（seedream）模型为社区帖子生成封面图
+  coverGeneration: {
+    provider: process.env.IMAGE_GEN_LLM_PROVIDER || 'volcengine',
+    model: process.env.JIMENG_MODEL || process.env.IMAGE_GEN_LLM_MODEL || 'seedream-3-0-t2i-250415',
+    apiKey: process.env.VOLCENGINE_API_KEY,
+    baseURL: process.env.JIMENG_API_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3',
+    imageSize: process.env.JIMENG_IMAGE_SIZE || '1024x576',
+    timeout: parseInt(process.env.JIMENG_TIMEOUT || '60000', 10),
+    maxRetries: 2,
+    pipelineTimeout: 120000,
+  },
+
   // Performance Requirements (from requirements.md)
   performance: {
     textSaveTimeout: 500,        // Requirement 1.6: 500ms

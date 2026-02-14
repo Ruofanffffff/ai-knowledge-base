@@ -189,6 +189,49 @@ function createTables(db) {
       FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
     )`);
 
+    db.run(`CREATE TABLE IF NOT EXISTS community_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      document_id INTEGER NOT NULL,
+      title VARCHAR(255),
+      summary TEXT,
+      cover_image VARCHAR(500),
+      tags TEXT,
+      likes INTEGER DEFAULT 0,
+      view_count INTEGER DEFAULT 0,
+      status VARCHAR(20) DEFAULT 'published',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (document_id) REFERENCES documents(id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS community_likes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      post_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, post_id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS community_bookmarks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      post_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, post_id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS community_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      post_id INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE
+    )`);
+
     console.log('Database tables created successfully.');
     
     createDefaultAdmin(db);

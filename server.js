@@ -72,7 +72,10 @@ const { initStatsService } = require('./services/statsService');
 const authRoutes = require('./routes/authRoutes');
 const userCenterRoutes = require('./routes/userCenterRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const { router: communityRouter, initCommunityRoutes } = require('./routes/communityRoutes');
 const { initDatabase } = require('./database/initUserDB');
+const { PrismaClient } = require('@prisma/client');
+const kgPrisma = new PrismaClient();
 
 initAuthService();
 initStatsService();
@@ -80,6 +83,7 @@ const userDb = initDatabase();
 const authRouter = authRoutes.initAuthRoutes();
 const userCenterRouter = userCenterRoutes.initUserCenterRoutes();
 const adminRouter = adminRoutes.initAdminRoutes();
+initCommunityRoutes(userDb, kgPrisma);
 
 // Initialize storage and deduplication services
 const documentStorageService = new DocumentStorageService(userDb);
@@ -721,6 +725,9 @@ app.use('/api/kg', kgRoutes);
 const notesRoutes = require('./routes/notesRoutes');
 app.use('/api/notes', notesRoutes);
 
+// 社区路由
+app.use('/api/community', communityRouter);
+
 // 附件路由
 const attachmentRoutes = require('./routes/attachmentRoutes');
 app.use('/api/attachments', attachmentRoutes);
@@ -790,8 +797,6 @@ const searchRoutes = require('./routes/searchRoutes');
 app.use('/api/search', searchRoutes);
 
 // LLM预处理路由（文档索引查询）
-const { PrismaClient } = require('@prisma/client');
-const kgPrisma = new PrismaClient();
 
 app.get('/api/preprocessing/index/:docId', authMiddleware, async (req, res) => {
   try {

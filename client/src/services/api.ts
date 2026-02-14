@@ -83,6 +83,37 @@ export interface Recommendation {
   relatedEntities: string[];
 }
 
+export interface CommunityPost {
+  id: number;
+  userId: number;
+  documentId: number;
+  title: string;
+  summary: string;
+  coverImage: string | null;
+  tags: string[];
+  likes: number;
+  viewCount: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  authorName: string;
+  authorAvatar: string | null;
+  isLiked: boolean;
+  isBookmarked: boolean;
+  commentCount: number;
+  contentImages?: string[];
+}
+
+export interface Comment {
+  id: number;
+  postId: number;
+  userId: number;
+  content: string;
+  createdAt: string;
+  authorName: string;
+  authorAvatar: string | null;
+}
+
 // ============================================================================
 // Cache Interface
 // ============================================================================
@@ -742,6 +773,149 @@ class ApiService {
       return {
         success: false,
         error: this.handleError(error)
+      };
+    }
+  }
+
+  // ==========================================================================
+  // Community API Methods
+  // ==========================================================================
+
+  /**
+   * 发布文档到社区
+   */
+  async publishToCommunity(documentIds: string[]): Promise<ApiResponse<{
+    published: Array<{ id: number; documentId: string; title: string }>;
+    skipped: Array<{ documentId: string; reason: string }>;
+  }>> {
+    try {
+      const response = await apiClient.post('/community/publish', { documentIds });
+      return { success: true, data: response.data.data || response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+  /**
+   * 获取社区帖子列表
+   */
+  async getCommunityPosts(params?: {
+    page?: number;
+    limit?: number;
+    sort?: 'latest' | 'hottest';
+    filter?: 'mine';
+    search?: string;
+  }): Promise<ApiResponse<{
+    posts: CommunityPost[];
+    total: number;
+    page: number;
+    limit: number;
+  }>> {
+    try {
+      const response = await apiClient.get('/community/posts', { params });
+      return { success: true, data: response.data.data || response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+  /**
+   * 获取社区帖子详情（含文档索引）
+   */
+  async getCommunityPostDetail(postId: number): Promise<ApiResponse<CommunityPost & {
+    indexData: { indexedText: string; version: number; metadata: Record<string, any> } | null;
+  }>> {
+    try {
+      const response = await apiClient.get(`/community/posts/${postId}`);
+      return { success: true, data: response.data.data || response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+  /**
+   * 切换帖子点赞状态
+   */
+  async togglePostLike(postId: number): Promise<ApiResponse<{
+    liked: boolean;
+    likes: number;
+  }>> {
+    try {
+      const response = await apiClient.post(`/community/posts/${postId}/like`);
+      return { success: true, data: response.data.data || response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+  /**
+   * 取消发布帖子
+   */
+  async unpublishPost(postId: number): Promise<ApiResponse<void>> {
+    try {
+      await apiClient.delete(`/community/posts/${postId}`);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+  /**
+   * 切换帖子收藏状态
+   */
+  async togglePostBookmark(postId: number): Promise<ApiResponse<{ bookmarked: boolean }>> {
+    try {
+      const response = await apiClient.post(`/community/posts/${postId}/bookmark`);
+      return { success: true, data: response.data.data || response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+  /**
+   * 获取帖子评论列表
+   */
+  async getPostComments(postId: number): Promise<ApiResponse<{ comments: Comment[]; total: number }>> {
+    try {
+      const response = await apiClient.get(`/community/posts/${postId}/comments`);
+      return { success: true, data: response.data.data || response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+  /**
+   * 发表帖子评论
+   */
+  async addPostComment(postId: number, content: string): Promise<ApiResponse<Comment>> {
+    try {
+      const response = await apiClient.post(`/community/posts/${postId}/comments`, { content });
+      return { success: true, data: response.data.data || response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
       };
     }
   }

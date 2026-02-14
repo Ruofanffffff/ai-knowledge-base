@@ -1,0 +1,1040 @@
+/**
+ * Community Routes
+ * 
+ * 社区知识分享相关 API 路由
+ * 实现文档发布到社区的功能
+ */
+
+const express = require('express');
+const router = express.Router();
+const { authMiddleware } = require('../services/authService');
+const { initDatabase } = require('../database/initUserDB');
+const { CoverGenerationService } = require('../services/coverGenerationService');
+const { JimengClient } = require('../services/jimengClient');
+const { notesConfig } = require('../config/notes.config');
+
+let db;
+let coverGenerationService = null;
+
+/**
+ * 从 TipTap/ProseMirror JSON content 中提取纯文本
+ */
+function extractTextFromContent(content) {
+  if (!content) return '';
+  try {
+    const doc = typeof content === 'string' ? JSON.parse(content) : content;
+    if (!doc || !doc.content) return typeof content === 'string' ? content.substring(0, 200) : '';
+    
+    function walkNodes(nodes) {
+      let text = '';
+      for (const node of nodes) {
+        if (node.text) {
+          text += node.text;
+        }
+        if (node.content) {
+          text += walkNodes(node.content);
+        }
+        if (node.type === 'paragraph' || node.type === 'heading') {
+          text += ' ';
+        }
+      }
+      return text;
+    }
+    
+    return walkNodes(doc.content).trim().substring(0, 200);
+  } catch {
+    // 如果不是 JSON，直接截取
+    return typeof content === 'string' ? content.substring(0, 200) : '';
+  }
+}
+
+/**
+ * 从 TipTap/ProseMirror JSON content 中提取所有图片 URL
+ * 支持 imageBlock 节点（attrs.src）
+ */
+function extractImagesFromContent(content) {
+  if (!content) return [];
+  try {
+    const doc = typeof content === 'string' ? JSON.parse(content) : content;
+    if (!doc || !doc.content) return [];
+    
+    const images = [];
+    function walkNodes(nodes) {
+      for (const node of nodes) {
+        if (node.type === 'imageBlock' && node.attrs && node.attrs.src) {
+          images.push(node.attrs.src);
+        }
+        if (node.content) {
+          walkNodes(node.content);
+        }
+      }
+    }
+    walkNodes(doc.content);
+    return images;
+  } catch {
+    return [];
+  }
+}
+
+let kgPrisma;
+
+function initCommunityRoutes(externalDb, prismaClient) {
+  db = externalDb || initDatabase();
+  kgPrisma = prismaClient;
+
+  // 初始化封面生成服务（仅当 VOLCENGINE_API_KEY 存在时）
+  const coverConfig = notesConfig.coverGeneration;
+  if (coverConfig.apiKey) {
+    const jimengClient = new JimengClient({
+      apiKey: coverConfig.apiKey,
+      model: coverConfig.model,
+      baseURL: coverConfig.baseURL,
+      imageSize: coverConfig.imageSize,
+      timeout: coverConfig.timeout,
+      maxRetries: coverConfig.maxRetries,
+    });
+    coverGenerationService = new CoverGenerationService({
+      jimengClient,
+      kgPrisma: prismaClient,
+      db,
+      pipelineTimeout: coverConfig.pipelineTimeout,
+    });
+    console.log('[CoverGen] 封面生成服务已初始化');
+  } else {
+    console.warn('[CoverGen] VOLCENGINE_API_KEY 未配置，封面生成服务未启用');
+  }
+
+  return router;
+}
+
+/**
+ * POST /api/community/publish
+ * 发布文档到社区
+ * 
+ * Body: { documentIds: number[] }
+ * Response: { success: true, data: { published: [...], skipped: [...] } }
+ * 
+ * Validates: Requirements 1.2, 1.3, 1.4, 1.6
+ */
+router.post('/publish', authMiddleware, (req, res) => {
+  try {
+    const { documentIds } = req.body;
+    const userId = req.userId;
+
+    // 校验 documentIds 非空
+    if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '请提供要发布的文档ID'
+      });
+    }
+
+    const published = [];
+    const skipped = [];
+    let processed = 0;
+
+    documentIds.forEach((documentId) => {
+      // 查询文档信息
+      db.get(
+        'SELECT id, title, content, tags FROM documents WHERE id = ?',
+        [documentId],
+        (err, doc) => {
+          if (err) {
+            console.error('查询文档失败:', err);
+            return res.status(500).json({
+              success: false,
+              error: '服务器内部错误'
+            });
+          }
+
+          if (!doc) {
+            skipped.push({ documentId, reason: '文档不存在' });
+            processed++;
+            if (processed === documentIds.length) {
+              return res.json({ success: true, data: { published, skipped } });
+            }
+            return;
+          }
+
+          // 检查是否已发布
+          db.get(
+            'SELECT id FROM community_posts WHERE document_id = ?',
+            [documentId],
+            (err, existing) => {
+              if (err) {
+                console.error('查询社区帖子失败:', err);
+                return res.status(500).json({
+                  success: false,
+                  error: '服务器内部错误'
+                });
+              }
+
+              if (existing) {
+                skipped.push({ documentId, reason: '已发布' });
+                processed++;
+                if (processed === documentIds.length) {
+                  return res.json({ success: true, data: { published, skipped } });
+                }
+                return;
+              }
+
+              // 插入社区帖子（封面由 AI 异步生成，初始为 null）
+              const summary = extractTextFromContent(doc.content);
+              db.run(
+                `INSERT INTO community_posts (user_id, document_id, title, summary, cover_image, tags, likes, view_count, status)
+                 VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'published')`,
+                [userId, documentId, doc.title, summary, null, doc.tags],
+                function (err) {
+                  if (err) {
+                    console.error('插入社区帖子失败:', err);
+                    return res.status(500).json({
+                      success: false,
+                      error: '服务器内部错误'
+                    });
+                  }
+
+                  const postId = this.lastID;
+
+                  // 异步触发 AI 封面生成（fire-and-forget）
+                  if (coverGenerationService) {
+                    coverGenerationService.generateCover(postId, documentId)
+                      .catch(err => console.error('[CoverGen] 封面生成失败:', err.message));
+                  }
+
+                  published.push({
+                    id: postId,
+                    documentId,
+                    title: doc.title
+                  });
+                  processed++;
+                  if (processed === documentIds.length) {
+                    return res.json({ success: true, data: { published, skipped } });
+                  }
+                }
+              );
+            }
+          );
+        }
+      );
+    });
+  } catch (error) {
+    console.error('发布文档到社区失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '服务器内部错误'
+    });
+  }
+});
+
+/**
+ * GET /api/community/posts
+ * 获取社区帖子列表（分页、排序、过滤、搜索）
+ * 
+ * Query: page, limit, sort (latest|hottest), filter (mine), search
+ * Response: { success: true, data: { posts, total, page, limit } }
+ * 
+ * Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6
+ */
+router.get('/posts', authMiddleware, (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 20));
+    const sort = req.query.sort === 'hottest' ? 'hottest' : 'latest';
+    const filter = req.query.filter;
+    const search = req.query.search;
+    const userId = req.userId;
+    const offset = (page - 1) * limit;
+
+    // Build WHERE conditions
+    const conditions = ["cp.status = 'published'"];
+    const params = [];
+
+    if (filter === 'mine') {
+      conditions.push('cp.user_id = ?');
+      params.push(userId);
+    }
+
+    if (search) {
+      conditions.push('(cp.title LIKE ? OR cp.summary LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+    const orderBy = sort === 'hottest' ? 'cp.likes DESC' : 'cp.created_at DESC';
+
+    // Count total
+    const countSql = `SELECT COUNT(*) as total FROM community_posts cp ${whereClause}`;
+
+    db.get(countSql, params, (err, countRow) => {
+      if (err) {
+        console.error('查询帖子总数失败:', err);
+        return res.status(500).json({
+          success: false,
+          error: '服务器内部错误'
+        });
+      }
+
+      const total = countRow ? countRow.total : 0;
+
+      // Query posts with JOIN
+      const querySql = `
+        SELECT cp.*,
+               u.username AS authorName,
+               u.avatar AS authorAvatar,
+               CASE WHEN cl.id IS NOT NULL THEN 1 ELSE 0 END AS isLiked,
+               CASE WHEN cb.id IS NOT NULL THEN 1 ELSE 0 END AS isBookmarked,
+               (SELECT COUNT(*) FROM community_comments cc WHERE cc.post_id = cp.id) AS commentCount
+        FROM community_posts cp
+        LEFT JOIN users u ON cp.user_id = u.id
+        LEFT JOIN community_likes cl ON cl.post_id = cp.id AND cl.user_id = ?
+        LEFT JOIN community_bookmarks cb ON cb.post_id = cp.id AND cb.user_id = ?
+        ${whereClause}
+        ORDER BY ${orderBy}
+        LIMIT ? OFFSET ?
+      `;
+
+      const queryParams = [userId, userId, ...params, limit, offset];
+
+      db.all(querySql, queryParams, (err, rows) => {
+        if (err) {
+          console.error('查询帖子列表失败:', err);
+          return res.status(500).json({
+            success: false,
+            error: '服务器内部错误'
+          });
+        }
+
+        const posts = (rows || []).map(row => ({
+          id: row.id,
+          userId: row.user_id,
+          documentId: row.document_id,
+          title: row.title,
+          summary: row.summary,
+          coverImage: row.cover_image,
+          tags: row.tags,
+          likes: row.likes,
+          viewCount: row.view_count,
+          status: row.status,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          authorName: row.authorName,
+          authorAvatar: row.authorAvatar,
+          isLiked: row.isLiked === 1,
+          isBookmarked: row.isBookmarked === 1,
+          commentCount: row.commentCount || 0
+        }));
+
+        res.json({
+          success: true,
+          data: { posts, total, page, limit }
+        });
+      });
+    });
+  } catch (error) {
+    console.error('获取社区帖子列表失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '服务器内部错误'
+    });
+  }
+});
+
+/**
+ * POST /api/community/posts/:id/like
+ * 切换点赞状态（toggle）
+ * 
+ * Response: { success: true, data: { liked: boolean, likes: number } }
+ * 
+ * Validates: Requirements 4.1, 4.2, 4.3
+ */
+router.post('/posts/:id/like', authMiddleware, (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const userId = req.userId;
+
+    if (isNaN(postId)) {
+      return res.status(400).json({
+        success: false,
+        error: '无效的帖子ID'
+      });
+    }
+
+    // 先检查帖子是否存在
+    db.get(
+      'SELECT id, likes FROM community_posts WHERE id = ?',
+      [postId],
+      (err, post) => {
+        if (err) {
+          console.error('查询帖子失败:', err);
+          return res.status(500).json({
+            success: false,
+            error: '服务器内部错误'
+          });
+        }
+
+        if (!post) {
+          return res.status(404).json({
+            success: false,
+            error: '帖子不存在'
+          });
+        }
+
+        // 查询是否已点赞
+        db.get(
+          'SELECT id FROM community_likes WHERE user_id = ? AND post_id = ?',
+          [userId, postId],
+          (err, existingLike) => {
+            if (err) {
+              console.error('查询点赞记录失败:', err);
+              return res.status(500).json({
+                success: false,
+                error: '服务器内部错误'
+              });
+            }
+
+            if (existingLike) {
+              // 已点赞 → 取消点赞
+              db.run(
+                'DELETE FROM community_likes WHERE user_id = ? AND post_id = ?',
+                [userId, postId],
+                (err) => {
+                  if (err) {
+                    console.error('删除点赞记录失败:', err);
+                    return res.status(500).json({
+                      success: false,
+                      error: '服务器内部错误'
+                    });
+                  }
+
+                  db.run(
+                    'UPDATE community_posts SET likes = likes - 1 WHERE id = ?',
+                    [postId],
+                    (err) => {
+                      if (err) {
+                        console.error('更新点赞数失败:', err);
+                        return res.status(500).json({
+                          success: false,
+                          error: '服务器内部错误'
+                        });
+                      }
+
+                      // 查询更新后的 likes 数
+                      db.get(
+                        'SELECT likes FROM community_posts WHERE id = ?',
+                        [postId],
+                        (err, updated) => {
+                          if (err) {
+                            console.error('查询更新后点赞数失败:', err);
+                            return res.status(500).json({
+                              success: false,
+                              error: '服务器内部错误'
+                            });
+                          }
+
+                          res.json({
+                            success: true,
+                            data: { liked: false, likes: updated.likes }
+                          });
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            } else {
+              // 未点赞 → 点赞
+              db.run(
+                'INSERT INTO community_likes (user_id, post_id) VALUES (?, ?)',
+                [userId, postId],
+                (err) => {
+                  if (err) {
+                    console.error('插入点赞记录失败:', err);
+                    return res.status(500).json({
+                      success: false,
+                      error: '服务器内部错误'
+                    });
+                  }
+
+                  db.run(
+                    'UPDATE community_posts SET likes = likes + 1 WHERE id = ?',
+                    [postId],
+                    (err) => {
+                      if (err) {
+                        console.error('更新点赞数失败:', err);
+                        return res.status(500).json({
+                          success: false,
+                          error: '服务器内部错误'
+                        });
+                      }
+
+                      // 查询更新后的 likes 数
+                      db.get(
+                        'SELECT likes FROM community_posts WHERE id = ?',
+                        [postId],
+                        (err, updated) => {
+                          if (err) {
+                            console.error('查询更新后点赞数失败:', err);
+                            return res.status(500).json({
+                              success: false,
+                              error: '服务器内部错误'
+                            });
+                          }
+
+                          res.json({
+                            success: true,
+                            data: { liked: true, likes: updated.likes }
+                          });
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            }
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('切换点赞状态失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '服务器内部错误'
+    });
+  }
+});
+
+/**
+ * POST /api/community/posts/:id/bookmark
+ * 切换收藏状态（toggle）
+ *
+ * Response: { success: true, data: { bookmarked: boolean } }
+ *
+ * Validates: Requirements 2.2, 2.3, 2.4
+ */
+router.post('/posts/:id/bookmark', authMiddleware, (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const userId = req.userId;
+
+    if (isNaN(postId)) {
+      return res.status(400).json({
+        success: false,
+        error: '无效的帖子ID'
+      });
+    }
+
+    // 先检查帖子是否存在
+    db.get(
+      'SELECT id FROM community_posts WHERE id = ?',
+      [postId],
+      (err, post) => {
+        if (err) {
+          console.error('查询帖子失败:', err);
+          return res.status(500).json({
+            success: false,
+            error: '服务器内部错误'
+          });
+        }
+
+        if (!post) {
+          return res.status(404).json({
+            success: false,
+            error: '帖子不存在'
+          });
+        }
+
+        // 查询是否已收藏
+        db.get(
+          'SELECT id FROM community_bookmarks WHERE user_id = ? AND post_id = ?',
+          [userId, postId],
+          (err, existingBookmark) => {
+            if (err) {
+              console.error('查询收藏记录失败:', err);
+              return res.status(500).json({
+                success: false,
+                error: '服务器内部错误'
+              });
+            }
+
+            if (existingBookmark) {
+              // 已收藏 → 取消收藏
+              db.run(
+                'DELETE FROM community_bookmarks WHERE user_id = ? AND post_id = ?',
+                [userId, postId],
+                (err) => {
+                  if (err) {
+                    console.error('删除收藏记录失败:', err);
+                    return res.status(500).json({
+                      success: false,
+                      error: '服务器内部错误'
+                    });
+                  }
+
+                  res.json({
+                    success: true,
+                    data: { bookmarked: false }
+                  });
+                }
+              );
+            } else {
+              // 未收藏 → 收藏
+              db.run(
+                'INSERT INTO community_bookmarks (user_id, post_id) VALUES (?, ?)',
+                [userId, postId],
+                (err) => {
+                  if (err) {
+                    console.error('插入收藏记录失败:', err);
+                    return res.status(500).json({
+                      success: false,
+                      error: '服务器内部错误'
+                    });
+                  }
+
+                  res.json({
+                    success: true,
+                    data: { bookmarked: true }
+                  });
+                }
+              );
+            }
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('切换收藏状态失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '服务器内部错误'
+    });
+  }
+});
+
+/**
+ * POST /api/community/posts/:id/comments
+ * 发表评论
+ *
+ * Body: { content: string }
+ * Response: { success: true, data: { id, postId, userId, content, createdAt, authorName, authorAvatar } }
+ *
+ * Validates: Requirements 3.2, 3.3, 3.4
+ */
+router.post('/posts/:id/comments', authMiddleware, (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const userId = req.userId;
+
+    if (isNaN(postId)) {
+      return res.status(400).json({
+        success: false,
+        error: '无效的帖子ID'
+      });
+    }
+
+    const content = (req.body.content || '').trim();
+    if (!content) {
+      return res.status(400).json({
+        success: false,
+        error: '评论内容不能为空'
+      });
+    }
+
+    // 验证帖子存在
+    db.get(
+      'SELECT id FROM community_posts WHERE id = ?',
+      [postId],
+      (err, post) => {
+        if (err) {
+          console.error('查询帖子失败:', err);
+          return res.status(500).json({
+            success: false,
+            error: '服务器内部错误'
+          });
+        }
+
+        if (!post) {
+          return res.status(404).json({
+            success: false,
+            error: '帖子不存在'
+          });
+        }
+
+        // 插入评论记录
+        db.run(
+          'INSERT INTO community_comments (user_id, post_id, content) VALUES (?, ?, ?)',
+          [userId, postId, content],
+          function (err) {
+            if (err) {
+              console.error('插入评论记录失败:', err);
+              return res.status(500).json({
+                success: false,
+                error: '服务器内部错误'
+              });
+            }
+
+            const commentId = this.lastID;
+
+            // JOIN users 查询新评论含作者信息
+            db.get(
+              `SELECT cc.id, cc.post_id, cc.user_id, cc.content, cc.created_at,
+                      u.username AS authorName, u.avatar AS authorAvatar
+               FROM community_comments cc
+               LEFT JOIN users u ON cc.user_id = u.id
+               WHERE cc.id = ?`,
+              [commentId],
+              (err, comment) => {
+                if (err) {
+                  console.error('查询新评论失败:', err);
+                  return res.status(500).json({
+                    success: false,
+                    error: '服务器内部错误'
+                  });
+                }
+
+                res.json({
+                  success: true,
+                  data: {
+                    id: comment.id,
+                    postId: comment.post_id,
+                    userId: comment.user_id,
+                    content: comment.content,
+                    createdAt: comment.created_at,
+                    authorName: comment.authorName,
+                    authorAvatar: comment.authorAvatar
+                  }
+                });
+              }
+            );
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('发表评论失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '服务器内部错误'
+    });
+  }
+});
+
+/**
+ * GET /api/community/posts/:id/comments
+ * 获取帖子评论列表（按创建时间倒序）
+ *
+ * Response: { success: true, data: { comments: [...], total: number } }
+ *
+ * Validates: Requirements 3.5
+ */
+router.get('/posts/:id/comments', authMiddleware, (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+
+    if (isNaN(postId)) {
+      return res.status(400).json({
+        success: false,
+        error: '无效的帖子ID'
+      });
+    }
+
+    // 验证帖子存在
+    db.get(
+      'SELECT id FROM community_posts WHERE id = ?',
+      [postId],
+      (err, post) => {
+        if (err) {
+          console.error('查询帖子失败:', err);
+          return res.status(500).json({
+            success: false,
+            error: '服务器内部错误'
+          });
+        }
+
+        if (!post) {
+          return res.status(404).json({
+            success: false,
+            error: '帖子不存在'
+          });
+        }
+
+        // 查询评论列表 JOIN users 获取作者信息，按 created_at DESC 排序
+        db.all(
+          `SELECT cc.id, cc.post_id, cc.user_id, cc.content, cc.created_at,
+                  u.username AS authorName, u.avatar AS authorAvatar
+           FROM community_comments cc
+           LEFT JOIN users u ON cc.user_id = u.id
+           WHERE cc.post_id = ?
+           ORDER BY cc.created_at DESC`,
+          [postId],
+          (err, rows) => {
+            if (err) {
+              console.error('查询评论列表失败:', err);
+              return res.status(500).json({
+                success: false,
+                error: '服务器内部错误'
+              });
+            }
+
+            const comments = (rows || []).map(row => ({
+              id: row.id,
+              postId: row.post_id,
+              userId: row.user_id,
+              content: row.content,
+              createdAt: row.created_at,
+              authorName: row.authorName,
+              authorAvatar: row.authorAvatar
+            }));
+
+            res.json({
+              success: true,
+              data: {
+                comments,
+                total: comments.length
+              }
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('获取评论列表失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '服务器内部错误'
+    });
+  }
+});
+
+/**
+ * GET /api/community/posts/:id
+ * 获取社区帖子详情（含文档索引）
+ */
+router.get('/posts/:id', authMiddleware, async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const userId = req.userId;
+
+    if (isNaN(postId)) {
+      return res.status(400).json({ success: false, error: '无效的帖子ID' });
+    }
+
+    db.get(
+      `SELECT cp.*,
+              u.username AS authorName,
+              u.avatar AS authorAvatar,
+              CASE WHEN cl.id IS NOT NULL THEN 1 ELSE 0 END AS isLiked,
+              CASE WHEN cb.id IS NOT NULL THEN 1 ELSE 0 END AS isBookmarked,
+              (SELECT COUNT(*) FROM community_comments cc WHERE cc.post_id = cp.id) AS commentCount
+       FROM community_posts cp
+       LEFT JOIN users u ON cp.user_id = u.id
+       LEFT JOIN community_likes cl ON cl.post_id = cp.id AND cl.user_id = ?
+       LEFT JOIN community_bookmarks cb ON cb.post_id = cp.id AND cb.user_id = ?
+       WHERE cp.id = ?`,
+      [userId, userId, postId],
+      async (err, row) => {
+        if (err) {
+          console.error('查询帖子详情失败:', err);
+          return res.status(500).json({ success: false, error: '服务器内部错误' });
+        }
+
+        if (!row) {
+          return res.status(404).json({ success: false, error: '帖子不存在' });
+        }
+
+        const post = {
+          id: row.id,
+          userId: row.user_id,
+          documentId: row.document_id,
+          title: row.title,
+          summary: row.summary,
+          tags: row.tags,
+          coverImage: row.cover_image || null,
+          likes: row.likes,
+          viewCount: row.view_count,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          authorName: row.authorName,
+          authorAvatar: row.authorAvatar,
+          isLiked: row.isLiked === 1,
+          isBookmarked: row.isBookmarked === 1,
+          commentCount: row.commentCount || 0,
+        };
+
+        // 查询关联文档的 content 字段，提取内容图片
+        let contentImages = [];
+        if (row.document_id) {
+          try {
+            const doc = await new Promise((resolve, reject) => {
+              db.get(
+                'SELECT content FROM documents WHERE id = ?',
+                [row.document_id],
+                (err, doc) => {
+                  if (err) reject(err);
+                  else resolve(doc);
+                }
+              );
+            });
+            if (doc && doc.content) {
+              contentImages = extractImagesFromContent(doc.content);
+            }
+          } catch (e) {
+            console.error('查询文档内容失败:', e);
+          }
+        }
+
+        // 查询文档索引（从 Prisma/KG 数据库）
+        let indexData = null;
+        if (kgPrisma && row.document_id) {
+          try {
+            const docIndex = await kgPrisma.documentIndex.findFirst({
+              where: { docId: String(row.document_id) },
+              orderBy: { version: 'desc' },
+            });
+            if (docIndex) {
+              let metadata = {};
+              try { metadata = docIndex.metadata ? JSON.parse(docIndex.metadata) : {}; } catch {}
+              indexData = {
+                indexedText: docIndex.indexedText,
+                version: docIndex.version,
+                metadata,
+              };
+            }
+          } catch (e) {
+            console.error('查询文档索引失败:', e);
+          }
+        }
+
+        res.json({
+          success: true,
+          data: { ...post, contentImages, indexData },
+        });
+      }
+    );
+  } catch (error) {
+    console.error('获取帖子详情失败:', error);
+    res.status(500).json({ success: false, error: '服务器内部错误' });
+  }
+});
+
+/**
+ * DELETE /api/community/posts/:id
+ * 取消发布（删除帖子）
+ * 
+ * Response: { success: true }
+ * 
+ * Validates: Requirements 5.1, 5.2, 5.3, 5.4
+ */
+router.delete('/posts/:id', authMiddleware, (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const userId = req.userId;
+
+    if (isNaN(postId)) {
+      return res.status(400).json({
+        success: false,
+        error: '无效的帖子ID'
+      });
+    }
+
+    // 查询帖子是否存在
+    db.get(
+      'SELECT id, user_id FROM community_posts WHERE id = ?',
+      [postId],
+      (err, post) => {
+        if (err) {
+          console.error('查询帖子失败:', err);
+          return res.status(500).json({
+            success: false,
+            error: '服务器内部错误'
+          });
+        }
+
+        if (!post) {
+          return res.status(404).json({
+            success: false,
+            error: '帖子不存在'
+          });
+        }
+
+        // 检查是否为帖子所有者
+        if (post.user_id !== userId) {
+          return res.status(403).json({
+            success: false,
+            error: '无权删除此帖子'
+          });
+        }
+
+        // 先删除关联的点赞记录
+        db.run(
+          'DELETE FROM community_likes WHERE post_id = ?',
+          [postId],
+          (err) => {
+            if (err) {
+              console.error('删除点赞记录失败:', err);
+              return res.status(500).json({
+                success: false,
+                error: '服务器内部错误'
+              });
+            }
+
+            // 删除关联的收藏记录
+            db.run(
+              'DELETE FROM community_bookmarks WHERE post_id = ?',
+              [postId],
+              (err) => {
+                if (err) {
+                  console.error('删除收藏记录失败:', err);
+                  return res.status(500).json({
+                    success: false,
+                    error: '服务器内部错误'
+                  });
+                }
+
+                // 删除关联的评论记录
+                db.run(
+                  'DELETE FROM community_comments WHERE post_id = ?',
+                  [postId],
+                  (err) => {
+                    if (err) {
+                      console.error('删除评论记录失败:', err);
+                      return res.status(500).json({
+                        success: false,
+                        error: '服务器内部错误'
+                      });
+                    }
+
+                    // 最后删除帖子
+                    db.run(
+                      'DELETE FROM community_posts WHERE id = ?',
+                      [postId],
+                      (err) => {
+                        if (err) {
+                          console.error('删除帖子失败:', err);
+                          return res.status(500).json({
+                            success: false,
+                            error: '服务器内部错误'
+                          });
+                        }
+
+                        res.json({ success: true });
+                      }
+                    );
+                  }
+                );
+              }
+            );
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('删除帖子失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '服务器内部错误'
+    });
+  }
+});
+
+module.exports = { router, initCommunityRoutes };
