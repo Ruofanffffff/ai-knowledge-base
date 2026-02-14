@@ -301,46 +301,58 @@ export function Community() {
         ) : filteredArtworks.length === 0 ? (
           <div className="py-16 text-center text-slate-400 text-sm">暂无帖子</div>
         ) : (
-          <ResponsiveMasonry columnsCountBreakPoints={{350: 1, 750: 2, 900: 3, 1200: 4, 1600: 5}}>
+          <ResponsiveMasonry columnsCountBreakPoints={{350: 1, 750: 2, 1100: 3, 1500: 4}}>
             <Masonry gutter="16px">
-              {filteredArtworks.map((art) => (
+              {filteredArtworks.map((art, index) => (
                 <motion.div
-                  layout
+                  key={art.id}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  key={art.id}
+                  viewport={{ once: true, margin: '-50px' }}
+                  transition={{ duration: 0.4, delay: index * 0.05 }}
                   onClick={() => !art.isGenerating && art.postId && openDetail(art.postId)}
-                  className={`relative group rounded-xl overflow-hidden cursor-pointer bg-slate-100 ${art.isGenerating ? 'cursor-default' : ''}`}
+                  className={`relative group rounded-xl overflow-hidden cursor-pointer ${art.isGenerating ? 'cursor-default' : ''}`}
+                  style={{ backgroundColor: art.isGenerating ? 'transparent' : '#f1f5f9' }}
                 >
-                  <div className="relative overflow-hidden">
-                    {art.url ? (
-                      <img
-                        src={art.url}
-                        alt={art.title}
-                        className={`w-full h-auto object-cover transition-all duration-700 ${
-                          art.isGenerating ? 'blur-md scale-110 opacity-80 grayscale-[30%]' : 'group-hover:scale-105'
-                        }`}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full aspect-[16/10] bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200" />
-                    )}
-                    {art.isGenerating && (
-                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/10 backdrop-blur-[2px]">
-                        <div className="relative mb-4">
-                          <div className="absolute inset-0 bg-purple-500/30 blur-xl rounded-full animate-pulse" />
+                  {art.isGenerating ? (
+                    <div
+                      className="relative w-full h-[220px]"
+                      style={{ background: art.url
+                        ? `url(${art.url}) center/cover no-repeat`
+                        : 'linear-gradient(135deg, #a855f7, #f9a8d4, #60a5fa)'
+                      }}
+                    >
+                      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                        <div className="relative mb-3">
                           <div className="w-12 h-12 rounded-full border-[3px] border-white/20 border-t-white border-r-white/50 animate-spin" />
                           <div className="absolute inset-0 flex items-center justify-center">
                             <Sparkles className="text-white drop-shadow-md animate-pulse" size={18} />
                           </div>
                         </div>
-                        <motion.div key={art.generatingText} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-center">
-                          <span className="text-white font-bold text-sm tracking-wide drop-shadow-md">{art.generatingText || '正在构思...'}</span>
-                        </motion.div>
+                        <AnimatePresence mode="wait">
+                          <motion.span
+                            key={art.generatingText}
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -5 }}
+                            className="text-white font-bold text-sm tracking-wide drop-shadow-md"
+                          >
+                            {art.generatingText || '正在构思...'}
+                          </motion.span>
+                        </AnimatePresence>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="relative overflow-hidden">
+                      <img
+                        src={art.url}
+                        alt={art.title}
+                        className="w-full h-auto object-cover transition-all duration-700 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
                   {!art.isGenerating && (
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-4">
                       <div className="flex justify-end gap-2">

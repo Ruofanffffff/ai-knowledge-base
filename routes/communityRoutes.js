@@ -178,12 +178,18 @@ router.post('/publish', authMiddleware, (req, res) => {
                 return;
               }
 
-              // 插入社区帖子（封面由 AI 异步生成，初始为 null）
+              // 插入社区帖子
+              // 逻辑：如果文档内容有图片，随机选一张作为封面；否则触发 AI 异步生成
               const summary = extractTextFromContent(doc.content);
+              const contentImages = extractImagesFromContent(doc.content);
+              const coverImage = contentImages.length > 0
+                ? contentImages[Math.floor(Math.random() * contentImages.length)]
+                : null;
+
               db.run(
                 `INSERT INTO community_posts (user_id, document_id, title, summary, cover_image, tags, likes, view_count, status)
                  VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'published')`,
-                [userId, documentId, doc.title, summary, null, doc.tags],
+                [userId, documentId, doc.title, summary, coverImage, doc.tags],
                 function (err) {
                   if (err) {
                     console.error('插入社区帖子失败:', err);
@@ -195,8 +201,8 @@ router.post('/publish', authMiddleware, (req, res) => {
 
                   const postId = this.lastID;
 
-                  // 异步触发 AI 封面生成（fire-and-forget）
-                  if (coverGenerationService) {
+                  // 仅当文档无图片时，异步触发 AI 封面生成（fire-and-forget）
+                  if (!coverImage && coverGenerationService) {
                     coverGenerationService.generateCover(postId, documentId)
                       .catch(err => console.error('[CoverGen] 封面生成失败:', err.message));
                   }
