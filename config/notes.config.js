@@ -70,10 +70,15 @@ const notesConfig = {
 
   // 封面图AI生成配置
   // 使用字节火山引擎即梦AI（seedream）模型为社区帖子生成封面图
+  // 支持两种认证方式：
+  // 1. API Key 方式：配置 ARK_API_KEY
+  // 2. AKSK 方式：配置 VOLCENGINE_ACCESS_KEY_ID 和 VOLCENGINE_SECRET_ACCESS_KEY
   coverGeneration: {
     provider: process.env.IMAGE_GEN_LLM_PROVIDER || 'volcengine',
-    model: process.env.JIMENG_MODEL || process.env.IMAGE_GEN_LLM_MODEL || 'seedream-3-0-t2i-250415',
-    apiKey: process.env.VOLCENGINE_API_KEY,
+    model: process.env.JIMENG_MODEL || process.env.IMAGE_GEN_LLM_MODEL || 'doubao-seedream-4-5-251128',
+    apiKey: process.env.ARK_API_KEY || process.env.VOLCENGINE_API_KEY,
+    accessKeyId: process.env.VOLCENGINE_ACCESS_KEY_ID,
+    secretAccessKey: process.env.VOLCENGINE_SECRET_ACCESS_KEY,
     baseURL: process.env.JIMENG_API_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3',
     imageSize: process.env.JIMENG_IMAGE_SIZE || '1024x576',
     timeout: parseInt(process.env.JIMENG_TIMEOUT || '60000', 10),

@@ -806,7 +806,7 @@ class ApiService {
     page?: number;
     limit?: number;
     sort?: 'latest' | 'hottest';
-    filter?: 'mine';
+    filter?: 'mine' | 'liked';
     search?: string;
   }): Promise<ApiResponse<{
     posts: CommunityPost[];
@@ -867,6 +867,36 @@ class ApiService {
     try {
       await apiClient.delete(`/community/posts/${postId}`);
       return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+  /**
+   * 更新帖子
+   */
+  async updatePost(postId: number, data: { title?: string; summary?: string }): Promise<ApiResponse<{ id: number; title?: string; summary?: string; updated_at: string }>> {
+    try {
+      const response = await apiClient.put(`/community/posts/${postId}`, data);
+      return { success: true, data: response.data.data || response.data };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
+  /**
+   * 批量删除帖子
+   */
+  async batchDeletePosts(postIds: number[]): Promise<ApiResponse<{ deleted: number[]; failed: { id: number; reason: string }[] }>> {
+    try {
+      const response = await apiClient.post('/community/posts/batch-delete', { postIds });
+      return { success: true, data: response.data.data || response.data };
     } catch (error) {
       return {
         success: false,

@@ -177,8 +177,12 @@ export function Graph() {
   // 当 graphData 更新时，运行力导向布局
   useEffect(() => {
     if (graphData.nodes.length === 0) {
-      setGraphNodes([]);
-      setGraphLinks([]);
+      // 只有在非加载状态下才清空节点，避免加载时的闪烁
+      // 或者如果是首次加载（当前没有任何节点），也允许清空（保持空状态）
+      if (!isLoading || graphNodes.length === 0) {
+        setGraphNodes([]);
+        setGraphLinks([]);
+      }
       return;
     }
 
@@ -354,12 +358,21 @@ export function Graph() {
          </div>
       </div>
       
-      {isLoading && (
+      {/* 仅在无数据时显示全屏加载 - 已移除，改为非阻塞 */}
+      {/* {isLoading && graphNodes.length === 0 && (
         <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
           <div className="text-center">
             <Loader2 size={40} className="animate-spin text-purple-600 mx-auto mb-2" />
             <p className="text-slate-600">加载知识图谱数据...</p>
           </div>
+        </div>
+      )} */}
+
+      {/* 有数据时的非阻塞加载提示 */}
+      {isLoading && (
+        <div className="absolute top-20 right-6 z-20 bg-white/90 backdrop-blur-sm shadow-sm border border-purple-100 rounded-full px-4 py-1.5 flex items-center gap-2 pointer-events-none">
+          <Loader2 size={14} className="animate-spin text-purple-600" />
+          <span className="text-xs text-purple-600 font-medium">更新数据中...</span>
         </div>
       )}
       
@@ -374,7 +387,8 @@ export function Graph() {
         </div>
       )}
       
-      {!isLoading && !error && graphData.nodes.length === 0 && (
+      {/* 暂无图谱数据遮罩层 - 已移除，确保不阻塞操作 */}
+      {/* {!isLoading && !error && graphData.nodes.length === 0 && (
         <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
           <div className="text-center max-w-md px-4">
             <div className="text-slate-400 mb-2 text-4xl">📭</div>
@@ -382,7 +396,7 @@ export function Graph() {
             <p className="text-slate-600">请先上传文档并构建知识图谱</p>
           </div>
         </div>
-      )}
+      )} */}
       
       {/* SVG Graph */}
       <div ref={containerRef} className="w-full h-full">

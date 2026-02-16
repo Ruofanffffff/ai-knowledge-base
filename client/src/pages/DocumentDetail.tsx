@@ -77,7 +77,9 @@ export default function DocumentDetail() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [structuredData, setStructuredData] = useState<StructuredSummary | null>(null);
-  const [summaryError, setSummaryError] = useState<string | null>(null);;
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  // 新增：视图模式 'preview' | 'edit'
+  const [viewMode, setViewMode] = useState<'preview' | 'edit'>('edit');
   
   const models = [
     { id: 'deepseek-chat', name: 'DeepSeek Chat' },
@@ -95,11 +97,54 @@ export default function DocumentDetail() {
     }
   }, [id]);
 
+  // 轮询文档状态（针对正在处理中的文档）
+  useEffect(() => {
+    let pollingTimer: NodeJS.Timeout;
+
+    if (document && document.content && document.content.includes('[PROCESSING]')) {
+      const pollDocument = async () => {
+        try {
+          const response = await apiClient.get(`/documents/${document.id}`);
+          const newDoc = response.data;
+          
+          // 只要内容发生变化，就立即更新（即使包含错误信息）
+          // 只有当新内容依然包含 [PROCESSING] 时才保持 polling
+          if (newDoc.content !== document.content) {
+            setDocument(newDoc);
+            setEditContent(newDoc.content);
+          }
+          
+          // 如果新内容已经处理完成（不包含 PROCESSING），则停止轮询
+          if (!newDoc.content.includes('[PROCESSING]')) {
+            if (pollingTimer) clearInterval(pollingTimer);
+          }
+        } catch (error) {
+          console.error('Polling failed:', error);
+        }
+      };
+
+      // 每2秒轮询一次，加快响应速度
+      pollingTimer = setInterval(pollDocument, 2000);
+    }
+
+    return () => {
+      if (pollingTimer) clearInterval(pollingTimer);
+    };
+  }, [document, viewMode]);
+
   const loadDocument = async (documentId: string) => {
     try {
       setIsLoading(true);
       const response = await apiClient.get(`/documents/${documentId}`);
-      setDocument(response.data);
+      const docData = response.data;
+      setDocument(docData);
+      
+      // 如果是 PDF 文件，默认进入预览模式
+      if (docData.fileType === '.pdf') {
+        setViewMode('preview');
+      } else {
+        setViewMode('edit');
+      }
     } catch (error: any) {
       console.error('加载文档失败:', error);
       
@@ -385,6 +430,32 @@ export default function DocumentDetail() {
           </button>
           
           <div className="w-px h-5 bg-slate-200 mx-0.5"></div>
+
+          {/* 视图切换按钮 (仅针对PDF) */}
+          {document.fileType === '.pdf' && (
+            <div className="flex bg-slate-100 rounded-lg p-0.5 mr-2">
+              <button
+                onClick={() => setViewMode('preview')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                  viewMode === 'preview'
+                    ? 'bg-white text-slate-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                原件预览
+              </button>
+              <button
+                onClick={() => setViewMode('edit')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                  viewMode === 'edit'
+                    ? 'bg-white text-slate-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                提取文本
+              </button>
+            </div>
+          )}
           
           <button className="text-slate-400 hover:text-violet-600 p-1.5 hover:bg-violet-50 rounded-lg transition-colors" title="下载">
             <Download size={16} />
@@ -405,10 +476,65 @@ export default function DocumentDetail() {
       {/* Content Area */}
       <div className="flex-1 overflow-hidden relative flex">
         {/* Main Document Content */}
-        <div className={`flex-1 overflow-y-auto transition-all duration-300 p-4 md:p-8 bg-slate-100 ${showChatPanel && !isMobile ? 'w-1/2' : 'w-full'}`}>
-          <div className="max-w-[850px] mx-auto bg-white shadow-md min-h-[1100px] rounded-sm px-8 py-10 md:px-16 md:py-14">
-            {/* Document Header */}
-            <div className="mb-10 border-b border-slate-100 pb-6">
+        <div className={`flex-1 transition-all duration-300 bg-slate-100 ${
+          showChatPanel && !isMobile ? 'w-1/2' : 'w-full'
+        } ${
+          viewMode === 'preview' && document.fileType === '.pdf' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto p-4 md:p-8'
+        }`}>
+          <div className={`mx-auto bg-white shadow-md rounded-sm transition-all duration-300 relative ${
+            viewMode === 'preview' && document.fileType === '.pdf' 
+              ? 'w-full h-full p-0 flex flex-col' 
+              : 'max-w-[850px] min-h-[1100px] px-8 py-10 md:px-16 md:py-14'
+          }`}>
+            {/* 加载状态覆盖层 - 纯净磨砂版 */}
+             {viewMode === 'edit' && (document.content.includes('[PROCESSING]') || editContent.includes('[PROCESSING]')) && (
+               <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/60 backdrop-blur-xl transition-all duration-500 rounded-sm">
+                 {/* 状态提示容器 */}
+                 <div className="bg-white/80 backdrop-blur-md border border-white/60 shadow-xl shadow-purple-500/10 rounded-2xl px-8 py-6 flex flex-col items-center gap-4 z-50 ring-1 ring-black/5 max-w-sm text-center">
+                   <div className="relative w-10 h-10">
+                     {/* 渐变 Spinner */}
+                     <svg className="animate-spin w-full h-full" viewBox="0 0 24 24">
+                       <defs>
+                         <linearGradient id="spinner-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                           <stop offset="0%" stopColor="#8b5cf6" /> {/* violet-500 */}
+                           <stop offset="100%" stopColor="#9333ea" /> {/* purple-600 */}
+                         </linearGradient>
+                       </defs>
+                       <circle 
+                         className="opacity-20" 
+                         cx="12" cy="12" r="10" 
+                         stroke="currentColor" strokeWidth="3" 
+                         fill="none" 
+                         style={{ color: '#8b5cf6' }} 
+                       />
+                       <path 
+                         className="opacity-100" 
+                         fill="currentColor" 
+                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                         style={{ color: 'url(#spinner-gradient)' }}
+                         stroke="url(#spinner-gradient)"
+                         strokeWidth="3"
+                         strokeLinecap="round"
+                       />
+                     </svg>
+                   </div>
+                   
+                   <div className="space-y-1">
+                     <h3 className="text-base font-semibold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                       AI 正在识别文本内容
+                     </h3>
+                     <p className="text-xs text-slate-500">
+                       正在进行OCR识别与版面还原，请稍候...
+                     </p>
+                   </div>
+                 </div>
+               </div>
+             )}
+
+            {/* Document Header - Hide in preview mode or adjust padding */}
+            <div className={`border-b border-slate-100 pb-6 ${
+              viewMode === 'preview' && document.fileType === '.pdf' ? 'hidden' : 'mb-10'
+            }`}>
               <h1 className="text-3xl font-bold text-slate-800 mb-3 leading-tight">{document.title}</h1>
               <div className="flex items-center gap-4 text-xs text-slate-400">
                 <span>更新于 {new Date(document.updatedAt).toLocaleDateString()}</span>
@@ -425,22 +551,32 @@ export default function DocumentDetail() {
               </div>
             </div>
 
-            {isJsonContent(document.content) ? (
-              <div onDoubleClick={handleDoubleClick}>
+            {isJsonContent(document.content) && viewMode === 'edit' ? (
+              <div onDoubleClick={handleDoubleClick} key={document.updatedAt + document.content.length}>
                 <RichTextEditor
                   content={JSON.parse(document.content)}
                   editable={isEditing}
                   onChange={(json) => setEditContent(JSON.stringify(json))}
                 />
               </div>
+            ) : viewMode === 'preview' && document.fileType === '.pdf' ? (
+              <div className="w-full h-full bg-slate-100 rounded-sm overflow-hidden">
+                <iframe
+                  src={`${apiClient.defaults.baseURL?.replace('/api', '')}/uploads/${document.metadata?.filename || ''}`}
+                  className="w-full h-full border-0"
+                  title="PDF Preview"
+                />
+              </div>
             ) : isEditing ? (
               <div className="relative min-h-[800px] flex flex-col">
                  <textarea
+                   key={document.updatedAt + document.content.length} // Force re-render when content updates
                    ref={textareaRef}
                    value={editContent}
                    onChange={(e) => setEditContent(e.target.value)}
                    className="w-full min-h-[800px] p-0 border-0 outline-none resize-none overflow-hidden text-slate-700 leading-8 text-base font-sans bg-transparent"
                    autoFocus
+                   readOnly={editContent.includes('[PROCESSING]')}
                  />
                  <div className="fixed bottom-8 right-8 z-50 transition-opacity duration-300">
                     <span className={`px-4 py-2 rounded-full text-sm font-medium shadow-sm backdrop-blur-sm

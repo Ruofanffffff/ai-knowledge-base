@@ -134,10 +134,21 @@ router.post('/publish', authMiddleware, (req, res) => {
     let processed = 0;
 
     documentIds.forEach((documentId) => {
+      // 将字符串ID转换为整数（前端传递的是字符串，数据库存储的是整数）
+      const numericDocId = parseInt(documentId, 10);
+      if (isNaN(numericDocId)) {
+        skipped.push({ documentId, reason: '无效的文档ID' });
+        processed++;
+        if (processed === documentIds.length) {
+          return res.json({ success: true, data: { published, skipped } });
+        }
+        return;
+      }
+
       // 查询文档信息
       db.get(
         'SELECT id, title, content, tags FROM documents WHERE id = ?',
-        [documentId],
+        [numericDocId],
         (err, doc) => {
           if (err) {
             console.error('查询文档失败:', err);
@@ -159,7 +170,7 @@ router.post('/publish', authMiddleware, (req, res) => {
           // 检查是否已发布
           db.get(
             'SELECT id FROM community_posts WHERE document_id = ?',
-            [documentId],
+            [numericDocId],
             (err, existing) => {
               if (err) {
                 console.error('查询社区帖子失败:', err);
@@ -189,7 +200,7 @@ router.post('/publish', authMiddleware, (req, res) => {
               db.run(
                 `INSERT INTO community_posts (user_id, document_id, title, summary, cover_image, tags, likes, view_count, status)
                  VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'published')`,
-                [userId, documentId, doc.title, summary, coverImage, doc.tags],
+                [userId, numericDocId, doc.title, summary, coverImage, doc.tags],
                 function (err) {
                   if (err) {
                     console.error('插入社区帖子失败:', err);
@@ -203,13 +214,13 @@ router.post('/publish', authMiddleware, (req, res) => {
 
                   // 仅当文档无图片时，异步触发 AI 封面生成（fire-and-forget）
                   if (!coverImage && coverGenerationService) {
-                    coverGenerationService.generateCover(postId, documentId)
+                    coverGenerationService.generateCover(postId, numericDocId)
                       .catch(err => console.error('[CoverGen] 封面生成失败:', err.message));
                   }
 
                   published.push({
                     id: postId,
-                    documentId,
+                    documentId: numericDocId,
                     title: doc.title
                   });
                   processed++;
@@ -260,6 +271,10 @@ router.get('/posts', authMiddleware, (req, res) => {
       params.push(userId);
     }
 
+    if (filter === 'liked') {
+      conditions.push('cl.id IS NOT NULL');
+    }
+
     if (search) {
       conditions.push('(cp.title LIKE ? OR cp.summary LIKE ?)');
       params.push(`%${search}%`, `%${search}%`);
@@ -268,10 +283,23 @@ router.get('/posts', authMiddleware, (req, res) => {
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
     const orderBy = sort === 'hottest' ? 'cp.likes DESC' : 'cp.created_at DESC';
 
-    // Count total
-    const countSql = `SELECT COUNT(*) as total FROM community_posts cp ${whereClause}`;
+    let countSql;
+    let countParams;
+    
+    if (filter === 'liked') {
+      countSql = `
+        SELECT COUNT(*) as total 
+        FROM community_posts cp
+        LEFT JOIN community_likes cl ON cl.post_id = cp.id AND cl.user_id = ?
+        WHERE cp.status = 'published' AND cl.id IS NOT NULL
+      `;
+      countParams = [userId];
+    } else {
+      countSql = `SELECT COUNT(*) as total FROM community_posts cp ${whereClause}`;
+      countParams = params;
+    }
 
-    db.get(countSql, params, (err, countRow) => {
+    db.get(countSql, countParams, (err, countRow) => {
       if (err) {
         console.error('查询帖子总数失败:', err);
         return res.status(500).json({
@@ -924,6 +952,102 @@ router.get('/posts/:id', authMiddleware, async (req, res) => {
 });
 
 /**
+ * PUT /api/community/posts/:id
+ * 更新帖子
+ * 
+ * Body: { title?: string, summary?: string }
+ * Response: { success: true, data: { id, title, summary, updated_at } }
+ */
+router.put('/posts/:id', authMiddleware, (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const userId = req.userId;
+    const { title, summary } = req.body;
+
+    if (isNaN(postId)) {
+      return res.status(400).json({
+        success: false,
+        error: '无效的帖子ID'
+      });
+    }
+
+    if (!title && !summary) {
+      return res.status(400).json({
+        success: false,
+        error: '请提供要更新的内容'
+      });
+    }
+
+    db.get(
+      'SELECT id, user_id FROM community_posts WHERE id = ?',
+      [postId],
+      (err, post) => {
+        if (err) {
+          console.error('查询帖子失败:', err);
+          return res.status(500).json({
+            success: false,
+            error: '服务器内部错误'
+          });
+        }
+
+        if (!post) {
+          return res.status(404).json({
+            success: false,
+            error: '帖子不存在'
+          });
+        }
+
+        if (post.user_id !== userId) {
+          return res.status(403).json({
+            success: false,
+            error: '无权修改此帖子'
+          });
+        }
+
+        const updates = [];
+        const params = [];
+        if (title) {
+          updates.push('title = ?');
+          params.push(title);
+        }
+        if (summary !== undefined) {
+          updates.push('summary = ?');
+          params.push(summary);
+        }
+        updates.push('updated_at = CURRENT_TIMESTAMP');
+        params.push(postId);
+
+        db.run(
+          `UPDATE community_posts SET ${updates.join(', ')} WHERE id = ?`,
+          params,
+          (err) => {
+            if (err) {
+              console.error('更新帖子失败:', err);
+              return res.status(500).json({
+                success: false,
+                error: '服务器内部错误'
+              });
+            }
+            res.json({
+              success: true,
+              data: {
+                id: postId,
+                title: title || undefined,
+                summary: summary || undefined,
+                updated_at: new Date().toISOString()
+              }
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('更新帖子失败:', error);
+    res.status(500).json({ success: false, error: '服务器内部错误' });
+  }
+});
+
+/**
  * DELETE /api/community/posts/:id
  * 取消发布（删除帖子）
  * 
@@ -1040,6 +1164,124 @@ router.delete('/posts/:id', authMiddleware, (req, res) => {
       success: false,
       error: '服务器内部错误'
     });
+  }
+});
+
+/**
+ * POST /api/community/posts/batch-delete
+ * 批量删除帖子
+ * 
+ * Body: { postIds: number[] }
+ * Response: { success: true, data: { deleted: number[], failed: { id: number, reason: string }[] } }
+ */
+router.post('/posts/batch-delete', authMiddleware, (req, res) => {
+  try {
+    const { postIds } = req.body;
+    const userId = req.userId;
+
+    if (!postIds || !Array.isArray(postIds) || postIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '请提供要删除的帖子ID列表'
+      });
+    }
+
+    const deleted = [];
+    const failed = [];
+    let processed = 0;
+
+    postIds.forEach((postId) => {
+      const numericId = parseInt(postId);
+      if (isNaN(numericId)) {
+        failed.push({ id: postId, reason: '无效的帖子ID' });
+        processed++;
+        if (processed === postIds.length) {
+          return res.json({ success: true, data: { deleted, failed } });
+        }
+        return;
+      }
+
+      db.get(
+        'SELECT id, user_id FROM community_posts WHERE id = ?',
+        [numericId],
+        (err, post) => {
+          if (err) {
+            failed.push({ id: numericId, reason: '查询失败' });
+            processed++;
+            if (processed === postIds.length) {
+              return res.json({ success: true, data: { deleted, failed } });
+            }
+            return;
+          }
+
+          if (!post) {
+            failed.push({ id: numericId, reason: '帖子不存在' });
+            processed++;
+            if (processed === postIds.length) {
+              return res.json({ success: true, data: { deleted, failed } });
+            }
+            return;
+          }
+
+          if (post.user_id !== userId) {
+            failed.push({ id: numericId, reason: '无权删除' });
+            processed++;
+            if (processed === postIds.length) {
+              return res.json({ success: true, data: { deleted, failed } });
+            }
+            return;
+          }
+
+          db.run('DELETE FROM community_likes WHERE post_id = ?', [numericId], (err) => {
+            if (err) {
+              failed.push({ id: numericId, reason: '删除点赞记录失败' });
+              processed++;
+              if (processed === postIds.length) {
+                return res.json({ success: true, data: { deleted, failed } });
+              }
+              return;
+            }
+
+            db.run('DELETE FROM community_bookmarks WHERE post_id = ?', [numericId], (err) => {
+              if (err) {
+                failed.push({ id: numericId, reason: '删除收藏记录失败' });
+                processed++;
+                if (processed === postIds.length) {
+                  return res.json({ success: true, data: { deleted, failed } });
+                }
+                return;
+              }
+
+              db.run('DELETE FROM community_comments WHERE post_id = ?', [numericId], (err) => {
+                if (err) {
+                  failed.push({ id: numericId, reason: '删除评论记录失败' });
+                  processed++;
+                  if (processed === postIds.length) {
+                    return res.json({ success: true, data: { deleted, failed } });
+                  }
+                  return;
+                }
+
+                db.run('DELETE FROM community_posts WHERE id = ?', [numericId], (err) => {
+                  if (err) {
+                    failed.push({ id: numericId, reason: '删除帖子失败' });
+                  } else {
+                    deleted.push(numericId);
+                  }
+                  processed++;
+                  if (processed === postIds.length) {
+                    return res.json({ success: true, data: { deleted, failed } });
+                  }
+                });
+              });
+            });
+          });
+        }
+      );
+    });
+  } catch (error) {
+    console.error('批量删除帖子失败:', error);
+    res.status(500).json({ success: false, error: '服务器内部错误' });
   }
 });
 

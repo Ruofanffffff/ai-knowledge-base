@@ -9,6 +9,8 @@ const cors = require('cors');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { Document, Packer, Paragraph, TextRun } = require('docx');
 const JSZip = require('jszip');
+const pdf = require('pdf-parse');
+const { processPdfWithOcr } = require('./services/pdfOcrService');
 require('dotenv').config();
 
 // KG Pipeline Service (redesigned)
@@ -1320,6 +1322,103 @@ app.post('/api/tags', (req, res) => {
   }
 });
 
+// 异步 PDF 处理逻辑
+const processPdfAsync = async (filePath, docId, userId) => {
+  try {
+    console.log(`[AsyncPDF] Starting background processing for docId: ${docId}`);
+    let finalContent = '';
+    const dataBuffer = fs.readFileSync(filePath);
+    let data;
+    
+    // 1. 尝试标准解析
+    try {
+      data = await pdf(dataBuffer);
+    } catch (pdfError) {
+      console.warn('[AsyncPDF] Standard parsing failed:', pdfError.message);
+      data = { text: '' };
+    }
+    
+    let extractedText = data.text || '';
+    
+    // 2. 如果文本过短，调用 OCR
+    if (!extractedText || extractedText.length < 100) {
+      console.log('[AsyncPDF] Text too short, invoking Aliyun OCR...');
+      try {
+        const ocrText = await processPdfWithOcr(filePath);
+        if (ocrText && ocrText.length > 50) {
+          extractedText = ocrText;
+        }
+      } catch (ocrError) {
+        console.error('[AsyncPDF] OCR failed:', ocrError);
+      }
+    }
+    
+    // 3. 确定最终内容
+    if (extractedText && extractedText.length > 0) {
+      // 简单分段逻辑
+      const paragraphs = extractedText.split(/\n+/).map(line => line.trim()).filter(line => line.length > 0);
+      
+      // 辅助函数：将纯文本段落数组转换为 Tiptap JSON 格式
+      const textToTiptapJson = (paragraphs) => {
+        const doc = {
+          type: 'doc',
+          content: paragraphs.map(text => ({
+            type: 'paragraph',
+            content: text ? [{ type: 'text', text }] : []
+          }))
+        };
+        if (doc.content.length === 0) doc.content.push({ type: 'paragraph', content: [] });
+        return JSON.stringify(doc);
+      };
+      
+      finalContent = textToTiptapJson(paragraphs);
+    } else {
+      const textToTiptapJson = (paragraphs) => {
+        const doc = { type: 'doc', content: paragraphs.map(text => ({ type: 'paragraph', content: text ? [{ type: 'text', text }] : [] })) };
+        return JSON.stringify(doc);
+      };
+      finalContent = textToTiptapJson(['(此文档为图片或扫描件，OCR识别失败，请查看预览)']);
+    }
+    
+    // 4. 精确更新数据库
+    const updateSql = `UPDATE documents SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`;
+    userDb.run(updateSql, [finalContent, docId, userId], (err) => {
+      if (err) {
+        console.error('[AsyncPDF] DB Update failed:', err);
+      } else {
+        console.log(`[AsyncPDF] Document ${docId} content updated successfully`);
+        
+        // 5. 触发知识图谱构建 (延迟触发，确保内容已更新)
+        // 构造一个完整的 document 对象用于 KG 构建
+        // 注意：我们需要重新获取文档元数据，或者使用传入的 filePath 等信息重构
+        // 为简化，这里我们假设 onDocumentCreated 可以处理基本的 document 结构
+        // 但更好的做法是重新查询文档，这里为了性能我们只构造必要的字段
+        
+        // 由于 onDocumentCreated 需要 document 对象，我们构造一个包含最新内容的临时对象
+        // 注意：这里没有 metadata，可能会影响某些处理，但在知识图谱生成中主要用 content
+        const tempDoc = {
+          id: docId,
+          content: finalContent,
+          type: 'document',
+          userId: userId
+        };
+        
+        console.log('[AsyncPDF] 内容更新完成，触发延迟的知识图谱构建...');
+        if (onDocumentCreated) {
+          onDocumentCreated(tempDoc, { async: true, skipIfExists: false })
+            .then(result => console.log('[KG Hook] 异步PDF处理后知识图谱构建结果:', result))
+            .catch(error => console.error('[KG Hook] 异步PDF处理后知识图谱构建失败:', error));
+        }
+      }
+    });
+    
+  } catch (bgError) {
+    console.error('[AsyncPDF] Background processing error:', bgError);
+    // 尝试更新错误状态，但也需要 textToTiptapJson
+    // 简单起见这里不再重复定义，只 log
+  }
+};
+
 // 文件上传处理函数
 const handleFileUpload = async (req, res) => {
   try {
@@ -1405,6 +1504,14 @@ const handleFileUpload = async (req, res) => {
         console.error('Error parsing docx file:', error);
         content = textToTiptapJson(['无法解析docx文件内容']);
       }
+    } else if (fileType === '.pdf') {
+      // 异步 PDF 处理逻辑：
+      // 1. 设置初始状态为 [PROCESSING]
+      // 2. 立即返回成功响应
+      // 3. 后台启动 OCR 任务 (在 DB 插入成功后触发)
+      content = textToTiptapJson(['[PROCESSING] 文档正在解析中，请稍候...']);
+      // processPdfAsync 将在 userDb.run 的回调中调用
+      
     } else if (fileType === '.doc') {
       // 对于旧版doc文件，提供提示信息
       content = textToTiptapJson(['旧版.doc文件暂不支持直接预览，建议转换为.docx格式']);
@@ -1505,6 +1612,24 @@ const handleFileUpload = async (req, res) => {
         
         const documentId = this.lastID.toString();
         
+        // 如果是 PDF 且处于处理中状态，触发后台解析，并跳过知识图谱构建
+        if (fileType === '.pdf' && content.includes('[PROCESSING]')) {
+          console.log('[Upload] PDF异步处理模式：跳过初始知识图谱构建，等待内容解析完成...');
+          processPdfAsync(filePath, documentId, userId).catch(err => 
+            console.error('[AsyncPDF] Trigger failed:', err)
+          );
+        } else {
+          // 非 PDF 或非异步处理，立即触发知识图谱构建
+          console.log('[Upload] 同步处理模式：开始触发知识图谱构建...');
+          if (onDocumentCreated) onDocumentCreated(document, { async: true, skipIfExists: false })
+            .then(result => {
+              console.log('[KG Hook] 文档上传后知识图谱构建结果:', result);
+            })
+            .catch(error => {
+              console.error('[KG Hook] 文档上传后知识图谱构建失败:', error);
+            });
+        }
+        
         const document = {
           id: documentId,
           title: title,
@@ -1518,8 +1643,10 @@ const handleFileUpload = async (req, res) => {
           updatedAt: new Date().toISOString()
         };
         
-        console.log('[Upload] 文档上传成功，ID:', documentId, '开始触发知识图谱构建...');
+        console.log('[Upload] 文档上传成功，ID:', documentId);
         
+        // 移除重复的知识图谱触发逻辑 (因为已经在上面处理了)
+        /*
         // 触发知识图谱构建钩子 (异步)
         if (onDocumentCreated) onDocumentCreated(document, { async: true, skipIfExists: false })
           .then(result => {
@@ -1528,6 +1655,7 @@ const handleFileUpload = async (req, res) => {
           .catch(error => {
             console.error('[KG Hook] 文档上传后知识图谱构建失败:', error);
           });
+        */
         
         // 返回成功响应，包含 success 标志和文档元数据
         res.status(201).json({
@@ -1674,6 +1802,50 @@ app.post('/api/documents/upload/resolve-duplicate', authMiddleware, async (req, 
       } catch (error) {
         console.error('[ResolveDuplicate] Error parsing docx file:', error);
         content = '无法解析docx文件内容';
+      }
+    } else if (fileType === '.pdf') {
+      try {
+        const dataBuffer = fs.readFileSync(tempFile.path);
+        
+        let data;
+        try {
+          data = await pdf(dataBuffer);
+        } catch (pdfError) {
+          console.warn('[ResolveDuplicate] PDF standard parsing failed:', pdfError.message);
+          data = { text: '' };
+        }
+        
+        let extractedText = data.text || '';
+        
+        // OCR 兜底逻辑
+        if (extractedText.length < 100) {
+          console.log('[ResolveDuplicate] PDF text too short, attempting OCR...');
+          try {
+            const ocrText = await processPdfWithOcr(tempFile.path);
+            if (ocrText && ocrText.length > 50) {
+              extractedText = ocrText;
+            }
+          } catch (ocrError) {
+            console.error('[ResolveDuplicate] OCR failed:', ocrError);
+          }
+        }
+        
+        content = extractedText || '(此文档为图片或扫描件，OCR识别失败，请查看预览)';
+      } catch (error) {
+        console.error('[ResolveDuplicate] Error parsing pdf file:', error);
+        
+        // 解析失败尝试 OCR
+        try {
+          const ocrText = await processPdfWithOcr(tempFile.path);
+          if (ocrText && ocrText.length > 50) {
+            content = ocrText;
+          } else {
+            content = '(PDF 解析失败，请查看预览。原因：OCR识别未返回有效文本)';
+          }
+        } catch (ocrError) {
+          console.error('[ResolveDuplicate] OCR Fallback failed:', ocrError.message);
+          content = `(PDF 解析失败，请查看预览。系统错误：${ocrError.message})`;
+        }
       }
     }
     
@@ -3235,8 +3407,9 @@ app.get('/api/knowledge-graph', (req, res) => {
     const needRegenerate = documents.length !== lastKnowledgeGraphDocCount || 
                           currentHash !== lastKnowledgeGraphDocHash;
     
-    if (needRegenerate || !cachedKnowledgeGraph || !cachedKnowledgeGraph.entities || cachedKnowledgeGraph.entities.length === 0) {
-      console.log('文档内容变化或缓存为空，需要重新生成知识图谱');
+    // 如果缓存为空且需要重新生成，则返回空并提示需要生成
+    if ((!cachedKnowledgeGraph || !cachedKnowledgeGraph.entities || cachedKnowledgeGraph.entities.length === 0) && needRegenerate) {
+      console.log('缓存为空且文档有更新，需要重新生成知识图谱');
       return res.json({
         success: true,
         entities: null,
@@ -3246,12 +3419,14 @@ app.get('/api/knowledge-graph', (req, res) => {
       });
     }
     
+    // 否则返回缓存（即使需要更新），并标记 needRegenerate
+    // 这样前端可以先显示旧图谱，同时后台触发更新（或者前端根据标记触发）
     res.json({
       success: true,
-      entities: cachedKnowledgeGraph.entities,
-      relations: cachedKnowledgeGraph.relations,
-      needRegenerate: false,
-      message: '使用缓存的知识图谱'
+      entities: cachedKnowledgeGraph ? cachedKnowledgeGraph.entities : [],
+      relations: cachedKnowledgeGraph ? cachedKnowledgeGraph.relations : [],
+      needRegenerate: needRegenerate,
+      message: needRegenerate ? '返回缓存的知识图谱（数据已过期，建议更新）' : '使用缓存的知识图谱'
     });
   } catch (error) {
     console.error('获取知识图谱失败:', error);

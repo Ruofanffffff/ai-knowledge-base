@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-// @ts-ignore - no types for react-responsive-masonry
-import Masonry, { ResponsiveMasonry } from "react-responsive-masonry";
 import {
-  Search, Heart, Share2, MoreHorizontal, SlidersHorizontal,
-  Image as ImageIcon, Video, Layers, Wand2, X,
+  Search, Heart, Share2, SlidersHorizontal,
+  Layers, Wand2, X,
   Maximize2, BookOpen, Sparkles, GitFork, Network, Zap,
-  ChevronLeft, ChevronRight, Loader2, FileText, MessageCircle, Bookmark
+  ChevronLeft, ChevronRight, Loader2, FileText, MessageCircle, Bookmark,
+  MoreHorizontal, Edit2, Trash2, CheckSquare, Square
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -15,8 +14,32 @@ import { getAvatarUrl } from '../utils/transformers';
 import { parseIndexSections } from '../utils/parseIndexSections';
 import type { IndexSection } from '../types/document-index';
 
-const tabs = ['Top Day', 'Likes', 'Styles', 'Images', 'Videos'];
+const tabs = ['今日热帖', '已收藏', '我发布的'];
 const generatingTexts = ['正在构思...', '绘制轮廓...', '优化细节...'];
+
+const CARD_COLOR_PALETTES = [
+  { bg: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #fcd34d 100%)', text: '#92400e', subtext: '#a16207' },
+  { bg: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 50%, #93c5fd 100%)', text: '#1e40af', subtext: '#1d4ed8' },
+  { bg: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 50%, #86efac 100%)', text: '#166534', subtext: '#15803d' },
+  { bg: 'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 50%, #f9a8d4 100%)', text: '#9d174d', subtext: '#be185d' },
+  { bg: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 50%, #d8b4fe 100%)', text: '#6b21a8', subtext: '#7c3aed' },
+  { bg: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 50%, #a5b4fc 100%)', text: '#3730a3', subtext: '#4338ca' },
+  { bg: 'linear-gradient(135deg, #ccfbf1 0%, #99f6e4 50%, #5eead4 100%)', text: '#0f766e', subtext: '#0d9488' },
+  { bg: 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 50%, #fdba74 100%)', text: '#9a3412', subtext: '#c2410c' },
+  { bg: 'linear-gradient(135deg, #fef9c3 0%, #fef08a 50%, #fde047 100%)', text: '#854d0e', subtext: '#a16207' },
+  { bg: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #cbd5e1 100%)', text: '#334155', subtext: '#475569' },
+  { bg: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 50%, #fda4af 100%)', text: '#9f1239', subtext: '#be123c' },
+  { bg: 'linear-gradient(135deg, #ecfccb 0%, #d9f99d 50%, #bef264 100%)', text: '#3f6212', subtext: '#4d7c0f' },
+];
+
+function getCardColorPalette(title: string) {
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = ((hash << 5) - hash) + title.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return CARD_COLOR_PALETTES[Math.abs(hash) % CARD_COLOR_PALETTES.length];
+}
 
 interface ArtWork {
   id: string;
@@ -53,7 +76,7 @@ function mapPostToArtwork(post: CommunityPost): ArtWork {
     isBookmarked: post.isBookmarked ?? false,
     commentCount: post.commentCount ?? 0,
     prompt: post.summary || '',
-    isGenerating: !post.coverImage,
+    isGenerating: false,
     postId: post.id,
     documentId: post.documentId,
     authorAvatar: post.authorAvatar,
@@ -64,7 +87,7 @@ function mapPostToArtwork(post: CommunityPost): ArtWork {
 export function Community() {
   const navigate = useNavigate();
   const [artworks, setArtworks] = useState<ArtWork[]>([]);
-  const [activeTab, setActiveTab] = useState('Top Day');
+  const [activeTab, setActiveTab] = useState('今日热帖');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -76,6 +99,27 @@ export function Community() {
   // Generation State
   const [isGenerating] = useState(false);
 
+  // Selection mode for "我发布的" tab
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Edit modal
+  const [editingPost, setEditingPost] = useState<ArtWork | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editSummary, setEditSummary] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+
+  // Delete confirmation
+  const [deletingPost, setDeletingPost] = useState<ArtWork | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Batch delete confirmation
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
+  const [batchDeleteLoading, setBatchDeleteLoading] = useState(false);
+
+  // Dropdown menu
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+
   // Generating text animation timers
   const generatingTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
   // Polling for cover generation
@@ -84,22 +128,35 @@ export function Community() {
   // ─── Load posts from API ───
   const loadPosts = useCallback(async () => {
     setLoading(true);
-    const params: { page: number; sort?: 'latest' | 'hottest'; search?: string } = { page: 1 };
-    if (activeTab === 'Likes') params.sort = 'hottest';
-    else params.sort = 'latest';
-    if (searchQuery.trim()) params.search = searchQuery.trim();
+    try {
+      const params: { page: number; sort?: 'latest' | 'hottest'; search?: string; filter?: 'mine' | 'liked' } = { page: 1 };
+      if (activeTab === '已收藏') {
+        params.filter = 'liked';
+        params.sort = 'latest';
+      } else if (activeTab === '我发布的') {
+        params.filter = 'mine';
+        params.sort = 'latest';
+      } else {
+        params.sort = 'latest';
+      }
+      if (searchQuery.trim()) params.search = searchQuery.trim();
 
-    const result = await apiService.getCommunityPosts(params);
-    if (result.success && result.data) {
-      const items = result.data.posts.map(mapPostToArtwork);
-      setArtworks(items);
-      items.forEach(item => {
-        if (item.isGenerating) startGeneratingAnimation(item.id);
-      });
-    } else {
+      const result = await apiService.getCommunityPosts(params);
+      if (result.success && result.data) {
+        const items = result.data.posts.map(mapPostToArtwork);
+        setArtworks(items);
+        items.forEach(item => {
+          if (item.isGenerating) startGeneratingAnimation(item.id);
+        });
+      } else {
+        setArtworks([]);
+      }
+    } catch (error) {
+      console.error('Failed to load community posts:', error);
       setArtworks([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [activeTab, searchQuery]);
 
   // ─── Cycle generating text for a card ───
@@ -127,8 +184,15 @@ export function Community() {
         return;
       }
       const params: any = { page: 1 };
-      if (activeTab === 'Likes') params.sort = 'hottest';
-      else params.sort = 'latest';
+      if (activeTab === '已收藏') {
+        params.filter = 'liked';
+        params.sort = 'latest';
+      } else if (activeTab === '我发布的') {
+        params.filter = 'mine';
+        params.sort = 'latest';
+      } else {
+        params.sort = 'latest';
+      }
       if (searchQuery.trim()) params.search = searchQuery.trim();
 
       const result = await apiService.getCommunityPosts(params);
@@ -163,6 +227,16 @@ export function Community() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openDropdownId) {
+        setOpenDropdownId(null);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openDropdownId]);
+
   const toggleLike = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     const art = artworks.find(a => a.id === id);
@@ -186,6 +260,132 @@ export function Community() {
   const startGeneration = () => {
     if (isGenerating) return;
     navigate('/documents/new');
+  };
+
+  // ─── Selection mode handlers ───
+  const toggleSelectMode = () => {
+    setIsSelectMode(!isSelectMode);
+    setSelectedIds(new Set());
+    setOpenDropdownId(null);
+  };
+
+  const toggleSelectItem = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(artworks.map(a => a.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  // ─── Edit handlers ───
+  const openEditModal = (art: ArtWork, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setEditingPost(art);
+    setEditTitle(art.title);
+    setEditSummary(art.prompt);
+    setOpenDropdownId(null);
+  };
+
+  const closeEditModal = () => {
+    setEditingPost(null);
+    setEditTitle('');
+    setEditSummary('');
+    setEditLoading(false);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingPost?.postId) return;
+    setEditLoading(true);
+    const result = await apiService.updatePost(editingPost.postId, {
+      title: editTitle,
+      summary: editSummary,
+    });
+    if (result.success) {
+      setArtworks(prev => prev.map(a =>
+        a.id === editingPost.id ? { ...a, title: editTitle, prompt: editSummary } : a
+      ));
+      closeEditModal();
+    } else {
+      alert(result.error || '更新失败');
+    }
+    setEditLoading(false);
+  };
+
+  // ─── Delete handlers ───
+  const openDeleteConfirm = (art: ArtWork, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setDeletingPost(art);
+    setOpenDropdownId(null);
+  };
+
+  const closeDeleteConfirm = () => {
+    setDeletingPost(null);
+    setDeleteLoading(false);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingPost?.postId) {
+      return;
+    }
+    setDeleteLoading(true);
+    const result = await apiService.unpublishPost(deletingPost.postId);
+    if (result.success) {
+      setArtworks(prev => prev.filter(a => a.id !== deletingPost.id));
+      closeDeleteConfirm();
+    } else {
+      alert(result.error || '删除失败');
+    }
+    setDeleteLoading(false);
+  };
+
+  // ─── Batch delete handlers ───
+  const openBatchDeleteConfirm = () => {
+    if (selectedIds.size === 0) return;
+    setShowBatchDeleteConfirm(true);
+  };
+
+  const closeBatchDeleteConfirm = () => {
+    setShowBatchDeleteConfirm(false);
+    setBatchDeleteLoading(false);
+  };
+
+  const handleBatchDeleteConfirm = async () => {
+    const postIds = artworks
+      .filter(a => selectedIds.has(a.id) && a.postId)
+      .map(a => a.postId!);
+    
+    if (postIds.length === 0) return;
+    
+    setBatchDeleteLoading(true);
+    const result = await apiService.batchDeletePosts(postIds);
+    if (result.success) {
+      setArtworks(prev => prev.filter(a => !selectedIds.has(a.id)));
+      setSelectedIds(new Set());
+      setIsSelectMode(false);
+      closeBatchDeleteConfirm();
+    } else {
+      alert(result.error || '批量删除失败');
+    }
+    setBatchDeleteLoading(false);
+  };
+
+  // ─── Dropdown handler ───
+  const toggleDropdown = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setOpenDropdownId(prev => prev === id ? null : id);
   };
 
   // ─── Detail modal ───
@@ -275,7 +475,11 @@ export function Community() {
         {tabs.map(tab => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              setActiveTab(tab);
+              setIsSelectMode(false);
+              setSelectedIds(new Set());
+            }}
             className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === tab ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
@@ -283,16 +487,42 @@ export function Community() {
             {tab}
           </button>
         ))}
-        <div className="h-4 w-px bg-slate-200 mx-2" />
-        <button className="pb-3 text-sm font-medium text-slate-500 hover:text-slate-700 flex items-center gap-2">
-          <ImageIcon size={16} /> Styles
-        </button>
-        <button className="pb-3 text-sm font-medium text-slate-500 hover:text-slate-700 flex items-center gap-2">
-          <Video size={16} /> Videos
-        </button>
+        
+        {activeTab === '我发布的' && filteredArtworks.length > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            {isSelectMode && (
+              <>
+                <button
+                  onClick={selectAll}
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                >
+                  全选
+                </button>
+                <span className="text-slate-300">|</span>
+                <button
+                  onClick={deselectAll}
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                >
+                  取消全选
+                </button>
+                <span className="text-slate-300">|</span>
+              </>
+            )}
+            <button
+              onClick={toggleSelectMode}
+              className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+                isSelectMode 
+                  ? 'bg-red-50 text-red-600 hover:bg-red-100' 
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {isSelectMode ? '取消选择' : '批量管理'}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Masonry Grid */}
+      {/* Grid Layout */}
       <div className="flex-1 overflow-y-auto p-6 bg-white">
         {loading ? (
           <div className="py-8 flex justify-center">
@@ -301,103 +531,167 @@ export function Community() {
         ) : filteredArtworks.length === 0 ? (
           <div className="py-16 text-center text-slate-400 text-sm">暂无帖子</div>
         ) : (
-          <ResponsiveMasonry columnsCountBreakPoints={{350: 1, 750: 2, 1100: 3, 1500: 4}}>
-            <Masonry gutter="16px">
-              {filteredArtworks.map((art, index) => (
-                <motion.div
-                  key={art.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-50px' }}
-                  transition={{ duration: 0.4, delay: index * 0.05 }}
-                  onClick={() => !art.isGenerating && art.postId && openDetail(art.postId)}
-                  className={`relative group rounded-xl overflow-hidden cursor-pointer ${art.isGenerating ? 'cursor-default' : ''}`}
-                  style={{ backgroundColor: art.isGenerating ? 'transparent' : '#f1f5f9' }}
-                >
-                  {art.isGenerating ? (
-                    <div
-                      className="relative w-full h-[220px]"
-                      style={{ background: art.url
-                        ? `url(${art.url}) center/cover no-repeat`
-                        : 'linear-gradient(135deg, #a855f7, #f9a8d4, #60a5fa)'
-                      }}
+          <div className="w-full" style={{ columns: '5 180px', columnGap: '12px' }}>
+            {filteredArtworks.map((art, index) => (
+              <motion.div
+                key={art.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-50px' }}
+                transition={{ duration: 0.4, delay: index * 0.03 }}
+                onClick={() => {
+                  if (isSelectMode && activeTab === '我发布的') {
+                    toggleSelectItem(art.id);
+                  } else if (!art.isGenerating && art.postId) {
+                    openDetail(art.postId);
+                  }
+                }}
+                className={`break-inside-avoid mb-3 bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer w-full relative ${
+                  selectedIds.has(art.id) ? 'ring-2 ring-blue-500' : ''
+                }`}
+              >
+                {isSelectMode && activeTab === '我发布的' && (
+                  <div 
+                    className="absolute top-2 left-2 z-10"
+                    onClick={(e) => toggleSelectItem(art.id, e)}
+                  >
+                    {selectedIds.has(art.id) ? (
+                      <CheckSquare size={20} className="text-blue-500 bg-white rounded" />
+                    ) : (
+                      <Square size={20} className="text-slate-400 bg-white rounded" />
+                    )}
+                  </div>
+                )}
+                
+                {!isSelectMode && activeTab === '我发布的' && (
+                  <div className="absolute top-2 right-2 z-20">
+                    <button
+                      onClick={(e) => toggleDropdown(art.id, e)}
+                      className="p-1.5 bg-white/90 hover:bg-white rounded-full shadow-sm"
                     >
-                      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-                      <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                        <div className="relative mb-3">
-                          <div className="w-12 h-12 rounded-full border-[3px] border-white/20 border-t-white border-r-white/50 animate-spin" />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Sparkles className="text-white drop-shadow-md animate-pulse" size={18} />
-                          </div>
-                        </div>
-                        <AnimatePresence mode="wait">
-                          <motion.span
-                            key={art.generatingText}
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -5 }}
-                            className="text-white font-bold text-sm tracking-wide drop-shadow-md"
-                          >
-                            {art.generatingText || '正在构思...'}
-                          </motion.span>
-                        </AnimatePresence>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="relative overflow-hidden">
-                      <img
-                        src={art.url}
-                        alt={art.title}
-                        className="w-full h-auto object-cover transition-all duration-700 group-hover:scale-105"
-                        loading="lazy"
-                      />
-                    </div>
-                  )}
-                  {!art.isGenerating && (
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-4">
-                      <div className="flex justify-end gap-2">
+                      <MoreHorizontal size={14} className="text-slate-600" />
+                    </button>
+                    {openDropdownId === art.id && (
+                      <div 
+                        className="absolute top-8 right-0 bg-white rounded-lg shadow-lg border border-slate-100 py-1 min-w-[100px] z-30"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
-                          onClick={(e) => toggleLike(art.id, e)}
-                          className={`p-2 rounded-full backdrop-blur-md transition-colors ${art.isLiked ? 'bg-pink-500/20 text-pink-500 hover:bg-pink-500/30' : 'bg-black/20 text-white hover:bg-white/20'}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            openEditModal(art, e);
+                            setOpenDropdownId(null);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                         >
-                          <Heart size={16} fill={art.isLiked ? "currentColor" : "none"} />
+                          <Edit2 size={14} /> 编辑
                         </button>
-                        <button className="p-2 rounded-full bg-black/20 backdrop-blur-md text-white hover:bg-white/20 transition-colors">
-                          <MoreHorizontal size={16} />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            openDeleteConfirm(art, e);
+                            setOpenDropdownId(null);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          <Trash2 size={14} /> 删除
                         </button>
                       </div>
-                      <div>
-                        <h3 className="text-white font-medium text-sm mb-1 truncate">{art.title}</h3>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">
-                              {art.authorAvatar ? (
-                                <img src={getAvatarUrl(art.authorAvatar)} alt="" className="w-5 h-5 rounded-full object-cover" />
-                              ) : (
-                                <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] text-white">
-                                  {art.author?.charAt(0) || '?'}
-                                </span>
-                              )}
-                            </span>
-                            <span className="text-slate-300 text-xs hover:text-white transition-colors">{art.author}</span>
-                          </div>
-                          <span className="text-slate-300 text-xs">{art.likes}</span>
-                        </div>
-                        <div className="mt-3 text-[10px] text-slate-400 line-clamp-2 leading-relaxed opacity-80">{art.prompt}</div>
+                    )}
+                  </div>
+                )}
+                
+                {art.url ? (
+                  <div className="relative">
+                    <img
+                      src={art.url}
+                      alt={art.title}
+                      className="w-full h-auto object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : (
+                  (() => {
+                    const palette = getCardColorPalette(art.title || '');
+                    return (
+                      <div 
+                        className="relative w-full min-h-[120px] flex flex-col items-center justify-center p-4"
+                        style={{ background: palette.bg }}
+                      >
+                        <div className="absolute top-3 right-3 w-12 h-12 rounded-full bg-white/30 blur-xl" />
+                        <FileText className="mb-2 drop-shadow-sm relative z-10" size={24} style={{ color: palette.text }} />
+                        <h3 className="font-semibold text-xs line-clamp-2 text-center relative z-10" style={{ color: palette.text }}>{art.title}</h3>
                       </div>
+                    );
+                  })()
+                )}
+                <div className="p-3">
+                  <h3 className="font-medium text-sm text-slate-800 line-clamp-2 mb-2 leading-snug">{art.title}</h3>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {art.authorAvatar ? (
+                        <img src={getAvatarUrl(art.authorAvatar)} alt="" className="w-5 h-5 rounded-full object-cover" />
+                      ) : (
+                        <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-500">
+                          {art.author?.charAt(0) || '?'}
+                        </span>
+                      )}
+                      <span className="text-slate-500 text-xs truncate max-w-[80px]">{art.author}</span>
                     </div>
-                  )}
-                </motion.div>
-              ))}
-            </Masonry>
-          </ResponsiveMasonry>
-        )}
-        {!loading && filteredArtworks.length > 0 && (
-          <div className="py-8 flex justify-center">
-            <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-slate-500 animate-spin" />
+                    <button
+                      onClick={(e) => toggleLike(art.id, e)}
+                      className="flex items-center gap-1 text-slate-400 hover:text-pink-500 transition-colors"
+                    >
+                      <Heart size={14} fill={art.isLiked ? "#ec4899" : "none"} className={art.isLiked ? "text-pink-500" : ""} />
+                      <span className="text-xs">{art.likes}</span>
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
           </div>
         )}
       </div>
+
+      {/* Batch Delete Floating Button - rendered via portal */}
+      {isSelectMode && selectedIds.size > 0 && createPortal(
+        <div 
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'white',
+            borderRadius: '9999px',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            border: '1px solid #e2e8f0',
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            zIndex: 99999
+          }}
+        >
+          <span style={{ fontSize: '14px', color: '#475569' }}>已选择 {selectedIds.size} 项</span>
+          <button
+            onClick={openBatchDeleteConfirm}
+            style={{
+              padding: '6px 16px',
+              backgroundColor: '#ef4444',
+              color: 'white',
+              fontSize: '14px',
+              borderRadius: '9999px',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            批量删除
+          </button>
+        </div>,
+        document.body
+      )}
 
       {/* Artwork Detail Modal - rendered via portal to escape overflow-hidden */}
       {(selectedDetail || detailLoading) && createPortal(
@@ -431,10 +725,37 @@ export function Community() {
                             className="max-w-full max-h-full object-contain shadow-2xl"
                           />
                         ) : (
-                          <motion.div key="generating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-3 text-white/60">
-                            <Sparkles size={32} />
-                            <span className="text-sm">封面生成中...</span>
-                          </motion.div>
+                          (() => {
+                            const palette = getCardColorPalette(selectedDetail?.post.title || '');
+                            return (
+                              <motion.div 
+                                key="no-cover" 
+                                initial={{ opacity: 0, scale: 0.95 }} 
+                                animate={{ opacity: 1, scale: 1 }} 
+                                className="flex flex-col items-center justify-center w-full h-full p-8"
+                                style={{ background: palette.bg }}
+                              >
+                                <div className="absolute top-16 right-16 w-40 h-40 rounded-full bg-white/30 blur-3xl" />
+                                <div className="absolute bottom-20 left-20 w-32 h-32 rounded-full bg-white/20 blur-2xl" />
+                                <div className="relative z-10 flex flex-col items-center justify-center text-center max-w-md">
+                                  <FileText className="mb-6 drop-shadow-lg" size={48} style={{ color: palette.text }} />
+                                  <h2 className="font-bold text-xl md:text-2xl leading-relaxed mb-4" style={{ color: palette.text }}>
+                                    {selectedDetail?.post.title}
+                                  </h2>
+                                  {selectedDetail?.post.summary && (
+                                    <p className="text-sm leading-relaxed line-clamp-4" style={{ color: palette.subtext }}>
+                                      {selectedDetail.post.summary}
+                                    </p>
+                                  )}
+                                  <div className="mt-8 flex items-center gap-2">
+                                    <span className="px-4 py-1.5 bg-white/50 rounded-full backdrop-blur-sm text-xs font-medium" style={{ color: palette.text }}>
+                                      文档笔记
+                                    </span>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            );
+                          })()
                         )}
                       </AnimatePresence>
                     </div>
@@ -599,6 +920,231 @@ export function Community() {
             </div>
           </div>,
       document.body
+      )}
+
+      {/* Edit Modal */}
+      {editingPost && createPortal(
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeEditModal();
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">编辑帖子</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">标题</label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="请输入标题"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">摘要</label>
+                  <textarea
+                    value={editSummary}
+                    onChange={(e) => setEditSummary(e.target.value)}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    placeholder="请输入摘要"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeEditModal();
+                  }}
+                  className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditSave();
+                  }}
+                  disabled={editLoading || !editTitle.trim()}
+                  className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {editLoading ? '保存中...' : '保存'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingPost && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(4px)'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeDeleteConfirm();
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{ 
+              maxHeight: '80vh', 
+              overflowY: 'auto',
+              width: '360px',
+              maxWidth: '90vw'
+            }}
+          >
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-2">确认删除</h2>
+              <p className="text-sm text-slate-600 mb-6 break-words">
+                确定要删除「<span className="font-medium text-slate-800">{deletingPost.title.length > 30 ? deletingPost.title.slice(0, 30) + '...' : deletingPost.title}</span>」吗？此操作不可撤销。
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeDeleteConfirm();
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    color: '#475569',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteConfirm();
+                  }}
+                  disabled={deleteLoading}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    color: '#ffffff',
+                    backgroundColor: deleteLoading ? '#9ca3af' : '#ef4444',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: deleteLoading ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {deleteLoading ? '删除中...' : '确认删除'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Batch Delete Confirmation Modal */}
+      {showBatchDeleteConfirm && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(4px)'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeBatchDeleteConfirm();
+            }
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              width: '360px',
+              maxWidth: '90vw',
+              margin: '16px',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '24px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>批量删除确认</h2>
+              <p style={{ fontSize: '14px', color: '#475569', marginBottom: '24px' }}>
+                确定要删除选中的 {selectedIds.size} 个帖子吗？此操作不可撤销。
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeBatchDeleteConfirm();
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    color: '#475569',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBatchDeleteConfirm();
+                  }}
+                  disabled={batchDeleteLoading}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    color: '#ffffff',
+                    backgroundColor: batchDeleteLoading ? '#9ca3af' : '#ef4444',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: batchDeleteLoading ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {batchDeleteLoading ? '删除中...' : '确认删除'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -607,6 +607,7 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
                  ref={fileInputRef} 
                  onChange={handleFileSelect} 
                  className="hidden" 
+                 accept=".txt,.md,.docx,.pdf"
                  multiple 
                />
                <button 

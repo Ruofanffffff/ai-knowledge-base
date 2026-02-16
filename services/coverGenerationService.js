@@ -75,21 +75,38 @@ class CoverGenerationService {
   async generateCover(postId, documentId) {
     try {
       const mainLogic = async () => {
-        // 1. 查询文档索引（docId 在 Prisma 中是 String 类型，需确保转换）
-        const docIndex = await this.kgPrisma.documentIndex.findFirst({
-          where: { docId: String(documentId) },
-          orderBy: { version: 'desc' },
-        });
+        let promptText = null;
 
-        if (!docIndex || !docIndex.indexedText) {
-          console.warn(`[CoverGen] 文档 ${documentId} 无索引数据，跳过封面生成`);
+        // 1. 优先查询文档索引（docId 在 Prisma 中是 String 类型，需确保转换）
+        if (this.kgPrisma) {
+          const docIndex = await this.kgPrisma.documentIndex.findFirst({
+            where: { docId: String(documentId) },
+            orderBy: { version: 'desc' },
+          });
+          if (docIndex && docIndex.indexedText) {
+            promptText = docIndex.indexedText;
+            console.log(`[CoverGen] 使用文档索引生成封面 (docId=${documentId})`);
+          }
+        }
+
+        // 2. 如果没有索引数据，从数据库查询文档标题和摘要
+        if (!promptText) {
+          const docInfo = await this.getDocumentInfo(documentId);
+          if (docInfo && docInfo.title) {
+            promptText = `文章标题：${docInfo.title}\n${docInfo.summary ? '内容摘要：' + docInfo.summary : ''}`;
+            console.log(`[CoverGen] 使用文档标题/摘要生成封面 (docId=${documentId}): ${docInfo.title}`);
+          }
+        }
+
+        if (!promptText) {
+          console.warn(`[CoverGen] 文档 ${documentId} 无索引数据且无法获取文档信息，跳过封面生成`);
           return;
         }
 
-        // 2. 构建提示词
-        const prompt = this.buildPrompt(docIndex.indexedText);
+        // 3. 构建提示词
+        const prompt = this.buildPrompt(promptText);
 
-        // 3. 调用即梦AI生成图片
+        // 4. 调用即梦AI生成图片
         let images;
         try {
           images = await this.jimengClient.generateImage(prompt);
@@ -103,7 +120,7 @@ class CoverGenerationService {
           return;
         }
 
-        // 4. 下载所有图片并上传到 MinIO
+        // 5. 下载所有图片并上传到 MinIO
         const proxyUrls = await this.downloadAndStoreAll(images);
 
         if (proxyUrls.length === 0) {
@@ -111,7 +128,7 @@ class CoverGenerationService {
           return;
         }
 
-        // 5. 随机选一张更新帖子封面
+        // 6. 随机选一张更新帖子封面
         const selectedUrl = proxyUrls[Math.floor(Math.random() * proxyUrls.length)];
         await this.updatePostCover(postId, selectedUrl);
 
@@ -135,6 +152,38 @@ class CoverGenerationService {
    */
   buildPrompt(indexedText) {
     return PROMPT_TEMPLATE.replace('{indexedText}', indexedText);
+  }
+
+  /**
+   * 从数据库获取文档信息（标题和摘要）
+   * @param {number|string} documentId - 文档ID
+   * @returns {Promise<{title: string, summary: string}|null>}
+   */
+  getDocumentInfo(documentId) {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve(null);
+        return;
+      }
+      this.db.get(
+        'SELECT title, content FROM documents WHERE id = ?',
+        [documentId],
+        (err, row) => {
+          if (err) {
+            console.error(`[CoverGen] 查询文档信息失败 (docId=${documentId}):`, err.message);
+            resolve(null);
+          } else if (!row) {
+            resolve(null);
+          } else {
+            const summary = row.content ? row.content.slice(0, 500) : '';
+            resolve({
+              title: row.title,
+              summary: summary.replace(/[#*`\[\]]/g, '').trim()
+            });
+          }
+        }
+      );
+    });
   }
 
   /**
