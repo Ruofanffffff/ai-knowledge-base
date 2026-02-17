@@ -50,7 +50,7 @@ export default function AdminLayout() {
       )}
       
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <div className={`flex-1 flex flex-col min-h-0 ${isMobile ? 'p-0 pb-20' : 'p-6'}`}>
+        <div className={`flex-1 flex flex-col min-h-0 overflow-y-auto ${isMobile ? 'p-0 pb-20' : 'p-6'}`}>
           <Outlet />
         </div>
         
@@ -58,9 +58,7 @@ export default function AdminLayout() {
           <MobileNav 
             currentPage={currentPage} 
             setCurrentPage={handlePageChange} 
-            // MobileNav might also need menuItems update, but let's stick to Sidebar for now as MobileNav wasn't requested explicitly to be updated for admin, 
-            // but for consistency we should probably update it too if it's easy.
-            // Let's check MobileNav code first.
+            menuItems={adminMenuItems}
           />
         )}
       </main>
