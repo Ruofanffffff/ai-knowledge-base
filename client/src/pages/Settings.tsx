@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, Shield, HardDrive, Bell, Moon, LogOut, Cpu, Cloud, Check, Loader2, Zap, RefreshCw, Key, Server } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Capacitor } from '@capacitor/core';
 import apiClient from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -24,6 +26,7 @@ const getAvatarUrl = (avatar: string | null | undefined): string => {
 
 export function Settings() {
   const { logout } = useAuth();
+  const navigate = useNavigate();
   const [modelType, setModelType] = useState<ModelType>('local');
   const [localEndpoint, setLocalEndpoint] = useState('http://localhost:11434');
   const [localStatus, setLocalStatus] = useState<ConnectionStatus>('disconnected');
@@ -543,6 +546,29 @@ export function Settings() {
                  )}
                </AnimatePresence>
              </div>
+          </div>
+
+          {/* Connection Settings */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+             <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Server size={20} className="text-indigo-600" /> Connection
+            </h2>
+            <div className="space-y-4">
+               <div className="flex items-center justify-between py-2">
+                  <div>
+                     <p className="font-medium text-slate-800">Server Configuration</p>
+                     <p className="text-sm text-slate-500">
+                       {Capacitor.isNativePlatform() ? 'Configure backend server address for mobile access' : 'Configure backend server address'}
+                     </p>
+                  </div>
+                  <button 
+                    onClick={() => navigate('/server-config')}
+                    className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+                  >
+                    Configure
+                  </button>
+               </div>
+            </div>
           </div>
 
           {/* Preferences */}

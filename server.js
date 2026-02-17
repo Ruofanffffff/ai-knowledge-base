@@ -466,7 +466,9 @@ async function backfillEmbeddings() {
 }
 
 // 启动时尝试回填
-setTimeout(backfillEmbeddings, 5000);
+if (process.env.NODE_ENV !== 'test') {
+  setTimeout(backfillEmbeddings, 5000);
+}
 
 // 云端模型API调用函数
 async function callCloudModel(modelKey, prompt, options = {}) {
@@ -4365,82 +4367,84 @@ function getLocalIP() {
 
 const localIP = getLocalIP();
 
-http.createServer(app).listen(PORT, '0.0.0.0', async () => {
-  console.log(`Server is running on http://0.0.0.0:${PORT}`);
-  console.log(`Server is running on http://localhost:${PORT}`);
-  console.log(`Server is accessible on network: http://${localIP}:${PORT}`);
-  
-  // Initialize MinIO bucket
-  try {
-    const minioService = require('./services/minioService');
-    await minioService.ensureBucket();
-    console.log('[MinIO] Bucket initialized successfully');
-  } catch (err) {
-    console.warn('[MinIO] Bucket initialization failed (MinIO may not be running):', err.message);
-  }
-  
-  // Initialize TempFileManager (cleanup task already started in constructor)
-  console.log('[TempFileManager] Automatic cleanup enabled (runs every 15 minutes)');
-  
-  // Start UnificationScheduler
-  unificationScheduler.start();
-  console.log('[UnificationScheduler] Started (checking every hour for new documents)');
-  
-  // KG module removed — pending redesign
-  console.log('[KG Module] Knowledge Graph module removed, pending redesign');
-  console.log('Available APIs:');
-  console.log('- GET /api/health - 健康检查');
-  console.log('- GET /api/monitoring - 监控状态');
-  console.log('- POST /api/monitoring/clean-logs - 清理日志');
-  console.log('- POST /api/auth/register - 用户注册');
-  console.log('- POST /api/auth/login - 用户登录');
-  console.log('- POST /api/auth/refresh - 刷新令牌');
-  console.log('- POST /api/auth/logout - 用户登出');
-  console.log('- GET /api/auth/me - 获取当前用户信息');
-  console.log('- GET /api/user/stats/overview - 获取用户统计概览');
-  console.log('- GET /api/user/stats/token-usage - 获取token使用记录');
-  console.log('- GET /api/user/models - 获取用户模型列表');
-  console.log('- POST /api/user/models - 创建用户模型');
-  console.log('- PUT /api/user/models/:id - 更新用户模型');
-  console.log('- DELETE /api/user/models/:id - 删除用户模型');
-  console.log('- GET /api/user/agents - 获取智能体列表');
-  console.log('- POST /api/user/agents - 创建智能体');
-  console.log('- PUT /api/user/agents/:id - 更新智能体');
-  console.log('- DELETE /api/user/agents/:id - 删除智能体');
-  console.log('- GET /api/user/agents/public - 获取公开智能体');
-  console.log('- GET /api/admin/users - 获取用户列表（管理员）');
-  console.log('- GET /api/admin/users/:id - 获取用户详情（管理员）');
-  console.log('- PUT /api/admin/users/:id/status - 更新用户状态（管理员）');
-  console.log('- GET /api/admin/users/:id/role - 更新用户角色（管理员）');
-  console.log('- GET /api/admin/stats/users - 获取用户增长统计（管理员）');
-  console.log('- GET /api/admin/stats/tokens - 获取token使用统计（管理员）');
-  console.log('- GET /api/documents - 获取文档列表');
-  console.log('- GET /api/documents/:id - 获取单个文档');
-  console.log('- POST /api/documents - 创建文档');
-  console.log('- PUT /api/documents/:id - 更新文档');
-  console.log('- DELETE /api/documents/:id - 删除文档');
-  console.log('- GET /api/tags - 获取标签列表');
-  console.log('- POST /api/tags - 创建标签');
-  console.log('- POST /api/upload - 上传文件');
-  console.log('- POST /api/ai/search - 语义搜索');
-  console.log('- POST /api/ai/generate-tags - 智能标签生成');
-  console.log('- POST /api/ai/extract-entities - 实体识别');
-  console.log('- GET /api/knowledge-graph - 获取知识图谱数据（带缓存）');
-  console.log('- POST /api/knowledge-graph - 生成知识图谱（云端大模型）');
-  console.log('- POST /api/ai/classify - AI自动分类');
-  console.log('- GET /api/categories - 获取分类列表');
-  console.log('- GET /api/categories/:id/documents - 获取分类文档');
-  console.log('- POST /api/ai/recommendations - 生成AI搜索推荐');
-  console.log('- GET /api/ai/recommendations - 获取AI搜索推荐');
-  console.log('- POST /api/images/upload - 上传图片到MinIO');
-  console.log('- GET /api/images/:id/analysis - 查询图片AI识别结果');
-  console.log('- GET /api/images/proxy/* - 代理MinIO图片访问');
-  
-  console.log('\n=== 网络访问信息 ===');
-  console.log(`本地访问: http://localhost:${PORT}`);
-  console.log(`局域网访问: http://${localIP}:${PORT}`);
-  console.log(`请确保防火墙允许端口 ${PORT} 的访问`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  http.createServer(app).listen(PORT, '0.0.0.0', async () => {
+    console.log(`Server is running on http://0.0.0.0:${PORT}`);
+    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Server is accessible on network: http://${localIP}:${PORT}`);
+    
+    // Initialize MinIO bucket
+    try {
+      const minioService = require('./services/minioService');
+      await minioService.ensureBucket();
+      console.log('[MinIO] Bucket initialized successfully');
+    } catch (err) {
+      console.warn('[MinIO] Bucket initialization failed (MinIO may not be running):', err.message);
+    }
+    
+    // Initialize TempFileManager (cleanup task already started in constructor)
+    console.log('[TempFileManager] Automatic cleanup enabled (runs every 15 minutes)');
+    
+    // Start UnificationScheduler
+    unificationScheduler.start();
+    console.log('[UnificationScheduler] Started (checking every hour for new documents)');
+    
+    // KG module removed — pending redesign
+    console.log('[KG Module] Knowledge Graph module removed, pending redesign');
+    console.log('Available APIs:');
+    console.log('- GET /api/health - 健康检查');
+    console.log('- GET /api/monitoring - 监控状态');
+    console.log('- POST /api/monitoring/clean-logs - 清理日志');
+    console.log('- POST /api/auth/register - 用户注册');
+    console.log('- POST /api/auth/login - 用户登录');
+    console.log('- POST /api/auth/refresh - 刷新令牌');
+    console.log('- POST /api/auth/logout - 用户登出');
+    console.log('- GET /api/auth/me - 获取当前用户信息');
+    console.log('- GET /api/user/stats/overview - 获取用户统计概览');
+    console.log('- GET /api/user/stats/token-usage - 获取token使用记录');
+    console.log('- GET /api/user/models - 获取用户模型列表');
+    console.log('- POST /api/user/models - 创建用户模型');
+    console.log('- PUT /api/user/models/:id - 更新用户模型');
+    console.log('- DELETE /api/user/models/:id - 删除用户模型');
+    console.log('- GET /api/user/agents - 获取智能体列表');
+    console.log('- POST /api/user/agents - 创建智能体');
+    console.log('- PUT /api/user/agents/:id - 更新智能体');
+    console.log('- DELETE /api/user/agents/:id - 删除智能体');
+    console.log('- GET /api/user/agents/public - 获取公开智能体');
+    console.log('- GET /api/admin/users - 获取用户列表（管理员）');
+    console.log('- GET /api/admin/users/:id - 获取用户详情（管理员）');
+    console.log('- PUT /api/admin/users/:id/status - 更新用户状态（管理员）');
+    console.log('- GET /api/admin/users/:id/role - 更新用户角色（管理员）');
+    console.log('- GET /api/admin/stats/users - 获取用户增长统计（管理员）');
+    console.log('- GET /api/admin/stats/tokens - 获取token使用统计（管理员）');
+    console.log('- GET /api/documents - 获取文档列表');
+    console.log('- GET /api/documents/:id - 获取单个文档');
+    console.log('- POST /api/documents - 创建文档');
+    console.log('- PUT /api/documents/:id - 更新文档');
+    console.log('- DELETE /api/documents/:id - 删除文档');
+    console.log('- GET /api/tags - 获取标签列表');
+    console.log('- POST /api/tags - 创建标签');
+    console.log('- POST /api/upload - 上传文件');
+    console.log('- POST /api/ai/search - 语义搜索');
+    console.log('- POST /api/ai/generate-tags - 智能标签生成');
+    console.log('- POST /api/ai/extract-entities - 实体识别');
+    console.log('- GET /api/knowledge-graph - 获取知识图谱数据（带缓存）');
+    console.log('- POST /api/knowledge-graph - 生成知识图谱（云端大模型）');
+    console.log('- POST /api/ai/classify - AI自动分类');
+    console.log('- GET /api/categories - 获取分类列表');
+    console.log('- GET /api/categories/:id/documents - 获取分类文档');
+    console.log('- POST /api/ai/recommendations - 生成AI搜索推荐');
+    console.log('- GET /api/ai/recommendations - 获取AI搜索推荐');
+    console.log('- POST /api/images/upload - 上传图片到MinIO');
+    console.log('- GET /api/images/:id/analysis - 查询图片AI识别结果');
+    console.log('- GET /api/images/proxy/* - 代理MinIO图片访问');
+    
+    console.log('\n=== 网络访问信息 ===');
+    console.log(`本地访问: http://localhost:${PORT}`);
+    console.log(`局域网访问: http://${localIP}:${PORT}`);
+    console.log(`请确保防火墙允许端口 ${PORT} 的访问`);
+  });
+}
 
 // Graceful shutdown handlers
 const gracefulShutdown = (signal) => {

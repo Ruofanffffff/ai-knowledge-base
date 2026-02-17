@@ -11,12 +11,18 @@ import Register from './pages/Register';
 import DocumentDetail from './pages/DocumentDetail';
 import CreateDocument from './pages/CreateDocument';
 import { Editor } from './pages/Editor';
+import { ServerConfig } from './pages/ServerConfig';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import AdminLayout from './components/AdminLayout';
+import { AdminRoute } from './components/AdminRoute';
+import { DashboardHome } from './pages/admin/DashboardHome';
+import { UserManagement } from './pages/admin/UserManagement';
 
 function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/server-config" element={<ServerConfig />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route element={<ProtectedRoute />}>
@@ -30,6 +36,14 @@ function App() {
             <Route path="/community" element={<Community />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/editor" element={<Editor />} />
+          </Route>
+          
+          <Route path="/admin" element={<AdminRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route index element={<DashboardHome />} />
+              <Route path="dashboard" element={<DashboardHome />} />
+              <Route path="users" element={<UserManagement />} />
+            </Route>
           </Route>
         </Route>
       </Routes>

@@ -1,19 +1,41 @@
 import React from 'react';
-import { LayoutDashboard, FileText, Network, Settings, Compass } from 'lucide-react';
+import { LayoutDashboard, FileText, Network, Settings, Compass, Shield } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: any;
+}
 
 interface MobileNavProps {
   currentPage: string;
   setCurrentPage: (page: string) => void;
+  menuItems?: MenuItem[];
 }
 
-export function MobileNav({ currentPage, setCurrentPage }: MobileNavProps) {
-  const menuItems = [
+export function MobileNav({ currentPage, setCurrentPage, menuItems: customMenuItems }: MobileNavProps) {
+  const { user } = useAuth();
+
+  const defaultMenuItems = [
     { id: 'dashboard', label: 'Hi Brain', icon: LayoutDashboard },
     { id: 'documents', label: '思库', icon: FileText },
     { id: 'graph', label: '思链', icon: Network },
     { id: 'community', label: '思圈', icon: Compass },
     { id: 'settings', label: '设置', icon: Settings },
   ];
+
+  if (user?.role === 'admin') {
+     if (!defaultMenuItems.some(item => item.id === 'admin/dashboard')) {
+       defaultMenuItems.push({ 
+         id: 'admin/dashboard', 
+         label: '管理后台', 
+         icon: Shield 
+       });
+     }
+  }
+
+  const menuItems = customMenuItems || defaultMenuItems;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 px-4 pb-safe pt-2 md:hidden">

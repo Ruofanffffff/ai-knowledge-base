@@ -229,8 +229,26 @@ function authMiddleware(req, res, next) {
     return res.status(401).json({ error: '认证令牌无效或已过期' });
   }
   
-  req.userId = decoded.userId;
-  next();
+  if (!db) db = initDatabase();
+  
+  db.get('SELECT status FROM users WHERE id = ?', [decoded.userId], (err, user) => {
+    if (err) {
+      console.error('Auth middleware DB error:', err);
+      return res.status(500).json({ error: '服务器内部错误' });
+    }
+    
+    if (!user) {
+      return res.status(401).json({ error: '用户不存在' });
+    }
+    
+    if (user.status !== 'active') {
+      return res.status(403).json({ error: '账号已被禁用' });
+    }
+    
+    req.userId = decoded.userId;
+    req.user = user;
+    next();
+  });
 }
 
 function adminMiddleware(req, res, next) {

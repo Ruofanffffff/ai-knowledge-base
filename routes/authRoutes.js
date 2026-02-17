@@ -6,7 +6,8 @@ const {
   registerUser, 
   loginUser, 
   refreshToken, 
-  logoutUser 
+  logoutUser,
+  authMiddleware
 } = require('../services/authService');
 const { initDatabase } = require('../database/initUserDB');
 
@@ -200,26 +201,13 @@ router.post('/logout', async (req, res) => {
   }
 });
 
-router.get('/me', async (req, res) => {
+router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ 
-        success: false, 
-        error: '未提供认证令牌' 
-      });
-    }
-    
-    const accessToken = authHeader.substring(7);
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-    
-    const decoded = jwt.verify(accessToken, JWT_SECRET);
+    const userId = req.userId;
     
     db.get(
       'SELECT id, username, email, phone, avatar, role, status, created_at, last_login_at FROM users WHERE id = ?',
-      [decoded.userId],
+      [userId],
       (err, user) => {
         if (err) {
           console.error('获取用户信息失败:', err);
@@ -228,6 +216,12 @@ router.get('/me', async (req, res) => {
         
         if (!user) {
           return res.status(404).json({ success: false, error: '用户不存在' });
+        }
+        
+        // 既然 authMiddleware 已经通过了，说明状态是 active
+        // 但为了双重保险，或者如果中间件逻辑变了
+        if (user.status !== 'active') {
+           return res.status(403).json({ error: '账号已被禁用' });
         }
         
         delete user.password;
@@ -240,9 +234,9 @@ router.get('/me', async (req, res) => {
     );
   } catch (error) {
     console.error('获取用户信息失败:', error);
-    res.status(401).json({ 
+    res.status(500).json({ 
       success: false, 
-      error: '认证令牌无效或已过期' 
+      error: '获取用户信息失败' 
     });
   }
 });

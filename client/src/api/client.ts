@@ -34,6 +34,11 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor - Add authentication token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Dynamic baseURL configuration
+    const serverUrl = localStorage.getItem('serverUrl');
+    const baseUrl = serverUrl || import.meta.env.VITE_API_BASE_URL || '/api';
+    config.baseURL = baseUrl;
+
     // Get token directly from localStorage (storage utilities will be created in task 5.1)
     const token = localStorage.getItem('auth_token');
     

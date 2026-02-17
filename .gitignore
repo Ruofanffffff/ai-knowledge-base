@@ -62,3 +62,6 @@ kg/field_normalizer/.synonym_dict_stats.json
 # 备份目录
 *.backup/
 *_backup/
+
+dist-electron/
+ios/
