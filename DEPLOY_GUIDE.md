@@ -26,7 +26,7 @@ scp -r ./* user@your_ecs_ip:/path/to/project
 
 ## 3. 安装环境
 
-我们提供了一个脚本来自动安装 Node.js, PM2, Nginx 等必要环境。
+我们提供了一个脚本来自动检测并安装环境（支持 apt/yum/dnf 包管理器），包括 Node.js, PM2, Nginx 等。
 
 ```bash
 # 赋予脚本执行权限
