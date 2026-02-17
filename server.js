@@ -63,12 +63,18 @@ const DeduplicationService = require('./services/deduplicationService');
 const { logger, accessLogMiddleware, errorHandlerMiddleware, getLogStatus, cleanOldLogs } = require('./utils/logger');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+
+const isElectron = process.env.NODE_ENV === 'production' && process.type !== undefined;
 
 // 静态文件服务
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// 初始化用户认证服务
+// 提供client目录下的静态文件服务（用于React应用）
+// 注意：这个要放在 /assets 路由之前，确保 /assets 能正确映射到 client/dist/assets
+app.use(express.static(path.join(__dirname, 'client/dist')));
+
+// API路由
 const { initAuthService, authMiddleware } = require('./services/authService');
 const { initStatsService } = require('./services/statsService');
 const authRoutes = require('./routes/authRoutes');
@@ -685,16 +691,6 @@ app.get('/', (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-
-// 静态文件服务
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// 提供client目录下的静态文件服务（用于React应用）
-app.use(express.static(path.join(__dirname, 'client/dist')));
-
-// 提供根目录下的静态文件服务
-app.use(express.static(path.join(__dirname)));
 
 // API路由
 app.get('/api/health', (req, res) => {
@@ -4347,6 +4343,11 @@ app.get('/api/health', (req, res) => {
 // 使用错误处理中间件
 app.use(notFound);
 app.use(errorHandlerMiddleware);
+
+// 处理 SPA 路由：所有未匹配 API 的请求都返回 index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/dist/index.html'));
+});
 
 // 启动HTTP服务器
 
