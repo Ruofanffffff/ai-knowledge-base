@@ -9,6 +9,75 @@ function getDb() {
   return db;
 }
 
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+exports.getStats = async (req, res) => {
+  try {
+    const database = getDb();
+    
+    // 1. Total Users & Active Users
+    const userStats = await new Promise((resolve, reject) => {
+      database.get(
+        `SELECT 
+           COUNT(*) as total,
+           SUM(CASE WHEN last_login_at >= date('now', '-30 days') THEN 1 ELSE 0 END) as active
+         FROM users`,
+        [],
+        (err, row) => err ? reject(err) : resolve(row)
+      );
+    });
+
+    // 2. Total Documents & Storage (DB content size)
+    const docStats = await new Promise((resolve, reject) => {
+      database.get(
+        `SELECT 
+           COUNT(*) as count,
+           COALESCE(SUM(LENGTH(content)), 0) as size
+         FROM documents`,
+        [],
+        (err, row) => err ? reject(err) : resolve(row)
+      );
+    });
+
+    // 3. MinIO Storage
+    let minioSize = 0;
+    try {
+      const minioService = require('../services/minioService');
+      const objects = await minioService.listObjects();
+      if (Array.isArray(objects)) {
+        minioSize = objects.reduce((sum, obj) => sum + (obj.size || 0), 0);
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    const totalStorageBytes = (docStats.size || 0) + minioSize;
+    const totalStorageFormatted = formatBytes(totalStorageBytes);
+    const totalLimit = 10 * 1024 * 1024 * 1024; // 10GB example
+    const storagePercentage = Math.min(100, (totalStorageBytes / totalLimit) * 100);
+
+    res.json({
+      success: true,
+      data: {
+        totalUsers: userStats.total || 0,
+        totalDocuments: docStats.count || 0,
+        totalStorage: totalStorageFormatted,
+        storagePercentage: storagePercentage,
+        activeUsersLast30Days: userStats.active || 0
+      }
+    });
+  } catch (error) {
+    console.error('Get admin stats failed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 exports.getUsers = async (req, res) => {
   try {
     const { page = 1, page_size, limit = 20, search, status, role } = req.query;

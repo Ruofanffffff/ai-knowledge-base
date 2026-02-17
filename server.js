@@ -4342,6 +4342,14 @@ app.get('/api/health', (req, res) => {
   }
 });
 
+// Add 404 handler for API routes BEFORE SPA catch-all
+app.use('/api/*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `API route not found: ${req.method} ${req.originalUrl}`
+  });
+});
+
 // 处理 SPA 路由：所有未匹配 API 的请求都返回 index.html
 app.get('*', (req, res, next) => {
   const indexPath = path.join(__dirname, 'client/dist/index.html');
