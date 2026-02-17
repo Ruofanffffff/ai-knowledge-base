@@ -20,16 +20,12 @@ export default function AdminLayout() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const syncCurrentPage = (path: string) => {
-    if (path) {
+  useEffect(() => {
+    if (location.pathname) {
       // Remove leading slash
-      const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+      const cleanPath = location.pathname.startsWith('/') ? location.pathname.slice(1) : location.pathname;
       setCurrentPage(cleanPath);
     }
-  };
-
-  useEffect(() => {
-    syncCurrentPage(location.pathname);
   }, [location.pathname]);
 
   const handlePageChange = (page: string) => {
