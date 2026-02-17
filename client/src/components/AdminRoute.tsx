@@ -1,9 +1,10 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from './LoadingSpinner';
 
 export function AdminRoute() {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -13,8 +14,11 @@ export function AdminRoute() {
     );
   }
 
-  // Check if user is logged in and has admin role (or username is admin as fallback)
-  if (!user || (user.role !== 'admin' && user.username !== 'admin')) {
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (user.role !== 'admin' && user.username !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
 

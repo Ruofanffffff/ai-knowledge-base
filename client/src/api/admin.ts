@@ -33,11 +33,11 @@ class AdminApi {
   async getStats(): Promise<ApiResponse<AdminStats>> {
     try {
       const response = await apiClient.get('/admin/stats');
-      return { success: true, data: response.data };
+      return { success: true, data: response.data.data || response.data };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.message || 'Failed to fetch admin stats',
+        error: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch admin stats',
       };
     }
   }
@@ -48,7 +48,15 @@ class AdminApi {
   async getUsers(filter?: UserFilter): Promise<ApiResponse<UserListResponse>> {
     try {
       const response = await apiClient.get('/admin/users', { params: filter });
-      return { success: true, data: response.data };
+      return { 
+        success: true, 
+        data: {
+          users: response.data.users || [],
+          total: response.data.total || 0,
+          page: response.data.page || 1,
+          limit: response.data.limit || 10
+        }
+      };
     } catch (error: any) {
       return {
         success: false,
@@ -63,11 +71,11 @@ class AdminApi {
   async updateUser(userId: string, data: Partial<User>): Promise<ApiResponse<User>> {
     try {
       const response = await apiClient.put(`/admin/users/${userId}`, data);
-      return { success: true, data: response.data };
+      return { success: true, data: response.data.data || response.data };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.message || 'Failed to update user',
+        error: error.response?.data?.error || error.response?.data?.message || 'Failed to update user',
       };
     }
   }

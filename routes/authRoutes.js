@@ -218,17 +218,23 @@ router.get('/me', authMiddleware, async (req, res) => {
           return res.status(404).json({ success: false, error: '用户不存在' });
         }
         
-        // 既然 authMiddleware 已经通过了，说明状态是 active
-        // 但为了双重保险，或者如果中间件逻辑变了
         if (user.status !== 'active') {
            return res.status(403).json({ error: '账号已被禁用' });
         }
         
-        delete user.password;
-        
         res.json({
           success: true,
-          data: user
+          data: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            phone: user.phone,
+            avatar: user.avatar,
+            role: user.role,
+            status: user.status,
+            createdAt: user.created_at,
+            lastLoginAt: user.last_login_at
+          }
         });
       }
     );

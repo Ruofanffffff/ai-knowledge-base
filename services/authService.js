@@ -149,7 +149,9 @@ async function loginUser(loginData) {
                   email: user.email,
                   phone: user.phone,
                   role: user.role,
-                  avatar: user.avatar
+                  avatar: user.avatar,
+                  status: user.status,
+                  createdAt: user.created_at
                 },
                 accessToken,
                 refreshToken,

@@ -81,59 +81,77 @@ exports.getStats = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const { page = 1, page_size, limit = 20, search, status, role } = req.query;
-    const pageSize = page_size || limit;
-    const offset = (page - 1) * pageSize;
+    const pageSize = parseInt(page_size || limit);
+    const offset = (parseInt(page) - 1) * pageSize;
     
-    let query = `
-      SELECT 
-        u.id, u.username, u.email, u.phone, u.role, u.status, 
-        u.created_at, u.last_login_at,
-        COUNT(DISTINCT d.id) as document_count,
-        COALESCE(SUM(tu.tokens_used), 0) as token_usage
-      FROM users u
-      LEFT JOIN documents d ON u.id = d.user_id
-      LEFT JOIN token_usage tu ON u.id = tu.user_id
-      WHERE 1=1
-    `;
-    let params = [];
+    let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
+    let countParams = [];
     
     if (search) {
-      query += ' AND (u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)';
+      countQuery += ' AND (username LIKE ? OR email LIKE ? OR phone LIKE ?)';
       const searchPattern = `%${search}%`;
-      params.push(searchPattern, searchPattern, searchPattern);
+      countParams.push(searchPattern, searchPattern, searchPattern);
     }
     
     if (status) {
-      query += ' AND u.status = ?';
-      params.push(status);
+      countQuery += ' AND status = ?';
+      countParams.push(status);
     }
     
     if (role) {
-      query += ' AND u.role = ?';
-      params.push(role);
+      countQuery += ' AND role = ?';
+      countParams.push(role);
     }
     
-    query += ' GROUP BY u.id ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
-    params.push(pageSize, offset);
-    
     const database = getDb();
-    database.all(query, params, (err, rows) => {
+    
+    database.get(countQuery, countParams, (err, countRow) => {
       if (err) {
-        console.error('获取用户列表失败:', err);
+        console.error('获取用户总数失败:', err);
         return res.status(500).json({ success: false, error: err.message });
       }
       
-      database.get('SELECT COUNT(*) as total FROM users WHERE 1=1', [], (err, countRow) => {
+      const total = countRow.total || 0;
+      
+      let query = `
+        SELECT 
+          id, username, email, phone, role, status, 
+          created_at as createdAt, last_login_at as lastLoginAt
+        FROM users 
+        WHERE 1=1
+      `;
+      let params = [];
+      
+      if (search) {
+        query += ' AND (username LIKE ? OR email LIKE ? OR phone LIKE ?)';
+        const searchPattern = `%${search}%`;
+        params.push(searchPattern, searchPattern, searchPattern);
+      }
+      
+      if (status) {
+        query += ' AND status = ?';
+        params.push(status);
+      }
+      
+      if (role) {
+        query += ' AND role = ?';
+        params.push(role);
+      }
+      
+      query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+      params.push(pageSize, offset);
+      
+      database.all(query, params, (err, rows) => {
         if (err) {
+          console.error('获取用户列表失败:', err);
           return res.status(500).json({ success: false, error: err.message });
         }
         
         res.json({
-          success: true,
-          data: {
-            users: rows,
-            totalPages: Math.ceil(countRow.total / pageSize)
-          }
+          users: rows || [],
+          total: total,
+          page: parseInt(page),
+          limit: pageSize
         });
       });
     });
@@ -171,6 +189,121 @@ exports.getUserById = async (req, res) => {
     );
   } catch (error) {
     console.error('获取用户详情失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.updateUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { role, status } = req.body;
+    
+    const database = getDb();
+    
+    const updates = [];
+    const values = [];
+    
+    if (role !== undefined) {
+      if (!['user', 'admin'].includes(role)) {
+        return res.status(400).json({ success: false, error: '无效的角色值' });
+      }
+      updates.push('role = ?');
+      values.push(role);
+    }
+    
+    if (status !== undefined) {
+      if (!['active', 'disabled', 'suspended', 'banned'].includes(status)) {
+        return res.status(400).json({ success: false, error: '无效的状态值' });
+      }
+      updates.push('status = ?');
+      values.push(status);
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: '没有要更新的字段' });
+    }
+    
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(userId);
+    
+    database.run(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+      values,
+      (err) => {
+        if (err) {
+          console.error('更新用户失败:', err);
+          return res.status(500).json({ success: false, error: err.message });
+        }
+        
+        database.get(
+          'SELECT id, username, email, phone, role, status, created_at, last_login_at FROM users WHERE id = ?',
+          [userId],
+          (err, user) => {
+            if (err) {
+              return res.status(500).json({ success: false, error: err.message });
+            }
+            
+            res.json({
+              success: true,
+              data: user,
+              message: '用户更新成功'
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('更新用户失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    const database = getDb();
+    
+    database.get('SELECT id, role FROM users WHERE id = ?', [userId], (err, user) => {
+      if (err) {
+        console.error('查询用户失败:', err);
+        return res.status(500).json({ success: false, error: err.message });
+      }
+      
+      if (!user) {
+        return res.status(404).json({ success: false, error: '用户不存在' });
+      }
+      
+      if (user.role === 'admin') {
+        return res.status(403).json({ success: false, error: '不能删除管理员用户' });
+      }
+      
+      database.run('DELETE FROM documents WHERE user_id = ?', [userId], (err) => {
+        if (err) {
+          console.error('删除用户文档失败:', err);
+        }
+        
+        database.run('DELETE FROM token_usage WHERE user_id = ?', [userId], (err) => {
+          if (err) {
+            console.error('删除用户token记录失败:', err);
+          }
+          
+          database.run('DELETE FROM users WHERE id = ?', [userId], (err) => {
+            if (err) {
+              console.error('删除用户失败:', err);
+              return res.status(500).json({ success: false, error: err.message });
+            }
+            
+            res.json({
+              success: true,
+              message: '用户删除成功'
+            });
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error('删除用户失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 };

@@ -80,7 +80,7 @@ export function UserManagement() {
     if (!selectedUser) return;
 
     try {
-      const response = await adminApi.updateUser(selectedUser.id, {
+      const response = await adminApi.updateUser(String(selectedUser.id), {
         role: editForm.role,
         status: editForm.status
       });
@@ -97,11 +97,11 @@ export function UserManagement() {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = async (userId: string | number) => {
     if (!confirm('确定要删除此用户吗？此操作无法撤销。')) return;
 
     try {
-      const response = await adminApi.deleteUser(userId);
+      const response = await adminApi.deleteUser(String(userId));
       if (response.success) {
         toast.success('用户删除成功');
         fetchUsers();
