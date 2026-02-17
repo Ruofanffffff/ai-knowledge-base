@@ -19,7 +19,7 @@ import {
   DialogFooter,
 } from '../../components/ui/dialog';
 import { Badge } from '../../components/ui/badge';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
+import LoadingSpinner from '../../components/LoadingSpinner';
 import { Search, Edit, Trash2, Shield, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';

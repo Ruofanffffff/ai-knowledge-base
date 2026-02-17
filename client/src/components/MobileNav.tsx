@@ -25,7 +25,7 @@ export function MobileNav({ currentPage, setCurrentPage, menuItems: customMenuIt
     { id: 'settings', label: '设置', icon: Settings },
   ];
 
-  if (user?.role === 'admin') {
+  if (user?.role === 'admin' || user?.username === 'admin') {
      if (!defaultMenuItems.some(item => item.id === 'admin/dashboard')) {
        defaultMenuItems.push({ 
          id: 'admin/dashboard', 

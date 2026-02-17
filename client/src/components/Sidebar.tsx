@@ -62,7 +62,8 @@ export function Sidebar({ currentPage, setCurrentPage, menuItems: customMenuItem
   ];
 
   // If user is admin, add Admin Dashboard link to default menu items
-  if (user?.role === 'admin') {
+  // Also check username for fallback
+  if (user?.role === 'admin' || user?.username === 'admin') {
     // Check if it's already there to avoid duplicates
     if (!defaultMenuItems.some(item => item.id === 'admin/dashboard')) {
       defaultMenuItems.push({ 

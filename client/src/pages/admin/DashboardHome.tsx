@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { adminApi, AdminStats } from '../../api/admin';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Users, FileText, Database, Activity } from 'lucide-react';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 export function DashboardHome() {
   const [stats, setStats] = useState<AdminStats | null>(null);
