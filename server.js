@@ -70,6 +70,9 @@ const isElectron = process.env.NODE_ENV === 'production' && process.type !== und
 // 静态文件服务
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// APK 下载服务
+app.use('/downloads', express.static(path.join(__dirname, 'downloads')));
+
 // 提供client目录下的静态文件服务（用于React应用）
 // 注意：这个要放在 /assets 路由之前，确保 /assets 能正确映射到 client/dist/assets
 app.use(express.static(path.join(__dirname, 'client/dist')));

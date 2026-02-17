@@ -69,3 +69,6 @@ ios/
 # Android signing keys
 *.keystore
 *.jks
+
+# APK files (upload separately)
+downloads/*.apk
