@@ -141,9 +141,14 @@ function accessLogMiddleware(req, res, next) {
 // 错误处理中间件
 function errorHandlerMiddleware(err, req, res, next) {
     const { method, url, ip } = req;
+    
+    // 确定状态码：优先使用 err.statusCode，其次使用 res.statusCode（如果不是200），最后默认为500
+    const statusCode = err.statusCode || (res.statusCode !== 200 ? res.statusCode : 500);
+    
     logger.error('Request error', {
         error: err.message,
         stack: err.stack,
+        statusCode,
         request: {
             method,
             url,
@@ -153,9 +158,9 @@ function errorHandlerMiddleware(err, req, res, next) {
         }
     });
 
-    res.status(500).json({
+    res.status(statusCode).json({
         success: false,
-        error: 'Internal server error'
+        error: statusCode === 500 ? 'Internal server error' : err.message
     });
 }
 

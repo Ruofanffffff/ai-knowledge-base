@@ -4342,14 +4342,20 @@ app.get('/api/health', (req, res) => {
   }
 });
 
+// 处理 SPA 路由：所有未匹配 API 的请求都返回 index.html
+app.get('*', (req, res, next) => {
+  const indexPath = path.join(__dirname, 'client/dist/index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    // 如果没有 index.html，说明前端未构建，返回 404 或提示
+    next(new Error('Frontend build not found. Please run "npm run build" in client directory.'));
+  }
+});
+
 // 使用错误处理中间件
 app.use(notFound);
 app.use(errorHandlerMiddleware);
-
-// 处理 SPA 路由：所有未匹配 API 的请求都返回 index.html
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/dist/index.html'));
-});
 
 // 启动HTTP服务器
 
