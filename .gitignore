@@ -65,3 +65,7 @@ kg/field_normalizer/.synonym_dict_stats.json
 
 dist-electron/
 ios/
+
+# Android signing keys
+*.keystore
+*.jks
