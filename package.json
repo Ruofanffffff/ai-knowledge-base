@@ -1,7 +1,7 @@
 {
   "name": "shisi",
   "productName": "拾思",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "AI知识库管理应用",
   "main": "electron/main.js",

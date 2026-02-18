@@ -36,11 +36,11 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-full bg-slate-50 overflow-hidden">
       {!isMobile && <Sidebar currentPage={currentPage} setCurrentPage={handlePageChange} />}
       
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <div className={`flex-1 flex flex-col min-h-0 ${isMobile ? 'p-0 pb-20 safe-area-top' : 'p-6'}`}>
+        <div className={`flex-1 flex flex-col min-h-0 ${isMobile ? 'p-0 pb-20' : 'p-6'}`}>
           <Outlet />
         </div>
         
