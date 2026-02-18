@@ -326,119 +326,123 @@ export default function Documents() {
   return (
     <div className="flex-1 h-full overflow-hidden flex flex-col bg-slate-50/50">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 shrink-0 border-b border-slate-200">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl md:text-2xl font-bold text-slate-900">思库</h1>
-          {!isSelectMode && <p className="text-slate-500 mt-1 text-sm md:text-base">管理和组织你的文档</p>}
-        </div>
-        <div className="flex items-center gap-2 md:gap-3 shrink-0">
-          {!isSelectMode ? (
-            <>
-              <button
-                onClick={() => setIsSelectMode(true)}
-                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-sm md:text-base"
-              >
-                <span className="text-sm md:text-base font-medium text-slate-700">选择</span>
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
-              >
-                <Upload size={16} className="text-slate-500" />
-                <span className="text-sm md:text-base font-medium text-slate-700">上传文件</span>
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleUpload}
-                className="hidden"
-                accept=".txt,.md,.docx,.pdf"
-              />
-              <motion.button
-                whileHover={{ y: -2 }}
-                onClick={() => navigate('/documents/new')}
-                className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all text-sm md:text-base"
-              >
-                <Plus size={16} />
-                <span className="text-sm md:text-base">新建文档</span>
-              </motion.button>
+      <div className="px-4 md:px-8 py-3 md:py-6 shrink-0 border-b border-slate-200">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold text-slate-900">思库</h1>
+            {!isSelectMode && <p className="text-slate-500 mt-0.5 md:mt-1 text-sm md:text-base">管理和组织你的文档</p>}
+          </div>
+          
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 md:gap-3 justify-end shrink-0">
+            {!isSelectMode ? (
+              <>
+                <button
+                  onClick={() => setIsSelectMode(true)}
+                  className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-lg md:rounded-xl hover:bg-slate-50 transition-colors text-sm"
+                >
+                  <span className="font-medium text-slate-700">选择</span>
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-lg md:rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  <Upload size={16} className="text-slate-500" />
+                  <span className="font-medium text-slate-700">上传</span>
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleUpload}
+                  className="hidden"
+                  accept=".txt,.md,.docx,.pdf"
+                />
+                <motion.button
+                  whileHover={{ y: -2 }}
+                  onClick={() => navigate('/documents/new')}
+                  className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg md:rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all text-sm"
+                >
+                  <Plus size={16} />
+                  <span>新建</span>
+                </motion.button>
 
-            </>
-          ) : (
-            <>
-              <span className="text-sm text-slate-600">已选择 {selectedIds.size} 项</span>
-              <button
-                onClick={handleToggleSelectAll}
-                className="px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                {selectedIds.size === searchFilteredDocuments.length ? '取消全选' : '全选'}
-              </button>
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={async () => {
-                  if (selectedIds.size === 0) {
-                    message.info('请先选择要发布的文档');
-                    return;
-                  }
-                  setIsPublishing(true);
-                  try {
-                    const result = await apiService.publishToCommunity(Array.from(selectedIds));
-                    if (result.success) {
-                      message.success('发布成功');
-                      navigate('/community');
-                    } else {
-                      message.error(result.error || '发布失败');
+              </>
+            ) : (
+              <>
+                <span className="text-sm text-slate-600">已选择 {selectedIds.size} 项</span>
+                <button
+                  onClick={handleToggleSelectAll}
+                  className="px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  {selectedIds.size === searchFilteredDocuments.length ? '取消全选' : '全选'}
+                </button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={async () => {
+                    if (selectedIds.size === 0) {
+                      message.info('请先选择要发布的文档');
+                      return;
                     }
-                  } catch {
-                    message.error('发布失败');
-                  } finally {
-                    setIsPublishing(false);
-                  }
-                }}
-                disabled={selectedIds.size === 0 || isPublishing}
-                className={`flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  selectedIds.size === 0 || isPublishing
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
-                }`}
-              >
-                <Send size={14} className="-rotate-45" />
-                {isPublishing ? '发布中...' : '发布到思圈'}
-              </motion.button>
-              <button
-                onClick={() => setBatchDeleteConfirm(true)}
-                disabled={selectedIds.size === 0}
-                style={selectedIds.size > 0 ? { backgroundColor: '#ef4444', color: '#ffffff' } : undefined}
-                className={`flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  selectedIds.size === 0
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    : 'hover:bg-red-600'
-                }`}
-              >
-                <Trash2 size={14} />
-                删除选中
-              </button>
-              <button
-                onClick={() => { setIsSelectMode(false); setSelectedIds(new Set()); }}
-                className="px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                取消
-              </button>
-            </>
-          )}
+                    setIsPublishing(true);
+                    try {
+                      const result = await apiService.publishToCommunity(Array.from(selectedIds));
+                      if (result.success) {
+                        message.success('发布成功');
+                        navigate('/community');
+                      } else {
+                        message.error(result.error || '发布失败');
+                      }
+                    } catch {
+                      message.error('发布失败');
+                    } finally {
+                      setIsPublishing(false);
+                    }
+                  }}
+                  disabled={selectedIds.size === 0 || isPublishing}
+                  className={`flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    selectedIds.size === 0 || isPublishing
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                  }`}
+                >
+                  <Send size={14} className="-rotate-45" />
+                  {isPublishing ? '发布中...' : '发布到思圈'}
+                </motion.button>
+                <button
+                  onClick={() => setBatchDeleteConfirm(true)}
+                  disabled={selectedIds.size === 0}
+                  style={selectedIds.size > 0 ? { backgroundColor: '#ef4444', color: '#ffffff' } : undefined}
+                  className={`flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    selectedIds.size === 0
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      : 'hover:bg-red-600'
+                  }`}
+                >
+                  <Trash2 size={14} />
+                  删除选中
+                </button>
+                <button
+                  onClick={() => { setIsSelectMode(false); setSelectedIds(new Set()); }}
+                  className="px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  取消
+                </button>
+              </>
+            )}
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Mobile Category Toggle */}
-      <div className="md:hidden border-b border-slate-200 bg-white overflow-x-auto">
-        <div className="flex p-2 gap-2">
-          <button
-            onClick={() => setSelectedCategory('all')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors text-sm ${
-              selectedCategory === 'all' 
-                ? 'bg-slate-900 text-white' 
-                : 'bg-slate-50 text-slate-600 border border-slate-200'
+        {/* Mobile Category Toggle */}
+        <div className="md:hidden border-b border-slate-200 bg-white overflow-x-auto">
+          <div className="flex p-2 gap-2">
+            <button
+              onClick={() => setSelectedCategory('all')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors text-sm ${
+                selectedCategory === 'all' 
+                  ? 'bg-slate-900 text-white' 
+                  : 'bg-slate-50 text-slate-600 border border-slate-200'
             }`}
           >
             <span>全部文档</span>

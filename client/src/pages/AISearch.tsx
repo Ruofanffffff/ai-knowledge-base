@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Mic, Bot, User, FileText, Sparkles, Clock, Link, Database, Plus, Trash2, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
+import { Send, Mic, Bot, User, FileText, Sparkles, Clock, Link, Database, Plus, Trash2, MessageSquare, ChevronDown, ChevronRight, Network } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import apiClient from '../api/client';
 
@@ -37,9 +37,15 @@ interface Model {
   type: 'cloud' | 'local';
 }
 
+interface AISearchProps {
+  documentCount?: number;
+  knowledgeNodeCount?: number;
+  isLoadingStats?: boolean;
+}
+
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 
-export function AISearch() {
+export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingStats = false }: AISearchProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -137,6 +143,22 @@ export function AISearch() {
 
   const createNewSession = async () => {
     const tempId = Date.now().toString();
+    
+    const welcomeContent = isMobile 
+      ? `你好！我是你的智能助手 Hi Brain 🧠
+
+📊 **你的知识库概览**
+├─ 📄 文档总数：${isLoadingStats ? '...' : documentCount}
+└─ 🔗 知识节点：${isLoadingStats ? '...' : knowledgeNodeCount}
+
+我可以帮你：
+• 🔍 搜索知识库：快速查找你的文档内容
+• 💡 智能问答：基于知识库回答问题
+• ✍️ 辅助创作：撰写文档、总结内容
+
+随时告诉我你需要什么！`
+      : '你好！我是你的智能助手 Hi Brain。\n\n我可以帮你：\n1. 搜索知识库：快速查找你上传的文档和笔记内容\n2. 智能问答：基于你的个人知识库和互联网信息回答问题\n3. 辅助创作：帮你撰写文档、总结内容或激发灵感\n\n随时告诉我你需要什么，我会尽力协助你。';
+
     const newSession: ChatSession = {
       id: tempId,
       title: '新对话',
@@ -146,7 +168,7 @@ export function AISearch() {
         {
           id: 1,
           role: 'assistant',
-          content: '你好！我是你的智能助手 Hi Brain。\n\n我可以帮你：\n1. 搜索知识库：快速查找你上传的文档和笔记内容\n2. 智能问答：基于你的个人知识库和互联网信息回答问题\n3. 辅助创作：帮你撰写文档、总结内容或激发灵感\n\n随时告诉我你需要什么，我会尽力协助你。',
+          content: welcomeContent,
           timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
         }
       ]

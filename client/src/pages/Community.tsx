@@ -442,36 +442,31 @@ export function Community() {
   return (
     <div className="flex-1 h-full flex flex-col bg-white overflow-hidden relative">
       {/* Header / Search */}
-      <div className="h-16 px-6 flex items-center gap-4 bg-white z-20 shrink-0">
-        <div className="flex-1 relative max-w-4xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+      <div className="px-3 md:px-6 py-2 md:py-0 md:h-16 flex items-center gap-2 md:gap-4 bg-white z-20 shrink-0">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
-            placeholder="搜索提示词、风格或创作者..."
-            className="w-full bg-slate-100 hover:bg-slate-50 focus:bg-white border-transparent focus:border-purple-200 border rounded-full pl-10 pr-4 py-2.5 outline-none transition-all placeholder:text-slate-500"
+            placeholder="搜索..."
+            className="w-full bg-slate-100 hover:bg-slate-50 focus:bg-white border-transparent focus:border-purple-200 border rounded-full pl-9 pr-4 py-2 md:py-2.5 outline-none transition-all placeholder:text-slate-500 text-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <button className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-slate-200 rounded-full text-slate-500">
-            <SlidersHorizontal size={16} />
-          </button>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={startGeneration}
-            disabled={isGenerating}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all ${
-              isGenerating ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-slate-800'
-            }`}
-          >
-            {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
-            {isGenerating ? '生成中...' : '开始创作'}
-          </button>
-        </div>
+        <button
+          onClick={startGeneration}
+          disabled={isGenerating}
+          className={`flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-full font-medium text-xs md:text-sm transition-all shrink-0 ${
+            isGenerating ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-slate-800'
+          }`}
+        >
+          {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+          <span className="hidden md:inline">{isGenerating ? '生成中...' : '开始创作'}</span>
+        </button>
       </div>
 
       {/* Tabs */}
-      <div className="px-6 pb-2 border-b border-slate-100 flex items-center gap-6 overflow-x-auto no-scrollbar shrink-0">
+      <div className="px-3 md:px-6 pb-2 border-b border-slate-100 flex items-center gap-3 md:gap-6 overflow-x-auto no-scrollbar shrink-0">
         {tabs.map(tab => (
           <button
             key={tab}
@@ -480,7 +475,7 @@ export function Community() {
               setIsSelectMode(false);
               setSelectedIds(new Set());
             }}
-            className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            className={`pb-2 md:pb-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === tab ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -489,19 +484,19 @@ export function Community() {
         ))}
         
         {activeTab === '我发布的' && filteredArtworks.length > 0 && (
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1 md:gap-2 shrink-0">
             {isSelectMode && (
               <>
                 <button
                   onClick={selectAll}
-                  className="text-xs text-slate-500 hover:text-slate-700"
+                  className="text-[10px] md:text-xs text-slate-500 hover:text-slate-700"
                 >
                   全选
                 </button>
                 <span className="text-slate-300">|</span>
                 <button
                   onClick={deselectAll}
-                  className="text-xs text-slate-500 hover:text-slate-700"
+                  className="text-[10px] md:text-xs text-slate-500 hover:text-slate-700"
                 >
                   取消全选
                 </button>
@@ -510,7 +505,7 @@ export function Community() {
             )}
             <button
               onClick={toggleSelectMode}
-              className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+              className={`text-[10px] md:text-xs px-2 md:px-3 py-1 md:py-1.5 rounded-full transition-colors ${
                 isSelectMode 
                   ? 'bg-red-50 text-red-600 hover:bg-red-100' 
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -523,7 +518,7 @@ export function Community() {
       </div>
 
       {/* Grid Layout */}
-      <div className="flex-1 overflow-y-auto p-6 bg-white">
+      <div className="flex-1 overflow-y-auto p-3 md:p-6 bg-white">
         {loading ? (
           <div className="py-8 flex justify-center">
             <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-slate-500 animate-spin" />
@@ -531,7 +526,7 @@ export function Community() {
         ) : filteredArtworks.length === 0 ? (
           <div className="py-16 text-center text-slate-400 text-sm">暂无帖子</div>
         ) : (
-          <div className="w-full" style={{ columns: '5 180px', columnGap: '12px' }}>
+          <div className="w-full" style={{ columns: '2 160px', columnGap: '8px' }}>
             {filteredArtworks.map((art, index) => (
               <motion.div
                 key={art.id}
@@ -546,7 +541,7 @@ export function Community() {
                     openDetail(art.postId);
                   }
                 }}
-                className={`break-inside-avoid mb-3 bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer w-full relative ${
+                className={`break-inside-avoid mb-2 md:mb-3 bg-white rounded-lg md:rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer w-full relative ${
                   selectedIds.has(art.id) ? 'ring-2 ring-blue-500' : ''
                 }`}
               >
@@ -617,20 +612,20 @@ export function Community() {
                     const palette = getCardColorPalette(art.title || '');
                     return (
                       <div 
-                        className="relative w-full min-h-[120px] flex flex-col items-center justify-center p-4"
+                        className="relative w-full min-h-[100px] md:min-h-[120px] flex flex-col items-center justify-center p-3 md:p-4"
                         style={{ background: palette.bg }}
                       >
-                        <div className="absolute top-3 right-3 w-12 h-12 rounded-full bg-white/30 blur-xl" />
-                        <FileText className="mb-2 drop-shadow-sm relative z-10" size={24} style={{ color: palette.text }} />
-                        <h3 className="font-semibold text-xs line-clamp-2 text-center relative z-10" style={{ color: palette.text }}>{art.title}</h3>
+                        <div className="absolute top-3 right-3 w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/30 blur-xl" />
+                        <FileText className="mb-1 md:mb-2 drop-shadow-sm relative z-10" size={20} style={{ color: palette.text }} />
+                        <h3 className="font-semibold text-[10px] md:text-xs line-clamp-2 text-center relative z-10" style={{ color: palette.text }}>{art.title}</h3>
                       </div>
                     );
                   })()
                 )}
-                <div className="p-3">
-                  <h3 className="font-medium text-sm text-slate-800 line-clamp-2 mb-2 leading-snug">{art.title}</h3>
+                <div className="p-2 md:p-3">
+                  <h3 className="font-medium text-xs md:text-sm text-slate-800 line-clamp-2 mb-1 md:mb-2 leading-snug">{art.title}</h3>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 md:gap-2">
                       {art.authorAvatar ? (
                         <img src={getAvatarUrl(art.authorAvatar)} alt="" className="w-5 h-5 rounded-full object-cover" />
                       ) : (

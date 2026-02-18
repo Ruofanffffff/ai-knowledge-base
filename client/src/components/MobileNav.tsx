@@ -38,7 +38,7 @@ export function MobileNav({ currentPage, setCurrentPage, menuItems: customMenuIt
   const menuItems = customMenuItems || defaultMenuItems;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 px-4 pb-safe pt-2 md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 px-4 pt-2 md:hidden safe-area-bottom">
       <div className="flex justify-around items-center h-16">
         {menuItems.map((item) => {
           const isActive = currentPage === item.id;

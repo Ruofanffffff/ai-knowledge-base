@@ -104,149 +104,164 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="flex-1 h-full overflow-hidden flex flex-col bg-slate-50/50">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 shrink-0">
+      {/* Header - Desktop Only */}
+      <div className="hidden md:flex items-center justify-between px-8 py-6 shrink-0">
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl md:text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-slate-900">
             欢迎回来，<Typewriter text={userName} />
           </h1>
-          <p className="text-slate-500 mt-1 text-sm md:text-base">今天你想探索什么？</p>
+          <p className="text-slate-500 mt-1">今天你想探索什么？</p>
         </div>
         <div className="flex items-center gap-4">
-          <button className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-sm">
-             <img src={getAvatarUrl(user?.avatar) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"} alt={user?.username || "Profile"} className="w-full h-full object-cover" />
+          <button className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-sm">
+            <img src={getAvatarUrl(user?.avatar) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"} alt={user?.username || "Profile"} className="w-full h-full object-cover" />
           </button>
         </div>
       </div>
 
       {/* Main Content Grid */}
-      <div className="flex-1 overflow-y-auto lg:overflow-hidden px-4 md:px-8 pb-20 md:pb-8 grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 items-stretch">
+      <div className="flex-1 overflow-hidden px-4 md:px-8 pb-4 md:pb-8 flex flex-col">
         
-        {/* Left Column: AI Assistant (Prominent) */}
-        <div className="lg:col-span-7 xl:col-span-8 flex flex-col lg:h-full min-h-0 order-2 lg:order-1">
-          <div className="flex-1 h-full min-h-0 overflow-hidden">
-             <AISearch />
-          </div>
+        {/* Mobile: Full screen AI Assistant */}
+        <div className="flex-1 h-full overflow-hidden md:hidden">
+          <AISearch 
+            documentCount={documents.length} 
+            knowledgeNodeCount={knowledgeNodeCount}
+            isLoadingStats={isLoadingStats}
+          />
         </div>
 
-        {/* Right Column: Widgets */}
-        <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 lg:overflow-hidden order-1 lg:order-2 shrink-0 h-full">
-          
-          {/* Quick Actions / Create */}
-          <motion.div 
-            whileHover={{ y: -2 }}
-            onClick={() => navigate('/documents/new')}
-            className="cursor-pointer bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-2xl p-6 text-white shadow-lg shadow-purple-500/20 relative overflow-hidden group shrink-0"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-20">
-              <Sparkles size={80} />
+        {/* Desktop: Two column layout */}
+        <div className="hidden md:grid md:grid-cols-12 gap-6 h-full">
+          {/* Left Column: AI Assistant */}
+          <div className="col-span-7 xl:col-span-8 flex flex-col h-full min-h-0">
+            <div className="flex-1 h-full min-h-0 overflow-hidden">
+              <AISearch 
+                documentCount={documents.length} 
+                knowledgeNodeCount={knowledgeNodeCount}
+                isLoadingStats={isLoadingStats}
+              />
             </div>
-            <div className="relative z-10 flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Plus size={24} className="text-white" />
-              </div>
-              <div>
-                 <h3 className="text-lg font-bold">新建文档</h3>
-                 <p className="text-white/80 text-sm">开始新的创作或导入文件</p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-4 shrink-0">
-             <div 
-               onClick={() => onNavigate ? onNavigate('documents') : navigate('/documents')}
-               className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow cursor-pointer"
-              >
-                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg w-fit mb-3">
-                    <FileText size={20} />
-                 </div>
-                 {isLoadingStats ? (
-                   <span className="text-2xl font-bold text-slate-800">...</span>
-                 ) : (
-                   <span className="text-2xl font-bold text-slate-800">{documents.length}</span>
-                 )}
-                 <p className="text-xs text-slate-400">文档总数</p>
-             </div>
-
-             <div 
-               onClick={() => onNavigate ? onNavigate('graph') : navigate('/graph')}
-               className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow cursor-pointer"
-              >
-                 <div className="p-2 bg-purple-50 text-purple-600 rounded-lg w-fit mb-3">
-                    <Network size={20} />
-                 </div>
-                 {isLoadingStats ? (
-                   <span className="text-2xl font-bold text-slate-800">...</span>
-                 ) : (
-                   <span className="text-2xl font-bold text-slate-800">{knowledgeNodeCount}</span>
-                 )}
-                 <p className="text-xs text-slate-400">知识节点</p>
-             </div>
           </div>
 
-          {/* Recent Activity */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-1 min-h-[300px] flex flex-col">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
-              <h2 className="font-bold text-slate-800">最近活动</h2>
-              <button onClick={() => onNavigate ? onNavigate('documents') : navigate('/documents')} className="text-xs text-purple-600 font-medium hover:underline">查看全部</button>
+          {/* Right Column: Widgets */}
+          <div className="col-span-5 xl:col-span-4 flex flex-col gap-6 overflow-hidden h-full">
+            
+            {/* Quick Actions / Create */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              onClick={() => navigate('/documents/new')}
+              className="cursor-pointer bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 rounded-2xl p-6 text-white shadow-lg shadow-purple-500/20 relative overflow-hidden group shrink-0"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-20">
+                <Sparkles size={80} />
+              </div>
+              <div className="relative z-10 flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Plus size={24} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">新建文档</h3>
+                  <p className="text-white/80 text-sm">开始新的创作或导入文件</p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-4 shrink-0">
+              <div 
+                onClick={() => onNavigate ? onNavigate('documents') : navigate('/documents')}
+                className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow cursor-pointer"
+              >
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg w-fit mb-3">
+                  <FileText size={20} />
+                </div>
+                {isLoadingStats ? (
+                  <span className="text-2xl font-bold text-slate-800">...</span>
+                ) : (
+                  <span className="text-2xl font-bold text-slate-800">{documents.length}</span>
+                )}
+                <p className="text-xs text-slate-400">文档总数</p>
+              </div>
+
+              <div 
+                onClick={() => onNavigate ? onNavigate('graph') : navigate('/graph')}
+                className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow cursor-pointer"
+              >
+                <div className="p-2 bg-purple-50 text-purple-600 rounded-lg w-fit mb-3">
+                  <Network size={20} />
+                </div>
+                {isLoadingStats ? (
+                  <span className="text-2xl font-bold text-slate-800">...</span>
+                ) : (
+                  <span className="text-2xl font-bold text-slate-800">{knowledgeNodeCount}</span>
+                )}
+                <p className="text-xs text-slate-400">知识节点</p>
+              </div>
             </div>
-            <div className="divide-y divide-slate-100 overflow-y-auto flex-1">
-              {isLoadingStats ? (
-                <div className="p-8 text-center text-slate-400">
-                  <div className="animate-pulse">加载中...</div>
-                </div>
-              ) : statsError ? (
-                <div className="p-8 text-center text-red-400">
-                  <div>{statsError}</div>
-                </div>
-              ) : recentDocs.length === 0 ? (
-                <div className="p-8 text-center text-slate-400">
-                  <div>暂无最近活动</div>
-                </div>
-              ) : (
-                recentDocs.map((doc) => (
-                  <div 
-                    key={doc.id}
-                    onClick={() => doc.type !== 'folder' && navigate(`/documents/${doc.id}`)}
-                    className={`p-4 flex items-center gap-3 hover:bg-slate-50 group transition-colors ${doc.type !== 'folder' ? 'cursor-pointer' : 'cursor-default'}`}
-                  >
-                    <div className={`p-2 rounded-lg ${doc.type === 'folder' ? 'bg-orange-50 text-orange-400' : 'bg-blue-50 text-blue-400'}`}>
-                      {doc.type === 'folder' ? <Folder size={16} /> : <FileText size={16} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`text-sm font-medium truncate ${doc.type !== 'folder' ? 'group-hover:text-purple-600' : 'text-slate-700'}`}>{doc.title}</h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                         <span className="text-xs text-slate-400 flex items-center gap-0.5">
-                            <Clock size={10} /> {doc.updated}
-                         </span>
-                         {doc.tags?.slice(0, 2).map((tag: string, i: number) => (
-                            <span key={i} className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">
-                               {tag}
-                            </span>
-                         ))}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIndexDrawerDocId(doc.id);
-                        setIndexDrawerDocTitle(doc.title);
-                      }}
-                      title="查看索引"
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-purple-50 rounded text-slate-400 hover:text-purple-600 transition-colors"
-                    >
-                      <BookOpen size={14} />
-                    </button>
-                    <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-50 rounded text-slate-400">
-                      <MoreVertical size={14} />
-                    </button>
+
+            {/* Recent Activity */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-1 min-h-[200px] flex flex-col">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                <h2 className="font-bold text-slate-800">最近活动</h2>
+                <button onClick={() => onNavigate ? onNavigate('documents') : navigate('/documents')} className="text-xs text-purple-600 font-medium hover:underline">查看全部</button>
+              </div>
+              <div className="divide-y divide-slate-100 overflow-y-auto flex-1">
+                {isLoadingStats ? (
+                  <div className="p-8 text-center text-slate-400">
+                    <div className="animate-pulse">加载中...</div>
                   </div>
-                ))
-              )}
+                ) : statsError ? (
+                  <div className="p-8 text-center text-red-400">
+                    <div>{statsError}</div>
+                  </div>
+                ) : recentDocs.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400">
+                    <div>暂无最近活动</div>
+                  </div>
+                ) : (
+                  recentDocs.map((doc) => (
+                    <div 
+                      key={doc.id}
+                      onClick={() => doc.type !== 'folder' && navigate(`/documents/${doc.id}`)}
+                      className={`p-4 flex items-center gap-3 hover:bg-slate-50 group transition-colors ${doc.type !== 'folder' ? 'cursor-pointer' : 'cursor-default'}`}
+                    >
+                      <div className={`p-2 rounded-lg ${doc.type === 'folder' ? 'bg-orange-50 text-orange-400' : 'bg-blue-50 text-blue-400'}`}>
+                        {doc.type === 'folder' ? <Folder size={16} /> : <FileText size={16} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`text-sm font-medium truncate ${doc.type !== 'folder' ? 'group-hover:text-purple-600' : 'text-slate-700'}`}>{doc.title}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-slate-400 flex items-center gap-0.5">
+                            <Clock size={10} /> {doc.updated}
+                          </span>
+                          {doc.tags?.slice(0, 2).map((tag: string, i: number) => (
+                            <span key={i} className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIndexDrawerDocId(doc.id);
+                          setIndexDrawerDocTitle(doc.title);
+                        }}
+                        title="查看索引"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-purple-50 rounded text-slate-400 hover:text-purple-600 transition-colors"
+                      >
+                        <BookOpen size={14} />
+                      </button>
+                      <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-50 rounded text-slate-400">
+                        <MoreVertical size={14} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
-
         </div>
       </div>
 
