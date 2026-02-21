@@ -744,7 +744,7 @@ export function Community() {
         >
           <span style={{ fontSize: '14px', color: '#475569' }}>已选择 {selectedIds.size} 项</span>
           <button
-            onClick={openBatchDeleteConfirm}
+            onClick={() => setShowBatchDeleteConfirm(true)}
             style={{
               padding: '6px 16px',
               backgroundColor: '#ef4444',
@@ -946,41 +946,46 @@ export function Community() {
                           );
                         })
                       ) : (
-                        <div className="text-center text-slate-400 text-sm py-8">暂无文档索引分析</div>
+                        <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400">
+                          <BookOpen className="mb-4 opacity-50" size={48} />
+                          <p>暂无文档索引分析</p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (selectedDetail.post.documentId) {
+                                window.open(`/dashboard/documents/${selectedDetail.post.documentId}`, '_blank');
+                              } else {
+                                alert('文档不存在');
+                              }
+                            }}
+                            className="mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium underline underline-offset-4"
+                          >
+                            查看原文档
+                          </button>
+                        </div>
                       )}
                     </div>
                     </div>{/* end scrollable area */}
 
                     {/* Footer Actions */}
                     <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-between gap-4 z-10 shrink-0">
-                      <button
-                        onClick={() => {
-                          closeDetail();
-                          navigate(`/documents/${selectedDetail!.post.documentId}`);
-                        }}
-                        className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-sm"
-                      >
-                        <FileText size={14} /> 查看原文档
-                      </button>
-                      <div className="flex gap-2">
-                        <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors" title="Comment">
+                      <div className="flex gap-4">
+                        <button className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${selectedDetail.post.isLiked ? 'text-pink-600' : 'text-slate-600 hover:text-pink-600'}`} onClick={() => toggleLike(String(selectedDetail!.post.id))}>
+                          <Heart size={18} className={selectedDetail.post.isLiked ? 'fill-current' : ''} />
+                          <span>{selectedDetail.post.likes}</span>
+                        </button>
+                        <button className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors">
                           <MessageCircle size={18} />
+                          <span>{selectedDetail.commentCount}</span>
                         </button>
-                        <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors" title="Favorite">
-                          <Bookmark size={18} />
-                        </button>
-                        <button
-                          onClick={() => toggleLike(String(selectedDetail!.post.id))}
-                          className={`p-2 rounded-lg border transition-colors ${
-                            selectedDetail.post.isLiked
-                              ? 'border-pink-200 bg-pink-50 text-pink-600'
-                              : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                          }`}
-                          title="Like"
-                        >
-                          <Heart size={18} fill={selectedDetail.post.isLiked ? "currentColor" : "none"} />
+                        <button className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${selectedDetail.post.isBookmarked ? 'text-purple-600' : 'text-slate-600 hover:text-purple-600'}`}>
+                          <Bookmark size={18} className={selectedDetail.post.isBookmarked ? 'fill-current' : ''} />
                         </button>
                       </div>
+                      <button className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
+                        <Share2 size={18} />
+                        <span>分享</span>
+                      </button>
                     </div>
                   </div>
                 </>
