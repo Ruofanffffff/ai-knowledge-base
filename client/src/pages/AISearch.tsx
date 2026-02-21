@@ -536,7 +536,7 @@ export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingS
   };
 
   return (
-    <div className="flex-1 h-full flex bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="flex-1 h-full flex overflow-hidden">
       {/* Sidebar - History */}
       <AnimatePresence>
         {isSidebarOpen && (

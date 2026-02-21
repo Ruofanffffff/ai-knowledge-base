@@ -137,7 +137,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           
           {/* Left Column: AI Assistant */}
           <div className="col-span-7 xl:col-span-8 flex flex-col h-full min-h-0">
-            <div className="flex-1 h-full min-h-0 overflow-hidden">
+            <div className="flex-1 h-full min-h-0 overflow-hidden bg-white rounded-2xl border border-slate-200 shadow-sm">
               <AISearch />
             </div>
           </div>
