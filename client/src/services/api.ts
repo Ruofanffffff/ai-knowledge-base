@@ -784,12 +784,12 @@ class ApiService {
   /**
    * 发布文档到社区
    */
-  async publishToCommunity(documentIds: string[]): Promise<ApiResponse<{
+  async publishToCommunity(documentIds: string[], isPublic: boolean = false): Promise<ApiResponse<{
     published: Array<{ id: number; documentId: string; title: string }>;
     skipped: Array<{ documentId: string; reason: string }>;
   }>> {
     try {
-      const response = await apiClient.post('/community/publish', { documentIds });
+      const response = await apiClient.post('/community/publish', { documentIds, isPublic });
       return { success: true, data: response.data.data || response.data };
     } catch (error) {
       return {

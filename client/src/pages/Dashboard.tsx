@@ -104,50 +104,48 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="flex-1 h-full overflow-hidden flex flex-col bg-slate-50/50">
-      {/* Header - Desktop Only */}
-      <div className="hidden md:flex items-center justify-between px-8 py-6 shrink-0">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 md:px-8 py-3 md:py-6 shrink-0">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-lg md:text-2xl font-bold text-slate-900">
             欢迎回来，<Typewriter text={userName} />
           </h1>
-          <p className="text-slate-500 mt-1">今天你想探索什么？</p>
+          <p className="text-slate-500 mt-0.5 md:mt-1 text-sm md:text-base">今天你想探索什么？</p>
         </div>
         <div className="flex items-center gap-4">
-          <button className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-sm">
+          <button className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-200 overflow-hidden border-2 border-white shadow-sm">
             <img src={getAvatarUrl(user?.avatar) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"} alt={user?.username || "Profile"} className="w-full h-full object-cover" />
           </button>
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="flex-1 overflow-hidden px-4 md:px-8 pb-4 md:pb-8 flex flex-col">
-        
-        {/* Mobile: Full screen AI Assistant */}
-        <div className="flex-1 h-full overflow-hidden md:hidden">
+      {/* Mobile Layout - Chat Focused */}
+      <div className="md:hidden flex-1 overflow-hidden flex flex-col min-h-0">
+        <div className="flex-1 h-full min-h-0 overflow-hidden">
           <AISearch 
             documentCount={documents.length} 
             knowledgeNodeCount={knowledgeNodeCount}
             isLoadingStats={isLoadingStats}
+            recentDocs={recentDocs}
           />
         </div>
+      </div>
 
-        {/* Desktop: Two column layout */}
-        <div className="hidden md:grid md:grid-cols-12 gap-6 h-full">
+      {/* Desktop Layout */}
+      <div className="hidden md:flex flex-1 overflow-hidden px-8 pb-8">
+        <div className="flex-1 grid grid-cols-12 gap-6 h-full">
+          
           {/* Left Column: AI Assistant */}
           <div className="col-span-7 xl:col-span-8 flex flex-col h-full min-h-0">
             <div className="flex-1 h-full min-h-0 overflow-hidden">
-              <AISearch 
-                documentCount={documents.length} 
-                knowledgeNodeCount={knowledgeNodeCount}
-                isLoadingStats={isLoadingStats}
-              />
+              <AISearch />
             </div>
           </div>
 
           {/* Right Column: Widgets */}
           <div className="col-span-5 xl:col-span-4 flex flex-col gap-6 overflow-hidden h-full">
             
-            {/* Quick Actions / Create */}
+            {/* Quick Actions */}
             <motion.div 
               whileHover={{ y: -2 }}
               onClick={() => navigate('/documents/new')}

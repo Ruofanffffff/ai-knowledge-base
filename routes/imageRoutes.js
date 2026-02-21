@@ -13,8 +13,52 @@ const router = express.Router();
 const multer = require('multer');
 const { PrismaClient } = require('@prisma/client');
 const minioService = require('../services/minioService');
+const { authMiddleware } = require('../services/authService');
 
 const prisma = new PrismaClient();
+
+// URL 验证辅助函数
+const validateUrl = (urlString) => {
+  try {
+    const url = new URL(urlString);
+    
+    // 1. 协议检查
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return { valid: false, error: '仅支持 HTTP/HTTPS 协议' };
+    }
+    
+    // 2. 主机名检查 (防 SSRF)
+    const hostname = url.hostname;
+    
+    // 检查是否为 IP 地址
+    const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+    if (isIp) {
+      const parts = hostname.split('.').map(Number);
+      // 检查私有 IP 段
+      // 10.0.0.0/8
+      if (parts[0] === 10) return { valid: false, error: '禁止访问私有 IP' };
+      // 172.16.0.0/12
+      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return { valid: false, error: '禁止访问私有 IP' };
+      // 192.168.0.0/16
+      if (parts[0] === 192 && parts[1] === 168) return { valid: false, error: '禁止访问私有 IP' };
+      // 127.0.0.0/8
+      if (parts[0] === 127) return { valid: false, error: '禁止访问本地回环地址' };
+      // 0.0.0.0/8
+      if (parts[0] === 0) return { valid: false, error: '无效 IP' };
+      // 169.254.0.0/16
+      if (parts[0] === 169 && parts[1] === 254) return { valid: false, error: '禁止访问链路本地地址' };
+    }
+    
+    // 检查 localhost
+    if (hostname.toLowerCase() === 'localhost') {
+      return { valid: false, error: '禁止访问 localhost' };
+    }
+    
+    return { valid: true };
+  } catch (e) {
+    return { valid: false, error: '无效的 URL 格式' };
+  }
+};
 
 // multer 配置：内存存储，仅接受图片，10MB 限制
 const upload = multer({
@@ -40,7 +84,7 @@ const upload = multer({
  * Request: multipart/form-data, field name: "file"
  * Response: { url, key, analysisId, analysisStatus }
  */
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: '请上传图片文件' });
@@ -86,12 +130,18 @@ router.post('/upload', upload.single('file'), async (req, res) => {
  * Request: { url: string }
  * Response: { url, key, analysisId, analysisStatus }
  */
-router.post('/upload-from-url', async (req, res) => {
+router.post('/upload-from-url', authMiddleware, async (req, res) => {
   try {
     const { url } = req.body;
 
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: '请提供图片 URL' });
+    }
+
+    // URL 安全性检查
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
     }
 
     // 抓取外部图片 — 多策略尝试绕过防盗链
@@ -223,7 +273,7 @@ router.post('/upload-from-url', async (req, res) => {
  *
  * Response: ImageAnalysis 记录（含 description, elements, theme, status 等）
  */
-router.get('/:id/analysis', async (req, res) => {
+router.get('/:id/analysis', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -270,11 +320,17 @@ router.get('/:id/analysis', async (req, res) => {
  * 当外部图片因防盗链无法直接在浏览器中显示时，
  * 通过服务器代理请求并流式返回给客户端。
  */
-router.get('/external-proxy', async (req, res) => {
+router.get('/external-proxy', authMiddleware, async (req, res) => {
   try {
     const { url } = req.query;
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: '缺少 url 参数' });
+    }
+
+    // URL 安全性检查
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
     }
 
     let parsedUrl;
@@ -340,7 +396,7 @@ router.get('/external-proxy', async (req, res) => {
  * 从 MinIO 获取图片并以流方式返回给客户端
  * key 参数通过通配符捕获完整路径（含斜杠）
  */
-router.get('/proxy/*', async (req, res) => {
+router.get('/proxy/*', authMiddleware, async (req, res) => {
   try {
     // req.params[0] 捕获通配符匹配的完整路径
     const key = req.params[0];

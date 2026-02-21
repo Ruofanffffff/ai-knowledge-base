@@ -1405,7 +1405,9 @@ const processPdfAsync = async (filePath, docId, userId) => {
         };
         
         console.log('[AsyncPDF] 内容更新完成，触发延迟的知识图谱构建...');
-        if (onDocumentCreated) {
+        const autoBuildKG = process.env.AUTO_BUILD_KG === 'true' || true; // 默认开启
+        
+        if (autoBuildKG && onDocumentCreated) {
           onDocumentCreated(tempDoc, { async: true, skipIfExists: false })
             .then(result => console.log('[KG Hook] 异步PDF处理后知识图谱构建结果:', result))
             .catch(error => console.error('[KG Hook] 异步PDF处理后知识图谱构建失败:', error));
@@ -1622,13 +1624,33 @@ const handleFileUpload = async (req, res) => {
         } else {
           // 非 PDF 或非异步处理，立即触发知识图谱构建
           console.log('[Upload] 同步处理模式：开始触发知识图谱构建...');
-          if (onDocumentCreated) onDocumentCreated(document, { async: true, skipIfExists: false })
-            .then(result => {
-              console.log('[KG Hook] 文档上传后知识图谱构建结果:', result);
-            })
-            .catch(error => {
-              console.error('[KG Hook] 文档上传后知识图谱构建失败:', error);
-            });
+          
+          const autoBuildKG = process.env.AUTO_BUILD_KG === 'true' || true; // 默认开启
+          
+          if (autoBuildKG && typeof onDocumentCreated === 'function') {
+             // 构建文档对象传递给 onDocumentCreated
+             const docForKG = {
+                id: documentId,
+                title: title,
+                content: content,
+                type: 'document',
+                fileType: fileType,
+                metadata: JSON.parse(metadata),
+                hash: fileHash,
+                size: size,
+                userId: userId,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+             };
+             
+             onDocumentCreated(docForKG, { async: true, skipIfExists: false })
+              .then(result => {
+                console.log('[KG Hook] 文档上传后知识图谱构建结果:', result);
+              })
+              .catch(error => {
+                console.error('[KG Hook] 文档上传后知识图谱构建失败:', error);
+              });
+          }
         }
         
         const document = {

@@ -111,14 +111,14 @@ function initCommunityRoutes(externalDb, prismaClient) {
  * POST /api/community/publish
  * 发布文档到社区
  * 
- * Body: { documentIds: number[] }
+ * Body: { documentIds: number[], isPublic: boolean }
  * Response: { success: true, data: { published: [...], skipped: [...] } }
  * 
  * Validates: Requirements 1.2, 1.3, 1.4, 1.6
  */
 router.post('/publish', authMiddleware, (req, res) => {
   try {
-    const { documentIds } = req.body;
+    const { documentIds, isPublic = false } = req.body;
     const userId = req.userId;
 
     // 校验 documentIds 非空
@@ -198,9 +198,9 @@ router.post('/publish', authMiddleware, (req, res) => {
                 : null;
 
               db.run(
-                `INSERT INTO community_posts (user_id, document_id, title, summary, cover_image, tags, likes, view_count, status)
-                 VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'published')`,
-                [userId, numericDocId, doc.title, summary, coverImage, doc.tags],
+                `INSERT INTO community_posts (user_id, document_id, title, summary, cover_image, tags, likes, view_count, status, is_public)
+                 VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'published', ?)`,
+                [userId, numericDocId, doc.title, summary, coverImage, doc.tags, isPublic ? 1 : 0],
                 function (err) {
                   if (err) {
                     console.error('插入社区帖子失败:', err);
@@ -349,6 +349,7 @@ router.get('/posts', authMiddleware, (req, res) => {
           likes: row.likes,
           viewCount: row.view_count,
           status: row.status,
+          isPublic: row.is_public === 1,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
           authorName: row.authorName,
@@ -892,12 +893,16 @@ router.get('/posts/:id', authMiddleware, async (req, res) => {
           authorAvatar: row.authorAvatar,
           isLiked: row.isLiked === 1,
           isBookmarked: row.isBookmarked === 1,
+          isPublic: row.is_public === 1,
           commentCount: row.commentCount || 0,
         };
 
         // 查询关联文档的 content 字段，提取内容图片
         let contentImages = [];
-        if (row.document_id) {
+        // 只有当文档ID存在，且（是当前用户自己的文档 OR 文档已设为公开）才返回文档内容
+        const canViewContent = row.document_id && (row.user_id === userId || row.is_public === 1);
+        
+        if (canViewContent) {
           try {
             const doc = await new Promise((resolve, reject) => {
               db.get(

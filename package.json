@@ -112,7 +112,7 @@
     "@capacitor/ios": "^6.2.1",
     "@prisma/client": "^5.0.0",
     "axios": "^1.13.4",
-    "bcrypt": "^5.1.0",
+    "bcrypt": "^5.1.1",
     "compromise": "^14.14.5",
     "cors": "^2.8.5",
     "docx": "^9.5.1",

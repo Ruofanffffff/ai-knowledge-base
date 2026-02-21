@@ -373,6 +373,7 @@ exports.updateUserRole = async (req, res) => {
 exports.getUserGrowthStats = async (req, res) => {
   try {
     const { days = 30 } = req.query;
+    const daysInt = parseInt(days, 10) || 30;
     
     const database = getDb();
     database.all(
@@ -380,7 +381,7 @@ exports.getUserGrowthStats = async (req, res) => {
          DATE(created_at) as date,
          COUNT(*) as new_users
        FROM users 
-       WHERE created_at >= date('now', '-${days} days')
+       WHERE created_at >= date('now', '-${daysInt} days')
        GROUP BY DATE(created_at) 
        ORDER BY date DESC`,
       [],
@@ -405,6 +406,7 @@ exports.getUserGrowthStats = async (req, res) => {
 exports.getTokenUsageStats = async (req, res) => {
   try {
     const { days = 30 } = req.query;
+    const daysInt = parseInt(days, 10) || 30;
     
     const database = getDb();
     database.all(
@@ -414,7 +416,7 @@ exports.getTokenUsageStats = async (req, res) => {
          SUM(cost) as daily_cost,
          COUNT(*) as request_count
        FROM token_usage 
-       WHERE created_at >= date('now', '-${days} days')
+       WHERE created_at >= date('now', '-${daysInt} days')
        GROUP BY DATE(created_at) 
        ORDER BY date DESC`,
       [],

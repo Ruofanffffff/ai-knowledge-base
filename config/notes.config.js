@@ -16,8 +16,8 @@ const notesConfig = {
   // S3-Compatible Object Storage Configuration
   storage: {
     endpoint: process.env.S3_ENDPOINT || 'http://localhost:9000',
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || 'minioadmin',
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || 'minioadmin',
+    accessKeyId: process.env.S3_ACCESS_KEY_ID || (process.env.NODE_ENV === 'production' ? undefined : 'minioadmin'),
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || (process.env.NODE_ENV === 'production' ? undefined : 'minioadmin'),
     bucketName: process.env.S3_BUCKET_NAME || 'notes-attachments',
     region: process.env.S3_REGION || 'us-east-1',
     useSSL: process.env.S3_USE_SSL === 'true',

@@ -117,6 +117,27 @@ export function Community() {
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
   const [batchDeleteLoading, setBatchDeleteLoading] = useState(false);
 
+  // Batch publish logic
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
+
+  const handlePublish = async () => {
+    if (selectedIds.size === 0) return;
+    setPublishLoading(true);
+    const result = await apiService.publishToCommunity(Array.from(selectedIds), isPublic);
+    if (result.success) {
+      alert(`发布成功 ${result.data?.published.length} 篇文档`);
+      setSelectedIds(new Set());
+      setIsSelectMode(false);
+      setShowPublishModal(false);
+      loadPosts();
+    } else {
+      alert(result.error || '发布失败');
+    }
+    setPublishLoading(false);
+  };
+
   // Dropdown menu
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
@@ -519,6 +540,53 @@ export function Community() {
 
       {/* Grid Layout */}
       <div className="flex-1 overflow-y-auto p-3 md:p-6 bg-white">
+        {/* Bulk Action Bar */}
+        {isSelectMode && activeTab === '我发布的' && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100 sticky top-0 z-20"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-700">已选择 {selectedIds.size} 项</span>
+              {selectedIds.size > 0 && (
+                <button 
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-xs text-slate-400 hover:text-slate-600"
+                >
+                  清空
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPublishModal(true)}
+                disabled={selectedIds.size === 0}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  selectedIds.size > 0
+                    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                <Upload size={14} />
+                <span>发布</span>
+              </button>
+              <button
+                onClick={() => setShowBatchDeleteConfirm(true)}
+                disabled={selectedIds.size === 0}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  selectedIds.size > 0
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-100'
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                <Trash2 size={14} />
+                <span>删除</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {loading ? (
           <div className="py-8 flex justify-center">
             <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-slate-500 animate-spin" />
@@ -915,6 +983,69 @@ export function Community() {
             </div>
           </div>,
       document.body
+      )}
+
+      {/* Publish Modal */}
+      {showPublishModal && createPortal(
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowPublishModal(false);
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">发布到社区</h2>
+              <p className="text-sm text-slate-600 mb-6">
+                确定要发布选中的 {selectedIds.size} 篇文档吗？
+              </p>
+              
+              <div className="flex items-center gap-3 mb-6 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <input
+                  type="checkbox"
+                  id="public-toggle"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                />
+                <label htmlFor="public-toggle" className="text-sm text-slate-700 select-none cursor-pointer flex-1">
+                  <span className="font-medium block">公开原文档</span>
+                  <span className="text-xs text-slate-500 block mt-0.5">其他用户可查看文档全文</span>
+                </label>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowPublishModal(false)}
+                  className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition-colors"
+                  disabled={publishLoading}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handlePublish}
+                  className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  disabled={publishLoading}
+                >
+                  {publishLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>发布中...</span>
+                    </>
+                  ) : (
+                    <span>确认发布</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Edit Modal */}

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Mic, Bot, User, FileText, Sparkles, Clock, Link, Database, Plus, Trash2, MessageSquare, ChevronDown, ChevronRight, Network } from 'lucide-react';
+import { Send, Mic, Bot, User, FileText, Sparkles, Clock, Link, Database, Plus, Trash2, MessageSquare, ChevronDown, ChevronRight, ChevronUp, BarChart3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import apiClient from '../api/client';
 
-// Get API base URL from environment variables or use default
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 interface Message {
@@ -21,6 +20,12 @@ interface Message {
     snippet: string;
   }>;
   timestamp?: string;
+  isStatsCard?: boolean;
+  statsData?: {
+    documentCount: number;
+    knowledgeNodeCount: number;
+    isLoading: boolean;
+  };
 }
 
 interface ChatSession {
@@ -41,11 +46,122 @@ interface AISearchProps {
   documentCount?: number;
   knowledgeNodeCount?: number;
   isLoadingStats?: boolean;
+  recentDocs?: Array<{
+    id: string;
+    title: string;
+    type: string;
+    updated: string;
+    tags?: string[];
+  }>;
 }
+
+const StatsCard = ({ documentCount, knowledgeNodeCount, isLoading }: { documentCount: number; knowledgeNodeCount: number; isLoading: boolean }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const maxNodes = 100;
+  const nodePercentage = Math.min((knowledgeNodeCount / maxNodes) * 100, 100);
+  
+  const generateBars = () => {
+    const bars = [];
+    const totalBars = 8;
+    const filledBars = Math.min(Math.floor(knowledgeNodeCount / 10), totalBars);
+    
+    for (let i = 0; i < totalBars; i++) {
+      const height = 20 + Math.random() * 30;
+      const isFilled = i < filledBars;
+      bars.push(
+        <div
+          key={i}
+          className={`w-3 rounded-t-sm transition-all duration-300 ${
+            isFilled 
+              ? (i % 2 === 0 ? 'bg-purple-500' : 'bg-blue-500')
+              : 'bg-slate-200'
+          }`}
+          style={{ height: `${height}px` }}
+        />
+      );
+    }
+    return bars;
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-1 h-5 bg-purple-500 rounded-full" />
+          <span className="font-semibold text-slate-800 text-sm">你的文档统计</span>
+        </div>
+        <ChevronUp 
+          size={18} 
+          className={`text-slate-400 transition-transform duration-200 ${isExpanded ? '' : 'rotate-180'}`}
+        />
+      </button>
+      
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 flex gap-6">
+              <div className="flex-1 flex flex-col items-center">
+                <div className="text-xs text-slate-500 mb-2">文档数量</div>
+                <div className="relative w-20 h-20">
+                  <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="#E2E8F0"
+                      strokeWidth="3"
+                    />
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="#3B82F6"
+                      strokeWidth="3"
+                      strokeDasharray={`${Math.min(documentCount, 100)}, 100`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-lg font-bold text-slate-800">
+                      {isLoading ? '...' : documentCount}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex-1 flex flex-col items-center">
+                <div className="text-xs text-slate-500 mb-2">知识节点数</div>
+                <div className="flex items-end gap-1 h-16">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center w-full">
+                      <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent animate-spin rounded-full" />
+                    </div>
+                  ) : (
+                    generateBars()
+                  )}
+                </div>
+                <div className="mt-2 text-sm font-medium text-slate-700">
+                  {isLoading ? '...' : knowledgeNodeCount}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 
-export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingStats = false }: AISearchProps) {
+export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingStats = false, recentDocs = [] }: AISearchProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -144,20 +260,7 @@ export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingS
   const createNewSession = async () => {
     const tempId = Date.now().toString();
     
-    const welcomeContent = isMobile 
-      ? `你好！我是你的智能助手 Hi Brain 🧠
-
-📊 **你的知识库概览**
-├─ 📄 文档总数：${isLoadingStats ? '...' : documentCount}
-└─ 🔗 知识节点：${isLoadingStats ? '...' : knowledgeNodeCount}
-
-我可以帮你：
-• 🔍 搜索知识库：快速查找你的文档内容
-• 💡 智能问答：基于知识库回答问题
-• ✍️ 辅助创作：撰写文档、总结内容
-
-随时告诉我你需要什么！`
-      : '你好！我是你的智能助手 Hi Brain。\n\n我可以帮你：\n1. 搜索知识库：快速查找你上传的文档和笔记内容\n2. 智能问答：基于你的个人知识库和互联网信息回答问题\n3. 辅助创作：帮你撰写文档、总结内容或激发灵感\n\n随时告诉我你需要什么，我会尽力协助你。';
+    const welcomeContent = '你好！我是你的智能助手 Hi Brain。\n\n我可以帮你：\n• 🔍 搜索知识库：快速查找你的文档内容\n• 💡 智能问答：基于知识库回答问题\n• ✍️ 辅助创作：撰写文档、总结内容\n\n随时告诉我你需要什么！';
 
     const newSession: ChatSession = {
       id: tempId,
@@ -168,8 +271,14 @@ export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingS
         {
           id: 1,
           role: 'assistant',
-          content: welcomeContent,
-          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+          content: isMobile ? welcomeContent : welcomeContent,
+          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+          isStatsCard: isMobile,
+          statsData: isMobile ? {
+            documentCount,
+            knowledgeNodeCount,
+            isLoading: isLoadingStats
+          } : undefined
         }
       ]
     };
@@ -603,7 +712,7 @@ export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingS
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ background: 'linear-gradient(135deg, #F0F4FF 0%, #F5F3FF 50%, #FDF4FF 100%)' }}>
           {messages.map((msg) => (
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
@@ -611,68 +720,83 @@ export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingS
               key={msg.id} 
               className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
             >
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-slate-200 text-slate-600' : 'bg-purple-100 text-purple-600'}`}>
-                {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
-              </div>
-              
-              <div className={`flex flex-col gap-2 max-w-[85%]`}>
-                 <div className={`flex items-center gap-2 mb-1 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                   {msg.timestamp && (
-                     <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                       <Clock size={10} /> {msg.timestamp}
-                     </span>
-                   )}
-                 </div>
-                 
-                 <div className={`p-3 rounded-2xl text-sm ${
-                   msg.role === 'user' 
-                     ? 'bg-slate-900 text-white rounded-tr-sm' 
-                     : 'bg-white border border-slate-200 shadow-sm text-slate-700 rounded-tl-sm'
-                 }`}>
-                   {msg.content ? (
-                     <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                   ) : (
-                     <div className="flex items-center gap-2">
-                       <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent animate-spin rounded-full" />
-                       <span>正在思考...</span>
+              {msg.isStatsCard ? (
+                <div className="w-full max-w-[90%] mx-auto">
+                  <StatsCard 
+                    documentCount={msg.statsData?.documentCount || 0}
+                    knowledgeNodeCount={msg.statsData?.knowledgeNodeCount || 0}
+                    isLoading={msg.statsData?.isLoading || false}
+                  />
+                  <div className="mt-3 p-3 rounded-2xl bg-white border border-slate-200 shadow-sm text-sm text-slate-700">
+                    <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-slate-200 text-slate-600' : 'bg-purple-100 text-purple-600'}`}>
+                    {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
+                  </div>
+                  
+                  <div className={`flex flex-col gap-2 max-w-[85%]`}>
+                     <div className={`flex items-center gap-2 mb-1 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                       {msg.timestamp && (
+                         <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                           <Clock size={10} /> {msg.timestamp}
+                         </span>
+                       )}
                      </div>
-                   )}
-                 </div>
-                 
-                 {msg.sources && msg.sources.length > 0 && (
-                   <div className="flex flex-col gap-2">
-                     <div className="text-xs font-semibold text-slate-500 flex items-center gap-1">
-                       <Database size={10} />
-                       <span>知识库来源</span>
+                     
+                     <div className={`p-3 rounded-2xl text-sm ${
+                       msg.role === 'user' 
+                         ? 'bg-slate-900 text-white rounded-tr-sm' 
+                         : 'bg-white border border-slate-200 shadow-sm text-slate-700 rounded-tl-sm'
+                     }`}>
+                       {msg.content ? (
+                         <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                       ) : (
+                         <div className="flex items-center gap-2">
+                           <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent animate-spin rounded-full" />
+                           <span>正在思考...</span>
+                         </div>
+                       )}
                      </div>
-                     <div className="flex gap-2 flex-wrap">
-                        {msg.sources.map((src, i) => (
-                           <div key={i} className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded text-[10px] text-slate-500 cursor-pointer hover:text-purple-600 hover:border-purple-300 transition-all shadow-sm max-w-[200px]">
-                              <FileText size={10} />
-                              <span className="truncate">{src.title}</span>
-                           </div>
-                        ))}
-                     </div>
-                   </div>
-                 )}
-                 
-                 {msg.webSources && msg.webSources.length > 0 && (
-                   <div className="flex flex-col gap-2">
-                     <div className="text-xs font-semibold text-slate-500 flex items-center gap-1">
-                       <Link size={10} />
-                       <span>网络搜索来源</span>
-                     </div>
-                     <div className="flex gap-2 flex-wrap">
-                        {msg.webSources.map((src, i) => (
-                           <div key={i} className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded text-[10px] text-slate-500 cursor-pointer hover:text-purple-600 hover:border-purple-300 transition-all shadow-sm max-w-[200px]">
-                              <Link size={10} />
-                              <span className="truncate">{src.title}</span>
-                           </div>
-                        ))}
-                     </div>
-                   </div>
-                 )}
-              </div>
+                     
+                     {msg.sources && msg.sources.length > 0 && (
+                       <div className="flex flex-col gap-2">
+                         <div className="text-xs font-semibold text-slate-600 flex items-center gap-1">
+                           <Database size={10} />
+                           <span>知识库来源</span>
+                         </div>
+                         <div className="flex gap-2 flex-wrap">
+                            {msg.sources.map((src, i) => (
+                               <div key={i} className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded text-[10px] text-slate-500 cursor-pointer hover:text-purple-600 hover:border-purple-300 transition-all shadow-sm max-w-[200px]">
+                                  <FileText size={10} />
+                                  <span className="truncate">{src.title}</span>
+                               </div>
+                            ))}
+                         </div>
+                       </div>
+                     )}
+                     
+                     {msg.webSources && msg.webSources.length > 0 && (
+                       <div className="flex flex-col gap-2">
+                         <div className="text-xs font-semibold text-slate-600 flex items-center gap-1">
+                           <Link size={10} />
+                           <span>网络搜索来源</span>
+                         </div>
+                         <div className="flex gap-2 flex-wrap">
+                            {msg.webSources.map((src, i) => (
+                               <div key={i} className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded text-[10px] text-slate-500 cursor-pointer hover:text-purple-600 hover:border-purple-300 transition-all shadow-sm max-w-[200px]">
+                                  <Link size={10} />
+                                  <span className="truncate">{src.title}</span>
+                               </div>
+                            ))}
+                         </div>
+                       </div>
+                     )}
+                  </div>
+                </>
+              )}
             </motion.div>
           ))}
           
