@@ -542,7 +542,7 @@ export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingS
         {isSidebarOpen && (
           <motion.div
             initial={isMobile ? { x: -280, opacity: 0 } : { width: 0, opacity: 0 }}
-            animate={isMobile ? { x: 0, opacity: 1 } : { width: 280, opacity: 1 }}
+            animate={isMobile ? { x: 0, opacity: 1 } : { width: 260, opacity: 1 }}
             exit={isMobile ? { x: -280, opacity: 0 } : { width: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className={`border-r border-slate-200 bg-slate-50/50 flex flex-col min-w-0 ${

@@ -48,6 +48,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [statsError, setStatsError] = useState<string | null>(null);
   const [indexDrawerDocId, setIndexDrawerDocId] = useState<string | null>(null);
   const [indexDrawerDocTitle, setIndexDrawerDocTitle] = useState<string | undefined>(undefined);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   useEffect(() => {
     const loadUserInfo = async () => {
@@ -120,30 +130,31 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       {/* Mobile Layout - Chat Focused */}
-      <div className="md:hidden flex-1 overflow-hidden flex flex-col min-h-0">
-        <div className="flex-1 h-full min-h-0 overflow-hidden">
-          <AISearch 
-            documentCount={documents.length} 
-            knowledgeNodeCount={knowledgeNodeCount}
-            isLoadingStats={isLoadingStats}
-            recentDocs={recentDocs}
-          />
+      {isMobile && (
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <div className="flex-1 h-full min-h-0 overflow-hidden">
+            <AISearch 
+              documentCount={documents.length} 
+              knowledgeNodeCount={knowledgeNodeCount}
+              isLoadingStats={isLoadingStats}
+              recentDocs={recentDocs}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Desktop Layout */}
-      <div className="hidden md:flex flex-1 overflow-hidden px-8 pb-8">
-        <div className="flex-1 grid grid-cols-12 gap-6 h-full">
-          
+      {!isMobile && (
+        <div className="flex-1 overflow-hidden px-8 pb-8 flex gap-6">
           {/* Left Column: AI Assistant */}
-          <div className="col-span-7 xl:col-span-8 flex flex-col h-full min-h-0">
+          <div className="flex-1 flex flex-col h-full min-h-0" style={{ flex: '7' }}>
             <div className="flex-1 h-full min-h-0 overflow-hidden bg-white rounded-2xl border border-slate-200 shadow-sm">
               <AISearch />
             </div>
           </div>
 
           {/* Right Column: Widgets */}
-          <div className="col-span-5 xl:col-span-4 flex flex-col gap-6 overflow-hidden h-full">
+          <div className="flex flex-col gap-6 overflow-hidden h-full" style={{ flex: '5', minWidth: '280px', maxWidth: '400px' }}>
             
             {/* Quick Actions */}
             <motion.div 
@@ -261,7 +272,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Document Index Drawer */}
       <DocumentIndexDrawer
