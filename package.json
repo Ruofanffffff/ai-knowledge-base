@@ -111,6 +111,7 @@
     "@capacitor/core": "^6.0.0",
     "@capacitor/ios": "^6.2.1",
     "@prisma/client": "^5.0.0",
+    "antd-mobile-rn": "^2.3.3",
     "axios": "^1.13.4",
     "bcrypt": "^5.1.1",
     "compromise": "^14.14.5",
