@@ -720,6 +720,7 @@ export function Community() {
               </motion.div>
             ))}
           </div>
+          </div>
         )}
       </div>
 
