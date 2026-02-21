@@ -5,7 +5,7 @@ import {
   Layers, Wand2, X,
   Maximize2, BookOpen, Sparkles, GitFork, Network, Zap,
   ChevronLeft, ChevronRight, Loader2, FileText, MessageCircle, Bookmark,
-  MoreHorizontal, Edit2, Trash2, CheckSquare, Square
+  MoreHorizontal, Edit2, Trash2, CheckSquare, Square, Upload, MoreVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -125,17 +125,23 @@ export function Community() {
   const handlePublish = async () => {
     if (selectedIds.size === 0) return;
     setPublishLoading(true);
-    const result = await apiService.publishToCommunity(Array.from(selectedIds), isPublic);
-    if (result.success) {
-      alert(`发布成功 ${result.data?.published.length} 篇文档`);
-      setSelectedIds(new Set());
-      setIsSelectMode(false);
-      setShowPublishModal(false);
-      loadPosts();
-    } else {
-      alert(result.error || '发布失败');
+    try {
+      const result = await apiService.publishToCommunity(Array.from(selectedIds), isPublic);
+      if (result.success) {
+        alert(`发布成功 ${result.data?.published?.length || 0} 篇文档`);
+        setSelectedIds(new Set());
+        setIsSelectMode(false);
+        setShowPublishModal(false);
+        loadPosts();
+      } else {
+        alert(result.error || '发布失败');
+      }
+    } catch (error) {
+      console.error('Publish error:', error);
+      alert('发布失败，请重试');
+    } finally {
+      setPublishLoading(false);
     }
-    setPublishLoading(false);
   };
 
   // Dropdown menu
@@ -594,7 +600,8 @@ export function Community() {
         ) : filteredArtworks.length === 0 ? (
           <div className="py-16 text-center text-slate-400 text-sm">暂无帖子</div>
         ) : (
-          <div className="w-full" style={{ columns: '2 160px', columnGap: '8px' }}>
+          <div className="w-full">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             {filteredArtworks.map((art, index) => (
               <motion.div
                 key={art.id}
@@ -609,19 +616,19 @@ export function Community() {
                     openDetail(art.postId);
                   }
                 }}
-                className={`break-inside-avoid mb-2 md:mb-3 bg-white rounded-lg md:rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer w-full relative ${
+                className={`bg-white rounded-lg md:rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer w-full relative ${
                   selectedIds.has(art.id) ? 'ring-2 ring-blue-500' : ''
                 }`}
               >
                 {isSelectMode && activeTab === '我发布的' && (
                   <div 
-                    className="absolute top-2 left-2 z-10"
+                    className="absolute top-2 left-2 z-10 p-1 bg-white/80 rounded backdrop-blur-sm"
                     onClick={(e) => toggleSelectItem(art.id, e)}
                   >
                     {selectedIds.has(art.id) ? (
-                      <CheckSquare size={20} className="text-blue-500 bg-white rounded" />
+                      <CheckSquare size={20} className="text-blue-500" />
                     ) : (
-                      <Square size={20} className="text-slate-400 bg-white rounded" />
+                      <Square size={20} className="text-slate-400" />
                     )}
                   </div>
                 )}
@@ -630,36 +637,34 @@ export function Community() {
                   <div className="absolute top-2 right-2 z-20">
                     <button
                       onClick={(e) => toggleDropdown(art.id, e)}
-                      className="p-1.5 bg-white/90 hover:bg-white rounded-full shadow-sm"
+                      className="p-1.5 bg-white/80 hover:bg-white rounded-full shadow-sm backdrop-blur-sm transition-all"
                     >
-                      <MoreHorizontal size={14} className="text-slate-600" />
+                      <MoreVertical size={16} className="text-slate-600" />
                     </button>
+                    
                     {openDropdownId === art.id && (
-                      <div 
-                        className="absolute top-8 right-0 bg-white rounded-lg shadow-lg border border-slate-100 py-1 min-w-[100px] z-30"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <div className="absolute top-8 right-0 w-32 bg-white rounded-lg shadow-lg border border-slate-100 py-1 z-30">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            e.preventDefault();
-                            openEditModal(art, e);
                             setOpenDropdownId(null);
+                            handleEditClick(art);
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                          className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                         >
-                          <Edit2 size={14} /> 编辑
+                          <Edit2 size={14} />
+                          编辑
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            e.preventDefault();
-                            openDeleteConfirm(art, e);
                             setOpenDropdownId(null);
+                            handleDeleteClick(art);
                           }}
-                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                         >
-                          <Trash2 size={14} /> 删除
+                          <Trash2 size={14} />
+                          删除
                         </button>
                       </div>
                     )}
