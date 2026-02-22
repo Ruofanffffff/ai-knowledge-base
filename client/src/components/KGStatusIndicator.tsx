@@ -18,7 +18,7 @@ export interface KGStatusIndicatorProps {
 /**
  * Get status display configuration
  */
-function getStatusConfig(status: KGBuildStatus) {
+function getStatusConfig(status: KGBuildStatus | undefined | null) {
   switch (status) {
     case 'pending':
       return {
@@ -47,6 +47,13 @@ function getStatusConfig(status: KGBuildStatus) {
         text: '构建失败',
         className: styles.statusFailed,
         color: '#ff4d4f',
+      };
+    default:
+      return {
+        icon: '?',
+        text: '未知状态',
+        className: styles.statusUnknown || '',
+        color: '#999',
       };
   }
 }
