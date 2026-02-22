@@ -100,6 +100,7 @@ export interface CommunityPost {
   authorAvatar: string | null;
   isLiked: boolean;
   isBookmarked: boolean;
+  isPublic: boolean;
   commentCount: number;
   contentImages?: string[];
 }

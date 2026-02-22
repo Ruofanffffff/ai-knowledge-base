@@ -146,8 +146,7 @@ export default function Documents() {
     }
   };
 
-  const handleRebuildKG = async (documentId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent document click
+  const handleRebuildKG = async (documentId: string) => {
     try {
       await apiService.rebuildKG(documentId);
       // Status will be updated automatically via polling
@@ -325,307 +324,313 @@ export default function Documents() {
 
   return (
     <div className="flex-1 h-full overflow-hidden flex flex-col bg-slate-50/50">
-      {/* Header */}
-      <div className="px-4 md:px-8 py-3 md:py-6 shrink-0 border-b border-slate-200">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl md:text-2xl font-bold text-slate-900">思库</h1>
-            {!isSelectMode && <p className="text-slate-500 mt-0.5 md:mt-1 text-sm md:text-base">管理和组织你的文档</p>}
-          </div>
-          
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 md:gap-3 justify-end shrink-0">
-            {!isSelectMode ? (
-              <>
-                <button
-                  onClick={() => setIsSelectMode(true)}
-                  className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-lg md:rounded-xl hover:bg-slate-50 transition-colors text-sm"
-                >
-                  <span className="font-medium text-slate-700">选择</span>
-                </button>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-lg md:rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  <Upload size={16} className="text-slate-500" />
-                  <span className="font-medium text-slate-700">上传</span>
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleUpload}
-                  className="hidden"
-                  accept=".txt,.md,.docx,.pdf"
-                />
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  onClick={() => navigate('/documents/new')}
-                  className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg md:rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all text-sm"
-                >
-                  <Plus size={16} />
-                  <span>新建</span>
-                </motion.button>
+      {/* Main Content - Unified Card */}
+      <div className="flex-1 overflow-hidden px-4 md:px-8 py-3 md:py-5">
+        <div className="h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl md:text-2xl font-bold text-slate-900">思库</h1>
+                {!isSelectMode && <p className="text-slate-500 mt-0.5 text-sm">管理和组织你的文档</p>}
+              </div>
+              
+              {/* Action buttons */}
+              <div className="flex items-center gap-2 md:gap-3 shrink-0">
+                {!isSelectMode ? (
+                  <>
+                    <button
+                      onClick={() => setIsSelectMode(true)}
+                      className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl hover:bg-slate-100 transition-colors text-sm"
+                    >
+                      <span className="font-medium text-slate-700">选择</span>
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      <Upload size={16} className="text-slate-500" />
+                      <span className="font-medium text-slate-700">上传</span>
+                    </button>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleUpload}
+                      className="hidden"
+                      accept=".txt,.md,.docx,.pdf"
+                    />
+                    <motion.button
+                      whileHover={{ y: -2 }}
+                      onClick={() => navigate('/documents/new')}
+                      className="flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg md:rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all text-sm"
+                    >
+                      <Plus size={16} />
+                      <span>新建</span>
+                    </motion.button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm text-slate-600">已选择 {selectedIds.size} 项</span>
+                    <button
+                      onClick={handleToggleSelectAll}
+                      className="px-3 md:px-4 py-2 md:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      {selectedIds.size === searchFilteredDocuments.length ? '取消全选' : '全选'}
+                    </button>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={async () => {
+                        if (selectedIds.size === 0) {
+                          message.info('请先选择要发布的文档');
+                          return;
+                        }
+                        setIsPublishing(true);
+                        try {
+                          const result = await apiService.publishToCommunity(Array.from(selectedIds));
+                          if (result.success) {
+                            message.success('发布成功');
+                            navigate('/community');
+                          } else {
+                            message.error(result.error || '发布失败');
+                          }
+                        } catch {
+                          message.error('发布失败');
+                        } finally {
+                          setIsPublishing(false);
+                        }
+                      }}
+                      disabled={selectedIds.size === 0 || isPublishing}
+                      className={`flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        selectedIds.size === 0 || isPublishing
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Send size={14} className="-rotate-45" />
+                      {isPublishing ? '发布中...' : '发布到思圈'}
+                    </motion.button>
+                    <button
+                      onClick={() => setBatchDeleteConfirm(true)}
+                      disabled={selectedIds.size === 0}
+                      style={selectedIds.size > 0 ? { backgroundColor: '#ef4444', color: '#ffffff' } : undefined}
+                      className={`flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        selectedIds.size === 0
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'hover:bg-red-600'
+                      }`}
+                    >
+                      <Trash2 size={14} />
+                      删除选中
+                    </button>
+                    <button
+                      onClick={() => { setIsSelectMode(false); setSelectedIds(new Set()); }}
+                      className="px-3 md:px-4 py-2 md:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      取消
+                    </button>
+                  </>
+                )}
+                </div>
+              </div>
+            </div>
 
-              </>
-            ) : (
-              <>
-                <span className="text-sm text-slate-600">已选择 {selectedIds.size} 项</span>
+            {/* Mobile Category Toggle */}
+            <div className="md:hidden border-t border-slate-100 mt-3 pt-3 overflow-x-auto">
+              <div className="flex gap-2 px-4">
                 <button
-                  onClick={handleToggleSelectAll}
-                  className="px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  {selectedIds.size === searchFilteredDocuments.length ? '取消全选' : '全选'}
-                </button>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={async () => {
-                    if (selectedIds.size === 0) {
-                      message.info('请先选择要发布的文档');
-                      return;
-                    }
-                    setIsPublishing(true);
-                    try {
-                      const result = await apiService.publishToCommunity(Array.from(selectedIds));
-                      if (result.success) {
-                        message.success('发布成功');
-                        navigate('/community');
-                      } else {
-                        message.error(result.error || '发布失败');
-                      }
-                    } catch {
-                      message.error('发布失败');
-                    } finally {
-                      setIsPublishing(false);
-                    }
-                  }}
-                  disabled={selectedIds.size === 0 || isPublishing}
-                  className={`flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    selectedIds.size === 0 || isPublishing
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                  onClick={() => setSelectedCategory('all')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors text-sm ${
+                    selectedCategory === 'all' 
+                      ? 'bg-slate-900 text-white' 
+                      : 'bg-slate-100 text-slate-600'
                   }`}
                 >
-                  <Send size={14} className="-rotate-45" />
-                  {isPublishing ? '发布中...' : '发布到思圈'}
-                </motion.button>
-                <button
-                  onClick={() => setBatchDeleteConfirm(true)}
-                  disabled={selectedIds.size === 0}
-                  style={selectedIds.size > 0 ? { backgroundColor: '#ef4444', color: '#ffffff' } : undefined}
-                  className={`flex items-center gap-1.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    selectedIds.size === 0
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                      : 'hover:bg-red-600'
-                  }`}
-                >
-                  <Trash2 size={14} />
-                  删除选中
+                  <span>全部文档</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                    selectedCategory === 'all' ? 'bg-white/20' : 'bg-slate-200'
+                  }`}>{documents.length}</span>
                 </button>
-                <button
-                  onClick={() => { setIsSelectMode(false); setSelectedIds(new Set()); }}
-                  className="px-3 md:px-4 py-2 md:py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  取消
-                </button>
-              </>
-            )}
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Category Toggle */}
-        <div className="md:hidden border-b border-slate-200 bg-white overflow-x-auto">
-          <div className="flex p-2 gap-2">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors text-sm ${
-                selectedCategory === 'all' 
-                  ? 'bg-slate-900 text-white' 
-                  : 'bg-slate-50 text-slate-600 border border-slate-200'
-            }`}
-          >
-            <span>全部文档</span>
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              selectedCategory === 'all' ? 'bg-white/20' : 'bg-slate-200'
-            }`}>{documents.length}</span>
-          </button>
-          
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setSelectedCategory(category.id)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors text-sm ${
-                selectedCategory === category.id 
-                  ? 'bg-slate-900 text-white' 
-                  : 'bg-slate-50 text-slate-600 border border-slate-200'
-              }`}
-            >
-              <span>{category.name}</span>
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                selectedCategory === category.id ? 'bg-white/20' : 'bg-slate-200'
-              }`}>{category.documentCount}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-hidden flex">
-        {/* Sidebar - Categories */}
-        <div className="w-64 border-r border-slate-200 bg-white p-4 overflow-y-auto hidden md:block">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-900">分类</h2>
-            <button className="text-slate-400 hover:text-slate-600">
-              <Plus size={16} />
-            </button>
-          </div>
-          
-          <div className="space-y-1">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
-                selectedCategory === 'all' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-              }`}
-            >
-              <span>全部文档</span>
-              <span className="text-xs bg-slate-200 rounded-full px-2 py-0.5">{documents.length}</span>
-            </button>
-            
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => setSelectedCategory(category.id)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
-                  selectedCategory === category.id ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-                }`}
-              >
-                <span>{category.name}</span>
-                <span className="text-xs bg-slate-200 rounded-full px-2 py-0.5">{category.documentCount}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Main - Documents List */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {/* Search Bar */}
-          <div className="p-4 border-b border-slate-200 bg-white">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input
-                type="text"
-                placeholder="搜索文档..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-              />
-            </div>
-          </div>
-
-          {/* Documents Grid */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent animate-spin rounded-full" />
-              </div>
-            ) : searchFilteredDocuments.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                <FileText size={48} className="mb-4 opacity-50" />
-                <h3 className="text-lg font-medium mb-2">暂无文档</h3>
-                <p className="text-sm">点击"上传文件"或"新建文档"开始</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchFilteredDocuments.map((document) => {
-                  const kgStatus = statuses.get(document.id);
-                  
-                  return (
-                  <motion.div
-                    key={document.id}
-                    whileHover={{ y: -4, boxShadow: '0 10px 30px -15px rgba(0, 0, 0, 0.15)' }}
-                    onClick={(e) => handleDocumentClick(document, e)}
-                    className="bg-white rounded-xl border border-slate-200 p-4 cursor-pointer transition-all duration-200 hover:border-purple-300 relative"
+                
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors text-sm ${
+                      selectedCategory === category.id 
+                        ? 'bg-slate-900 text-white' 
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
                   >
-                    {isSelectMode && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(document.id)}
-                        onChange={() => toggleSelect(document.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute top-3 left-3 w-4 h-4 accent-purple-600 cursor-pointer z-10"
-                      />
-                    )}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className="p-2 rounded-lg bg-blue-50 text-blue-400 shrink-0">
-                          <FileText size={16} />
-                        </div>
-                        {editingId === document.id ? (
-                          <input
-                            autoFocus
-                            ref={(el) => el?.select()}
-                            value={editingTitle}
-                            onChange={(e) => setEditingTitle(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveEdit(document.id);
-                              if (e.key === 'Escape') handleCancelEdit();
-                            }}
-                            onBlur={() => handleSaveEdit(document.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="font-medium text-slate-800 text-sm w-full border border-purple-300 rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-purple-400"
-                          />
-                        ) : (
-                          <h3 className="font-medium text-slate-800 line-clamp-1">{document.title}</h3>
-                        )}
-                      </div>
-                      <Dropdown menu={getMenuItems(document)} trigger={['click']}>
-                        <button
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-slate-400 hover:text-slate-600 p-1"
-                        >
-                          <MoreVertical size={16} />
-                        </button>
-                      </Dropdown>
-                    </div>
-                    
-                    <p className="text-sm text-slate-500 line-clamp-3 mb-4">
-                      {extractPreview(document.content)}
-                    </p>
-                    
-                    <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
-                      <span className="flex items-center gap-1">
-                        <Clock size={12} />
-                        {formatTimeAgo(document.updatedAt)}
-                      </span>
-                      <span>{document.fileType || '文档'}</span>
-                    </div>
-                    
-                    {/* KG Status Indicator */}
-                    {kgStatus && (
-                      <div className="mb-3">
-                        <KGStatusIndicator
-                          status={kgStatus}
-                          onRetry={(e) => handleRebuildKG(document.id, e)}
-                        />
-                      </div>
-                    )}
-                    
-                    {/* Tags */}
-                    {document.tags && document.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-3">
-                        {document.tags.slice(0, 3).map((tag, index) => (
-                          <span key={index} className="px-2 py-0.5 bg-slate-100 rounded-full text-xs text-slate-600">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </motion.div>
-                  );
-                })}
+                    <span>{category.name}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                      selectedCategory === category.id ? 'bg-white/20' : 'bg-slate-200'
+                    }`}>{category.documentCount}</span>
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
+
+          {/* Content Area with Sidebar */}
+          <div className="flex-1 overflow-hidden flex">
+            {/* Sidebar - Categories */}
+            <div className="w-56 border-r border-slate-100 bg-slate-50/30 overflow-y-auto hidden md:block shrink-0">
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-semibold text-slate-700 text-sm">分类</h2>
+                  <button className="text-slate-400 hover:text-slate-600">
+                    <Plus size={16} />
+                  </button>
+                </div>
+                
+                <div className="space-y-1">
+                  <button
+                    onClick={() => setSelectedCategory('all')}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-sm ${
+                      selectedCategory === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'
+                    }`}
+                  >
+                    <span>全部文档</span>
+                    <span className="text-xs bg-slate-200 rounded-full px-2 py-0.5">{documents.length}</span>
+                  </button>
+                  
+                  {categories.map((category) => (
+                    <button
+                      key={category.id}
+                      onClick={() => setSelectedCategory(category.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-sm ${
+                        selectedCategory === category.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'
+                      }`}
+                    >
+                      <span>{category.name}</span>
+                      <span className="text-xs bg-slate-200 rounded-full px-2 py-0.5">{category.documentCount}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Main - Documents List */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {/* Search Bar */}
+              <div className="p-4 border-b border-slate-100 bg-slate-50/30 shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="搜索文档..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              {/* Documents Grid */}
+              <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent animate-spin rounded-full" />
+                  </div>
+                ) : searchFilteredDocuments.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                    <FileText size={48} className="mb-4 opacity-50" />
+                    <h3 className="text-lg font-medium mb-2">暂无文档</h3>
+                    <p className="text-sm">点击"上传文件"或"新建文档"开始</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {searchFilteredDocuments.map((document) => {
+                      const kgStatus = statuses.get(document.id);
+                      
+                      return (
+                        <motion.div
+                          key={document.id}
+                          whileHover={{ y: -4, boxShadow: '0 10px 30px -15px rgba(0, 0, 0, 0.15)' }}
+                          onClick={(e) => handleDocumentClick(document, e)}
+                          className="bg-white rounded-xl border border-slate-200 p-4 cursor-pointer transition-all duration-200 hover:border-purple-300 relative"
+                        >
+                          {isSelectMode && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(document.id)}
+                              onChange={() => toggleSelect(document.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute top-3 left-3 w-4 h-4 accent-purple-600 cursor-pointer z-10"
+                            />
+                          )}
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="p-2 rounded-lg bg-blue-50 text-blue-400 shrink-0">
+                                <FileText size={16} />
+                              </div>
+                              {editingId === document.id ? (
+                                <input
+                                  autoFocus
+                                  ref={(el) => el?.select()}
+                                  value={editingTitle}
+                                  onChange={(e) => setEditingTitle(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveEdit(document.id);
+                                    if (e.key === 'Escape') handleCancelEdit();
+                                  }}
+                                  onBlur={() => handleSaveEdit(document.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="font-medium text-slate-800 text-sm w-full border border-purple-300 rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-purple-400"
+                                />
+                              ) : (
+                                <h3 className="font-medium text-slate-800 line-clamp-1">{document.title}</h3>
+                              )}
+                            </div>
+                            <Dropdown menu={getMenuItems(document)} trigger={['click']}>
+                              <button
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-slate-400 hover:text-slate-600 p-1"
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+                            </Dropdown>
+                          </div>
+                          
+                          <p className="text-sm text-slate-500 line-clamp-3 mb-4">
+                            {extractPreview(document.content)}
+                          </p>
+                          
+                          <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
+                            <span className="flex items-center gap-1">
+                              <Clock size={12} />
+                              {formatTimeAgo(document.updatedAt)}
+                            </span>
+                            <span>{document.fileType || '文档'}</span>
+                          </div>
+                          
+                          {/* KG Status Indicator */}
+                          {kgStatus && (
+                            <div className="mb-3">
+                              <KGStatusIndicator
+                                docId={document.id}
+                                onRetry={() => handleRebuildKG(document.id)}
+                              />
+                            </div>
+                          )}
+                          
+                          {/* Tags */}
+                          {document.tags && document.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-3">
+                              {document.tags.slice(0, 3).map((tag: string, index: number) => (
+                                <span key={index} className="px-2 py-0.5 bg-slate-100 rounded-full text-xs text-slate-600">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

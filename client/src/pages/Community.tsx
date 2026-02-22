@@ -57,6 +57,7 @@ interface ArtWork {
   documentId?: number;
   authorAvatar?: string | null;
   generatingText?: string;
+  isPublic?: boolean;
 }
 
 interface PostDetail {
@@ -81,6 +82,7 @@ function mapPostToArtwork(post: CommunityPost): ArtWork {
     documentId: post.documentId,
     authorAvatar: post.authorAvatar,
     generatingText: generatingTexts[0],
+    isPublic: post.isPublic ?? false,
   };
 }
 
@@ -648,7 +650,7 @@ export function Community() {
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenDropdownId(null);
-                            handleEditClick(art);
+                            openEditModal(art);
                           }}
                           className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                         >
@@ -659,7 +661,7 @@ export function Community() {
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenDropdownId(null);
-                            handleDeleteClick(art);
+                            openDeleteConfirm(art);
                           }}
                           className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                         >
@@ -950,17 +952,38 @@ export function Community() {
                         <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400">
                           <BookOpen className="mb-4 opacity-50" size={48} />
                           <p>暂无文档索引分析</p>
+                          {selectedDetail.post.isPublic ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (selectedDetail.post.documentId) {
+                                  window.open(`/documents/${selectedDetail.post.documentId}`, '_blank');
+                                } else {
+                                  alert('文档不存在');
+                                }
+                              }}
+                              className="mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium underline underline-offset-4"
+                            >
+                              查看原文档
+                            </button>
+                          ) : (
+                            <p className="mt-4 text-xs text-slate-400">
+                              作者未公开原文档
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      
+                      {selectedDetail.post.isPublic && selectedDetail.post.documentId && (
+                        <div className="pt-4 border-t border-slate-100 mt-6">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (selectedDetail.post.documentId) {
-                                window.open(`/dashboard/documents/${selectedDetail.post.documentId}`, '_blank');
-                              } else {
-                                alert('文档不存在');
-                              }
+                              window.open(`/documents/${selectedDetail.post.documentId}`, '_blank');
                             }}
-                            className="mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium underline underline-offset-4"
+                            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
                           >
+                            <BookOpen size={16} />
                             查看原文档
                           </button>
                         </div>
