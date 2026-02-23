@@ -3,18 +3,33 @@ import React, {
   useImperativeHandle,
   useCallback,
   useRef,
+  useState,
+  useEffect,
 } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { AnimatePresence, motion } from 'motion/react';
+import { toast } from 'sonner';
 import {
   Bold,
   Italic,
   List,
   ListOrdered,
   Image as ImageIcon,
+  Loader2,
+  Sparkles,
+  CheckCircle,
+  TableIcon,
+  Network,
+  Undo2,
+  Redo2,
+  Quote,
+  Minus,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 import apiClient from '../../api/client';
 import ImageBlockExtension from './ImageBlockExtension';
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
 
 // ============================================================================
 // Types
@@ -127,6 +142,7 @@ function ToolbarButton({
   return (
     <button
       type="button"
+      onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -308,6 +324,13 @@ async function processPastedHtmlWithImages(
 }
 
 // ============================================================================
+// AI Context Menu types & helpers
+// ============================================================================
+
+type AIActionType = 'generate' | 'proofread' | 'table' | 'mindmap';
+
+
+// ============================================================================
 // RichTextEditor component
 // ============================================================================
 
@@ -317,14 +340,30 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     // Ref to hold the editor instance for use inside editorProps callbacks
     const editorRef = useRef<ReturnType<typeof useEditor>>(null) as React.MutableRefObject<ReturnType<typeof useEditor>>;
 
+    // AI Context Menu state
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; isLoading: boolean; loadingAction: string | null } | null>(null);
+    const [selectedText, setSelectedText] = useState('');
+    const selectionRef = useRef<{ from: number; to: number } | null>(null);
+    const lastSelectionRef = useRef<{ from: number; to: number; text: string } | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Dialog state
+    const [showProofread, setShowProofread] = useState(false);
+    const [proofreadData, setProofreadData] = useState<{ original: string; corrected: string } | null>(null);
+    const [showTable, setShowTable] = useState(false);
+    const [tableData, setTableData] = useState<{ headers: string[]; rows: string[][] } | null>(null);
+
     const editor = useEditor({
-      extensions: [StarterKit, ImageBlockExtension],
+      extensions: [StarterKit, ImageBlockExtension, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell],
       content: content ?? { type: 'doc', content: [{ type: 'paragraph' }] },
       editable,
       onUpdate: ({ editor: ed }) => {
         onChange?.(ed.getJSON());
       },
       editorProps: {
+        attributes: {
+          class: 'bb-editor outline-none',
+        },
         // ---------------------------------------------------------------
         // handlePaste — runs BEFORE ProseMirror's default paste handling.
         // Return true to prevent default, false to let ProseMirror handle.
@@ -428,6 +467,166 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     // Keep editorRef in sync
     editorRef.current = editor;
 
+    // Track selection changes for right-click fallback
+    useEffect(() => {
+      if (!editor) return;
+      const handleSelectionUpdate = () => {
+        const { from, to, empty } = editor.state.selection;
+        if (!empty) {
+          const text = editor.state.doc.textBetween(from, to, ' ');
+          if (text.trim()) {
+            lastSelectionRef.current = { from, to, text: text.trim() };
+          }
+        }
+      };
+      editor.on('selectionUpdate', handleSelectionUpdate);
+      return () => { editor.off('selectionUpdate', handleSelectionUpdate); };
+    }, [editor]);
+
+    // AI Context Menu: right-click handler
+    const handleContextMenu = useCallback((e: React.MouseEvent) => {
+      if (!editor) return;
+      const { from, to, empty } = editor.state.selection;
+      let selFrom: number, selTo: number, text: string;
+      if (!empty) {
+        text = editor.state.doc.textBetween(from, to, ' ');
+        selFrom = from;
+        selTo = to;
+      } else if (lastSelectionRef.current) {
+        selFrom = lastSelectionRef.current.from;
+        selTo = lastSelectionRef.current.to;
+        text = lastSelectionRef.current.text;
+      } else {
+        return;
+      }
+      if (!text.trim()) return;
+      e.preventDefault();
+      setSelectedText(text.trim());
+      selectionRef.current = { from: selFrom, to: selTo };
+      setCtxMenu({ x: e.clientX, y: e.clientY, isLoading: false, loadingAction: null });
+    }, [editor]);
+
+    // AI Context Menu: action handler
+    const handleMenuAction = useCallback((action: AIActionType, text: string) => {
+      const actionLabels: Record<AIActionType, string> = {
+        generate: '智能生成', proofread: '智能校对', table: '生成表格', mindmap: '生成脑图',
+      };
+      setCtxMenu(prev => prev ? { ...prev, isLoading: true, loadingAction: actionLabels[action] } : prev);
+
+      if (action === 'generate') {
+        const sel = selectionRef.current;
+        if (!editor || !sel) {
+          setCtxMenu(null);
+          lastSelectionRef.current = null;
+          return;
+        }
+        (async () => {
+          try {
+            const response = await apiClient.post('/ai/generate', { text });
+            const { expandedText, imagePrompt } = response.data.data;
+
+            editor.chain().focus()
+              .insertContentAt({ from: sel.from, to: sel.to }, expandedText)
+              .run();
+
+            toast.success('智能生成完成');
+
+            if (imagePrompt && imagePrompt.trim()) {
+              toast.info(imagePrompt, {
+                duration: 8000,
+                description: '点击复制图片描述',
+                action: {
+                  label: '复制',
+                  onClick: async () => {
+                    try {
+                      await navigator.clipboard.writeText(imagePrompt);
+                      toast.success('已复制图片描述');
+                    } catch {
+                      toast.error('复制失败，请手动复制');
+                    }
+                  },
+                },
+              });
+            }
+          } catch {
+            toast.error('智能生成失败，请稍后重试');
+          } finally {
+            setCtxMenu(null);
+            lastSelectionRef.current = null;
+          }
+        })();
+        return;
+      }
+
+      if (action === 'proofread') {
+        const sel = selectionRef.current;
+        if (!editor || !sel) {
+          setCtxMenu(null);
+          lastSelectionRef.current = null;
+          return;
+        }
+        (async () => {
+          try {
+            const response = await apiClient.post('/ai/proofread', { text });
+            const { correctedText } = response.data.data;
+
+            setProofreadData({ original: text, corrected: correctedText });
+            setShowProofread(true);
+            toast.success('智能校对完成', { description: '请查看校对建议' });
+          } catch {
+            toast.error('智能校对失败，请稍后重试');
+          } finally {
+            setCtxMenu(null);
+            lastSelectionRef.current = null;
+          }
+        })();
+        return;
+      }
+
+      if (action === 'table') {
+        const sel = selectionRef.current;
+        if (!editor || !sel) {
+          setCtxMenu(null);
+          lastSelectionRef.current = null;
+          return;
+        }
+        (async () => {
+          try {
+            const response = await apiClient.post('/ai/generate-table', { text });
+            const { table } = response.data.data;
+
+            setTableData({ headers: table.headers, rows: table.rows });
+            setShowTable(true);
+            toast.success('表格生成完成', { description: `已生成 ${table.rows.length} 行数据` });
+          } catch {
+            toast.error('表格生成失败，请稍后重试');
+          } finally {
+            setCtxMenu(null);
+            lastSelectionRef.current = null;
+          }
+        })();
+        return;
+      }
+
+      if (action === 'mindmap') {
+        toast.info('脑图功能暂不支持', { description: '请在编辑器页面使用脑图功能' });
+        setCtxMenu(null);
+        lastSelectionRef.current = null;
+        return;
+      }
+    }, [editor]);
+
+    // AI Context Menu: click-outside to dismiss
+    useEffect(() => {
+      const handleClickOutside = (e: MouseEvent) => {
+        if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+          setCtxMenu(null);
+        }
+      };
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
+
     // Expose getJSON / setContent to parent via ref
     useImperativeHandle(
       ref,
@@ -479,48 +678,102 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     if (!editor) return null;
 
     return (
-      <div>
+      <>
+        <div>
         {/* Toolbar */}
         {editable && (
-          <div className="px-12 py-3 border-b border-slate-100 flex items-center gap-1 sticky top-0 bg-white z-10">
+          <div className="px-12 py-2 border-b border-slate-100 flex items-center gap-0.5 sticky top-0 bg-white z-10">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().undo().run()}
+              title="撤销"
+            >
+              <Undo2 size={16} />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().redo().run()}
+              title="重做"
+            >
+              <Redo2 size={16} />
+            </ToolbarButton>
+
+            <div className="w-px h-4 bg-slate-200 mx-1.5" />
+
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+              isActive={editor.isActive('heading', { level: 1 })}
+              title="标题1"
+            >
+              <span className="text-xs font-bold">H1</span>
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              isActive={editor.isActive('heading', { level: 2 })}
+              title="标题2"
+            >
+              <span className="text-xs font-bold">H2</span>
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+              isActive={editor.isActive('heading', { level: 3 })}
+              title="标题3"
+            >
+              <span className="text-xs font-bold">H3</span>
+            </ToolbarButton>
+
+            <div className="w-px h-4 bg-slate-200 mx-1.5" />
+
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBold().run()}
               isActive={editor.isActive('bold')}
-              title="加粗"
+              title="粗体"
             >
-              <Bold size={18} />
+              <Bold size={16} />
             </ToolbarButton>
-
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleItalic().run()}
               isActive={editor.isActive('italic')}
               title="斜体"
             >
-              <Italic size={18} />
+              <Italic size={16} />
             </ToolbarButton>
 
-            <div className="w-px h-4 bg-slate-200 mx-2" />
+            <div className="w-px h-4 bg-slate-200 mx-1.5" />
 
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBulletList().run()}
               isActive={editor.isActive('bulletList')}
               title="无序列表"
             >
-              <List size={18} />
+              <List size={16} />
             </ToolbarButton>
-
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleOrderedList().run()}
               isActive={editor.isActive('orderedList')}
               title="有序列表"
             >
-              <ListOrdered size={18} />
+              <ListOrdered size={16} />
             </ToolbarButton>
 
-            <div className="w-px h-4 bg-slate-200 mx-2" />
+            <div className="w-px h-4 bg-slate-200 mx-1.5" />
+
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              isActive={editor.isActive('blockquote')}
+              title="引用"
+            >
+              <Quote size={16} />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setHorizontalRule().run()}
+              title="分割线"
+            >
+              <Minus size={16} />
+            </ToolbarButton>
+
+            <div className="w-px h-4 bg-slate-200 mx-1.5" />
 
             <ToolbarButton onClick={handleImageButtonClick} title="插入图片">
-              <ImageIcon size={18} />
+              <ImageIcon size={16} />
             </ToolbarButton>
 
             <input
@@ -537,6 +790,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         <div
           className="px-12 py-8 bg-white cursor-text"
           onClick={() => editor?.chain().focus().run()}
+          onContextMenu={handleContextMenu}
         >
           <style>{`
             .ProseMirror { min-height: 60vh; outline: none; }
@@ -547,13 +801,216 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
               height: 0;
               pointer-events: none;
             }
+            .ProseMirror h1 { font-size: 2em !important; font-weight: 800 !important; margin: 0.67em 0; color: #1e293b; }
+            .ProseMirror h2 { font-size: 1.5em !important; font-weight: 700 !important; margin: 0.83em 0; color: #1e293b; }
+            .ProseMirror h3 { font-size: 1.17em !important; font-weight: 600 !important; margin: 1em 0; color: #334155; }
+            .ProseMirror p { margin: 0.5em 0; line-height: 1.8; }
+            .ProseMirror ul { list-style: disc; padding-left: 1.5em; margin: 0.5em 0; }
+            .ProseMirror ol { list-style: decimal; padding-left: 1.5em; margin: 0.5em 0; }
+            .ProseMirror ul ul { list-style: circle; }
+            .ProseMirror ul ul ul { list-style: square; }
+            .ProseMirror li { margin: 0.25em 0; }
+            .ProseMirror li p { margin: 0; }
+            .ProseMirror blockquote {
+              border-left: 3px solid #c4b5fd;
+              padding-left: 1em;
+              margin: 0.75em 0;
+              color: #64748b;
+              font-style: italic;
+            }
+            .ProseMirror hr {
+              border: none;
+              border-top: 2px solid #e2e8f0;
+              margin: 1.5em 0;
+            }
+            .ProseMirror table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+            .ProseMirror th { border: 1px solid #d1d5db; padding: 0.5rem 0.75rem; background-color: #f3e8ff; font-weight: bold; text-align: left; }
+            .ProseMirror td { border: 1px solid #d1d5db; padding: 0.5rem 0.75rem; }
+            .ProseMirror tr:hover td { background-color: #faf5ff; }
           `}</style>
           <EditorContent
             editor={editor}
             className="prose prose-slate max-w-none text-lg leading-relaxed font-serif"
           />
         </div>
-      </div>
+        </div>
+
+        {/* AI Context Menu */}
+        <AnimatePresence>
+          {ctxMenu && (
+            <motion.div
+              ref={menuRef}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 50 }}
+              className="bg-white/95 backdrop-blur-sm rounded-xl shadow-xl border border-slate-200/80 py-1.5 min-w-[180px]"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {ctxMenu.isLoading ? (
+                <div className="flex items-center gap-2 px-4 py-3 text-sm text-purple-600">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>{ctxMenu.loadingAction || '处理中'}...</span>
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                </div>
+              ) : (
+                ([
+                  { action: 'generate' as AIActionType, label: '智能生成', icon: <Sparkles size={16} /> },
+                  { action: 'proofread' as AIActionType, label: '智能校对', icon: <CheckCircle size={16} /> },
+                  { action: 'table' as AIActionType, label: '生成表格', icon: <TableIcon size={16} /> },
+                  { action: 'mindmap' as AIActionType, label: '生成脑图', icon: <Network size={16} /> },
+                ]).map((item) => (
+                  <button
+                    key={item.action}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-50 hover:text-purple-700 transition-colors"
+                    onClick={() => handleMenuAction(item.action, selectedText)}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </button>
+                ))
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Proofreading Dialog */}
+        <Dialog open={showProofread} onOpenChange={setShowProofread}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>智能校对</DialogTitle>
+              <DialogDescription>AI 已分析您选中的文本，以下是校对建议。</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-sm font-medium text-slate-500 mb-2">原文</h4>
+                <div className="p-3 bg-red-50 rounded-lg text-sm text-slate-700 min-h-[100px]">
+                  {proofreadData?.original}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-slate-500 mb-2 flex items-center gap-1">
+                  <Sparkles size={14} className="text-purple-500" /> 建议修改
+                </h4>
+                <div className="p-3 bg-green-50 rounded-lg text-sm text-purple-700 min-h-[100px]">
+                  {proofreadData?.corrected}
+                  <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse inline-block" />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <button className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50" onClick={() => setShowProofread(false)}>
+                忽略
+              </button>
+              <button className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-700" onClick={() => {
+                if (editor && proofreadData && selectionRef.current) {
+                  const { from, to } = selectionRef.current;
+                  editor.chain().focus().deleteRange({ from, to }).insertContentAt(from, proofreadData.corrected).run();
+                }
+                setShowProofread(false);
+              }}>
+                采纳建议
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Table Dialog */}
+        <Dialog open={showTable} onOpenChange={setShowTable}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>生成表格</DialogTitle>
+              <DialogDescription>基于选中文本生成的结构化表格。</DialogDescription>
+            </DialogHeader>
+            {tableData && (
+              <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-purple-500 to-violet-500 text-white">
+                      {tableData.headers.map((h, i) => (
+                        <th key={i} className="px-4 py-2.5 text-left text-sm font-medium">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableData.rows.map((row, i) => (
+                      <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                        {row.map((cell, j) => (
+                          <td key={j} className="px-4 py-2 text-sm text-slate-700">{cell}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <DialogFooter>
+              <button className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50" onClick={() => setShowTable(false)}>
+                取消
+              </button>
+              <button className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-700" onClick={() => {
+                const ed = editorRef.current ?? editor;
+                if (ed && tableData) {
+                  if (tableData.headers.length === 0) {
+                    toast.error('表格数据为空，无法插入');
+                    setShowTable(false);
+                    return;
+                  }
+                  // Build JSON content with proper paragraph wrapping for block+ content spec
+                  const headerRow = {
+                    type: 'tableRow',
+                    content: tableData.headers.map(h => ({
+                      type: 'tableHeader',
+                      content: [{ type: 'paragraph', content: h ? [{ type: 'text', text: h }] : [] }],
+                    })),
+                  };
+                  const bodyRows = tableData.rows.map(row => ({
+                    type: 'tableRow',
+                    content: row.map(cell => ({
+                      type: 'tableCell',
+                      content: [{ type: 'paragraph', content: cell ? [{ type: 'text', text: cell }] : [] }],
+                    })),
+                  }));
+                  const tableNode = {
+                    type: 'table',
+                    content: [headerRow, ...bodyRows],
+                  };
+
+                  const savedSelection = selectionRef.current ? { ...selectionRef.current } : null;
+                  setShowTable(false);
+                  requestAnimationFrame(() => {
+                    setTimeout(() => {
+                      try {
+                        const currentEditor = editorRef.current;
+                        if (!currentEditor) {
+                          toast.error('插入表格失败：编辑器不可用');
+                          return;
+                        }
+                        if (savedSelection) {
+                          currentEditor.chain().focus().deleteRange(savedSelection).insertContentAt(savedSelection.from, tableNode).run();
+                        } else {
+                          currentEditor.chain().focus('end').insertContent(tableNode).run();
+                        }
+                        toast.success('已插入表格');
+                      } catch (err) {
+                        console.error('[insertTable] 插入表格失败:', err);
+                        toast.error('插入表格失败');
+                      }
+                    }, 150);
+                  });
+                } else {
+                  toast.error('插入失败：编辑器或表格数据不可用');
+                  setShowTable(false);
+                }
+              }}>
+                插入文档
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
     );
   },
 );
