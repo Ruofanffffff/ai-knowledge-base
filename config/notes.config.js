@@ -91,7 +91,7 @@ const notesConfig = {
     textSaveTimeout: 500,        // Requirement 1.6: 500ms
     imageUploadTimeout: 3000,    // Requirement 2.7: 3s
     imageAnalysisTimeout: 10000, // Requirement 2.8: 10s
-    aiEnhancementTimeout: 5000,  // Requirements 5.5, 6.6, 7.5, 8.6: 5s
+    aiEnhancementTimeout: 30000, // Requirements 5.5, 6.6, 7.5, 8.6: 30s (increased for professional-grade prompt)
     searchTimeout: 500,          // Requirement 9.6: 500ms
   },
 

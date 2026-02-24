@@ -301,26 +301,29 @@ describe('AIEnhancementService', () => {
   });
 
   describe('Mind Map Generation', () => {
-    it('should generate mind map from text', async () => {
+    it('should generate mind map from text with central_topic and nodes', async () => {
       mockLLMClient.generateJSON.mockResolvedValue({
         data: {
-          central: 'Main Topic',
-          branches: [
+          central_topic: 'Main Topic',
+          nodes: [
             {
-              label: 'Branch 1',
+              id: '1',
+              text: 'Branch 1',
               children: [
-                { label: 'Sub 1.1' },
-                { label: 'Sub 1.2' }
+                { id: '1-1', text: 'Sub 1.1' },
+                { id: '1-2', text: 'Sub 1.2' }
               ]
             },
             {
-              label: 'Branch 2',
+              id: '2',
+              text: 'Branch 2',
               children: [
-                { label: 'Sub 2.1' }
+                { id: '2-1', text: 'Sub 2.1' }
               ]
             },
             {
-              label: 'Branch 3'
+              id: '3',
+              text: 'Branch 3'
             }
           ]
         },
@@ -332,21 +335,26 @@ describe('AIEnhancementService', () => {
         text: 'A complex topic with multiple aspects and subtopics.'
       });
 
+      // Requirement 2.8: return { mindmap: { central_topic, nodes }, tokens, model }
       expect(result).toHaveProperty('mindmap');
-      expect(result.mindmap.central).toBe('Main Topic');
-      expect(result.mindmap.branches).toHaveLength(3);
-      expect(result.mindmap.branches[0].children).toHaveLength(2);
+      expect(result).toHaveProperty('tokens', 180);
+      expect(result).toHaveProperty('model', 'qwen-max');
+      expect(result.mindmap.central_topic).toBe('Main Topic');
+      expect(result.mindmap.nodes).toHaveLength(3);
+      expect(result.mindmap.nodes[0].id).toBe('1');
+      expect(result.mindmap.nodes[0].text).toBe('Branch 1');
+      expect(result.mindmap.nodes[0].children).toHaveLength(2);
     });
 
     it('should support maxBranches and maxDepth options', async () => {
       mockLLMClient.generateJSON.mockResolvedValue({
         data: {
-          central: 'Topic',
-          branches: [
-            { label: 'B1' },
-            { label: 'B2' },
-            { label: 'B3' },
-            { label: 'B4' }
+          central_topic: 'Topic',
+          nodes: [
+            { id: '1', text: 'B1' },
+            { id: '2', text: 'B2' },
+            { id: '3', text: 'B3' },
+            { id: '4', text: 'B4' }
           ]
         },
         tokens: 100,
@@ -361,83 +369,197 @@ describe('AIEnhancementService', () => {
 
       const callArgs = mockLLMClient.generateJSON.mock.calls[0][0];
       expect(callArgs.prompt).toContain('3-4');
-      expect(callArgs.prompt).toContain('2层');
+      expect(callArgs.prompt).toContain('2 层');
     });
 
-    it('should validate branch count (3-6)', async () => {
+    it('should validate branch count too few (< 3)', async () => {
       mockLLMClient.generateJSON.mockResolvedValue({
         data: {
-          central: 'Topic',
-          branches: [
-            { label: 'B1' },
-            { label: 'B2' }
-          ] // Only 2 branches
+          central_topic: 'Topic',
+          nodes: [
+            { id: '1', text: 'B1' },
+            { id: '2', text: 'B2' }
+          ]
         },
         tokens: 50,
         model: 'qwen-max'
       });
 
+      // Requirement 2.6: nodes < 3 or > 6 should throw
       await expect(service.generateMindMap({ text: 'Test' }))
-        .rejects.toThrow('3-6 first-level branches');
+        .rejects.toThrow('一级分支数量应为 3-6 个');
     });
 
-    it('should validate label length (max 20 characters)', async () => {
+    it('should validate branch count too many (> 6)', async () => {
       mockLLMClient.generateJSON.mockResolvedValue({
         data: {
-          central: 'Topic',
-          branches: [
-            { label: 'This is a very long label that exceeds twenty characters' },
-            { label: 'B2' },
-            { label: 'B3' }
+          central_topic: 'Topic',
+          nodes: [
+            { id: '1', text: 'B1' },
+            { id: '2', text: 'B2' },
+            { id: '3', text: 'B3' },
+            { id: '4', text: 'B4' },
+            { id: '5', text: 'B5' },
+            { id: '6', text: 'B6' },
+            { id: '7', text: 'B7' }
+          ]
+        },
+        tokens: 50,
+        model: 'qwen-max'
+      });
+
+      // Requirement 2.6: nodes > 6 should throw
+      await expect(service.generateMindMap({ text: 'Test' }))
+        .rejects.toThrow('一级分支数量应为 3-6 个');
+    });
+
+    it('should validate node text length (max 20 characters)', async () => {
+      mockLLMClient.generateJSON.mockResolvedValue({
+        data: {
+          central_topic: 'Topic',
+          nodes: [
+            { id: '1', text: 'This is a very long text that exceeds twenty characters' },
+            { id: '2', text: 'B2' },
+            { id: '3', text: 'B3' }
           ]
         },
         tokens: 100,
         model: 'qwen-max'
       });
 
+      // Requirement 2.5: text > 20 chars should throw
       await expect(service.generateMindMap({ text: 'Test' }))
-        .rejects.toThrow('label too long');
+        .rejects.toThrow('节点文本过长');
     });
 
-    it('should validate nested branch structure', async () => {
+    it('should validate nested children node text length', async () => {
       mockLLMClient.generateJSON.mockResolvedValue({
         data: {
-          central: 'Topic',
-          branches: [
+          central_topic: 'Topic',
+          nodes: [
             {
-              label: 'B1',
+              id: '1',
+              text: 'B1',
               children: [
-                { label: 'This label is way too long for a mind map branch' }
+                { id: '1-1', text: 'This text is way too long for a mind map node' }
               ]
             },
-            { label: 'B2' },
-            { label: 'B3' }
+            { id: '2', text: 'B2' },
+            { id: '3', text: 'B3' }
           ]
         },
         tokens: 100,
         model: 'qwen-max'
       });
 
+      // Requirement 2.7: recursive children validation
       await expect(service.generateMindMap({ text: 'Test' }))
-        .rejects.toThrow('label too long');
+        .rejects.toThrow('节点文本过长');
     });
 
-    it('should require central field', async () => {
+    it('should require central_topic field as non-empty string', async () => {
       mockLLMClient.generateJSON.mockResolvedValue({
         data: {
-          branches: [
-            { label: 'B1' },
-            { label: 'B2' },
-            { label: 'B3' }
+          nodes: [
+            { id: '1', text: 'B1' },
+            { id: '2', text: 'B2' },
+            { id: '3', text: 'B3' }
           ]
-          // Missing central
         },
         tokens: 50,
         model: 'qwen-max'
       });
 
+      // Requirement 2.2: missing central_topic should throw
       await expect(service.generateMindMap({ text: 'Test' }))
-        .rejects.toThrow('central');
+        .rejects.toThrow('central_topic');
+    });
+
+    it('should reject empty string central_topic', async () => {
+      mockLLMClient.generateJSON.mockResolvedValue({
+        data: {
+          central_topic: '',
+          nodes: [
+            { id: '1', text: 'B1' },
+            { id: '2', text: 'B2' },
+            { id: '3', text: 'B3' }
+          ]
+        },
+        tokens: 50,
+        model: 'qwen-max'
+      });
+
+      // Requirement 2.2: empty string central_topic should throw
+      await expect(service.generateMindMap({ text: 'Test' }))
+        .rejects.toThrow('central_topic');
+    });
+
+    it('should reject non-array nodes', async () => {
+      mockLLMClient.generateJSON.mockResolvedValue({
+        data: {
+          central_topic: 'Topic',
+          nodes: 'not an array'
+        },
+        tokens: 50,
+        model: 'qwen-max'
+      });
+
+      // Requirement 2.3: non-array nodes should throw
+      await expect(service.generateMindMap({ text: 'Test' }))
+        .rejects.toThrow('nodes');
+    });
+
+    it('should reject empty nodes array', async () => {
+      mockLLMClient.generateJSON.mockResolvedValue({
+        data: {
+          central_topic: 'Topic',
+          nodes: []
+        },
+        tokens: 50,
+        model: 'qwen-max'
+      });
+
+      // Requirement 2.3: empty nodes array should throw
+      await expect(service.generateMindMap({ text: 'Test' }))
+        .rejects.toThrow('nodes');
+    });
+
+    it('should reject node missing id field', async () => {
+      mockLLMClient.generateJSON.mockResolvedValue({
+        data: {
+          central_topic: 'Topic',
+          nodes: [
+            { text: 'B1' },
+            { id: '2', text: 'B2' },
+            { id: '3', text: 'B3' }
+          ]
+        },
+        tokens: 50,
+        model: 'qwen-max'
+      });
+
+      // Requirement 2.4: node without id should throw
+      await expect(service.generateMindMap({ text: 'Test' }))
+        .rejects.toThrow('id');
+    });
+
+    it('should reject node missing text field', async () => {
+      mockLLMClient.generateJSON.mockResolvedValue({
+        data: {
+          central_topic: 'Topic',
+          nodes: [
+            { id: '1' },
+            { id: '2', text: 'B2' },
+            { id: '3', text: 'B3' }
+          ]
+        },
+        tokens: 50,
+        model: 'qwen-max'
+      });
+
+      // Requirement 2.4: node without text should throw
+      await expect(service.generateMindMap({ text: 'Test' }))
+        .rejects.toThrow('text');
     });
   });
 

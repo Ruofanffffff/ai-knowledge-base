@@ -334,7 +334,8 @@ router.post('/generate-table', authMiddleware, async (req, res) => {
       success: true,
       data: {
         table: result.table,
-        notes: result.notes,
+        tableType: result.tableType,
+        summary: result.summary,
         metadata: {
           model: result.model,
           tokens: result.tokens
@@ -391,10 +392,11 @@ router.post('/generate-table', authMiddleware, async (req, res) => {
  *   success: boolean,
  *   data: {
  *     mindmap: {
- *       central: string,
- *       branches: Array<{
- *         label: string,
- *         children?: Array<Branch>
+ *       central_topic: string,
+ *       nodes: Array<{
+ *         id: string,
+ *         text: string,
+ *         children?: Array<Node>
  *       }>
  *     },
  *     metadata: {

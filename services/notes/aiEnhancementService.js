@@ -147,10 +147,11 @@ class AIEnhancementService {
 
       return {
         table: {
-          headers: result.data.headers,
+          headers: result.data.columns,
           rows: result.data.rows
         },
-        notes: result.data.notes,
+        tableType: result.data.table_type,
+        summary: result.data.summary,
         tokens: result.tokens,
         model: result.model
       };
@@ -190,8 +191,8 @@ class AIEnhancementService {
 
       return {
         mindmap: {
-          central: result.data.central,
-          branches: result.data.branches
+          central_topic: result.data.central_topic,
+          nodes: result.data.nodes
         },
         tokens: result.tokens,
         model: result.model
@@ -279,46 +280,45 @@ class AIEnhancementService {
    * @private
    */
   _validateTableOutput(data) {
-    if (!data || typeof data !== 'object') {
-      throw new Error('Output must be an object');
-    }
-
-    if (!Array.isArray(data.headers)) {
-      throw new Error('Output must contain headers field as array');
-    }
-
-    if (!Array.isArray(data.rows)) {
-      throw new Error('Output must contain rows field as array');
-    }
-
-    if (data.headers.length === 0) {
-      throw new Error('Table must have at least one column');
-    }
-
-    // Validate all headers are strings
-    data.headers.forEach((header, index) => {
-      if (typeof header !== 'string') {
-        throw new Error(`Header ${index} must be a string`);
+      if (!data || typeof data !== 'object') {
+        throw new Error('Output must be an object');
       }
-    });
 
-    // Validate all rows have same length as headers (Property 11)
-    const headerLength = data.headers.length;
-    data.rows.forEach((row, index) => {
-      if (!Array.isArray(row)) {
-        throw new Error(`Row ${index} must be an array`);
+      if (!Array.isArray(data.columns)) {
+        throw new Error('Output must contain columns field as array');
       }
-      if (row.length !== headerLength) {
-        throw new Error(`Row ${index} has ${row.length} columns, expected ${headerLength}`);
+
+      if (!Array.isArray(data.rows)) {
+        throw new Error('Output must contain rows field as array');
       }
-      // Validate all cells are strings
-      row.forEach((cell, cellIndex) => {
-        if (typeof cell !== 'string') {
-          throw new Error(`Row ${index}, cell ${cellIndex} must be a string`);
+
+      if (data.columns.length === 0) {
+        throw new Error('Table must have at least one column');
+      }
+
+      // Validate all columns are strings
+      data.columns.forEach((col, index) => {
+        if (typeof col !== 'string') {
+          throw new Error(`Column ${index} must be a string`);
         }
       });
-    });
-  }
+
+      // Validate all rows have same length as columns
+      const colLength = data.columns.length;
+      data.rows.forEach((row, index) => {
+        if (!Array.isArray(row)) {
+          throw new Error(`Row ${index} must be an array`);
+        }
+        if (row.length !== colLength) {
+          throw new Error(`Row ${index} has ${row.length} columns, expected ${colLength}`);
+        }
+        row.forEach((cell, cellIndex) => {
+          if (typeof cell !== 'string') {
+            throw new Error(`Row ${index}, cell ${cellIndex} must be a string`);
+          }
+        });
+      });
+    }
 
   /**
    * Validate mind map output format
@@ -327,55 +327,54 @@ class AIEnhancementService {
    * @private
    */
   _validateMindMapOutput(data) {
-    if (!data || typeof data !== 'object') {
-      throw new Error('Output must be an object');
-    }
-
-    if (!data.central || typeof data.central !== 'string') {
-      throw new Error('Output must contain central field as string');
-    }
-
-    if (!Array.isArray(data.branches)) {
-      throw new Error('Output must contain branches field as array');
-    }
-
-    // Property 12: Check branch count (3-6)
-    if (data.branches.length < 3 || data.branches.length > 6) {
-      throw new Error(`Mind map must have 3-6 first-level branches, got ${data.branches.length}`);
-    }
-
-    // Validate each branch
-    data.branches.forEach((branch, index) => {
-      this._validateBranch(branch, index, 1);
-    });
-  }
-
-  /**
-   * Validate mind map branch recursively
-   * @private
-   */
-  _validateBranch(branch, index, depth) {
-    if (!branch || typeof branch !== 'object') {
-      throw new Error(`Branch ${index} at depth ${depth} must be an object`);
-    }
-
-    if (!branch.label || typeof branch.label !== 'string') {
-      throw new Error(`Branch ${index} at depth ${depth} must have label as string`);
-    }
-
-    // Property 12: Check label length (not more than 20 characters)
-    if (branch.label.length > 20) {
-      throw new Error(`Branch ${index} at depth ${depth} label too long: ${branch.label.length} characters (max 20)`);
-    }
-
-    // Validate children if present
-    if (branch.children) {
-      if (!Array.isArray(branch.children)) {
-        throw new Error(`Branch ${index} at depth ${depth} children must be an array`);
+      if (!data || typeof data !== 'object') {
+        throw new Error('Output must be an object');
       }
 
-      branch.children.forEach((child, childIndex) => {
-        this._validateBranch(child, childIndex, depth + 1);
+      // 校验 central_topic
+      if (!data.central_topic || typeof data.central_topic !== 'string') {
+        throw new Error('Output must contain central_topic field as string');
+      }
+
+      // 校验 nodes
+      if (!Array.isArray(data.nodes) || data.nodes.length === 0) {
+        throw new Error('Output must contain nodes field as non-empty array');
+      }
+
+      // 校验一级分支数量
+      if (data.nodes.length < 1 || data.nodes.length > 6) {
+        throw new Error(`一级分支数量应为 1-6 个, got ${data.nodes.length}`);
+      }
+
+      // 递归校验每个节点
+      data.nodes.forEach((node, index) => {
+        this._validateNode(node, index, 1);
+      });
+    }
+
+  /**
+   * Validate mind map node recursively
+   * @private
+   */
+  _validateNode(node, index, depth) {
+    if (!node || typeof node !== 'object') {
+      throw new Error(`Node ${index} at depth ${depth} must be an object`);
+    }
+    if (!node.id || typeof node.id !== 'string') {
+      throw new Error(`Node ${index} at depth ${depth} must have id as string`);
+    }
+    if (!node.text || typeof node.text !== 'string') {
+      throw new Error(`Node ${index} at depth ${depth} must have text as string`);
+    }
+    if (node.text.length > 20) {
+      throw new Error(`节点文本过长: Node ${index} at depth ${depth}, ${node.text.length} characters (max 20)`);
+    }
+    if (node.children) {
+      if (!Array.isArray(node.children)) {
+        throw new Error(`Node ${index} at depth ${depth} children must be an array`);
+      }
+      node.children.forEach((child, childIndex) => {
+        this._validateNode(child, childIndex, depth + 1);
       });
     }
   }

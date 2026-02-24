@@ -383,27 +383,30 @@ describe('AI Enhancement Routes', () => {
 
   describe('POST /api/ai/generate-mindmap', () => {
     it('should generate mind map from text', async () => {
-      // Mock service response
+      // Mock service response with new central_topic + nodes format
       mockAIService.generateMindMap.mockResolvedValue({
         mindmap: {
-          central: 'Project Planning',
-          branches: [
+          central_topic: 'Project Planning',
+          nodes: [
             {
-              label: 'Research',
+              id: '1',
+              text: 'Research',
               children: [
-                { label: 'Market Analysis' },
-                { label: 'Competitor Study' }
+                { id: '1-1', text: 'Market Analysis' },
+                { id: '1-2', text: 'Competitor Study' }
               ]
             },
             {
-              label: 'Development',
+              id: '2',
+              text: 'Development',
               children: [
-                { label: 'Frontend' },
-                { label: 'Backend' }
+                { id: '2-1', text: 'Frontend' },
+                { id: '2-2', text: 'Backend' }
               ]
             },
             {
-              label: 'Testing'
+              id: '3',
+              text: 'Testing'
             }
           ]
         },
@@ -420,9 +423,13 @@ describe('AI Enhancement Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('mindmap');
-      expect(response.body.data.mindmap).toHaveProperty('central');
-      expect(response.body.data.mindmap).toHaveProperty('branches');
-      expect(Array.isArray(response.body.data.mindmap.branches)).toBe(true);
+      expect(response.body.data.mindmap).toHaveProperty('central_topic');
+      expect(response.body.data.mindmap).toHaveProperty('nodes');
+      expect(Array.isArray(response.body.data.mindmap.nodes)).toBe(true);
+      expect(response.body.data.mindmap.central_topic).toBe('Project Planning');
+      expect(response.body.data.mindmap.nodes).toHaveLength(3);
+      expect(response.body.data.mindmap.nodes[0]).toHaveProperty('id');
+      expect(response.body.data.mindmap.nodes[0]).toHaveProperty('text');
       expect(response.body.data.metadata).toHaveProperty('model');
       expect(response.body.data.metadata).toHaveProperty('tokens');
 
@@ -436,11 +443,11 @@ describe('AI Enhancement Routes', () => {
     it('should accept optional maxBranches and maxDepth parameters', async () => {
       mockAIService.generateMindMap.mockResolvedValue({
         mindmap: {
-          central: 'Topic',
-          branches: [
-            { label: 'Branch 1' },
-            { label: 'Branch 2' },
-            { label: 'Branch 3' }
+          central_topic: 'Topic',
+          nodes: [
+            { id: '1', text: 'Branch 1' },
+            { id: '2', text: 'Branch 2' },
+            { id: '3', text: 'Branch 3' }
           ]
         },
         tokens: 100,

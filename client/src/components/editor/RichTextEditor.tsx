@@ -25,11 +25,18 @@ import {
   Redo2,
   Quote,
   Minus,
+  Plus,
+  Trash2,
+  Pencil,
+  X,
+  Check,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 import apiClient from '../../api/client';
 import ImageBlockExtension from './ImageBlockExtension';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
+import { TextSelection } from '@tiptap/pm/state';
+import { MindMapImage, buildMindMapSVG, computeMMPositions as computeMMPositionsShared } from './mindmap-svg-utils';
 
 // ============================================================================
 // Types
@@ -38,6 +45,7 @@ import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table
 export interface RichTextEditorHandle {
   getJSON: () => object;
   setContent: (json: object) => void;
+  getEditor: () => ReturnType<typeof useEditor>;
 }
 
 export interface RichTextEditorProps {
@@ -329,6 +337,86 @@ async function processPastedHtmlWithImages(
 
 type AIActionType = 'generate' | 'proofread' | 'table' | 'mindmap';
 
+// ============================================================================
+// Mind map helpers — layout, SVG, data conversion
+// ============================================================================
+
+interface MMNode { id: string; label: string; type?: string }
+interface MMLink { source: string; target: string }
+interface MMData { nodes: MMNode[]; links: MMLink[] }
+
+/** Convert API format {central_topic, nodes[{id,text,children}]} to flat {nodes, links} */
+function mindmapApiToFlat(central_topic: string, apiNodes: Array<{id: string; text: string; children?: any[]}>): MMData {
+  const flatNodes: MMNode[] = [];
+  const links: MMLink[] = [];
+  const rootId = '__root__';
+  flatNodes.push({ id: rootId, label: central_topic, type: 'main' });
+
+  function walk(items: Array<{id: string; text: string; children?: any[]}>, parentId: string) {
+    items.forEach(item => {
+      flatNodes.push({ id: item.id, label: item.text, type: parentId === rootId ? 'sub' : 'leaf' });
+      links.push({ source: parentId, target: item.id });
+      if (item.children?.length) walk(item.children, item.id);
+    });
+  }
+  walk(apiNodes, rootId);
+  return { nodes: flatNodes, links };
+}
+
+/** Convert flat {nodes, links} back to API format for tiptap insertion */
+function flatToMindmapApi(data: MMData): { central_topic: string; nodes: Array<{id: string; text: string; children?: any[]}> } {
+  const targetIds = new Set(data.links.map(l => l.target));
+  const root = data.nodes.find(n => !targetIds.has(n.id)) || data.nodes[0];
+  const childMap: Record<string, string[]> = {};
+  data.links.forEach(l => {
+    childMap[l.source] = [...(childMap[l.source] || []), l.target];
+  });
+  const nodeMap = Object.fromEntries(data.nodes.map(n => [n.id, n]));
+
+  function buildTree(parentId: string): Array<{id: string; text: string; children?: any[]}> {
+    const childIds = childMap[parentId] || [];
+    return childIds.map(cid => {
+      const node = nodeMap[cid];
+      if (!node) return { id: cid, text: '?' };
+      const children = buildTree(cid);
+      return children.length > 0
+        ? { id: node.id, text: node.label, children }
+        : { id: node.id, text: node.label };
+    });
+  }
+
+  return {
+    central_topic: root?.label || '',
+    nodes: buildTree(root?.id || ''),
+  };
+}
+
+/** Radial tree layout */
+function computeMMPositions(nodes: MMNode[], links: MMLink[]): Record<string, { x: number; y: number }> {
+  if (!nodes.length) return {};
+  const pos: Record<string, { x: number; y: number }> = {};
+  const targetIds = new Set(links.map(l => l.target));
+  const root = nodes.find(n => !targetIds.has(n.id)) || nodes[0];
+  pos[root.id] = { x: 0, y: 0 };
+  const childMap: Record<string, string[]> = {};
+  links.forEach(l => {
+    childMap[l.source] = [...(childMap[l.source] || []), l.target];
+  });
+  const layout = (id: string, a0: number, a1: number, r: number) => {
+    const ch = childMap[id] || [];
+    if (!ch.length) return;
+    ch.forEach((cid, i) => {
+      const a = a0 + (a1 - a0) * (i + 0.5) / ch.length;
+      pos[cid] = { x: Math.round(Math.cos(a) * r), y: Math.round(Math.sin(a) * r) };
+      const span = (a1 - a0) / Math.max(ch.length, 1);
+      layout(cid, a - span * 0.72, a + span * 0.72, r + 130);
+    });
+  };
+  layout(root.id, -Math.PI, Math.PI, 155);
+  return pos;
+}
+
+const mmTrunc = (s: string, n: number) => (s.length > n ? s.slice(0, n) + '…' : s);
 
 // ============================================================================
 // RichTextEditor component
@@ -353,8 +441,18 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     const [showTable, setShowTable] = useState(false);
     const [tableData, setTableData] = useState<{ headers: string[]; rows: string[][] } | null>(null);
 
+    // Mind map Dialog state
+    const [showMindMap, setShowMindMap] = useState(false);
+    const [mindMapData, setMindMapData] = useState<MMData | null>(null);
+    const [mmSelectedId, setMmSelectedId] = useState<string | null>(null);
+    const [mmEditingId, setMmEditingId] = useState<string | null>(null);
+    const [mmEditLabel, setMmEditLabel] = useState('');
+    const [mmNewLabel, setMmNewLabel] = useState('');
+    const mmNewLabelRef = useRef<HTMLInputElement>(null);
+    const [mindmapUpdateTarget, setMindmapUpdateTarget] = useState<number | null>(null);
+
     const editor = useEditor({
-      extensions: [StarterKit, ImageBlockExtension, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell],
+      extensions: [StarterKit, ImageBlockExtension, MindMapImage, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell],
       content: content ?? { type: 'doc', content: [{ type: 'paragraph' }] },
       editable,
       onUpdate: ({ editor: ed }) => {
@@ -609,10 +707,179 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
       }
 
       if (action === 'mindmap') {
-        toast.info('脑图功能暂不支持', { description: '请在编辑器页面使用脑图功能' });
-        setCtxMenu(null);
-        lastSelectionRef.current = null;
+        (async () => {
+          try {
+            const response = await apiClient.post('/ai/generate-mindmap', { text });
+            const { central_topic, nodes } = response.data.data.mindmap;
+            const flat = mindmapApiToFlat(central_topic, nodes);
+            setMindMapData(flat);
+            setMmSelectedId(null);
+            setMmEditingId(null);
+            setMmNewLabel('');
+            setShowMindMap(true);
+            toast.success('脑图生成完成', { description: '请预览并编辑后插入文档' });
+          } catch {
+            toast.error('生成脑图失败，请稍后重试');
+          } finally {
+            setCtxMenu(null);
+            lastSelectionRef.current = null;
+          }
+        })();
         return;
+      }
+    }, [editor]);
+
+    // ── Mind map CRUD ─────────────────────────────────────────────────────
+    const mmRootId = mindMapData
+      ? (mindMapData.nodes.find(n => !mindMapData.links.some(l => l.target === n.id))?.id ?? mindMapData.nodes[0]?.id)
+      : undefined;
+
+    const mmPositions = mindMapData ? computeMMPositions(mindMapData.nodes, mindMapData.links) : {};
+    const mmSelectedNode = mindMapData?.nodes.find(n => n.id === mmSelectedId) ?? null;
+    const posVals = Object.values(mmPositions);
+    const mmMinX = posVals.length ? Math.min(...posVals.map(p => p.x)) : -150;
+    const mmMinY = posVals.length ? Math.min(...posVals.map(p => p.y)) : -150;
+    const mmMaxX = posVals.length ? Math.max(...posVals.map(p => p.x)) : 150;
+    const mmMaxY = posVals.length ? Math.max(...posVals.map(p => p.y)) : 150;
+    const mmW = Math.max(mmMaxX - mmMinX, 300);
+    const mmH = Math.max(mmMaxY - mmMinY, 200);
+    const mmViewBox = `${mmMinX - 90} ${mmMinY - 70} ${mmW + 180} ${mmH + 140}`;
+
+    const mmAddNode = useCallback(() => {
+      if (!mindMapData) return;
+      const parentId = mmSelectedId ?? mmRootId;
+      if (!parentId) return;
+      const newId = `n${Date.now()}`;
+      const label = mmNewLabel.trim() || '新节点';
+      setMindMapData(prev => prev ? ({
+        nodes: [...prev.nodes, { id: newId, label, type: 'sub' }],
+        links: [...prev.links, { source: parentId, target: newId }],
+      }) : prev);
+      setMmNewLabel('');
+      setMmSelectedId(newId);
+      setTimeout(() => mmNewLabelRef.current?.focus(), 50);
+    }, [mindMapData, mmSelectedId, mmRootId, mmNewLabel]);
+
+    const mmDeleteNode = useCallback((id: string) => {
+      if (!mindMapData || id === mmRootId) return;
+      const dead = new Set<string>([id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        mindMapData.links.forEach(l => {
+          if (dead.has(l.source) && !dead.has(l.target)) { dead.add(l.target); changed = true; }
+        });
+      }
+      setMindMapData({
+        nodes: mindMapData.nodes.filter(n => !dead.has(n.id)),
+        links: mindMapData.links.filter(l => !dead.has(l.source) && !dead.has(l.target)),
+      });
+      if (mmSelectedId && dead.has(mmSelectedId)) setMmSelectedId(null);
+      if (mmEditingId && dead.has(mmEditingId)) setMmEditingId(null);
+      toast.success('节点已删除');
+    }, [mindMapData, mmRootId, mmSelectedId, mmEditingId]);
+
+    const mmStartEdit = useCallback((node: MMNode) => {
+      setMmEditingId(node.id);
+      setMmEditLabel(node.label);
+    }, []);
+
+    const mmSaveEdit = useCallback(() => {
+      if (!mindMapData || !mmEditingId) return;
+      const label = mmEditLabel.trim();
+      if (!label) return;
+      setMindMapData(prev => prev ? ({
+        ...prev,
+        nodes: prev.nodes.map(n => n.id === mmEditingId ? { ...n, label } : n),
+      }) : prev);
+      setMmEditingId(null);
+      toast.success('标签已更新');
+    }, [mindMapData, mmEditingId, mmEditLabel]);
+
+    const insertMindMapToDocument = useCallback(() => {
+      if (!mindMapData || !editor) return;
+
+      // Determine root node (not targeted by any link)
+      const targetIds = new Set(mindMapData.links.map(l => l.target));
+      const rootNode = mindMapData.nodes.find(n => !targetIds.has(n.id)) || mindMapData.nodes[0];
+
+      // Compute positions and build SVG
+      const positions = computeMMPositionsShared(mindMapData.nodes, mindMapData.links, rootNode.id);
+      const svgStr = buildMindMapSVG(mindMapData.nodes, mindMapData.links, positions);
+
+      // Convert SVG to base64 data URL
+      const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgStr)));
+
+      // Serialize mindmap data for re-editing
+      const mindmapJson = JSON.stringify({ nodes: mindMapData.nodes, links: mindMapData.links });
+
+      if (mindmapUpdateTarget !== null) {
+        // Update mode: replace existing mindMapImage node in-place
+        editor.chain().focus()
+          .setNodeSelection(mindmapUpdateTarget)
+          .deleteSelection()
+          .insertContent({
+            type: 'mindMapImage',
+            attrs: {
+              src: dataUrl,
+              'data-mindmap': mindmapJson,
+              title: '双击编辑思维导图',
+            },
+          })
+          .run();
+      } else {
+        // Insert mode: add new mindMapImage node after current block
+        editor.chain().focus()
+          .command(({ tr, dispatch }) => {
+            if (dispatch) {
+              // Position cursor at end of document for safe insertion
+              const endPos = tr.doc.content.size;
+              tr.setSelection(TextSelection.create(tr.doc, endPos));
+            }
+            return true;
+          })
+          .insertContent({
+            type: 'mindMapImage',
+            attrs: {
+              src: dataUrl,
+              'data-mindmap': mindmapJson,
+              title: '双击编辑思维导图',
+            },
+          })
+          .run();
+      }
+
+      setShowMindMap(false);
+      setMindmapUpdateTarget(null);
+      toast.success('思维导图已插入文档');
+    }, [mindMapData, editor, mindmapUpdateTarget]);
+
+    // Double-click handler for re-editing inserted mindmaps
+    const handleEditorDoubleClick = useCallback((event: React.MouseEvent) => {
+      if (!editor) return;
+      const target = event.target as HTMLElement;
+      const img = target.closest('img[data-mindmap]') || (target.tagName === 'IMG' && target.getAttribute('data-mindmap') ? target : null);
+      if (!img) return;
+      const data = img.getAttribute('data-mindmap');
+      if (!data) return;
+      try {
+        const parsed = JSON.parse(data);
+        setMindMapData({ nodes: parsed.nodes || [], links: parsed.links || [] });
+        // Find the position of this node in the editor
+        const { state } = editor;
+        let pos: number | null = null;
+        state.doc.descendants((node, nodePos) => {
+          if (node.type.name === 'mindMapImage' && node.attrs['data-mindmap'] === data) {
+            pos = nodePos;
+            return false;
+          }
+        });
+        setMindmapUpdateTarget(pos);
+        setMmSelectedId(null);
+        setMmEditingId(null);
+        setShowMindMap(true);
+      } catch {
+        toast.error('思维导图数据损坏，无法打开编辑');
       }
     }, [editor]);
 
@@ -635,6 +902,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         setContent: (json: object) => {
           editor?.commands.setContent(json);
         },
+        getEditor: () => editor,
       }),
       [editor],
     );
@@ -789,8 +1057,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         {/* Editor area — click anywhere to type, like Word */}
         <div
           className="px-12 py-8 bg-white cursor-text"
-          onClick={() => editor?.chain().focus().run()}
+          onClick={(e) => { if (!(e.target as HTMLElement).closest('.ProseMirror')) editor?.chain().focus().run(); }}
           onContextMenu={handleContextMenu}
+          onDoubleClick={handleEditorDoubleClick}
         >
           <style>{`
             .ProseMirror { min-height: 60vh; outline: none; }
@@ -1006,6 +1275,193 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
                 }
               }}>
                 插入文档
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Mind Map Dialog */}
+        <Dialog
+          open={showMindMap}
+          onOpenChange={open => {
+            setShowMindMap(open);
+            if (!open) { setMmSelectedId(null); setMmEditingId(null); setMmNewLabel(''); setMindmapUpdateTarget(null); }
+          }}
+        >
+          <DialogContent className="sm:max-w-5xl flex flex-col" style={{ height: '80vh' }}>
+            <DialogHeader className="shrink-0">
+              <DialogTitle className="flex items-center gap-2">
+                <Network size={17} className="text-purple-600" /> 思维导图
+              </DialogTitle>
+              <DialogDescription>点击节点选中 · 侧边栏可增删改节点 · 编辑完成后点击「插入文档」</DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-3 flex-1 overflow-hidden min-h-0">
+              {/* Interactive SVG */}
+              <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden flex items-center justify-center relative">
+                <svg
+                  viewBox={mmViewBox}
+                  className="w-full h-full"
+                  onClick={e => { if (e.target === e.currentTarget) setMmSelectedId(null); }}
+                >
+                  <defs>
+                    <filter id="mm-glow">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                      <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
+                    <radialGradient id="mm-root-grad" cx="38%" cy="38%">
+                      <stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="#7c3aed" />
+                    </radialGradient>
+                    <radialGradient id="mm-root-grad-sel" cx="38%" cy="38%">
+                      <stop offset="0%" stopColor="#c4b5fd" /><stop offset="100%" stopColor="#8b5cf6" />
+                    </radialGradient>
+                  </defs>
+                  {/* Links */}
+                  {mindMapData?.links.map((link, i) => {
+                    const s = mmPositions[link.source];
+                    const t = mmPositions[link.target];
+                    if (!s || !t) return null;
+                    const dx = (t.x - s.x) * 0.45;
+                    return (
+                      <path key={i} d={`M ${s.x} ${s.y} C ${s.x + dx} ${s.y}, ${t.x - dx} ${t.y}, ${t.x} ${t.y}`}
+                        stroke="#ddd6fe" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.9" />
+                    );
+                  })}
+                  {/* Nodes */}
+                  {mindMapData?.nodes.map(node => {
+                    const pos = mmPositions[node.id];
+                    if (!pos) return null;
+                    const isRoot = node.id === mmRootId;
+                    const isSel = node.id === mmSelectedId;
+                    return (
+                      <g key={node.id} transform={`translate(${pos.x}, ${pos.y})`}
+                        onClick={e => { e.stopPropagation(); setMmSelectedId(isSel ? null : node.id); setMmEditingId(null); }}
+                        style={{ cursor: 'pointer' }}>
+                        {isRoot ? (
+                          <>
+                            {isSel && <circle r={48} fill="none" stroke="#c4b5fd" strokeWidth="2.5" strokeDasharray="5 3" opacity="0.8" />}
+                            <circle r={42} fill={isSel ? 'url(#mm-root-grad-sel)' : 'url(#mm-root-grad)'}
+                              filter={isSel ? 'url(#mm-glow)' : undefined} />
+                            <text textAnchor="middle" dy=".35em" fontSize={11} fill="white" fontWeight="700">
+                              {mmTrunc(node.label, 7)}
+                            </text>
+                          </>
+                        ) : (
+                          <>
+                            {isSel && <rect x={-59} y={-22} width={118} height={44} rx={13}
+                              fill="none" stroke="#a78bfa" strokeWidth="2" strokeDasharray="4 2" opacity="0.8" />}
+                            <rect x={-55} y={-18} width={110} height={36} rx={10}
+                              fill={isSel ? '#faf5ff' : 'white'} stroke={isSel ? '#8b5cf6' : '#e2e8f0'}
+                              strokeWidth={isSel ? 2 : 1.5} filter={isSel ? 'url(#mm-glow)' : undefined} />
+                            <text textAnchor="middle" dy=".35em" fontSize={10.5}
+                              fill={isSel ? '#6d28d9' : '#475569'} fontWeight={isSel ? '700' : '500'}>
+                              {mmTrunc(node.label, 9)}
+                            </text>
+                          </>
+                        )}
+                        <title>{node.label}</title>
+                      </g>
+                    );
+                  })}
+                </svg>
+                {(!mindMapData || mindMapData.nodes.length === 0) && (
+                  <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">暂无节点</div>
+                )}
+              </div>
+              {/* Edit Panel */}
+              <div className="w-56 shrink-0 flex flex-col gap-3 overflow-y-auto">
+                {/* Add node */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2.5">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Plus size={12} /> 添加节点
+                  </div>
+                  <input
+                    ref={mmNewLabelRef}
+                    value={mmNewLabel}
+                    onChange={e => setMmNewLabel(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && mmAddNode()}
+                    placeholder="节点名称…"
+                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition-all placeholder:text-slate-300"
+                  />
+                  <button onClick={mmAddNode}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 text-white text-xs font-semibold hover:from-purple-700 hover:to-violet-700 transition-all shadow-sm">
+                    <Plus size={13} />
+                    {mmSelectedId ? '添加子节点' : '添加一级节点'}
+                  </button>
+                  {mmSelectedId && mmSelectedNode && (
+                    <p className="text-[10px] text-slate-400 text-center leading-relaxed">
+                      将作为「{mmTrunc(mmSelectedNode.label, 8)}」的子节点
+                    </p>
+                  )}
+                </div>
+                {/* Selected node edit */}
+                <AnimatePresence>
+                  {mmSelectedNode && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+                      className="bg-purple-50 border border-purple-200 rounded-2xl p-4 space-y-2.5">
+                      <div className="text-xs font-bold text-purple-600 uppercase tracking-wider flex items-center gap-1.5">
+                        <Pencil size={12} /> 编辑节点
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-white/80 rounded-lg px-2.5 py-1.5 border border-purple-100">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
+                        <span className="text-xs text-slate-700 font-medium truncate">{mmSelectedNode.label}</span>
+                      </div>
+                      {mmEditingId === mmSelectedId ? (
+                        <div className="space-y-2">
+                          <input autoFocus value={mmEditLabel}
+                            onChange={e => setMmEditLabel(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') mmSaveEdit(); if (e.key === 'Escape') setMmEditingId(null); }}
+                            className="w-full text-sm px-3 py-2 rounded-lg border border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-200 bg-white transition-all"
+                          />
+                          <div className="flex gap-1.5">
+                            <button onClick={mmSaveEdit}
+                              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 transition-colors">
+                              <Check size={12} /> 保存
+                            </button>
+                            <button onClick={() => setMmEditingId(null)}
+                              className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+                              <X size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <button onClick={() => mmStartEdit(mmSelectedNode)}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white hover:bg-purple-100 border border-purple-100 text-purple-700 text-xs font-semibold transition-all">
+                            <Pencil size={12} /> 修改标签
+                          </button>
+                          <button onClick={() => mmDeleteNode(mmSelectedId!)} disabled={mmSelectedId === mmRootId}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white hover:bg-red-50 border border-red-100 text-red-500 text-xs font-semibold transition-all disabled:opacity-35 disabled:cursor-not-allowed">
+                            <Trash2 size={12} />
+                            {mmSelectedId === mmRootId ? '根节点不可删' : '删除节点及子节点'}
+                          </button>
+                          <button onClick={() => setMmSelectedId(null)}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-slate-400 hover:text-slate-600 text-xs transition-colors">
+                            <X size={11} /> 取消选中
+                          </button>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {!mmSelectedNode && (
+                  <div className="text-[11px] text-slate-400 text-center px-3 py-4 border border-dashed border-slate-200 rounded-2xl leading-relaxed">
+                    点击导图中的节点<br />进行编辑或删除
+                  </div>
+                )}
+                <div className="text-[10px] text-slate-400 text-center mt-auto">
+                  共 {mindMapData?.nodes.length ?? 0} 个节点
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="shrink-0 pt-2">
+              <button onClick={() => setShowMindMap(false)}
+                className="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 text-sm font-medium transition-colors">
+                关闭
+              </button>
+              <button onClick={insertMindMapToDocument}
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white text-sm font-medium flex items-center gap-2 transition-all shadow-sm">
+                <Network size={15} /> 插入文档
               </button>
             </DialogFooter>
           </DialogContent>

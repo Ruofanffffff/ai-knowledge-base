@@ -397,7 +397,7 @@ class TextLLMClient extends BaseLLMClient {
     const urls = {
       openai: 'https://api.openai.com/v1/chat/completions',
       anthropic: 'https://api.anthropic.com/v1/messages',
-      qwen: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
+      qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
       volcengine: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions' // 字节火山引擎
     };
     return urls[provider] || urls.openai;
@@ -487,7 +487,7 @@ class TextLLMClient extends BaseLLMClient {
           temperature
         };
 
-      case 'qwen':
+      case 'qwen': {
         const qwenMessages = [];
         if (systemPrompt) {
           qwenMessages.push({ role: 'system', content: systemPrompt });
@@ -496,13 +496,11 @@ class TextLLMClient extends BaseLLMClient {
 
         return {
           model: this.config.model,
-          input: { messages: qwenMessages },
-          parameters: {
-            temperature,
-            max_tokens: maxTokens,
-            result_format: 'message'
-          }
+          messages: qwenMessages,
+          temperature,
+          max_tokens: maxTokens
         };
+      }
 
       default:
         throw new Error(`Unsupported provider: ${this.config.provider}`);
@@ -529,7 +527,7 @@ class TextLLMClient extends BaseLLMClient {
         break;
 
       case 'qwen':
-        content = response.output.choices[0].message.content;
+        content = response.choices[0].message.content;
         tokens = response.usage?.total_tokens || 0;
         break;
 

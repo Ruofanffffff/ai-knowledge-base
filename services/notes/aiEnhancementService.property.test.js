@@ -6,8 +6,8 @@
  * - Property 9: Smart proofreading preserves meaning
  * - Property 10: Table generation JSON validity
  * - Property 11: Table structure reasonableness
- * - Property 12: Mind map structure completeness
- * - Property 13: Mind map JSON validity
+ * - Property 12: Mind map structure completeness (central_topic + nodes format)
+ * - Property 13: Mind map JSON validity (central_topic + nodes with id/text/children)
  * 
  * Feature: notes-feature
  */
@@ -334,30 +334,31 @@ describe('AIEnhancementService - Property-Based Tests', () => {
 
   /**
    * Property 12: Mind map structure completeness
-   * **Validates: Requirements 8.1, 8.2, 8.4**
+   * **Validates: Requirements 2.2, 2.3, 2.6**
    * 
-   * For any mind map generation request, output should contain central theme
-   * and 3-6 first-level branches, with each branch label being reasonable length.
+   * For any mind map generation request, output should contain central_topic
+   * and 3-6 first-level nodes, with each node text being reasonable length (≤20 chars).
    */
   describe('Property 12: Mind map structure completeness', () => {
-    it('should always have central theme and 3-6 branches', () => {
+    it('should always have central_topic and 3-6 nodes', () => {
       return fc.assert(
         fc.asyncProperty(
           fc.string({ minLength: 10, maxLength: 300 }),
           fc.integer({ min: 3, max: 6 }),
-          async (text, numBranches) => {
-            const branches = Array.from({ length: numBranches }, (_, i) => ({
-              label: `Branch ${i + 1}`,
+          async (text, numNodes) => {
+            const nodes = Array.from({ length: numNodes }, (_, i) => ({
+              id: `${i + 1}`,
+              text: `Node ${i + 1}`,
               children: [
-                { label: `Sub ${i}.1` },
-                { label: `Sub ${i}.2` }
+                { id: `${i + 1}-1`, text: `Sub ${i}.1` },
+                { id: `${i + 1}-2`, text: `Sub ${i}.2` }
               ]
             }));
 
             mockLLMClient.generateJSON.mockResolvedValue({
               data: {
-                central: 'Main Topic',
-                branches
+                central_topic: 'Main Topic',
+                nodes
               },
               tokens: 180,
               model: 'qwen-max'
@@ -365,19 +366,19 @@ describe('AIEnhancementService - Property-Based Tests', () => {
 
             const result = await service.generateMindMap({ text });
 
-            // Property: Must have central and branches
-            expect(result.mindmap).toHaveProperty('central');
-            expect(result.mindmap).toHaveProperty('branches');
-            expect(typeof result.mindmap.central).toBe('string');
-            expect(Array.isArray(result.mindmap.branches)).toBe(true);
+            // Property: Must have central_topic and nodes
+            expect(result.mindmap).toHaveProperty('central_topic');
+            expect(result.mindmap).toHaveProperty('nodes');
+            expect(typeof result.mindmap.central_topic).toBe('string');
+            expect(Array.isArray(result.mindmap.nodes)).toBe(true);
             
-            // Property: Must have 3-6 branches
-            expect(result.mindmap.branches.length).toBeGreaterThanOrEqual(3);
-            expect(result.mindmap.branches.length).toBeLessThanOrEqual(6);
+            // Property: Must have 3-6 nodes
+            expect(result.mindmap.nodes.length).toBeGreaterThanOrEqual(3);
+            expect(result.mindmap.nodes.length).toBeLessThanOrEqual(6);
             
-            // Property: All labels should be reasonable length (≤20 chars)
-            result.mindmap.branches.forEach(branch => {
-              expect(branch.label.length).toBeLessThanOrEqual(20);
+            // Property: All node texts should be reasonable length (≤20 chars)
+            result.mindmap.nodes.forEach(node => {
+              expect(node.text.length).toBeLessThanOrEqual(20);
             });
           }
         ),
@@ -385,82 +386,84 @@ describe('AIEnhancementService - Property-Based Tests', () => {
       );
     });
 
-    it('should reject mind maps with too few branches', () => {
+    it('should reject mind maps with too few nodes', () => {
       return fc.assert(
         fc.asyncProperty(
           fc.string({ minLength: 1, maxLength: 100 }).filter(s => s.trim().length > 0),
           fc.integer({ min: 1, max: 2 }),
-          async (text, numBranches) => {
-            const branches = Array.from({ length: numBranches }, (_, i) => ({
-              label: `Branch ${i}`
+          async (text, numNodes) => {
+            const nodes = Array.from({ length: numNodes }, (_, i) => ({
+              id: `${i + 1}`,
+              text: `Node ${i}`
             }));
 
             mockLLMClient.generateJSON.mockResolvedValue({
               data: {
-                central: 'Topic',
-                branches
+                central_topic: 'Topic',
+                nodes
               },
               tokens: 80,
               model: 'qwen-max'
             });
 
             await expect(service.generateMindMap({ text }))
-              .rejects.toThrow('3-6 first-level branches');
+              .rejects.toThrow('一级分支数量应为 3-6 个');
           }
         ),
         { numRuns: 50 }
       );
     });
 
-    it('should reject mind maps with too many branches', () => {
+    it('should reject mind maps with too many nodes', () => {
       return fc.assert(
         fc.asyncProperty(
           fc.string({ minLength: 1, maxLength: 100 }).filter(s => s.trim().length > 0),
           fc.integer({ min: 7, max: 10 }),
-          async (text, numBranches) => {
-            const branches = Array.from({ length: numBranches }, (_, i) => ({
-              label: `Branch ${i}`
+          async (text, numNodes) => {
+            const nodes = Array.from({ length: numNodes }, (_, i) => ({
+              id: `${i + 1}`,
+              text: `Node ${i}`
             }));
 
             mockLLMClient.generateJSON.mockResolvedValue({
               data: {
-                central: 'Topic',
-                branches
+                central_topic: 'Topic',
+                nodes
               },
               tokens: 100,
               model: 'qwen-max'
             });
 
             await expect(service.generateMindMap({ text }))
-              .rejects.toThrow('3-6 first-level branches');
+              .rejects.toThrow('一级分支数量应为 3-6 个');
           }
         ),
         { numRuns: 50 }
       );
     });
 
-    it('should reject branches with labels exceeding 20 characters', () => {
+    it('should reject nodes with text exceeding 20 characters', () => {
       return fc.assert(
         fc.asyncProperty(
           fc.string({ minLength: 1, maxLength: 100 }).filter(s => s.trim().length > 0),
           async (text) => {
-            const branches = [
-              { label: 'This is a very long label that exceeds the twenty character limit' },
-              { label: 'B2' },
-              { label: 'B3' }
+            const nodes = [
+              { id: '1', text: 'This is a very long text that exceeds the twenty character limit' },
+              { id: '2', text: 'N2' },
+              { id: '3', text: 'N3' }
             ];
 
             mockLLMClient.generateJSON.mockResolvedValue({
               data: {
-                central: 'Topic',
-                branches
+                central_topic: 'Topic',
+                nodes
               },
               tokens: 100,
               model: 'qwen-max'
             });
 
             await expect(service.generateMindMap({ text }))
-              .rejects.toThrow('label too long');
+              .rejects.toThrow('节点文本过长');
           }
         ),
         { numRuns: 50 }
@@ -470,26 +473,28 @@ describe('AIEnhancementService - Property-Based Tests', () => {
 
   /**
    * Property 13: Mind map JSON validity
-   * **Validates: Requirements 8.3, 8.5**
+   * **Validates: Requirements 2.2, 2.3, 2.4, 2.5, 2.7**
    * 
    * For any mind map generation request, output should be valid JSON format
-   * with central and branches fields, and branches should be valid hierarchical structure.
+   * with central_topic and nodes fields, and nodes should be valid hierarchical structure
+   * with id and text fields.
    */
   describe('Property 13: Mind map JSON validity', () => {
-    it('should always return valid JSON with central and branches', () => {
+    it('should always return valid JSON with central_topic and nodes', () => {
       return fc.assert(
         fc.asyncProperty(
           fc.string({ minLength: 10, maxLength: 300 }),
           fc.string({ minLength: 1, maxLength: 20 }),
           fc.integer({ min: 3, max: 6 }),
-          async (text, central, numBranches) => {
-            const branches = Array.from({ length: numBranches }, (_, i) => ({
-              label: `B${i + 1}`,
-              children: i % 2 === 0 ? [{ label: `S${i}.1` }] : undefined
+          async (text, centralTopic, numNodes) => {
+            const nodes = Array.from({ length: numNodes }, (_, i) => ({
+              id: `${i + 1}`,
+              text: `N${i + 1}`,
+              children: i % 2 === 0 ? [{ id: `${i + 1}-1`, text: `S${i}.1` }] : undefined
             }));
 
             mockLLMClient.generateJSON.mockResolvedValue({
-              data: { central, branches },
+              data: { central_topic: centralTopic, nodes },
               tokens: 150,
               model: 'qwen-max'
             });
@@ -497,22 +502,26 @@ describe('AIEnhancementService - Property-Based Tests', () => {
             const result = await service.generateMindMap({ text });
 
             // Property: Must have valid structure
-            expect(result.mindmap).toHaveProperty('central');
-            expect(result.mindmap).toHaveProperty('branches');
-            expect(typeof result.mindmap.central).toBe('string');
-            expect(Array.isArray(result.mindmap.branches)).toBe(true);
+            expect(result.mindmap).toHaveProperty('central_topic');
+            expect(result.mindmap).toHaveProperty('nodes');
+            expect(typeof result.mindmap.central_topic).toBe('string');
+            expect(Array.isArray(result.mindmap.nodes)).toBe(true);
             
-            // Property: Each branch must have label
-            result.mindmap.branches.forEach(branch => {
-              expect(branch).toHaveProperty('label');
-              expect(typeof branch.label).toBe('string');
+            // Property: Each node must have id and text
+            result.mindmap.nodes.forEach(node => {
+              expect(node).toHaveProperty('id');
+              expect(typeof node.id).toBe('string');
+              expect(node).toHaveProperty('text');
+              expect(typeof node.text).toBe('string');
               
               // If children exist, they must be valid array
-              if (branch.children) {
-                expect(Array.isArray(branch.children)).toBe(true);
-                branch.children.forEach(child => {
-                  expect(child).toHaveProperty('label');
-                  expect(typeof child.label).toBe('string');
+              if (node.children) {
+                expect(Array.isArray(node.children)).toBe(true);
+                node.children.forEach(child => {
+                  expect(child).toHaveProperty('id');
+                  expect(typeof child.id).toBe('string');
+                  expect(child).toHaveProperty('text');
+                  expect(typeof child.text).toBe('string');
                 });
               }
             });
@@ -522,17 +531,17 @@ describe('AIEnhancementService - Property-Based Tests', () => {
       );
     });
 
-    it('should reject mind maps missing central field', () => {
+    it('should reject mind maps missing central_topic field', () => {
       return fc.assert(
         fc.asyncProperty(
           fc.string({ minLength: 1, maxLength: 100 }),
           async (text) => {
             mockLLMClient.generateJSON.mockResolvedValue({
               data: {
-                branches: [
-                  { label: 'B1' },
-                  { label: 'B2' },
-                  { label: 'B3' }
+                nodes: [
+                  { id: '1', text: 'N1' },
+                  { id: '2', text: 'N2' },
+                  { id: '3', text: 'N3' }
                 ]
               },
               tokens: 80,
@@ -540,7 +549,7 @@ describe('AIEnhancementService - Property-Based Tests', () => {
             });
 
             await expect(service.generateMindMap({ text }))
-              .rejects.toThrow('central');
+              .rejects.toThrow('central_topic');
           }
         ),
         { numRuns: 50 }
@@ -552,26 +561,28 @@ describe('AIEnhancementService - Property-Based Tests', () => {
         fc.asyncProperty(
           fc.string({ minLength: 10, maxLength: 200 }),
           async (text) => {
-            const branches = [
+            const nodes = [
               {
-                label: 'B1',
+                id: '1',
+                text: 'N1',
                 children: [
                   {
-                    label: 'S1.1',
+                    id: '1-1',
+                    text: 'S1.1',
                     children: [
-                      { label: 'SS1.1.1' }
+                      { id: '1-1-1', text: 'SS1.1.1' }
                     ]
                   }
                 ]
               },
-              { label: 'B2' },
-              { label: 'B3' }
+              { id: '2', text: 'N2' },
+              { id: '3', text: 'N3' }
             ];
 
             mockLLMClient.generateJSON.mockResolvedValue({
               data: {
-                central: 'Topic',
-                branches
+                central_topic: 'Topic',
+                nodes
               },
               tokens: 150,
               model: 'qwen-max'
@@ -580,16 +591,18 @@ describe('AIEnhancementService - Property-Based Tests', () => {
             const result = await service.generateMindMap({ text });
 
             // Property: Nested structure should be valid
-            const validateBranch = (branch) => {
-              expect(branch).toHaveProperty('label');
-              expect(typeof branch.label).toBe('string');
-              if (branch.children) {
-                expect(Array.isArray(branch.children)).toBe(true);
-                branch.children.forEach(validateBranch);
+            const validateNode = (node) => {
+              expect(node).toHaveProperty('id');
+              expect(typeof node.id).toBe('string');
+              expect(node).toHaveProperty('text');
+              expect(typeof node.text).toBe('string');
+              if (node.children) {
+                expect(Array.isArray(node.children)).toBe(true);
+                node.children.forEach(validateNode);
               }
             };
 
-            result.mindmap.branches.forEach(validateBranch);
+            result.mindmap.nodes.forEach(validateNode);
           }
         ),
         { numRuns: 100 }

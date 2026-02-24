@@ -3,7 +3,7 @@
 import App from "./App.tsx";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ErrorProvider } from "./contexts/ErrorContext";
-import "./index.css";
+import "./styles/globals.css";
 
 // Filter out sqlcipher errors from browser extensions
 const originalError = console.error;

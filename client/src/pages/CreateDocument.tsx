@@ -1,9 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, XCircle } from 'lucide-react';
+import { Editor } from '@tiptap/react';
 import apiClient from '../api/client';
 import KGPipelineModal from '../components/KGPipelineModal';
 import RichTextEditor, { RichTextEditorHandle } from '../components/editor/RichTextEditor';
+import { InsightPanel } from '../components/editor/InsightPanel';
 
 export default function CreateDocument() {
   const navigate = useNavigate();
@@ -12,6 +14,15 @@ export default function CreateDocument() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [kgModalDocId, setKgModalDocId] = useState<string | null>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
+  const [editor, setEditor] = useState<Editor | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const ed = editorRef.current?.getEditor();
+      if (ed) setEditor(ed);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -123,44 +134,8 @@ export default function CreateDocument() {
           </div>
         </div>
 
-        <div className="w-80 bg-slate-50 border-l border-slate-200 flex flex-col shrink-0">
-          <div className="p-4 border-b border-slate-200">
-             <h3 className="font-semibold text-slate-700">文档提示</h3>
-          </div>
-          <div className="p-4 overflow-y-auto space-y-4">
-             <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                   <div className="w-2 h-2 rounded-full bg-purple-500" />
-                   <span className="text-xs font-bold text-purple-700 uppercase">写作技巧</span>
-                </div>
-                <h4 className="font-medium text-slate-800 text-sm mb-1">结构化内容</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                   使用标题、列表和段落来组织你的内容，让文档更易读。
-                </p>
-             </div>
-
-             <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                   <div className="w-2 h-2 rounded-full bg-blue-500" />
-                   <span className="text-xs font-bold text-blue-700 uppercase">图片支持</span>
-                </div>
-                <h4 className="font-medium text-slate-800 text-sm mb-1">插入图片</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                   点击工具栏图片按钮上传，或直接粘贴/拖拽图片到编辑器。
-                </p>
-             </div>
-
-             <div className="bg-white p-3 rounded-xl border border-green-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                   <div className="w-2 h-2 rounded-full bg-green-500" />
-                   <span className="text-xs font-bold text-green-700 uppercase">AI 辅助</span>
-                </div>
-                <h4 className="font-medium text-slate-800 text-sm mb-1">智能总结</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                   保存后可以使用 AI 生成文档总结。
-                </p>
-             </div>
-          </div>
+        <div className="w-80 shrink-0">
+          <InsightPanel editor={editor} />
         </div>
       </div>
 

@@ -123,32 +123,49 @@ function createSmartGenerationPrompt(text, options = {}) {
 
   let styleGuidance = '';
   if (style === 'professional') {
-    styleGuidance = '\n- 使用专业、正式的语言风格';
+    styleGuidance = `\n## 风格要求\n- 使用专业正式的语言风格\n- 措辞严谨、逻辑清晰、避免口语化表达`;
   } else if (style === 'casual') {
-    styleGuidance = '\n- 使用轻松、口语化的语言风格';
+    styleGuidance = `\n## 风格要求\n- 使用轻松口语化的语言风格\n- 自然亲切、可以适当使用日常用语和轻松的表达方式`;
   } else {
-    styleGuidance = '\n- 使用富有创意和想象力的语言风格';
+    styleGuidance = `\n## 风格要求\n- 保持创意但克制的风格\n- 在表达上有想象力，但不过度修饰`;
   }
 
-  const contextSection = context ? `\n\n背景信息：\n${context}` : '';
+  const contextSection = context ? `\n\n## 背景信息\n${context}` : '';
 
-  return `你是一个创意写作助手。请根据用户提供的文本进行扩展，并生成适合图像生成的提示词。
+  return `## 角色定义
+你是一位专业、克制、有审美判断力的内容与影像生成助手。
 
-用户文本：
-${text}${contextSection}
+## 核心原则
+- 不改变原文立场、情绪与风格
+- 不引入无关主题
+- 避免空话和套路化表达
+- 内容具体、有画面感、有信息密度
+- 影像描述真实、可拍、避免抽象词
 
-要求：
-1. 扩展文本：在保持原意的基础上，增加细节、描述和想象力
-2. 图像提示词：生成一个详细的、适合Midjourney/DALL-E的图像生成提示词
-3. 扩展后的文本应该是原文的2-3倍长度
-4. 图像提示词应包含风格、构图、色彩、氛围等元素${styleGuidance}
+## 文本扩写规则
+- 不重复原文句子
+- 自然衔接原文
+- 让内容更完整而非更啰嗦
 
-输出格式（JSON）：
+## 照片生成规则
+- 以真实摄影为目标而非插画或概念图
+- 描述清晰的主体、环境、光线、构图、情绪
+- 使用自然语言描述而非堆砌形容词
+- 不出现文字、logo、水印
+- 人物特写时不指定具体人脸
+${styleGuidance}
+
+## 输出格式
+请严格以 JSON 格式输出，不要包含任何其他内容：
 {
-  "expandedText": "扩展后的文本",
-  "imagePrompt": "图像生成提示词"
-}`;
+  "expandedText": "扩写后的文本",
+  "imagePrompt": "照片生成描述"
 }
+
+## 用户原始文本
+${text}${contextSection}`;
+}
+
 
 /**
  * Smart proofreading prompt
@@ -166,33 +183,49 @@ function createSmartProofreadingPrompt(text, options = {}) {
     ? 'Focus on English grammar, spelling, and punctuation.'
     : '重点关注中文的语法、错别字和标点符号。';
 
-  return `你是一个专业的文本校对助手。请校对以下文本，纠正错误但保持原意和风格。
+  return `## 角色定义
+你是一位专业严谨的中文校对助手。
 
-文本：
-${text}
+## 核心原则
+- 只修正明确的错误，不做主观优化
+- 保持原文的句式结构、语气和风格
+- 不扩写、不删除观点、不改变表达方式
 
-要求：
-1. 纠正拼写错误
-2. 修正语法错误
-3. 纠正标点符号错误
-4. 修正明显的用词不当
-5. 保持原意、写作风格和句式结构
-6. 列出所有修改
+## 校对范围（只修正以下类型）
+1. 错别字（如"以经"→"已经"）
+2. 病句（明显语法错误）
+3. 标点符号错误（如中英文标点混用、缺失标点）
+4. 明显用词不当（如"反应情况"→"反映情况"）
+
+## 禁止操作
+- 不改变句式结构
+- 不扩写内容
+- 不删除任何观点
+- 不改变语气和风格
 ${languageGuidance}
 
-输出格式（JSON）：
+## 输出格式
+请严格以 JSON 格式输出，不要包含任何其他内容：
 {
-  "correctedText": "校对后的文本",
+  "correctedText": "校对后的完整文本",
   "changes": [
     {
       "type": "spelling|grammar|punctuation|word-choice",
-      "original": "原文",
-      "corrected": "修正后",
-      "position": {"start": 0, "end": 10},
+      "original": "原文片段",
+      "corrected": "修正后片段",
       "reason": "修改原因"
     }
   ]
-}`;
+}
+
+如果原文没有任何错误，返回：
+{
+  "correctedText": "原文内容不变",
+  "changes": []
+}
+
+## 待校对文本
+${text}`;
 }
 
 /**
@@ -207,27 +240,38 @@ ${languageGuidance}
 function createTableGenerationPrompt(text, options = {}) {
   const { maxColumns = 10 } = options;
 
-  return `你是一个数据整理助手。请从以下文本中提取信息并整理成表格。
+  return `## 角色定义
+你是一个"信息结构化助手"，擅长从自然语言中提取信息，并将其整理为清晰、准确、可读的表格。
 
-文本：
+## 规则
+- 只基于用户提供的内容进行整理，不允许编造信息
+- 表格结构应符合内容本身的逻辑，而不是固定模板
+- 如果信息不完整，需要在表格中明确标注"原文未提及"
+- 优先保证表格对人类阅读友好，而非追求形式复杂
+- 列数不超过${maxColumns}列
+
+## 用户请求
+请将以下内容整理为一个表格。要求：
+- 自动判断最合适的表格类型（如信息表、对比表、清单、时间线）
+- 表格需覆盖文本中的核心信息
+- 表格结构清晰，字段命名简洁
+- 不要添加原文中不存在的信息
+
+文本内容：
+"""
 ${text}
+"""
 
-要求：
-1. 识别文本中的结构化信息
-2. 确定最合适的表格结构（列数和列名）
-3. 提取数据并填充表格
-4. 确保数据准确、清晰、可读
-5. 列数不超过${maxColumns}列
-6. 如果文本不适合表格化，说明原因
-
-输出格式（JSON）：
+## 输出格式
+请严格以 JSON 格式输出，不要包含任何其他内容：
 {
-  "headers": ["列1", "列2", "列3"],
+  "table_type": "表格类型",
+  "columns": ["列1", "列2", "..."],
   "rows": [
-    ["数据1", "数据2", "数据3"],
-    ["数据4", "数据5", "数据6"]
+    ["行1列1", "行1列2", "..."],
+    ["行2列1", "行2列2", "..."]
   ],
-  "notes": "可选的说明或注释"
+  "summary": "一句话说明该表格整理了什么"
 }`;
 }
 
@@ -242,41 +286,51 @@ ${text}
  * @returns {string} Prompt text
  */
 function createMindMapGenerationPrompt(text, options = {}) {
-  const { maxBranches = 6, maxDepth = 3 } = options;
+  const { maxBranches = 6, maxDepth } = options;
 
-  return `你是一个思维导图专家。请将以下文本转换为脑图结构。
+  const depthRule = maxDepth != null
+    ? `\n6. 最大层级深度不超过 ${maxDepth} 层`
+    : '';
 
-文本：
+  return `## 角色定义
+你是一位脑图结构生成助手，擅长将自然语言内容拆解为清晰的层级结构。
+
+## 规则
+1. 先提炼一个能概括全文的中心主题
+2. 将内容拆解为 3-${maxBranches} 个一级分支
+3. 每个节点用简短关键词或短语表达（不超过20个字符）
+4. 层级清晰，避免重复与交叉
+5. 不添加原文未提及的新观点${depthRule}
+
+## 用户请求
+请根据以下文本内容生成脑图结构：
+- 自动提炼中心主题
+- 拆解清晰的层级结构
+- 使用关键词而非长句
+- 结构适合脑图展示
+
+## 文本内容
+"""
 ${text}
+"""
 
-要求：
-1. 识别中心主题
-2. 创建3-${maxBranches}个一级分支
-3. 为每个一级分支创建2-4个二级分支（如果适用）
-4. 使用简短的关键词作为标签（不超过10个字）
-5. 确保层级结构清晰
-6. 最大深度为${maxDepth}层
-
-输出格式（JSON）：
+## 输出格式
+请严格以 JSON 格式输出，不要包含任何其他内容：
 {
-  "central": "中心主题",
-  "branches": [
+  "central_topic": "中心主题",
+  "nodes": [
     {
-      "label": "分支1",
+      "id": "1",
+      "text": "一级分支1",
       "children": [
-        {"label": "子分支1.1"},
-        {"label": "子分支1.2"}
-      ]
-    },
-    {
-      "label": "分支2",
-      "children": [
-        {"label": "子分支2.1"}
+        { "id": "1-1", "text": "子节点1" },
+        { "id": "1-2", "text": "子节点2" }
       ]
     }
   ]
 }`;
 }
+
 
 /**
  * Validate prompt parameters

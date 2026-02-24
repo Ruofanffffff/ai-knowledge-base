@@ -7,27 +7,9 @@ import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Save, MoreHorizontal, Bold, Italic, List, ChevronRight, Clock, ChevronLeft, Undo2, Redo2, ListOrdered, Quote, Minus, Loader2, Sparkles, CheckCircle, TableIcon, Network, Check, Plus, Trash2, Pencil, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
-
-// --- Task 1.2: MindMapImage custom Tiptap node ---
-export const MindMapImage = Image.extend({
-  name: 'mindMapImage',
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      'data-mindmap': {
-        default: null,
-        parseHTML: (el: HTMLElement) => el.getAttribute('data-mindmap'),
-        renderHTML: (attrs: Record<string, unknown>) => {
-          if (!attrs['data-mindmap']) return {};
-          return { 'data-mindmap': attrs['data-mindmap'] };
-        },
-      },
-      title: {
-        default: '双击编辑思维导图',
-      },
-    };
-  },
-});
+import { MindMapImage, computeMMPositions, buildMindMapSVG } from '../components/editor/mindmap-svg-utils';
+import { InsightPanel } from '../components/editor/InsightPanel';
+export { MindMapImage, computeMMPositions, buildMindMapSVG, type MMNode, type MMLink } from '../components/editor/mindmap-svg-utils';
 
 // --- Task 2.1: ToolBtn component ---
 interface ToolBtnProps {
@@ -62,118 +44,6 @@ export function buildTableHTML(headers: string[], rows: string[][]): string {
   ).join('');
   return `<table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table>`;
 }
-
-// --- Task 8.1: computeMMPositions radial tree layout ---
-export interface MMNode { id: string; label: string; x: number; y: number; depth: number; }
-export interface MMLink { source: string; target: string; }
-
-export function computeMMPositions(
-  nodes: Array<{ id: string; label: string }>,
-  links: MMLink[],
-  rootId: string,
-  centerX = 400,
-  centerY = 300,
-  radiusStep = 120
-): Record<string, { x: number; y: number }> {
-  // Build adjacency list from links (tree structure, parent → children)
-  const children: Record<string, string[]> = {};
-  const nodeIds = new Set(nodes.map(n => n.id));
-  for (const link of links) {
-    if (!children[link.source]) children[link.source] = [];
-    children[link.source].push(link.target);
-  }
-
-  const result: Record<string, { x: number; y: number }> = {};
-
-  // BFS to assign positions
-  const queue: Array<{ id: string; depth: number; angleStart: number; angleEnd: number }> = [
-    { id: rootId, depth: 0, angleStart: 0, angleEnd: 2 * Math.PI }
-  ];
-
-  while (queue.length > 0) {
-    const { id, depth, angleStart, angleEnd } = queue.shift()!;
-    if (!nodeIds.has(id)) continue;
-
-    const radius = depth * radiusStep;
-    const angle = (angleStart + angleEnd) / 2;
-    const x = depth === 0 ? centerX : centerX + radius * Math.cos(angle);
-    const y = depth === 0 ? centerY : centerY + radius * Math.sin(angle);
-
-    result[id] = { x, y };
-
-    const childIds = children[id] || [];
-    if (childIds.length > 0) {
-      const angleRange = angleEnd - angleStart;
-      const childAngleStep = angleRange / childIds.length;
-      childIds.forEach((childId, i) => {
-        queue.push({
-          id: childId,
-          depth: depth + 1,
-          angleStart: angleStart + i * childAngleStep,
-          angleEnd: angleStart + (i + 1) * childAngleStep,
-        });
-      });
-    }
-  }
-
-  return result;
-}
-
-export function buildMindMapSVG(nodes: Array<{ id: string; label: string }>, links: MMLink[], positions: Record<string, { x: number; y: number }>): string {
-  const width = 800;
-  const height = 600;
-
-  // Color palette by depth - determine depth via BFS
-  const colors = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-  const children: Record<string, string[]> = {};
-  for (const link of links) {
-    if (!children[link.source]) children[link.source] = [];
-    children[link.source].push(link.target);
-  }
-  const depthMap: Record<string, number> = {};
-  if (nodes.length > 0) {
-    const rootId = nodes[0].id;
-    const q = [{ id: rootId, depth: 0 }];
-    while (q.length > 0) {
-      const { id, depth } = q.shift()!;
-      depthMap[id] = depth;
-      for (const cid of (children[id] || [])) {
-        q.push({ id: cid, depth: depth + 1 });
-      }
-    }
-  }
-
-  let defs = `<defs><radialGradient id="rootGrad" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#7c3aed"/></radialGradient><filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
-
-  let paths = '';
-  for (const link of links) {
-    const source = positions[link.source];
-    const target = positions[link.target];
-    if (!source || !target) continue;
-    const mx = (source.x + target.x) / 2;
-    paths += `<path d="M${source.x},${source.y} C${mx},${source.y} ${mx},${target.y} ${target.x},${target.y}" fill="none" stroke="#cbd5e1" stroke-width="2"/>`;
-  }
-
-  let shapes = '';
-  for (const node of nodes) {
-    const pos = positions[node.id];
-    if (!pos) continue;
-    const depth = depthMap[node.id] ?? 0;
-    const color = colors[depth % colors.length];
-    if (depth === 0) {
-      shapes += `<circle cx="${pos.x}" cy="${pos.y}" r="36" fill="url(#rootGrad)" filter="url(#glow)"/>`;
-      shapes += `<text x="${pos.x}" y="${pos.y}" text-anchor="middle" dominant-baseline="central" fill="white" font-size="14" font-weight="bold">${node.label}</text>`;
-    } else {
-      const w = Math.max(node.label.length * 12, 60);
-      const h = 32;
-      shapes += `<rect x="${pos.x - w / 2}" y="${pos.y - h / 2}" width="${w}" height="${h}" rx="8" fill="${color}" opacity="0.9"/>`;
-      shapes += `<text x="${pos.x}" y="${pos.y}" text-anchor="middle" dominant-baseline="central" fill="white" font-size="12">${node.label}</text>`;
-    }
-  }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${defs}${paths}${shapes}</svg>`;
-}
-
 
 // --- Task 9.1: addChildNode pure function ---
 export function addChildNode(
@@ -609,43 +479,8 @@ export function Editor({ onNavigate }: EditorProps) {
         </div>
 
         {/* Right Sidebar */}
-        <div className="w-72 bg-slate-50 border-l border-slate-200 flex flex-col shrink-0">
-          <div className="p-4 border-b border-slate-200">
-             <h3 className="font-semibold text-slate-700">AI 洞察</h3>
-          </div>
-          <div className="p-4 overflow-y-auto space-y-4">
-             <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                   <div className="w-2 h-2 rounded-full bg-purple-500" />
-                   <span className="text-xs font-bold text-purple-700 uppercase">相关概念</span>
-                </div>
-                <h4 className="font-medium text-slate-800 text-sm mb-1">Transformer 架构</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                   发现了与"神经网络"的联系。Transformer 是现代大语言模型的基础。
-                </p>
-             </div>
-
-             <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                   <div className="w-2 h-2 rounded-full bg-blue-500" />
-                   <span className="text-xs font-bold text-blue-700 uppercase">建议参考</span>
-                </div>
-                <h4 className="font-medium text-slate-800 text-sm mb-1">Attention Is All You Need</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                   论文 (2017) Vaswani 等人。
-                </p>
-             </div>
-
-             <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-sm">
-               <div className="flex items-center gap-2 mb-2">
-                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                 <span className="text-xs font-bold text-emerald-700 uppercase">写作提示</span>
-               </div>
-               <p className="text-xs text-slate-500 leading-relaxed">
-                 选中文本后右键点击，可调用 AI 功能进行智能生成、校对、生成表格或脑图。
-               </p>
-             </div>
-          </div>
+        <div className="w-72 shrink-0">
+          <InsightPanel editor={editor} />
         </div>
       </div>
 

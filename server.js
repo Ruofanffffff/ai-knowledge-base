@@ -795,6 +795,10 @@ function formatBytes(bytes) {
 const aiEnhancementRoutes = require('./routes/aiEnhancementRoutes');
 app.use('/api/ai', aiEnhancementRoutes);
 
+// AI洞察路由
+const aiInsightsRoutes = require('./routes/aiInsightsRoutes');
+app.use('/api/ai', aiInsightsRoutes);
+
 // 搜索路由
 const searchRoutes = require('./routes/searchRoutes');
 app.use('/api/search', searchRoutes);

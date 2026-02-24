@@ -17,6 +17,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+        timeout: 60000,
       },
       '/uploads': {
         target: 'http://localhost:3000',
