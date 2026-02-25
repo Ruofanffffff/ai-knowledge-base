@@ -16,6 +16,10 @@ const mockTx = {
     deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     create: jest.fn(),
   },
+  docPrinciple: {
+    deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    create: jest.fn().mockResolvedValue({ id: 'principle-id' }),
+  },
 };
 
 const mockPrisma = {
@@ -57,6 +61,14 @@ const {
   truncateRelation,
   filterValidRelations,
   pipelineStatus,
+  VALID_ENTITY_TYPES,
+  VALID_SOURCE_TAGS,
+  VALID_LAYERS,
+  WEAK_RELATION_NAMES,
+  truncateEntityFourLayer,
+  truncateRelationFourLayer,
+  truncatePrinciple,
+  validateAndCleanFourLayerResult,
 } = require('./kgPipelineService');
 
 const llmClient = require('./llmClient');
@@ -75,6 +87,8 @@ describe('kgPipelineService', () => {
     mockTx.docRelation.create.mockReset().mockResolvedValue({ id: 'doc-rel-id' });
     mockTx.docEntity.deleteMany.mockReset().mockResolvedValue({ count: 0 });
     mockTx.docRelation.deleteMany.mockReset().mockResolvedValue({ count: 0 });
+    mockTx.docPrinciple.create.mockReset().mockResolvedValue({ id: 'principle-id' });
+    mockTx.docPrinciple.deleteMany.mockReset().mockResolvedValue({ count: 0 });
     mockPrisma.$transaction.mockReset().mockImplementation((fn) => fn(mockTx));
     mockPrisma.documentIndex.findFirst.mockReset();
     mockPrisma.documentIndex.create.mockReset();
@@ -560,21 +574,22 @@ describe('kgPipelineService', () => {
       };
     });
 
-    it('deletes existing relations and entities inside a transaction', async () => {
-      await kgPipelineService.persistToDatabase([], [], docId);
+    it('deletes existing relations, entities, and principles inside a transaction', async () => {
+      await kgPipelineService.persistToDatabase({ entities: [], relations: [], principles: [] }, docId);
 
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       expect(mockTx.docRelation.deleteMany).toHaveBeenCalledWith({ where: { docId } });
       expect(mockTx.docEntity.deleteMany).toHaveBeenCalledWith({ where: { docId } });
+      expect(mockTx.docPrinciple.deleteMany).toHaveBeenCalledWith({ where: { docId } });
     });
 
-    it('creates entities with correct fields', async () => {
+    it('creates entities with correct fields including entityType and source', async () => {
       const entities = [
-        { name: '实体A', description: '描述A' },
-        { name: '实体B', description: '描述B' },
+        { name: '实体A', definition: '描述A', type: 'concept', source: 'fact' },
+        { name: '实体B', definition: '描述B', type: 'process', source: 'inferred' },
       ];
 
-      await kgPipelineService.persistToDatabase(entities, [], docId);
+      await kgPipelineService.persistToDatabase({ entities, relations: [], principles: [] }, docId);
 
       expect(mockTx.docEntity.create).toHaveBeenCalledTimes(2);
       expect(mockTx.docEntity.create).toHaveBeenCalledWith({
@@ -582,6 +597,8 @@ describe('kgPipelineService', () => {
           docId,
           cleanedName: '实体A',
           description: '描述A',
+          entityType: 'concept',
+          source: 'fact',
         },
       });
       expect(mockTx.docEntity.create).toHaveBeenCalledWith({
@@ -589,20 +606,22 @@ describe('kgPipelineService', () => {
           docId,
           cleanedName: '实体B',
           description: '描述B',
+          entityType: 'process',
+          source: 'inferred',
         },
       });
     });
 
-    it('creates relations with correct entity ID references', async () => {
+    it('creates relations with correct entity ID references including layer and source', async () => {
       const entities = [
-        { name: '实体A', description: '描述A' },
-        { name: '实体B', description: '描述B' },
+        { name: '实体A', definition: '描述A', type: 'concept', source: 'fact' },
+        { name: '实体B', definition: '描述B', type: 'concept', source: 'fact' },
       ];
       const relations = [
-        { source: '实体A', target: '实体B', name: '属于', description: '关系描述' },
+        { source: '实体A', target: '实体B', name: '属于', description: '关系描述', layer: 'how', source_tag: 'fact' },
       ];
 
-      await kgPipelineService.persistToDatabase(entities, relations, docId);
+      await kgPipelineService.persistToDatabase({ entities, relations, principles: [] }, docId);
 
       expect(mockTx.docRelation.create).toHaveBeenCalledTimes(1);
       expect(mockTx.docRelation.create).toHaveBeenCalledWith({
@@ -612,28 +631,30 @@ describe('kgPipelineService', () => {
           description: '关系描述',
           sourceEntityId: 'entity-1',
           targetEntityId: 'entity-2',
+          layer: 'how',
+          source: 'fact',
         },
       });
     });
 
     it('skips relations where source entity is not found', async () => {
-      const entities = [{ name: '实体A', description: '描述A' }];
+      const entities = [{ name: '实体A', definition: '描述A', type: 'concept', source: 'fact' }];
       const relations = [
-        { source: '不存在', target: '实体A', name: '无效', description: '无效关系' },
+        { source: '不存在', target: '实体A', name: '无效', description: '无效关系', layer: 'how', source_tag: 'fact' },
       ];
 
-      await kgPipelineService.persistToDatabase(entities, relations, docId);
+      await kgPipelineService.persistToDatabase({ entities, relations, principles: [] }, docId);
 
       expect(mockTx.docRelation.create).not.toHaveBeenCalled();
     });
 
     it('skips relations where target entity is not found', async () => {
-      const entities = [{ name: '实体A', description: '描述A' }];
+      const entities = [{ name: '实体A', definition: '描述A', type: 'concept', source: 'fact' }];
       const relations = [
-        { source: '实体A', target: '不存在', name: '无效', description: '无效关系' },
+        { source: '实体A', target: '不存在', name: '无效', description: '无效关系', layer: 'how', source_tag: 'fact' },
       ];
 
-      await kgPipelineService.persistToDatabase(entities, relations, docId);
+      await kgPipelineService.persistToDatabase({ entities, relations, principles: [] }, docId);
 
       expect(mockTx.docRelation.create).not.toHaveBeenCalled();
     });
@@ -642,19 +663,19 @@ describe('kgPipelineService', () => {
       mockPrisma.$transaction.mockRejectedValue(new Error('DB write failed'));
 
       await expect(
-        kgPipelineService.persistToDatabase([], [], docId)
+        kgPipelineService.persistToDatabase({ entities: [], relations: [], principles: [] }, docId)
       ).rejects.toThrow('DB write failed');
     });
 
-    it('handles empty entities and relations', async () => {
-      await kgPipelineService.persistToDatabase([], [], docId);
+    it('handles empty entities, relations, and principles', async () => {
+      await kgPipelineService.persistToDatabase({ entities: [], relations: [], principles: [] }, docId);
 
       expect(mockTx.docEntity.create).not.toHaveBeenCalled();
       expect(mockTx.docRelation.create).not.toHaveBeenCalled();
     });
 
     it('updates DocumentIndex metadata with lastPipelineAt timestamp', async () => {
-      await kgPipelineService.persistToDatabase([], [], docId);
+      await kgPipelineService.persistToDatabase({ entities: [], relations: [], principles: [] }, docId);
 
       expect(mockTx.documentIndex.findFirst).toHaveBeenCalledWith({ where: { docId } });
       expect(mockTx.documentIndex.update).toHaveBeenCalledWith({
@@ -936,6 +957,237 @@ describe('kgPipelineService', () => {
       expect(status).not.toBeNull();
       expect(status.docId).toBe('doc-status-test');
       expect(status.status).toBe('failed');
+    });
+  });
+
+  describe('truncateEntityFourLayer', () => {
+    it('returns valid entity with all fields within limits', () => {
+      const result = truncateEntityFourLayer({
+        name: '知识图谱',
+        type: 'concept',
+        definition: '用于表示知识的图结构',
+        source: 'fact',
+      });
+      expect(result).toEqual({
+        name: '知识图谱',
+        type: 'concept',
+        definition: '用于表示知识的图结构',
+        source: 'fact',
+      });
+    });
+
+    it('truncates name to 6 characters', () => {
+      const result = truncateEntityFourLayer({ name: '一二三四五六七八', type: 'tool', definition: '描述', source: 'fact' });
+      expect(result.name).toBe('一二三四五六');
+    });
+
+    it('truncates definition to 30 characters', () => {
+      const longDef = 'a'.repeat(50);
+      const result = truncateEntityFourLayer({ name: 'test', type: 'concept', definition: longDef, source: 'fact' });
+      expect(result.definition).toBe('a'.repeat(30));
+    });
+
+    it('falls back type to concept for invalid type', () => {
+      const result = truncateEntityFourLayer({ name: 'test', type: 'invalid', definition: 'desc', source: 'fact' });
+      expect(result.type).toBe('concept');
+    });
+
+    it('falls back source to fact for invalid source', () => {
+      const result = truncateEntityFourLayer({ name: 'test', type: 'concept', definition: 'desc', source: 'unknown' });
+      expect(result.source).toBe('fact');
+    });
+
+    it('handles non-string name gracefully', () => {
+      const result = truncateEntityFourLayer({ name: 123, type: 'concept', definition: 'desc', source: 'fact' });
+      expect(result.name).toBe('');
+    });
+
+    it('handles non-string definition gracefully', () => {
+      const result = truncateEntityFourLayer({ name: 'test', type: 'concept', definition: null, source: 'fact' });
+      expect(result.definition).toBe('');
+    });
+  });
+
+  describe('truncateRelationFourLayer', () => {
+    it('returns valid relation with all fields within limits', () => {
+      const result = truncateRelationFourLayer({
+        source: '实体A', target: '实体B', name: '包含', description: '结构性包含关系', layer: 'how', source_tag: 'fact',
+      });
+      expect(result).toEqual({
+        source: '实体A', target: '实体B', name: '包含', description: '结构性包含关系', layer: 'how', source_tag: 'fact',
+      });
+    });
+
+    it('truncates name to 4 characters', () => {
+      const result = truncateRelationFourLayer({ source: 'A', target: 'B', name: '一二三四五', description: 'd', layer: 'how', source_tag: 'fact' });
+      expect(result.name).toBe('一二三四');
+    });
+
+    it('truncates description to 20 characters', () => {
+      const result = truncateRelationFourLayer({ source: 'A', target: 'B', name: 'rel', description: 'a'.repeat(30), layer: 'how', source_tag: 'fact' });
+      expect(result.description).toBe('a'.repeat(20));
+    });
+
+    it('falls back layer to how for invalid layer', () => {
+      const result = truncateRelationFourLayer({ source: 'A', target: 'B', name: 'rel', description: 'd', layer: 'what', source_tag: 'fact' });
+      expect(result.layer).toBe('how');
+    });
+
+    it('falls back source_tag to fact for invalid source_tag', () => {
+      const result = truncateRelationFourLayer({ source: 'A', target: 'B', name: 'rel', description: 'd', layer: 'why', source_tag: 'bad' });
+      expect(result.source_tag).toBe('fact');
+    });
+
+    it('keeps source and target as-is', () => {
+      const result = truncateRelationFourLayer({ source: 'entityA', target: 'entityB', name: 'r', description: 'd', layer: 'how', source_tag: 'fact' });
+      expect(result.source).toBe('entityA');
+      expect(result.target).toBe('entityB');
+    });
+  });
+
+  describe('truncatePrinciple', () => {
+    it('returns valid principle with all fields within limits', () => {
+      const result = truncatePrinciple({
+        name: '单一职责', description: '每个模块只负责一个功能', related_entities: ['模块', '功能'], source: 'pattern',
+      });
+      expect(result).toEqual({
+        name: '单一职责', description: '每个模块只负责一个功能', related_entities: ['模块', '功能'], source: 'pattern',
+      });
+    });
+
+    it('truncates name to 8 characters', () => {
+      const result = truncatePrinciple({ name: '一二三四五六七八九十', description: 'd', related_entities: [], source: 'pattern' });
+      expect(result.name).toBe('一二三四五六七八');
+    });
+
+    it('truncates description to 40 characters', () => {
+      const result = truncatePrinciple({ name: 'test', description: 'a'.repeat(50), related_entities: [], source: 'pattern' });
+      expect(result.description).toBe('a'.repeat(40));
+    });
+
+    it('falls back source to pattern for invalid source', () => {
+      const result = truncatePrinciple({ name: 'test', description: 'd', related_entities: [], source: 'invalid' });
+      expect(result.source).toBe('pattern');
+    });
+
+    it('defaults related_entities to empty array for non-array', () => {
+      const result = truncatePrinciple({ name: 'test', description: 'd', related_entities: 'not-array', source: 'pattern' });
+      expect(result.related_entities).toEqual([]);
+    });
+  });
+
+  describe('validateAndCleanFourLayerResult', () => {
+    it('handles null input gracefully', () => {
+      const result = validateAndCleanFourLayerResult(null);
+      expect(result).toEqual({ entities: [], relations: [], principles: [] });
+    });
+
+    it('handles undefined input gracefully', () => {
+      const result = validateAndCleanFourLayerResult(undefined);
+      expect(result).toEqual({ entities: [], relations: [], principles: [] });
+    });
+
+    it('handles non-object input gracefully', () => {
+      const result = validateAndCleanFourLayerResult(42);
+      expect(result).toEqual({ entities: [], relations: [], principles: [] });
+    });
+
+    it('filters out entities with empty names', () => {
+      const result = validateAndCleanFourLayerResult({
+        entities: [
+          { name: 'valid', type: 'concept', definition: 'def', source: 'fact' },
+          { name: '', type: 'concept', definition: 'def', source: 'fact' },
+          { name: 123, type: 'concept', definition: 'def', source: 'fact' },
+        ],
+        relations: [],
+        principles_or_patterns: [],
+      });
+      expect(result.entities).toHaveLength(1);
+      expect(result.entities[0].name).toBe('valid');
+    });
+
+    it('filters out weak relation names', () => {
+      const result = validateAndCleanFourLayerResult({
+        entities: [
+          { name: 'A', type: 'concept', definition: 'def', source: 'fact' },
+          { name: 'B', type: 'concept', definition: 'def', source: 'fact' },
+        ],
+        relations: [
+          { source: 'A', target: 'B', name: '相关', description: 'd', layer: 'how', source_tag: 'fact' },
+          { source: 'A', target: 'B', name: '驱动', description: 'd', layer: 'how', source_tag: 'fact' },
+          { source: 'A', target: 'B', name: '影响', description: 'd', layer: 'why', source_tag: 'fact' },
+        ],
+        principles_or_patterns: [],
+      });
+      expect(result.relations).toHaveLength(1);
+      expect(result.relations[0].name).toBe('驱动');
+    });
+
+    it('filters out relations with invalid entity references', () => {
+      const result = validateAndCleanFourLayerResult({
+        entities: [
+          { name: 'A', type: 'concept', definition: 'def', source: 'fact' },
+          { name: 'B', type: 'concept', definition: 'def', source: 'fact' },
+        ],
+        relations: [
+          { source: 'A', target: 'B', name: '包含', description: 'd', layer: 'how', source_tag: 'fact' },
+          { source: 'A', target: 'C', name: '依赖', description: 'd', layer: 'how', source_tag: 'fact' },
+        ],
+        principles_or_patterns: [],
+      });
+      expect(result.relations).toHaveLength(1);
+      expect(result.relations[0].name).toBe('包含');
+    });
+
+    it('filters out principles with no valid related entities', () => {
+      const result = validateAndCleanFourLayerResult({
+        entities: [
+          { name: 'A', type: 'concept', definition: 'def', source: 'fact' },
+        ],
+        relations: [],
+        principles_or_patterns: [
+          { name: '原则一', description: 'desc', related_entities: ['A'], source: 'pattern' },
+          { name: '原则二', description: 'desc', related_entities: ['X', 'Y'], source: 'pattern' },
+        ],
+      });
+      expect(result.principles).toHaveLength(1);
+      expect(result.principles[0].name).toBe('原则一');
+    });
+
+    it('returns complete structure with valid data', () => {
+      const result = validateAndCleanFourLayerResult({
+        entities: [
+          { name: 'A', type: 'tool', definition: 'tool A', source: 'fact' },
+          { name: 'B', type: 'process', definition: 'process B', source: 'inferred' },
+        ],
+        relations: [
+          { source: 'A', target: 'B', name: '驱动', description: 'A drives B', layer: 'why', source_tag: 'inferred' },
+        ],
+        principles_or_patterns: [
+          { name: '解耦原则', description: '模块间低耦合', related_entities: ['A', 'B'], source: 'pattern' },
+        ],
+      });
+      expect(result.entities).toHaveLength(2);
+      expect(result.relations).toHaveLength(1);
+      expect(result.principles).toHaveLength(1);
+    });
+  });
+
+  describe('four-layer constants', () => {
+    it('VALID_ENTITY_TYPES contains all 8 types', () => {
+      expect(VALID_ENTITY_TYPES).toEqual(['concept', 'object', 'process', 'role', 'rule', 'tool', 'target', 'data']);
+    });
+
+    it('VALID_SOURCE_TAGS contains fact, inferred, pattern', () => {
+      expect(VALID_SOURCE_TAGS).toEqual(['fact', 'inferred', 'pattern']);
+    });
+
+    it('VALID_LAYERS contains how and why', () => {
+      expect(VALID_LAYERS).toEqual(['how', 'why']);
+    });
+
+    it('WEAK_RELATION_NAMES contains the 4 weak names', () => {
+      expect(WEAK_RELATION_NAMES).toEqual(['相关', '有关', '影响', '关联']);
     });
   });
 });

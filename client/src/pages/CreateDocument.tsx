@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, XCircle } from 'lucide-react';
 import { Editor } from '@tiptap/react';
@@ -6,6 +6,7 @@ import apiClient from '../api/client';
 import KGPipelineModal from '../components/KGPipelineModal';
 import RichTextEditor, { RichTextEditorHandle } from '../components/editor/RichTextEditor';
 import { InsightPanel } from '../components/editor/InsightPanel';
+import { InsightsData } from '../hooks/useAIInsights';
 
 export default function CreateDocument() {
   const navigate = useNavigate();
@@ -15,6 +16,11 @@ export default function CreateDocument() {
   const [kgModalDocId, setKgModalDocId] = useState<string | null>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const insightsRef = useRef<InsightsData | null>(null);
+
+  const handleInsightsChange = useCallback((data: InsightsData | null) => {
+    insightsRef.current = data;
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -45,6 +51,19 @@ export default function CreateDocument() {
       const newDocument = response.data;
       setSaveStatus('saved');
       
+      // Save AI insights to database if available
+      if (newDocument.id && insightsRef.current && !insightsRef.current.message) {
+        try {
+          await apiClient.put(`/ai/insights/${newDocument.id}`, {
+            concepts: insightsRef.current.concepts,
+            references: insightsRef.current.references,
+            summary: insightsRef.current.summary,
+          });
+        } catch {
+          // Silently ignore — insights save is best-effort
+        }
+      }
+
       if (newDocument.id) {
         setKgModalDocId(newDocument.id.toString());
       } else {
@@ -135,7 +154,7 @@ export default function CreateDocument() {
         </div>
 
         <div className="w-80 shrink-0">
-          <InsightPanel editor={editor} />
+          <InsightPanel editor={editor} onInsightsChange={handleInsightsChange} />
         </div>
       </div>
 

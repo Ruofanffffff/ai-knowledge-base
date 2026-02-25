@@ -5,10 +5,13 @@ const fs = require('fs');
 const { 
   registerUser, 
   loginUser, 
-  refreshToken, 
+  refreshToken: localRefreshToken, 
   logoutUser,
-  authMiddleware
+  authMiddleware,
+  isAuthenEnabled,
+  extractBearerToken,
 } = require('../services/authService');
+const authenClient = require('../services/authenClient');
 const { initDatabase } = require('../database/initUserDB');
 
 // 确保上传目录存在
@@ -53,6 +56,48 @@ function initAuthRoutes() {
   return router;
 }
 
+// ============================================================
+// 统一错误处理辅助函数
+// ============================================================
+function handleAuthenError(res, error) {
+  const status = error.status || 500;
+  const message = error.message || '认证服务错误';
+  return res.status(status).json({ success: false, error: message });
+}
+
+// ============================================================
+// Authen 模式路由：邮箱注册
+// ============================================================
+router.post('/register/email', async (req, res) => {
+  if (!isAuthenEnabled()) {
+    return res.status(404).json({ success: false, error: '该功能未启用' });
+  }
+  try {
+    const result = await authenClient.registerByEmail(req.body);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    handleAuthenError(res, error);
+  }
+});
+
+// ============================================================
+// Authen 模式路由：手机注册
+// ============================================================
+router.post('/register/phone', async (req, res) => {
+  if (!isAuthenEnabled()) {
+    return res.status(404).json({ success: false, error: '该功能未启用' });
+  }
+  try {
+    const result = await authenClient.registerByPhone(req.body);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    handleAuthenError(res, error);
+  }
+});
+
+// ============================================================
+// 注册路由（本地模式保留）
+// ============================================================
 router.post('/register', async (req, res) => {
   try {
     const { username, email, phone, password, wechat_openid } = req.body;
@@ -98,7 +143,33 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// ============================================================
+// 登录路由
+// ============================================================
 router.post('/login', async (req, res) => {
+  if (isAuthenEnabled()) {
+    try {
+      // Authen expects { identifier, password }, frontend sends { email, password }
+      const { email, username, phone, password } = req.body;
+      const authenPayload = {
+        identifier: email || username || phone,
+        password,
+      };
+      const result = await authenClient.login(authenPayload);
+      return res.json({
+        success: true,
+        data: {
+          accessToken: result.access_token,
+          refreshToken: result.refresh_token,
+          user: result.user,
+        },
+      });
+    } catch (error) {
+      return handleAuthenError(res, error);
+    }
+  }
+
+  // 本地模式
   try {
     const { username, email, phone, password, wechat_openid } = req.body;
     
@@ -143,7 +214,49 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// ============================================================
+// OAuth 登录路由（仅 Authen 模式）
+// ============================================================
+router.post('/oauth/:provider', async (req, res) => {
+  if (!isAuthenEnabled()) {
+    return res.status(404).json({ success: false, error: '该功能未启用' });
+  }
+  try {
+    const { provider } = req.params;
+    const result = await authenClient.oauthLogin(provider, req.body);
+    res.json({
+      success: true,
+      data: {
+        accessToken: result.access_token,
+        refreshToken: result.refresh_token,
+        user: result.user,
+      },
+    });
+  } catch (error) {
+    handleAuthenError(res, error);
+  }
+});
+
+// ============================================================
+// Token 刷新路由
+// ============================================================
 router.post('/refresh', async (req, res) => {
+  if (isAuthenEnabled()) {
+    try {
+      const result = await authenClient.refreshToken(req.body);
+      return res.json({
+        success: true,
+        data: {
+          accessToken: result.access_token,
+          refreshToken: result.refresh_token,
+        },
+      });
+    } catch (error) {
+      return handleAuthenError(res, error);
+    }
+  }
+
+  // 本地模式
   try {
     const { refresh_token } = req.body;
     
@@ -154,7 +267,7 @@ router.post('/refresh', async (req, res) => {
       });
     }
     
-    const result = await refreshToken(refresh_token);
+    const result = await localRefreshToken(refresh_token);
     
     res.json({
       success: true,
@@ -174,6 +287,9 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+// ============================================================
+// 登出路由（保留本地模式）
+// ============================================================
 router.post('/logout', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -201,7 +317,21 @@ router.post('/logout', async (req, res) => {
   }
 });
 
+// ============================================================
+// 获取当前用户信息
+// ============================================================
 router.get('/me', authMiddleware, async (req, res) => {
+  if (isAuthenEnabled()) {
+    try {
+      const token = extractBearerToken(req);
+      const result = await authenClient.getUser(req.userId, token);
+      return res.json({ success: true, data: result });
+    } catch (error) {
+      return handleAuthenError(res, error);
+    }
+  }
+
+  // 本地模式
   try {
     const userId = req.userId;
     
@@ -247,6 +377,45 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// ============================================================
+// 获取当前用户角色列表
+// ============================================================
+router.get('/me/roles', authMiddleware, async (req, res) => {
+  if (!isAuthenEnabled()) {
+    return res.status(404).json({ success: false, error: '该功能未启用' });
+  }
+  try {
+    const token = extractBearerToken(req);
+    const result = await authenClient.getUserRoles(req.userId, token);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleAuthenError(res, error);
+  }
+});
+
+// ============================================================
+// 权限检查
+// ============================================================
+router.get('/me/permissions/check', authMiddleware, async (req, res) => {
+  if (!isAuthenEnabled()) {
+    return res.status(404).json({ success: false, error: '该功能未启用' });
+  }
+  try {
+    const { permission } = req.query;
+    if (!permission) {
+      return res.status(400).json({ success: false, error: '请提供 permission 查询参数' });
+    }
+    const token = extractBearerToken(req);
+    const result = await authenClient.checkPermission(req.userId, permission, token);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleAuthenError(res, error);
+  }
+});
+
+// ============================================================
+// 头像上传（保留原有逻辑）
+// ============================================================
 router.post('/avatar', upload.single('avatar'), async (req, res) => {
   try {
     console.log('头像上传请求开始');

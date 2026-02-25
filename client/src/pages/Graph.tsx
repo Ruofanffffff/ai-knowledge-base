@@ -10,16 +10,23 @@ interface Document {
   title: string;
 }
 
-// 实体类型颜色方案
+// 实体类型颜色方案（匹配后端 Entity_Type 枚举 + 旧类型兼容）
 const ENTITY_COLORS: Record<string, { fill: string; stroke: string; bg: string; label: string }> = {
-  technology: { fill: '#6366f1', stroke: '#4f46e5', bg: 'rgba(99,102,241,0.12)', label: '技术/工具' },
-  concept:    { fill: '#8b5cf6', stroke: '#7c3aed', bg: 'rgba(139,92,246,0.12)', label: '概念/理论' },
-  person:     { fill: '#f59e0b', stroke: '#d97706', bg: 'rgba(245,158,11,0.12)', label: '人物/组织' },
-  action:     { fill: '#10b981', stroke: '#059669', bg: 'rgba(16,185,129,0.12)', label: '方法/行为' },
-  target:     { fill: '#ef4444', stroke: '#dc2626', bg: 'rgba(239,68,68,0.12)',  label: '目标/成果' },
-  domain:     { fill: '#3b82f6', stroke: '#2563eb', bg: 'rgba(59,130,246,0.12)', label: '领域/场景' },
-  data:       { fill: '#14b8a6', stroke: '#0d9488', bg: 'rgba(20,184,166,0.12)', label: '数据/资源' },
-  default:    { fill: '#64748b', stroke: '#475569', bg: 'rgba(100,116,139,0.12)', label: '其他' },
+  // 后端 Entity_Type 枚举（优先）
+  concept:    { fill: '#8b5cf6', stroke: '#7c3aed', bg: 'rgba(139, 92, 246, 0.1)', label: '概念/理论' },
+  object:     { fill: '#6366f1', stroke: '#4f46e5', bg: 'rgba(99, 102, 241, 0.1)', label: '对象/产品' },
+  process:    { fill: '#10b981', stroke: '#059669', bg: 'rgba(16, 185, 129, 0.1)', label: '流程/方法' },
+  role:       { fill: '#f59e0b', stroke: '#d97706', bg: 'rgba(245, 158, 11, 0.1)', label: '人物/角色' },
+  rule:       { fill: '#ef4444', stroke: '#dc2626', bg: 'rgba(239, 68, 68, 0.1)',  label: '规则/规范' },
+  tool:       { fill: '#3b82f6', stroke: '#2563eb', bg: 'rgba(59, 130, 246, 0.1)', label: '工具/技术' },
+  target:     { fill: '#f97316', stroke: '#ea580c', bg: 'rgba(249, 115, 22, 0.1)', label: '目标/成果' },
+  data:       { fill: '#14b8a6', stroke: '#0d9488', bg: 'rgba(20, 184, 166, 0.1)', label: '数据/资源' },
+  // 旧 inferEntityType 兼容映射
+  technology: { fill: '#6366f1', stroke: '#4f46e5', bg: 'rgba(99, 102, 241, 0.12)', label: '技术/工具' },
+  person:     { fill: '#f59e0b', stroke: '#d97706', bg: 'rgba(245, 158, 11, 0.12)', label: '人物/组织' },
+  action:     { fill: '#10b981', stroke: '#059669', bg: 'rgba(16, 185, 129, 0.12)', label: '方法/行为' },
+  domain:     { fill: '#3b82f6', stroke: '#2563eb', bg: 'rgba(59, 130, 246, 0.12)', label: '领域/场景' },
+  default:    { fill: '#64748b', stroke: '#475569', bg: 'rgba(100, 116, 139, 0.1)', label: '其他' },
 };
 
 // 根据实体描述推断类型
@@ -207,7 +214,7 @@ export function Graph() {
     const posMap = new Map(layoutNodes.map(n => [n.id, { x: n.x, y: n.y, r: n.r }]));
     const newNodes = graphData.nodes.map(node => {
       const pos = posMap.get(node.id)!;
-      const entityType = inferEntityType(node.label, node.description);
+      const entityType = node.entityType || inferEntityType(node.label, node.description);
       const colorScheme = ENTITY_COLORS[entityType] || ENTITY_COLORS.default;
       return { ...node, x: pos.x, y: pos.y, color: colorScheme.fill };
     });
@@ -227,7 +234,7 @@ export function Graph() {
     return graphNodes.map(node => {
       const count = degree[node.id] || 0;
       const r = 20 + count * 6;
-      const entityType = inferEntityType(node.label, node.description);
+      const entityType = node.entityType || inferEntityType(node.label, node.description);
       const colorScheme = ENTITY_COLORS[entityType] || ENTITY_COLORS.default;
       const label = node.label.length > 8 ? node.label.substring(0, 8) + '…' : node.label;
       return { ...node, r, degree: count, entityType, colorScheme, displayLabel: label, fullLabel: node.label };
@@ -437,6 +444,12 @@ export function Graph() {
                  const isHighlighted = hoveredNode && (hoveredNode === source.id || hoveredNode === target.id);
                  const isDimmed = hoveredNode && !isHighlighted;
                  const isSearchDimmed = matchedNodeIds && !matchedNodeIds.has(source.id) && !matchedNodeIds.has(target.id);
+
+                 // Task 10.2 & 10.5: layer-based line style (why=dashed, how/missing=solid)
+                 const layer = link.layer || 'how';
+                 const layerDash = layer === 'why' ? '6 3' : undefined;
+                 // Task 10.5: source fallback to "fact"
+                 const linkSourceTag = link.linkSource || 'fact';
                  
                  return (
                     <g key={i} opacity={isDimmed || isSearchDimmed ? 0.1 : 1} style={{ transition: 'opacity 0.3s' }}>
@@ -444,12 +457,22 @@ export function Graph() {
                         x1={sx} y1={sy} x2={tx} y2={ty}
                         stroke={isHighlighted ? '#94a3b8' : '#e2e8f0'}
                         strokeWidth={isHighlighted ? 2 : 1.2}
-                        strokeDasharray={isHighlighted ? undefined : '4 2'}
+                        strokeDasharray={layerDash}
                       />
                       <rect x={midX - 18} y={midY - 9} width="36" height="18" rx="9" fill="white" stroke="#e2e8f0" strokeWidth="0.5" />
                       <text x={midX} y={midY + 4} textAnchor="middle" fontSize="9" fill="#94a3b8" className="pointer-events-none select-none">
                         {link.name}
                       </text>
+                      {/* Task 10.3: source tag indicator on edge */}
+                      {linkSourceTag !== 'fact' && (
+                        <circle
+                          cx={midX + 22}
+                          cy={midY}
+                          r="3"
+                          fill={linkSourceTag === 'inferred' ? '#f59e0b' : '#8b5cf6'}
+                          opacity={0.7}
+                        />
+                      )}
                     </g>
                  );
               })}
@@ -480,14 +503,14 @@ export function Graph() {
                        <motion.circle
                          cx={nx} cy={ny}
                          fill={`url(#grad-${node.entityType})`}
-                         initial={{ r: node.r + 4 }}
-                         animate={{ r: [node.r + 4, node.r + 12, node.r + 4], opacity: [0.6, 0.2, 0.6] }}
+                         initial={{ r: (node.r || 20) + 4 }}
+                         animate={{ r: [(node.r || 20) + 4, (node.r || 20) + 12, (node.r || 20) + 4], opacity: [0.6, 0.2, 0.6] }}
                          transition={{ repeat: Infinity, duration: breathDuration, delay: breathDelay, ease: "easeInOut" }}
                        />
 
                        {/* 外圈 */}
                        <motion.circle 
-                          cx={nx} cy={ny} r={node.r} 
+                          cx={nx} cy={ny} r={node.r || 20} 
                           fill={node.colorScheme.bg}
                           stroke={node.colorScheme.stroke}
                           strokeWidth={isHovered ? 2.5 : 1.5}
@@ -500,15 +523,15 @@ export function Graph() {
                        {/* 内核 */}
                        <motion.circle 
                           cx={nx} cy={ny}
-                          r={Math.max(3, node.r * 0.35)}
+                          r={Math.max(3, (node.r || 20) * 0.35)}
                           fill={node.colorScheme.fill}
-                          animate={{ r: [Math.max(3, node.r * 0.35), Math.max(4, node.r * 0.42), Math.max(3, node.r * 0.35)] }}
+                          animate={{ r: [Math.max(3, (node.r || 20) * 0.35), Math.max(4, (node.r || 20) * 0.42), Math.max(3, (node.r || 20) * 0.35)] }}
                           transition={{ repeat: Infinity, duration: breathDuration, delay: breathDelay, ease: "easeInOut" }}
                        />
                        
                        {/* 标签 */}
                        <text 
-                          x={nx} y={ny + node.r + 16} 
+                          x={nx} y={ny + (node.r || 20) + 16} 
                           textAnchor="middle" 
                           fill={isHovered ? node.colorScheme.stroke : '#64748b'}
                           fontSize={isHovered ? 13 : 11}
@@ -547,6 +570,40 @@ export function Graph() {
                 <span className="text-[10px] text-slate-400 whitespace-nowrap">{t.label}</span>
               </div>
             ))}
+
+            {/* 分隔线 */}
+            <div className="border-t border-slate-200/50 my-0.5" />
+
+            {/* Layer 图例 */}
+            <div className="flex items-center gap-1.5">
+              <svg width="14" height="6" className="shrink-0">
+                <line x1="0" y1="3" x2="14" y2="3" stroke="#94a3b8" strokeWidth="1.2" />
+              </svg>
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">how 结构层</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <svg width="14" height="6" className="shrink-0">
+                <line x1="0" y1="3" x2="14" y2="3" stroke="#94a3b8" strokeWidth="1.2" strokeDasharray="3 1.5" />
+              </svg>
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">why 因果层</span>
+            </div>
+
+            {/* 分隔线 */}
+            <div className="border-t border-slate-200/50 my-0.5" />
+
+            {/* Source 图例 */}
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: '#10b981' }} />
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">fact 事实</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: '#f59e0b' }} />
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">inferred 推断</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: '#8b5cf6' }} />
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">pattern 模式</span>
+            </div>
           </div>
         </div>
       )}
@@ -588,6 +645,19 @@ export function Graph() {
                     </span>
                     <span className="text-[9px] text-slate-400">
                       {node.degree} 连接
+                    </span>
+                  </div>
+
+                  {/* entityType 标签 */}
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: node.colorScheme.bg, color: accent }}>
+                      {node.entityType}
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{
+                      background: (node.source || 'fact') === 'fact' ? 'rgba(16,185,129,0.1)' : (node.source || 'fact') === 'inferred' ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)',
+                      color: (node.source || 'fact') === 'fact' ? '#059669' : (node.source || 'fact') === 'inferred' ? '#d97706' : '#7c3aed',
+                    }}>
+                      {(node.source || 'fact') === 'fact' ? '📄 事实' : (node.source || 'fact') === 'inferred' ? '💡 推断' : '🔗 模式'}
                     </span>
                   </div>
 

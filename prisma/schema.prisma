@@ -238,7 +238,9 @@ model DocEntity {
   id          String   @id @default(uuid())
   docId       String   @map("doc_id")
   cleanedName String   @map("cleaned_name")      // ≤6个字
-  description String                              // ≤20个字
+  description String                              // ≤30个字
+  entityType  String   @default("concept") @map("entity_type")  // Entity_Type 枚举值
+  source      String   @default("fact")                          // Source_Tag
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -256,13 +258,15 @@ model DocRelation {
   docId          String   @map("doc_id")
   cleanedName    String   @map("cleaned_name")        // ≤4个字
   description    String                                // ≤20个字
+  layer          String   @default("how")              // "how" | "why"
+  source         String   @default("fact")             // Source_Tag
   sourceEntityId String   @map("source_entity_id")
   targetEntityId String   @map("target_entity_id")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  source DocEntity @relation("DocSourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
-  target DocEntity @relation("DocTargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
+  sourceEntity DocEntity @relation("DocSourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
+  targetEntity DocEntity @relation("DocTargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
 
   @@map("doc_relations")
   @@index([docId])
@@ -270,11 +274,28 @@ model DocRelation {
   @@index([targetEntityId])
 }
 
+// 分文章原则表 — So What 层提取的原则和模式
+model DocPrinciple {
+  id               String   @id @default(uuid())
+  docId            String   @map("doc_id")
+  name             String                              // ≤8个字
+  description      String                              // ≤40个字
+  relatedEntityIds String   @map("related_entity_ids") // JSON string: DocEntity ID 列表
+  source           String   @default("pattern")        // Source_Tag
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("doc_principles")
+  @@index([docId])
+}
+
 // 统一实体表 — 语义归纳后的上层概念实体
 model UnifiedEntity {
   id                 String   @id @default(uuid())
   cleanedName        String   @map("cleaned_name")           // ≤6个字
   description        String                                   // ≤20个字，包含目录和总结
+  entityType         String   @default("concept") @map("entity_type")  // 新增：Entity_Type 枚举值
+  source             String   @default("fact")                          // 新增：Source_Tag
   sourceDocEntityIds String   @map("source_doc_entity_ids")  // JSON: 关联的 DocEntity ID 列表
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
@@ -291,35 +312,68 @@ model UnifiedRelation {
   id                    String   @id @default(uuid())
   cleanedName           String   @map("cleaned_name")              // ≤4个字
   description           String                                      // ≤20个字
+  layer                 String   @default("how")                    // 新增："how" | "why"
+  source                String   @default("fact")                   // 新增：Source_Tag
   sourceEntityId        String   @map("source_entity_id")
   targetEntityId        String   @map("target_entity_id")
   sourceDocRelationIds  String   @map("source_doc_relation_ids")   // JSON: 关联的 DocRelation ID 列表
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
-  source UnifiedEntity @relation("UnifiedSourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
-  target UnifiedEntity @relation("UnifiedTargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
+  sourceEntity UnifiedEntity @relation("UnifiedSourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
+  targetEntity UnifiedEntity @relation("UnifiedTargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
 
   @@map("unified_relations")
   @@index([sourceEntityId])
   @@index([targetEntityId])
 }
 
+// 统一原则表 — 语义归纳后的上层原则和模式
+model UnifiedPrinciple {
+  id                     String   @id @default(uuid())
+  name                   String                                        // ≤8个字
+  description            String                                        // ≤40个字
+  source                 String   @default("pattern")                  // Source_Tag
+  sourceDocPrincipleIds  String   @map("source_doc_principle_ids")    // JSON string
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("unified_principles")
+}
+
 // 统一归纳日志表 — 记录每次统一归纳的执行状态
 model UnificationLog {
-  id            String    @id @default(uuid())
-  status        String                              // 'running' | 'completed' | 'failed'
-  entityCount   Int       @default(0) @map("entity_count")
-  relationCount Int       @default(0) @map("relation_count")
-  triggeredBy   String    @map("triggered_by")      // 'scheduler' | 'manual'
-  error         String?
-  startedAt     DateTime  @default(now()) @map("started_at")
-  completedAt   DateTime? @map("completed_at")
+  id             String    @id @default(uuid())
+  status         String                              // 'running' | 'completed' | 'failed'
+  entityCount    Int       @default(0) @map("entity_count")
+  relationCount  Int       @default(0) @map("relation_count")
+  principleCount Int       @default(0) @map("principle_count")  // 新增
+  triggeredBy    String    @map("triggered_by")      // 'scheduler' | 'manual'
+  error          String?
+  startedAt      DateTime  @default(now()) @map("started_at")
+  completedAt    DateTime? @map("completed_at")
 
   @@map("unification_logs")
   @@index([startedAt])
 }
 
+
+// ============================================
+// AI Insights Persistence (AI 洞察持久化)
+// ============================================
+
+model DocumentInsight {
+  id         String   @id @default(uuid())
+  docId      String   @unique @map("doc_id")
+  concepts   String   // JSON string
+  references String   // JSON string
+  summary    String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("document_insights")
+  @@index([docId])
+}
 
 // ============================================
 // Image Analysis Models (图片 AI 识别)

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, Mic, Bot, User, FileText, Sparkles, Clock, Link, Database, Plus, Trash2, MessageSquare, ChevronDown, ChevronRight, ChevronUp, BarChart3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import apiClient from '../api/client';
+import { getAccessToken } from '../utils/storage';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -414,7 +415,7 @@ export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingS
       let currentMessages = [...updatedMessages, initialAssistantMsg];
       setMessages(currentMessages);
 
-      const token = localStorage.getItem('auth_token');
+      const token = getAccessToken();
       const response = await fetch(`${API_BASE_URL}/ai/search`, {
         method: 'POST',
         headers: {

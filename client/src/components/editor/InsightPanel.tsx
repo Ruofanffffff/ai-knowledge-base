@@ -5,6 +5,8 @@ import { RefreshCw, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-rea
 
 interface InsightPanelProps {
   editor: Editor | null;
+  documentId?: string;
+  onInsightsChange?: (insights: InsightsData | null) => void;
 }
 
 /**
@@ -182,8 +184,13 @@ function SummaryCard({ summary }: { summary: string }) {
   );
 }
 
-export function InsightPanel({ editor }: InsightPanelProps) {
-  const { insights, loading, error, retry } = useAIInsights({ editor });
+export function InsightPanel({ editor, documentId, onInsightsChange }: InsightPanelProps) {
+  const { insights, loading, error, retry } = useAIInsights({ editor, documentId });
+
+  // Notify parent whenever insights change
+  useEffect(() => {
+    onInsightsChange?.(insights);
+  }, [insights, onInsightsChange]);
 
   const hasInsights = insights && (
     insights.concepts.length > 0 ||

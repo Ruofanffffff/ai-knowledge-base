@@ -16,6 +16,7 @@ describe('KGPipelineService - DocGraph Persistence', () => {
     // Clean up test data
     await prisma.docRelation.deleteMany();
     await prisma.docEntity.deleteMany();
+    await prisma.docPrinciple.deleteMany();
     await prisma.documentIndex.deleteMany();
   });
 
@@ -27,14 +28,14 @@ describe('KGPipelineService - DocGraph Persistence', () => {
     it('should save entities and relations to DocEntity/DocRelation tables with docId', async () => {
       const docId = 'test-doc-001';
       const entities = [
-        { name: '实体A', description: '这是实体A的描述' },
-        { name: '实体B', description: '这是实体B的描述' },
+        { name: '实体A', definition: '这是实体A的描述', type: 'concept', source: 'fact' },
+        { name: '实体B', definition: '这是实体B的描述', type: 'concept', source: 'fact' },
       ];
       const relations = [
-        { source: '实体A', target: '实体B', name: '关联', description: '实体A关联实体B' },
+        { source: '实体A', target: '实体B', name: '关联', description: '实体A关联实体B', layer: 'how', source_tag: 'fact' },
       ];
 
-      await service.persistToDatabase(entities, relations, docId);
+      await service.persistToDatabase({ entities, relations, principles: [] }, docId);
 
       // Verify entities were saved
       const savedEntities = await prisma.docEntity.findMany({ where: { docId } });
@@ -57,9 +58,9 @@ describe('KGPipelineService - DocGraph Persistence', () => {
       const docId = 'test-doc-002';
       
       // First save
-      const entities1 = [{ name: '旧实体', description: '旧描述' }];
+      const entities1 = [{ name: '旧实体', definition: '旧描述', type: 'concept', source: 'fact' }];
       const relations1 = [];
-      await service.persistToDatabase(entities1, relations1, docId);
+      await service.persistToDatabase({ entities: entities1, relations: relations1, principles: [] }, docId);
 
       // Verify first save
       let savedEntities = await prisma.docEntity.findMany({ where: { docId } });
@@ -67,9 +68,9 @@ describe('KGPipelineService - DocGraph Persistence', () => {
       expect(savedEntities[0].cleanedName).toBe('旧实体');
 
       // Second save with different data
-      const entities2 = [{ name: '新实体', description: '新描述' }];
+      const entities2 = [{ name: '新实体', definition: '新描述', type: 'concept', source: 'fact' }];
       const relations2 = [];
-      await service.persistToDatabase(entities2, relations2, docId);
+      await service.persistToDatabase({ entities: entities2, relations: relations2, principles: [] }, docId);
 
       // Verify old data was deleted and new data was saved
       savedEntities = await prisma.docEntity.findMany({ where: { docId } });
@@ -93,9 +94,9 @@ describe('KGPipelineService - DocGraph Persistence', () => {
       const beforeTime = new Date();
       
       // Save entities/relations
-      const entities = [{ name: '测试', description: '测试描述' }];
+      const entities = [{ name: '测试', definition: '测试描述', type: 'concept', source: 'fact' }];
       const relations = [];
-      await service.persistToDatabase(entities, relations, docId);
+      await service.persistToDatabase({ entities, relations, principles: [] }, docId);
 
       const afterTime = new Date();
 
@@ -116,12 +117,12 @@ describe('KGPipelineService - DocGraph Persistence', () => {
       const docId2 = 'test-doc-005';
 
       // Save data for doc1
-      const entities1 = [{ name: '文档1', description: '文档1的实体' }];
-      await service.persistToDatabase(entities1, [], docId1);
+      const entities1 = [{ name: '文档1', definition: '文档1的实体', type: 'concept', source: 'fact' }];
+      await service.persistToDatabase({ entities: entities1, relations: [], principles: [] }, docId1);
 
       // Save data for doc2
-      const entities2 = [{ name: '文档2', description: '文档2的实体' }];
-      await service.persistToDatabase(entities2, [], docId2);
+      const entities2 = [{ name: '文档2', definition: '文档2的实体', type: 'concept', source: 'fact' }];
+      await service.persistToDatabase({ entities: entities2, relations: [], principles: [] }, docId2);
 
       // Verify isolation
       const doc1Entities = await prisma.docEntity.findMany({ where: { docId: docId1 } });

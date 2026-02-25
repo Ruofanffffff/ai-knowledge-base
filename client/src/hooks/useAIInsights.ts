@@ -19,6 +19,7 @@ export interface InsightsData {
 
 export interface UseAIInsightsOptions {
   editor: Editor | null;
+  documentId?: string;
   enabled?: boolean;
   interval?: number;
   initialDelay?: number;
@@ -99,6 +100,7 @@ function mergeInsights(
 export function useAIInsights(options: UseAIInsightsOptions): UseAIInsightsReturn {
   const {
     editor,
+    documentId,
     enabled = true,
     interval = 60000,
     initialDelay = 5000,
@@ -115,6 +117,42 @@ export function useAIInsights(options: UseAIInsightsOptions): UseAIInsightsRetur
   const consecutiveFailuresRef = useRef(0);
   const pausedRef = useRef(false);
   const mountedRef = useRef(true);
+  const loadedDocIdRef = useRef<string | undefined>(undefined);
+
+  /**
+   * Load saved insights from backend on mount (if documentId provided).
+   */
+  useEffect(() => {
+    if (!documentId || loadedDocIdRef.current === documentId) return;
+    loadedDocIdRef.current = documentId;
+
+    (async () => {
+      try {
+        const response = await apiClient.get(`/ai/insights/${documentId}`);
+        if (response.data?.success && response.data.data && mountedRef.current) {
+          setInsights(response.data.data);
+        }
+      } catch {
+        // Silently ignore — will generate fresh insights
+      }
+    })();
+  }, [documentId]);
+
+  /**
+   * Save insights to backend whenever they change (if documentId provided).
+   */
+  const saveInsights = useCallback(async (data: InsightsData) => {
+    if (!documentId || !data || data.message) return;
+    try {
+      await apiClient.put(`/ai/insights/${documentId}`, {
+        concepts: data.concepts,
+        references: data.references,
+        summary: data.summary,
+      });
+    } catch {
+      // Silently ignore save errors — insights are still in memory
+    }
+  }, [documentId]);
 
   /**
    * Fetch insights from the backend API.
@@ -157,6 +195,7 @@ export function useAIInsights(options: UseAIInsightsOptions): UseAIInsightsRetur
         const mode = data.mode || 'full';
         const merged = mergeInsights(insights, data.data, mode);
         setInsights(merged);
+        saveInsights(merged);
         lastTextRef.current = text;
         consecutiveFailuresRef.current = 0;
       }
@@ -180,7 +219,7 @@ export function useAIInsights(options: UseAIInsightsOptions): UseAIInsightsRetur
         setLoading(false);
       }
     }
-  }, [editor, enabled, insights]);
+  }, [editor, enabled, insights, saveInsights]);
 
   const stopPolling = useCallback(() => {
     if (intervalRef.current) {

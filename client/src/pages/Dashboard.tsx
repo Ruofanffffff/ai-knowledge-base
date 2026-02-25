@@ -6,6 +6,7 @@ import { AISearch } from './AISearch';
 import { useAuth } from '../contexts/AuthContext';
 import { useDocuments } from '../hooks/useDocuments';
 import { formatTimeAgo, getAvatarUrl } from '../utils/transformers';
+import { getAccessToken } from '../utils/storage';
 import DocumentIndexDrawer from '../components/DocumentIndexDrawer';
 
 interface DashboardProps {
@@ -85,7 +86,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         
         const response = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || '/api'}/kg/graph`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
+            'Authorization': `Bearer ${getAccessToken() || ''}`,
           },
         });
         const data = await response.json();

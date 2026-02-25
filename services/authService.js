@@ -2,12 +2,39 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { initDatabase } = require('../database/initUserDB');
+const authenClient = require('./authenClient');
 
 const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('JWT_SECRET is required in production'); })() : 'your-secret-key-change-in-production');
 const JWT_EXPIRES_IN = '7d';
 const REFRESH_TOKEN_EXPIRES_IN = '30d';
 
 let db;
+
+// --- Authen integration helpers ---
+
+/**
+ * Check if Authen mode is enabled by verifying AUTHEN_APP_ID is configured.
+ */
+function isAuthenEnabled() {
+  return !!(process.env.AUTHEN_APP_ID && process.env.AUTHEN_APP_ID.trim());
+}
+
+/**
+ * Extract Bearer token from the Authorization header.
+ * Returns the token string or null if not present/invalid format.
+ */
+function extractBearerToken(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  return authHeader.substring(7);
+}
+
+// Output warning at startup if Authen is not configured
+if (!isAuthenEnabled()) {
+  console.warn('[WARN] AUTHEN_APP_ID not configured, falling back to local auth mode');
+}
 
 function initAuthService() {
   db = initDatabase();
@@ -217,7 +244,7 @@ async function logoutUser(accessToken) {
   });
 }
 
-function authMiddleware(req, res, next) {
+function legacyAuthMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -253,6 +280,61 @@ function authMiddleware(req, res, next) {
   });
 }
 
+/**
+ * Authen-aware auth middleware.
+ * When Authen is enabled: extracts Bearer token, verifies JWT locally with
+ * AUTHEN_JWT_SECRET (HS256), and injects req.user + req.userId.
+ * When Authen is not enabled: falls back to legacy local auth middleware.
+ */
+function authMiddleware(req, res, next) {
+  if (!isAuthenEnabled()) {
+    return legacyAuthMiddleware(req, res, next);
+  }
+
+  const token = extractBearerToken(req);
+  if (!token) {
+    return res.status(401).json({ error: '未提供认证令牌' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.AUTHEN_JWT_SECRET, { algorithms: ['HS256'] });
+
+    // Inject req.user compatible with existing format (id, username, email, role)
+    req.user = {
+      id: decoded.sub,
+      username: decoded.username || '',
+      email: decoded.email || '',
+      role: decoded.role || 'user',
+      app_id: decoded.app_id,
+    };
+    req.userId = decoded.sub;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: '认证令牌无效或已过期' });
+  }
+}
+
+/**
+ * Factory function that returns an Express middleware to check if the
+ * authenticated user has the specified permission via Authen Gateway.
+ *
+ * @param {string} permissionCode - The permission code to check
+ * @returns {Function} Express middleware (req, res, next)
+ */
+function requirePermission(permissionCode) {
+  return async (req, res, next) => {
+    try {
+      const result = await authenClient.checkPermission(
+        req.userId, permissionCode, extractBearerToken(req)
+      );
+      if (result.has_permission) return next();
+      return res.status(403).json({ error: '权限不足' });
+    } catch (err) {
+      return res.status(503).json({ error: '认证服务暂时不可用' });
+    }
+  };
+}
+
 function adminMiddleware(req, res, next) {
   authMiddleware(req, res, (err) => {
     if (err) return;
@@ -283,7 +365,10 @@ module.exports = {
   logoutUser,
   authMiddleware,
   adminMiddleware,
+  requirePermission,
   hashPassword,
   verifyPassword,
-  generateTokens
+  generateTokens,
+  isAuthenEnabled,
+  extractBearerToken,
 };

@@ -565,6 +565,13 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     // Keep editorRef in sync
     editorRef.current = editor;
 
+    // Sync editable prop changes to the editor instance
+    useEffect(() => {
+      if (editor && editor.isEditable !== editable) {
+        editor.setEditable(editable);
+      }
+    }, [editor, editable]);
+
     // Track selection changes for right-click fallback
     useEffect(() => {
       if (!editor) return;

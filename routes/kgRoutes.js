@@ -12,7 +12,7 @@ const { pipelineStatus, prisma } = require('../services/kgPipelineService');
 const unificationService = require('../services/unificationService');
 
 // 正在执行中的Pipeline状态（收到重复请求时应拒绝）
-const ACTIVE_STATUSES = ['pending', 'indexing', 'extracting_entities', 'extracting_relations', 'merging', 'saving'];
+const ACTIVE_STATUSES = ['pending', 'indexing', 'extracting_four_layers', 'merging', 'saving'];
 
 /**
  * POST /api/kg/build
@@ -74,6 +74,7 @@ router.get('/graph', authMiddleware, async (req, res) => {
   try {
     const entities = await prisma.unifiedEntity.findMany();
     const relations = await prisma.unifiedRelation.findMany();
+    const principles = await prisma.unifiedPrinciple.findMany();
 
     res.json({
       success: true,
@@ -81,14 +82,24 @@ router.get('/graph', authMiddleware, async (req, res) => {
         entities: entities.map(e => ({
           id: e.id,
           name: e.cleanedName,
-          description: e.description
+          description: e.description,
+          entityType: e.entityType,
+          source: e.source
         })),
         relations: relations.map(r => ({
           id: r.id,
           source: r.sourceEntityId,
           target: r.targetEntityId,
           name: r.cleanedName,
-          description: r.description
+          description: r.description,
+          layer: r.layer,
+          source: r.source
+        })),
+        principles: principles.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          source: p.source
         }))
       }
     });
@@ -118,7 +129,8 @@ router.get('/status/:docId', authMiddleware, async (req, res) => {
           docId,
           status: 'idle',
           entityCount: 0,
-          relationCount: 0
+          relationCount: 0,
+          principleCount: 0
         }
       });
     }
@@ -129,7 +141,8 @@ router.get('/status/:docId', authMiddleware, async (req, res) => {
         docId: status.docId,
         status: status.status,
         entityCount: status.entityCount || 0,
-        relationCount: status.relationCount || 0
+        relationCount: status.relationCount || 0,
+        principleCount: status.principleCount || 0
       }
     });
   } catch (error) {
@@ -149,6 +162,7 @@ router.get('/unified/graph', authMiddleware, async (req, res) => {
   try {
     const entities = await prisma.unifiedEntity.findMany();
     const relations = await prisma.unifiedRelation.findMany();
+    const principles = await prisma.unifiedPrinciple.findMany();
 
     res.json({
       success: true,
@@ -156,14 +170,24 @@ router.get('/unified/graph', authMiddleware, async (req, res) => {
         entities: entities.map(e => ({
           id: e.id,
           name: e.cleanedName,
-          description: e.description
+          description: e.description,
+          entityType: e.entityType,
+          source: e.source
         })),
         relations: relations.map(r => ({
           id: r.id,
           source: r.sourceEntityId,
           target: r.targetEntityId,
           name: r.cleanedName,
-          description: r.description
+          description: r.description,
+          layer: r.layer,
+          source: r.source
+        })),
+        principles: principles.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          source: p.source
         }))
       }
     });
@@ -192,6 +216,10 @@ router.get('/doc/:docId/graph', authMiddleware, async (req, res) => {
       where: { docId }
     });
 
+    const principles = await prisma.docPrinciple.findMany({
+      where: { docId }
+    });
+
     res.json({
       success: true,
       data: {
@@ -199,14 +227,25 @@ router.get('/doc/:docId/graph', authMiddleware, async (req, res) => {
         entities: entities.map(e => ({
           id: e.id,
           name: e.cleanedName,
-          description: e.description
+          description: e.description,
+          entityType: e.entityType,
+          source: e.source
         })),
         relations: relations.map(r => ({
           id: r.id,
           source: r.sourceEntityId,
           target: r.targetEntityId,
           name: r.cleanedName,
-          description: r.description
+          description: r.description,
+          layer: r.layer,
+          source: r.source
+        })),
+        principles: principles.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          relatedEntityIds: p.relatedEntityIds,
+          source: p.source
         }))
       }
     });
@@ -285,6 +324,7 @@ router.get('/unified/status', authMiddleware, async (req, res) => {
         status: latestLog.status,
         entityCount: latestLog.entityCount,
         relationCount: latestLog.relationCount,
+        principleCount: latestLog.principleCount || 0,
         triggeredBy: latestLog.triggeredBy,
         startedAt: latestLog.startedAt,
         completedAt: latestLog.completedAt,

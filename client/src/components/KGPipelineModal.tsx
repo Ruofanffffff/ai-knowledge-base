@@ -12,6 +12,7 @@ interface KGPipelineModalProps {
 type PipelineStage = 'idle' | 'pending' | 'indexing' | 'extracting_entities' | 'extracting_relations' | 'merging' | 'saving' | 'completed' | 'failed';
 
 const STAGE_LABELS: Record<string, string> = {
+  idle: '等待构建',
   pending: '准备中',
   indexing: '文档索引',
   extracting_entities: '实体抽取',

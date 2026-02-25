@@ -37,6 +37,8 @@ export function useGraph(): UseGraphReturn {
         id: entity.id,
         label: entity.name || 'Unknown',
         description: entity.description || '',
+        entityType: entity.entityType || undefined,
+        source: entity.source || undefined,
         x: Math.random() * 600 + 100,
         y: Math.random() * 400 + 100,
         color: DEFAULT_NODE_COLOR,
@@ -48,6 +50,8 @@ export function useGraph(): UseGraphReturn {
         target: relation.target,
         name: relation.name || '',
         description: relation.description || '',
+        layer: relation.layer || undefined,
+        linkSource: relation.source_tag || relation.linkSource || undefined,
       }));
 
       setGraphData({ nodes, links });
@@ -69,6 +73,8 @@ export function useGraph(): UseGraphReturn {
         id: entity.id,
         label: entity.name || 'Unknown',
         description: entity.description || '',
+        entityType: entity.entityType || undefined,
+        source: entity.source || undefined,
         x: Math.random() * 600 + 100,
         y: Math.random() * 400 + 100,
         color: DEFAULT_NODE_COLOR,
@@ -80,6 +86,8 @@ export function useGraph(): UseGraphReturn {
         target: relation.target,
         name: relation.name || '',
         description: relation.description || '',
+        layer: relation.layer || undefined,
+        linkSource: relation.source_tag || relation.linkSource || undefined,
       }));
 
       setGraphData({ nodes, links });
@@ -101,6 +109,8 @@ export function useGraph(): UseGraphReturn {
         id: entity.id,
         label: entity.name || 'Unknown',
         description: entity.description || '',
+        entityType: entity.entityType || undefined,
+        source: entity.source || undefined,
         x: Math.random() * 600 + 100,
         y: Math.random() * 400 + 100,
         color: DEFAULT_NODE_COLOR,
@@ -112,6 +122,8 @@ export function useGraph(): UseGraphReturn {
         target: relation.target,
         name: relation.name || '',
         description: relation.description || '',
+        layer: relation.layer || undefined,
+        linkSource: relation.source_tag || relation.linkSource || undefined,
       }));
 
       setGraphData({ nodes, links });

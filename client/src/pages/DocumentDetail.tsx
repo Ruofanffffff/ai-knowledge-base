@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Download, Edit, Trash2, Brain, XCircle, RefreshCw, FileText, Tag, Lightbulb, Target, BarChart3, Sparkles, BookOpen, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import { Editor } from '@tiptap/react';
 import apiClient from '../api/client';
-import RichTextEditor from '../components/editor/RichTextEditor';
+import RichTextEditor, { RichTextEditorHandle } from '../components/editor/RichTextEditor';
+import { InsightPanel } from '../components/editor/InsightPanel';
 
 interface Summary {
   id: string;
@@ -214,6 +216,7 @@ export default function DocumentDetail() {
         const parsed = JSON.parse(latest.content);
         if (parsed && parsed.documentType) {
           setStructuredData(parsed);
+          setShowChatPanel(true);
         }
       } catch { /* 旧格式，忽略 */ }
     }
@@ -235,6 +238,8 @@ export default function DocumentDetail() {
   const [editContent, setEditContent] = useState('');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const richEditorRef = useRef<RichTextEditorHandle>(null);
+  const [tiptapEditor, setTiptapEditor] = useState<Editor | null>(null);
   const contentRef = React.useRef(editContent);
   const isEditingRef = React.useRef(isEditing);
   const documentRef = React.useRef(document);
@@ -245,6 +250,19 @@ export default function DocumentDetail() {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
+
+  // Extract tiptap editor instance from ref for InsightPanel
+  useEffect(() => {
+    if (isEditing && isJsonContent(document?.content || '')) {
+      const timer = setTimeout(() => {
+        const ed = richEditorRef.current?.getEditor();
+        if (ed) setTiptapEditor(ed);
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      setTiptapEditor(null);
+    }
+  }, [isEditing, document?.content]);
 
   useEffect(() => {
     contentRef.current = editContent;
@@ -460,7 +478,9 @@ export default function DocumentDetail() {
           <button className="text-slate-400 hover:text-violet-600 p-1.5 hover:bg-violet-50 rounded-lg transition-colors" title="下载">
             <Download size={16} />
           </button>
-          <button className="text-slate-400 hover:text-violet-600 p-1.5 hover:bg-violet-50 rounded-lg transition-colors" title="编辑">
+          <button 
+            onClick={() => { setIsEditing(true); setEditContent(document?.content || ''); }}
+            className="text-slate-400 hover:text-violet-600 p-1.5 hover:bg-violet-50 rounded-lg transition-colors" title="编辑">
             <Edit size={16} />
           </button>
           <button 
@@ -554,6 +574,7 @@ export default function DocumentDetail() {
             {isJsonContent(document.content) && viewMode === 'edit' ? (
               <div onDoubleClick={handleDoubleClick} key={document.updatedAt + document.content.length}>
                 <RichTextEditor
+                  ref={richEditorRef}
                   content={JSON.parse(document.content)}
                   editable={isEditing}
                   onChange={(json) => setEditContent(JSON.stringify(json))}
@@ -622,6 +643,13 @@ export default function DocumentDetail() {
             )}
           </div>
         </div>
+
+        {/* AI Insight Panel — shown for rich text documents (loads saved insights) */}
+        {isJsonContent(document.content) && !showChatPanel && (
+          <div className="w-80 shrink-0 overflow-hidden">
+            <InsightPanel editor={isEditing ? tiptapEditor : null} documentId={document.id} />
+          </div>
+        )}
 
         {/* AI Summary Panel */}
         <AnimatePresence>

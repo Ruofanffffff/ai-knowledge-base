@@ -9,8 +9,20 @@ export interface ApiResponse<T> {
 
 // Authentication types
 export interface LoginRequest {
-  username: string;
+  email: string;
   password: string;
+}
+
+export interface EmailRegisterRequest {
+  email: string;
+  password: string;
+  username: string;
+}
+
+export interface PhoneRegisterRequest {
+  phone: string;
+  password: string;
+  sms_code?: string;
 }
 
 export interface RegisterRequest {
@@ -20,8 +32,14 @@ export interface RegisterRequest {
 }
 
 export interface AuthResponse {
-  token: string;
+  accessToken: string;
+  refreshToken: string;
   user: User;
+}
+
+export interface RefreshResponse {
+  accessToken: string;
+  refreshToken: string;
 }
 
 export interface User {
@@ -34,6 +52,22 @@ export interface User {
   role?: string;
   status?: string;
   createdAt: string;
+}
+
+export interface UserRole {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface PermissionCheckResult {
+  has_permission: boolean;
+  permission_code: string;
+}
+
+export interface AuthenError {
+  error_code: string;
+  message: string;
 }
 
 // Document types
@@ -92,6 +126,8 @@ export interface GraphNode {
   id: string;
   label: string;
   description: string;
+  entityType?: string;
+  source?: string;
   x?: number;
   y?: number;
   color?: string;
@@ -103,6 +139,8 @@ export interface GraphLink {
   target: string;
   name: string;
   description: string;
+  layer?: string;
+  linkSource?: string;
 }
 
 export interface FrontendGraphData {
