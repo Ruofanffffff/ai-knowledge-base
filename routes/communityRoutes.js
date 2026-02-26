@@ -7,7 +7,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../services/authService');
+const { authMiddleware, requirePermission } = require('../services/authService');
 const { initDatabase } = require('../database/initUserDB');
 const { CoverGenerationService } = require('../services/coverGenerationService');
 const { JimengClient } = require('../services/jimengClient');
@@ -116,7 +116,7 @@ function initCommunityRoutes(externalDb, prismaClient) {
  * 
  * Validates: Requirements 1.2, 1.3, 1.4, 1.6
  */
-router.post('/publish', authMiddleware, (req, res) => {
+router.post('/publish', authMiddleware, requirePermission('community:publish'), (req, res) => {
   try {
     const { documentIds, isPublic = false } = req.body;
     const userId = req.userId;
@@ -655,7 +655,7 @@ router.post('/posts/:id/bookmark', authMiddleware, (req, res) => {
  *
  * Validates: Requirements 3.2, 3.3, 3.4
  */
-router.post('/posts/:id/comments', authMiddleware, (req, res) => {
+router.post('/posts/:id/comments', authMiddleware, requirePermission('community:comment'), (req, res) => {
   try {
     const postId = parseInt(req.params.id);
     const userId = req.userId;
@@ -1060,7 +1060,7 @@ router.put('/posts/:id', authMiddleware, (req, res) => {
  * 
  * Validates: Requirements 5.1, 5.2, 5.3, 5.4
  */
-router.delete('/posts/:id', authMiddleware, (req, res) => {
+router.delete('/posts/:id', authMiddleware, requirePermission('community:delete'), (req, res) => {
   try {
     const postId = parseInt(req.params.id);
     const userId = req.userId;
@@ -1179,7 +1179,7 @@ router.delete('/posts/:id', authMiddleware, (req, res) => {
  * Body: { postIds: number[] }
  * Response: { success: true, data: { deleted: number[], failed: { id: number, reason: string }[] } }
  */
-router.post('/posts/batch-delete', authMiddleware, (req, res) => {
+router.post('/posts/batch-delete', authMiddleware, requirePermission('community:delete'), (req, res) => {
   try {
     const { postIds } = req.body;
     const userId = req.userId;

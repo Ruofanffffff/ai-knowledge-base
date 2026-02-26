@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import {
   loginApi,
   registerByEmailApi,
+  sendEmailCodeApi,
   getMeApi,
   getMyRolesApi,
   checkPermissionApi,
@@ -35,7 +36,8 @@ export interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
-  register: (userData: RegisterRequest) => Promise<void>;
+  register: (userData: RegisterRequest & { verification_code: string }) => Promise<void>;
+  sendEmailCode: (email: string) => Promise<string | undefined>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   hasRole: (roleName: string) => boolean;
@@ -157,9 +159,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ------ register ------
 
-  const register = useCallback(async (userData: RegisterRequest) => {
+  const register = useCallback(async (userData: RegisterRequest & { verification_code: string }) => {
     const username = userData.username || userData.email.split('@')[0];
-    await registerByEmailApi({ email: userData.email, password: userData.password, username });
+    await registerByEmailApi({
+      email: userData.email,
+      password: userData.password,
+      username,
+      verification_code: userData.verification_code,
+    });
+  }, []);
+
+  // ------ sendEmailCode ------
+
+  const sendEmailCode = useCallback(async (email: string) => {
+    const result = await sendEmailCodeApi(email);
+    return result.code;
   }, []);
 
   // ------ logout ------
@@ -210,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         register,
+        sendEmailCode,
         logout,
         refreshUser,
         hasRole,

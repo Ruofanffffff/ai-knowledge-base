@@ -6,7 +6,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../services/authService');
+const { authMiddleware, requirePermission } = require('../services/authService');
 const kgPipelineService = require('../services/kgPipelineService');
 const { pipelineStatus, prisma } = require('../services/kgPipelineService');
 const unificationService = require('../services/unificationService');
@@ -18,7 +18,7 @@ const ACTIVE_STATUSES = ['pending', 'indexing', 'extracting_four_layers', 'mergi
  * POST /api/kg/build
  * 触发文档图谱构建（异步）
  */
-router.post('/build', authMiddleware, async (req, res) => {
+router.post('/build', authMiddleware, requirePermission('kg:run'), async (req, res) => {
   try {
     const { docId } = req.body;
 
@@ -70,7 +70,7 @@ router.post('/build', authMiddleware, async (req, res) => {
  * GET /api/kg/graph
  * 获取完整图谱数据（兼容旧接口，返回统一图谱数据）
  */
-router.get('/graph', authMiddleware, async (req, res) => {
+router.get('/graph', authMiddleware, requirePermission('kg:read'), async (req, res) => {
   try {
     const entities = await prisma.unifiedEntity.findMany();
     const relations = await prisma.unifiedRelation.findMany();
@@ -158,7 +158,7 @@ router.get('/status/:docId', authMiddleware, async (req, res) => {
  * GET /api/kg/unified/graph
  * 获取统一图谱数据（UnifiedEntity + UnifiedRelation）
  */
-router.get('/unified/graph', authMiddleware, async (req, res) => {
+router.get('/unified/graph', authMiddleware, requirePermission('kg:read'), async (req, res) => {
   try {
     const entities = await prisma.unifiedEntity.findMany();
     const relations = await prisma.unifiedRelation.findMany();
@@ -204,7 +204,7 @@ router.get('/unified/graph', authMiddleware, async (req, res) => {
  * GET /api/kg/doc/:docId/graph
  * 获取指定文档的分文章图谱数据（DocEntity + DocRelation）
  */
-router.get('/doc/:docId/graph', authMiddleware, async (req, res) => {
+router.get('/doc/:docId/graph', authMiddleware, requirePermission('kg:read'), async (req, res) => {
   try {
     const { docId } = req.params;
 
@@ -262,7 +262,7 @@ router.get('/doc/:docId/graph', authMiddleware, async (req, res) => {
  * POST /api/kg/unified/trigger
  * 手动触发统一归纳（检查是否已在执行中）
  */
-router.post('/unified/trigger', authMiddleware, async (req, res) => {
+router.post('/unified/trigger', authMiddleware, requirePermission('kg:run'), async (req, res) => {
   try {
     // 检查是否有正在执行的归纳
     const latestLog = await unificationService.getLatestLog();

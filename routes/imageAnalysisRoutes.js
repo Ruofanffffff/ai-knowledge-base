@@ -7,7 +7,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../services/authService');
+const { authMiddleware, requirePermission } = require('../services/authService');
 const { reanalyzeAttachment, analyzeImage } = require('../services/notes/imageAnalysisService');
 const { getAttachmentById } = require('../services/notes/attachmentDAL');
 
@@ -52,7 +52,7 @@ const { getAttachmentById } = require('../services/notes/attachmentDAL');
  * 
  * Validates: Requirements 2.2, 2.3, 2.4
  */
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, requirePermission('ai:use'), async (req, res) => {
   try {
     const { imageId, analysisType = 'full' } = req.body;
     const userId = req.user.id;

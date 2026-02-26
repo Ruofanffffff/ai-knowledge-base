@@ -17,6 +17,7 @@ export interface EmailRegisterRequest {
   email: string;
   password: string;
   username: string;
+  verification_code: string;
 }
 
 export interface PhoneRegisterRequest {

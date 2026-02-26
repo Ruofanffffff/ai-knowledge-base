@@ -29,6 +29,15 @@ class AuthenClient {
     throw { code: 'service_unavailable', message: '认证服务暂时不可用', status: 503 };
   }
 
+  async sendEmailCode(data) {
+    try {
+      const response = await this.client.post('/api/v1/gateway/auth/send-email-code', data);
+      return response.data;
+    } catch (error) {
+      this._handleError(error);
+    }
+  }
+
   async registerByEmail(data) {
     try {
       const response = await this.client.post('/api/v1/gateway/auth/register/email', data);
@@ -98,10 +107,12 @@ class AuthenClient {
 
   async checkPermission(userId, permissionCode, token) {
     try {
-      const response = await this.client.post(
-        `/api/v1/gateway/users/${userId}/permissions/check`,
-        { permission_code: permissionCode },
-        { headers: { Authorization: `Bearer ${token}` } }
+      // Call permission service directly (faster, no gateway bearer pipeline needed)
+      const permissionURL = process.env.AUTHEN_PERMISSION_URL || 'http://localhost:8004';
+      const response = await axios.post(
+        `${permissionURL}/api/v1/users/${userId}/check-permission`,
+        { permission: permissionCode },
+        { timeout: 5000, headers: { 'Content-Type': 'application/json' } }
       );
       return response.data;
     } catch (error) {
@@ -112,6 +123,17 @@ class AuthenClient {
   async changePassword(data, token) {
     try {
       const response = await this.client.post('/api/v1/gateway/auth/change-password', data, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error) {
+      this._handleError(error);
+    }
+  }
+
+  async getQuotaUsage(token) {
+    try {
+      const response = await this.client.get('/api/v1/quota/usage', {
         headers: { Authorization: `Bearer ${token}` },
       });
       return response.data;

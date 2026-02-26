@@ -66,6 +66,21 @@ function handleAuthenError(res, error) {
 }
 
 // ============================================================
+// Authen 模式路由：发送邮箱验证码
+// ============================================================
+router.post('/send-email-code', async (req, res) => {
+  if (!isAuthenEnabled()) {
+    return res.status(404).json({ success: false, error: '该功能未启用' });
+  }
+  try {
+    const result = await authenClient.sendEmailCode(req.body);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handleAuthenError(res, error);
+  }
+});
+
+// ============================================================
 // Authen 模式路由：邮箱注册
 // ============================================================
 router.post('/register/email', async (req, res) => {

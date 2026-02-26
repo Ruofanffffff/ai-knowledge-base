@@ -323,6 +323,8 @@ function authMiddleware(req, res, next) {
  */
 function requirePermission(permissionCode) {
   return async (req, res, next) => {
+    // When Authen is not enabled, skip permission check (local dev mode)
+    if (!isAuthenEnabled()) return next();
     try {
       const result = await authenClient.checkPermission(
         req.userId, permissionCode, extractBearerToken(req)

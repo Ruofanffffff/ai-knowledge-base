@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/600cc0a2e59f846c93e6529bc524d2ae023eb689.png';
-import { Lock, Mail, Check, Loader2 } from 'lucide-react';
+import { Lock, Mail, Check, Loader2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 // ---------------------------------------------------------------------------
@@ -39,11 +39,15 @@ const strengthConfig: Record<StrengthLevel, { label: string; color: string; widt
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, sendEmailCode } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const [error, setError] = useState('');
   const [registerSuccess, setRegisterSuccess] = useState(false);
 
@@ -51,9 +55,55 @@ export default function Register() {
   const strength = useMemo(() => getPasswordStrength(password), [password]);
   const passwordMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
+  // Countdown timer for resend
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (countdown > 0) {
+      countdownRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [countdown > 0]);
+
+  const handleSendCode = async () => {
+    if (!email.trim()) {
+      setError('请先输入邮箱');
+      return;
+    }
+    setIsSendingCode(true);
+    setError('');
+    try {
+      const code = await sendEmailCode(email);
+      setCodeSent(true);
+      setCountdown(60);
+      // 开发模式下自动填入验证码
+      if (code) {
+        setVerificationCode(code);
+      }
+    } catch (err: any) {
+      setError(err.message || '发送验证码失败');
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
   const handleRegister = async () => {
     if (!email.trim() || !password.trim()) {
       setError('请填写所有必填字段');
+      return;
+    }
+
+    if (!verificationCode.trim()) {
+      setError('请输入邮箱验证码');
       return;
     }
 
@@ -76,7 +126,7 @@ export default function Register() {
     setError('');
 
     try {
-      await register({ username: '', email, password });
+      await register({ username: '', email, password, verification_code: verificationCode });
       setRegisterSuccess(true);
       setTimeout(() => {
         navigate('/login');
@@ -131,10 +181,44 @@ export default function Register() {
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
                 disabled={isLoading || registerSuccess}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-12 py-3.5 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all disabled:opacity-50"
               />
+            </div>
+          </div>
+
+          {/* Verification code input */}
+          <div className="group">
+            <label className="block text-sm font-medium text-slate-700 mb-1 ml-1">邮箱验证码 *</label>
+            <div className="relative flex gap-2">
+              <div className="relative flex-1">
+                <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-purple-500 transition-colors" size={20} />
+                <input
+                  type="text"
+                  placeholder="请输入6位验证码"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
+                  disabled={isLoading || registerSuccess}
+                  maxLength={6}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-12 py-3.5 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all disabled:opacity-50"
+                />
+              </div>
+              <button
+                onClick={handleSendCode}
+                disabled={isSendingCode || countdown > 0 || isLoading || registerSuccess || !email.trim()}
+                className="shrink-0 px-4 py-3.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-purple-100 text-purple-600 hover:bg-purple-200"
+              >
+                {isSendingCode ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : countdown > 0 ? (
+                  `${countdown}s`
+                ) : codeSent ? (
+                  '重新发送'
+                ) : (
+                  '发送验证码'
+                )}
+              </button>
             </div>
           </div>
 

@@ -99,6 +99,23 @@ export async function loginApi(credentials: LoginRequest): Promise<AuthResponse>
 }
 
 /**
+ * Send email verification code via Authen Gateway
+ * POST /api/auth/send-email-code
+ */
+export async function sendEmailCodeApi(email: string): Promise<{ success: boolean; message: string; code?: string }> {
+  const response = await apiClient.post<ApiResponse<{ success: boolean; message: string; code?: string }>>(
+    '/auth/send-email-code',
+    { email }
+  );
+
+  if (response.data.success && response.data.data) {
+    return response.data.data;
+  }
+
+  throw new Error(response.data.error || 'Failed to send verification code');
+}
+
+/**
  * Register by email via Authen Gateway
  * POST /api/auth/register/email
  */

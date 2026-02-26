@@ -7,7 +7,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../services/authService');
+const { authMiddleware, requirePermission } = require('../services/authService');
 const { createAIInsightsService } = require('../services/aiInsightsService');
 const { PrismaClient } = require('@prisma/client');
 
@@ -33,7 +33,7 @@ const prisma = new PrismaClient();
  *   data: { concepts, references, summary, message? }
  * }
  */
-router.post('/insights', authMiddleware, async (req, res) => {
+router.post('/insights', authMiddleware, requirePermission('ai:use'), async (req, res) => {
   try {
     const { text, addedText, editedText, hasExistingInsights } = req.body;
 

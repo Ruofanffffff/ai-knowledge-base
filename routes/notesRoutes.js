@@ -7,7 +7,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../services/authService');
+const { authMiddleware, requirePermission } = require('../services/authService');
 const noteDAL = require('../services/notes/noteDAL');
 const attachmentDAL = require('../services/notes/attachmentDAL');
 
@@ -39,7 +39,7 @@ const attachmentDAL = require('../services/notes/attachmentDAL');
  *   }
  * }
  */
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, requirePermission('document:write'), async (req, res) => {
   try {
     const { content, tags } = req.body;
     const userId = req.user.id;
@@ -142,7 +142,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
  *   }
  * }
  */
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/:id', authMiddleware, requirePermission('document:write'), async (req, res) => {
   try {
     const { id } = req.params;
     const { content, tags } = req.body;
@@ -197,7 +197,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
  *   }
  * }
  */
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, requirePermission('document:delete'), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
