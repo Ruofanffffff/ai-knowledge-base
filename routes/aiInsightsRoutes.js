@@ -6,10 +6,12 @@
  */
 
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const { authMiddleware, requirePermission } = require('../services/authService');
 const { createAIInsightsService } = require('../services/aiInsightsService');
 const { PrismaClient } = require('@prisma/client');
+const fragmentCollector = require('../services/fragmentCollector');
 
 const aiInsightsService = createAIInsightsService();
 const prisma = new PrismaClient();
@@ -65,6 +67,23 @@ router.post('/insights', authMiddleware, requirePermission('ai:use'), async (req
         ...(result.data.message && { message: result.data.message })
       }
     });
+
+    // 异步采集 ai_chat 碎片（不阻塞主请求）
+    const userId = req.userId;
+    if (userId) {
+      process.nextTick(() => {
+        const userMessage = text || '';
+        const aiResponse = result.data.summary || '';
+        const sessionId = crypto.randomUUID();
+        fragmentCollector.collect({
+          userId,
+          fragmentType: 'ai_chat',
+          content: `${userMessage}\n${aiResponse}`.slice(0, 500),
+          sourceId: sessionId,
+          sourceMeta: { userMessage, aiResponse }
+        }).catch(err => console.error('[FragmentCollector] ai_chat collection error:', err));
+      });
+    }
   } catch (error) {
     console.error('Error in AI insights analysis:', error);
 

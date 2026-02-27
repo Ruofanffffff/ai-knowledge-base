@@ -180,6 +180,7 @@ export function Graph() {
       console.error('Failed to fetch documents:', err);
     }
   };
+
   
   // 当 graphData 更新时，运行力导向布局
   useEffect(() => {
@@ -544,6 +545,7 @@ export function Graph() {
                     </g>
                  );
               })}
+
             </motion.g>
          </svg>
       </div>
@@ -604,6 +606,7 @@ export function Graph() {
               <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: '#8b5cf6' }} />
               <span className="text-[10px] text-slate-400 whitespace-nowrap">pattern 模式</span>
             </div>
+
           </div>
         </div>
       )}
@@ -678,6 +681,7 @@ export function Graph() {
           </motion.div>
         );
       })()}
+
     </div>
 
     <DocumentIndexDrawer

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Editor } from '@tiptap/react';
 import { useAIInsights, InsightsData } from '../../hooks/useAIInsights';
 import { RefreshCw, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
+import { KnowledgeGrowthHint } from './KnowledgeGrowthHint';
 
 interface InsightPanelProps {
   editor: Editor | null;
@@ -289,6 +290,9 @@ export function InsightPanel({ editor, documentId, onInsightsChange }: InsightPa
             <SummaryCard summary={insights!.summary} />
           </>
         )}
+
+        {/* Knowledge Growth Hints */}
+        <KnowledgeGrowthHint documentId={documentId} />
       </div>
     </div>
   );

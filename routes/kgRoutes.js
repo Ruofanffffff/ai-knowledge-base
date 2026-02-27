@@ -93,7 +93,7 @@ router.get('/graph', authMiddleware, requirePermission('kg:read'), async (req, r
           name: r.cleanedName,
           description: r.description,
           layer: r.layer,
-          source: r.source
+          source_tag: r.source
         })),
         principles: principles.map(p => ({
           id: p.id,
@@ -181,7 +181,7 @@ router.get('/unified/graph', authMiddleware, requirePermission('kg:read'), async
           name: r.cleanedName,
           description: r.description,
           layer: r.layer,
-          source: r.source
+          source_tag: r.source
         })),
         principles: principles.map(p => ({
           id: p.id,
@@ -238,7 +238,7 @@ router.get('/doc/:docId/graph', authMiddleware, requirePermission('kg:read'), as
           name: r.cleanedName,
           description: r.description,
           layer: r.layer,
-          source: r.source
+          source_tag: r.source
         })),
         principles: principles.map(p => ({
           id: p.id,

@@ -1,0 +1,221 @@
+/* ==========================================================================
+   DigestPanel — Breathing & Sci-fi Visual Effects
+   Requirements: 5.1, 5.2, 5.3, 5.4, 5.5
+   Uses CSS transforms & opacity for GPU-accelerated performance.
+   ========================================================================== */
+
+/* ---------- 1. Card Breathing Effect (BreathingEffect) — Req 5.1 ---------- */
+@keyframes digest-breathe {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.08);
+  }
+  50% {
+    opacity: 0.92;
+    box-shadow: 0 0 18px rgba(99, 102, 241, 0.18);
+  }
+}
+
+.digest-card {
+  animation: digest-breathe 4s ease-in-out infinite;
+  will-change: opacity, box-shadow;
+}
+
+/* Stagger breathing across cards for organic feel */
+.digest-card:nth-child(2) { animation-delay: 1.3s; }
+.digest-card:nth-child(3) { animation-delay: 2.6s; }
+.digest-card:nth-child(4) { animation-delay: 0.8s; }
+.digest-card:nth-child(5) { animation-delay: 2s; }
+
+/* ---------- 2. Percentage Shimmer Sweep — Req 5.2 ---------- */
+@keyframes digest-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.digest-percentage {
+  background: linear-gradient(
+    90deg,
+    #6366f1 0%,
+    #a78bfa 30%,
+    #e0e7ff 50%,
+    #a78bfa 70%,
+    #6366f1 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: digest-shimmer 3s ease-in-out infinite;
+}
+
+/* ---------- 3. Card Border Gradient Glow — Req 5.3 ---------- */
+@keyframes digest-border-rotate {
+  0% {
+    --digest-border-angle: 0deg;
+  }
+  100% {
+    --digest-border-angle: 360deg;
+  }
+}
+
+@property --digest-border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.digest-card-border {
+  position: relative;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.digest-card-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--digest-border-angle, 0deg),
+    rgba(99, 102, 241, 0.15),
+    rgba(168, 85, 247, 0.25),
+    rgba(99, 102, 241, 0.08),
+    rgba(168, 85, 247, 0.15),
+    rgba(99, 102, 241, 0.15)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: digest-border-rotate 6s linear infinite;
+  pointer-events: none;
+}
+
+/* ---------- 4. Panel Background Grid Effect — Req 5.4 ---------- */
+@keyframes digest-grid-fade {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.5; }
+}
+
+.digest-panel-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.digest-panel-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(99, 102, 241, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  animation: digest-grid-fade 8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+/* Floating particle dots */
+@keyframes digest-particle-float {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.4; }
+  50% { transform: translateY(-6px) scale(1.2); opacity: 0.7; }
+}
+
+.digest-panel-bg::after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.25);
+  top: 20%;
+  left: 15%;
+  animation: digest-particle-float 5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Additional particles via box-shadow on a helper element */
+.digest-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.digest-particles::before,
+.digest-particles::after {
+  content: "";
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(168, 85, 247, 0.2);
+  animation: digest-particle-float 6s ease-in-out infinite;
+}
+
+.digest-particles::before {
+  top: 60%;
+  right: 20%;
+  animation-delay: 2s;
+}
+
+.digest-particles::after {
+  top: 40%;
+  right: 55%;
+  animation-delay: 3.5s;
+  background: rgba(99, 102, 241, 0.18);
+}
+
+/* ---------- 5. Card Hover Enhanced Glow + Scale — Req 5.5 ---------- */
+.digest-card:hover {
+  animation: none;
+  opacity: 1;
+  box-shadow: 0 0 24px rgba(99, 102, 241, 0.25), 0 4px 16px rgba(99, 102, 241, 0.1);
+  transform: scale(1.02);
+  transition: box-shadow 0.3s ease, transform 0.3s ease, opacity 0.15s ease;
+}
+
+.digest-card-border:hover::before {
+  background: conic-gradient(
+    from var(--digest-border-angle, 0deg),
+    rgba(99, 102, 241, 0.3),
+    rgba(168, 85, 247, 0.45),
+    rgba(99, 102, 241, 0.15),
+    rgba(168, 85, 247, 0.3),
+    rgba(99, 102, 241, 0.3)
+  );
+}
+
+/* ---------- Skeleton Breathing (loading state) ---------- */
+@keyframes digest-skeleton-breathe {
+  0%, 100% {
+    opacity: 0.6;
+    box-shadow: 0 0 6px rgba(99, 102, 241, 0.06);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 14px rgba(99, 102, 241, 0.12);
+  }
+}
+
+.digest-skeleton {
+  animation: digest-skeleton-breathe 2s ease-in-out infinite;
+}
+
+.digest-skeleton:nth-child(2) { animation-delay: 0.6s; }
+.digest-skeleton:nth-child(3) { animation-delay: 1.2s; }
+
+/* ---------- Content z-index layering ---------- */
+.digest-content {
+  position: relative;
+  z-index: 1;
+}

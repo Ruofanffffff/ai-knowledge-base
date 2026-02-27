@@ -115,6 +115,19 @@ export interface Comment {
   authorAvatar: string | null;
 }
 
+export interface DigestItem {
+  name: string;
+  percentage: number;
+  summary: string;
+  keywords: string[];
+  bodyIds: string[];
+}
+
+export interface KnowledgeDigest {
+  items: DigestItem[];
+  generatedAt: string;
+}
+
 // ============================================================================
 // Cache Interface
 // ============================================================================
@@ -950,6 +963,35 @@ class ApiService {
       };
     }
   }
+
+  // ==========================================================================
+  // Knowledge Digest API Methods
+  // ==========================================================================
+
+  /**
+   * 生成知识摘要
+   * POST /api/knowledge-growth/digest
+   */
+  async generateDigest(): Promise<ApiResponse<KnowledgeDigest>> {
+    try {
+      const response = await apiClient.post('/knowledge-growth/digest');
+
+      if (response.data?.success) {
+        return { success: true, data: response.data.data };
+      }
+
+      return {
+        success: false,
+        error: response.data?.error || '生成失败，请重试',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error),
+      };
+    }
+  }
+
 }
 
 // ============================================================================

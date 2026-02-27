@@ -7,6 +7,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const fragmentCollector = require('./fragmentCollector');
 
 class ImageRecognitionService {
   /**
@@ -22,9 +23,11 @@ class ImageRecognitionService {
    * 分析图片：从 MinIO 获取图片 → 转 base64 → 构建 prompt → 调用 LLM → 解析结果 → 存入数据库
    * @param {string} imageKey - MinIO 中的对象键
    * @param {string} [bucketName] - 存储桶名称
+   * @param {object} [options] - 可选参数
+   * @param {string} [options.userId] - 用户 ID，用于采集认知碎片
    * @returns {Promise<object>} ImageAnalysisResult
    */
-  async analyzeImage(imageKey, bucketName) {
+  async analyzeImage(imageKey, bucketName, options = {}) {
     try {
       // 1. 从 MinIO 获取图片
       const { body, contentType } = await this.minioService.getFile(imageKey, bucketName);
@@ -74,6 +77,22 @@ class ImageRecognitionService {
             theme: result.theme,
             status: 'completed',
           },
+        });
+      }
+
+      // 异步采集 image_analyze 碎片（不阻塞主流程）
+      const { userId } = options;
+      if (userId) {
+        const elementsStr = Array.isArray(result.elements) ? result.elements.join(', ') : '';
+        const fragmentContent = [result.description, elementsStr, result.theme].filter(Boolean).join(' ');
+        setImmediate(() => {
+          fragmentCollector.collect({
+            userId,
+            fragmentType: 'image_analyze',
+            content: fragmentContent,
+            sourceId: imageKey,
+            sourceMeta: { description: result.description, elements: result.elements, theme: result.theme }
+          }).catch(err => console.error('[FragmentCollector] image_analyze collection error:', err));
         });
       }
 

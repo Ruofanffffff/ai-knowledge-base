@@ -17,6 +17,9 @@ require('dotenv').config();
 const kgPipelineService = require('./services/kgPipelineService');
 const kg = null;
 
+// Fragment Collector (knowledge growth)
+const fragmentCollector = require('./services/fragmentCollector');
+
 // Unification Scheduler (dual-layer graph)
 const unificationScheduler = require('./services/unificationScheduler');
 const unificationService = require('./services/unificationService');
@@ -58,6 +61,9 @@ const fileHashService = require('./services/fileHashService');
 // Import DocumentStorageService and DeduplicationService
 const DocumentStorageService = require('./services/documentStorageService');
 const DeduplicationService = require('./services/deduplicationService');
+
+// Import EmbeddingService (extracted from server.js)
+const embeddingService = require('./services/embeddingService');
 
 // 导入监控系统
 const { logger, accessLogMiddleware, errorHandlerMiddleware, getLogStatus, cleanOldLogs } = require('./utils/logger');
@@ -371,63 +377,14 @@ if (mockDocuments.length === 0) {
   saveDocuments(mockDocuments);
 }
 
-// 生成文本嵌入向量
+// 生成文本嵌入向量 (delegated to EmbeddingService)
 async function generateEmbedding(text) {
-  const modelConfig = CLOUD_MODELS['text-embedding-v3'];
-  
-  if (!modelConfig || !modelConfig.apiKey) {
-    console.error('Embedding model not configured');
-    return null;
-  }
-  
-  try {
-    const response = await fetch(modelConfig.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${modelConfig.apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-v3',
-        input: {
-          texts: [text]
-        },
-        parameters: {
-          text_type: 'document'
-        }
-      })
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Embedding API error:', errorText);
-      return null;
-    }
-    
-    const data = await response.json();
-    if (data.output && data.output.embeddings && data.output.embeddings.length > 0) {
-      return data.output.embeddings[0].embedding;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error generating embedding:', error);
-    return null;
-  }
+  return embeddingService.generateEmbedding(text);
 }
 
-// 计算余弦相似度
+// 计算余弦相似度 (delegated to EmbeddingService)
 function cosineSimilarity(vecA, vecB) {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
-  }
-  
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  return embeddingService.cosineSimilarity(vecA, vecB);
 }
 
 // 自动为没有嵌入的文档生成嵌入
@@ -803,6 +760,10 @@ app.use('/api/ai', aiInsightsRoutes);
 const searchRoutes = require('./routes/searchRoutes');
 app.use('/api/search', searchRoutes);
 
+// 知识生长路由
+const knowledgeGrowthRoutes = require('./routes/knowledgeGrowthRoutes');
+app.use('/api/knowledge-growth', knowledgeGrowthRoutes);
+
 // LLM预处理路由（文档索引查询）
 
 app.get('/api/preprocessing/index/:docId', authMiddleware, async (req, res) => {
@@ -925,7 +886,7 @@ async function linkImageAnalysesToDocument(documentId, contentStr) {
 /**
  * 文档保存后，对所有 pending 状态的图片触发 AI 识别
  */
-async function triggerPendingImageRecognition(contentStr) {
+async function triggerPendingImageRecognition(contentStr, userId) {
   const analysisIds = extractAnalysisIds(contentStr);
   if (analysisIds.length === 0) return;
 
@@ -940,7 +901,7 @@ async function triggerPendingImageRecognition(contentStr) {
     const recognitionService = getImageRecognitionService();
 
     for (const record of pendingRecords) {
-      recognitionService.analyzeImage(record.imageKey).catch((err) => {
+      recognitionService.analyzeImage(record.imageKey, undefined, { userId }).catch((err) => {
         console.error(`[ImageRecognition] 识别失败 [${record.imageKey}]:`, err.message);
       });
     }
@@ -1091,10 +1052,32 @@ app.get('/api/documents/:id', authMiddleware, (req, res) => {
             updatedAt: a.updatedAt
           }));
           res.json(document);
+          
+          // 异步采集 doc_view 碎片，不阻塞主请求
+          setImmediate(() => {
+            fragmentCollector.collect({
+              userId,
+              fragmentType: 'doc_view',
+              content: document.title || '',
+              sourceId: document.id,
+              sourceMeta: { title: document.title, type: document.type }
+            }).catch(err => console.error('[FragmentCollector] doc_view collection error:', err));
+          });
         }).catch(prismaErr => {
           console.error('Error fetching imageAnalyses:', prismaErr);
           // 即使获取图片分析失败，也返回文档
           res.json(document);
+          
+          // 异步采集 doc_view 碎片，不阻塞主请求
+          setImmediate(() => {
+            fragmentCollector.collect({
+              userId,
+              fragmentType: 'doc_view',
+              content: document.title || '',
+              sourceId: document.id,
+              sourceMeta: { title: document.title, type: document.type }
+            }).catch(err => console.error('[FragmentCollector] doc_view collection error:', err));
+          });
         });
       });
     });
@@ -1140,7 +1123,7 @@ app.post('/api/documents', authMiddleware, (req, res) => {
         linkImageAnalysesToDocument(newDocument.id, content);
         
         // 触发 pending 图片的 AI 识别（异步，保存时才识别）
-        triggerPendingImageRecognition(content);
+        triggerPendingImageRecognition(content, userId);
         
         // 触发知识图谱构建钩子 (异步)
         if (onDocumentCreated) onDocumentCreated(newDocument, { async: true, skipIfExists: false })
@@ -1152,6 +1135,18 @@ app.post('/api/documents', authMiddleware, (req, res) => {
           });
         
         res.json(newDocument);
+        
+        // 异步采集 doc_create 碎片，不阻塞主请求
+        setImmediate(() => {
+          const contentSummary = (content || '').substring(0, 200);
+          fragmentCollector.collect({
+            userId,
+            fragmentType: 'doc_create',
+            content: `${title || ''} ${contentSummary}`.trim(),
+            sourceId: newDocument.id,
+            sourceMeta: { title, type: type || 'document' }
+          }).catch(err => console.error('[FragmentCollector] doc_create collection error:', err));
+        });
       }
     );
   } catch (error) {
@@ -1188,7 +1183,7 @@ app.put('/api/documents/:id', authMiddleware, (req, res) => {
         linkImageAnalysesToDocument(id, content);
         
         // 触发 pending 图片的 AI 识别（异步，保存时才识别）
-        triggerPendingImageRecognition(content);
+        triggerPendingImageRecognition(content, userId);
         
         userDb.get('SELECT * FROM documents WHERE id = ?', [id], (err, row) => {
           if (err || !row) {
@@ -1217,6 +1212,18 @@ app.put('/api/documents/:id', authMiddleware, (req, res) => {
             });
           
           res.json(document);
+          
+          // 异步采集 doc_edit 碎片，不阻塞主请求
+          setImmediate(() => {
+            const contentSummary = (document.content || '').substring(0, 200);
+            fragmentCollector.collect({
+              userId,
+              fragmentType: 'doc_edit',
+              content: `${document.title || ''} ${contentSummary}`.trim(),
+              sourceId: document.id,
+              sourceMeta: { title: document.title, type: document.type }
+            }).catch(err => console.error('[FragmentCollector] doc_edit collection error:', err));
+          });
         });
       }
     );
@@ -2561,6 +2568,7 @@ ${webSearchContext}
 
     let success = false;
     let lastError = null;
+    let accumulatedAIContent = '';
 
     for (const cloudModel of modelCallOrder) {
       try {
@@ -2632,6 +2640,7 @@ ${webSearchContext}
                 const data = JSON.parse(line.slice(6));
                 const content = data.choices?.[0]?.delta?.content || '';
                 if (content) {
+                  accumulatedAIContent += content;
                   res.write(`data: ${JSON.stringify({ type: 'content', content })}\n\n`);
                 }
               } catch (e) {
@@ -2656,6 +2665,19 @@ ${webSearchContext}
 
     res.write('data: [DONE]\n\n');
     res.end();
+
+    // 异步采集 ai_chat 碎片（不阻塞响应）
+    if (success && req.userId) {
+      const crypto = require('crypto');
+      const sessionId = crypto.randomUUID();
+      fragmentCollector.collect({
+        userId: req.userId,
+        fragmentType: 'ai_chat',
+        content: `${query}\n${accumulatedAIContent}`.slice(0, 500),
+        sourceId: sessionId,
+        sourceMeta: { userMessage: query, aiResponse: accumulatedAIContent.slice(0, 500) }
+      }).catch(err => console.error('[FragmentCollector] ai_chat collection error:', err));
+    }
 
   } catch (error) {
     console.error('AI search failed:', error);

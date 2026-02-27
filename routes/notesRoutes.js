@@ -10,6 +10,7 @@ const router = express.Router();
 const { authMiddleware, requirePermission } = require('../services/authService');
 const noteDAL = require('../services/notes/noteDAL');
 const attachmentDAL = require('../services/notes/attachmentDAL');
+const fragmentCollector = require('../services/fragmentCollector');
 
 // ============================================
 // Note Routes
@@ -62,6 +63,18 @@ router.post('/', authMiddleware, requirePermission('document:write'), async (req
     res.status(201).json({
       success: true,
       data: note
+    });
+
+    // 异步采集 note_create 碎片，不阻塞主请求
+    setImmediate(() => {
+      const tagsStr = note.tags && note.tags.length > 0 ? ` [标签: ${note.tags.join(', ')}]` : '';
+      fragmentCollector.collect({
+        userId,
+        fragmentType: 'note_create',
+        content: note.content + tagsStr,
+        sourceId: note.id,
+        sourceMeta: { tags: note.tags }
+      }).catch(err => console.error('[FragmentCollector] note_create collection error:', err));
     });
   } catch (error) {
     console.error('Error creating note:', error);
@@ -156,12 +169,46 @@ router.put('/:id', authMiddleware, requirePermission('document:write'), async (r
       });
     }
 
+    // 获取更新前的便签，用于检测标签变更
+    const oldNote = await noteDAL.getNoteById(id, userId);
+
     // Update note
     const note = await noteDAL.updateNote(id, { content, tags }, userId);
 
     res.json({
       success: true,
       data: note
+    });
+
+    // 异步采集碎片，不阻塞主请求
+    setImmediate(() => {
+      // 采集 note_edit 碎片
+      const changeSummary = content !== undefined ? '内容已更新' : '';
+      const tagsSummary = tags !== undefined ? ` 标签: [${note.tags.join(', ')}]` : '';
+      const editContent = (note.content || '') + (changeSummary ? ` [${changeSummary}]` : '') + tagsSummary;
+
+      fragmentCollector.collect({
+        userId,
+        fragmentType: 'note_edit',
+        content: editContent,
+        sourceId: note.id,
+        sourceMeta: { content: note.content, tags: note.tags }
+      }).catch(err => console.error('[FragmentCollector] note_edit collection error:', err));
+
+      // 检测标签变更，采集 tag_add 碎片
+      if (oldNote) {
+        const oldTags = (oldNote.tags || []).sort().join(',');
+        const newTags = (note.tags || []).sort().join(',');
+        if (oldTags !== newTags) {
+          fragmentCollector.collect({
+            userId,
+            fragmentType: 'tag_add',
+            content: `标签列表: ${note.tags.join(', ')}`,
+            sourceId: note.id,
+            sourceMeta: { oldTags: oldNote.tags, newTags: note.tags }
+          }).catch(err => console.error('[FragmentCollector] tag_add collection error:', err));
+        }
+      }
     });
   } catch (error) {
     console.error('Error updating note:', error);

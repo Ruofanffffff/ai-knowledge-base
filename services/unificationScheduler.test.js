@@ -1,9 +1,13 @@
 const { UnificationScheduler } = require('./unificationScheduler');
 const unificationService = require('./unificationService');
+const themeDiscoveryEngine = require('./themeDiscoveryEngine');
 const { PrismaClient } = require('@prisma/client');
 
 // Mock dependencies
 jest.mock('./unificationService');
+jest.mock('./themeDiscoveryEngine', () => ({
+  discover: jest.fn(),
+}));
 jest.mock('@prisma/client', () => {
   const mockPrisma = {
     documentIndex: {
@@ -34,6 +38,16 @@ describe('UnificationScheduler', () => {
     jest.useRealTimers();
   });
 
+  describe('scheduling intervals', () => {
+    test('should have themeDiscoveryIntervalMs set to 1 hour', () => {
+      expect(scheduler.themeDiscoveryIntervalMs).toBe(60 * 60 * 1000);
+    });
+
+    test('should have intervalMs (unification) set to 1 hour', () => {
+      expect(scheduler.intervalMs).toBe(60 * 60 * 1000);
+    });
+  });
+
   describe('start() and stop()', () => {
     test('should start the scheduler and set interval', () => {
       scheduler.start();
@@ -50,8 +64,10 @@ describe('UnificationScheduler', () => {
     test('should stop the scheduler and clear interval', () => {
       scheduler.start();
       expect(scheduler.intervalId).not.toBeNull();
+      expect(scheduler.themeDiscoveryIntervalId).not.toBeNull();
       scheduler.stop();
       expect(scheduler.intervalId).toBeNull();
+      expect(scheduler.themeDiscoveryIntervalId).toBeNull();
     });
 
     test('should call tick immediately on start', async () => {
@@ -276,6 +292,159 @@ describe('UnificationScheduler', () => {
       expect(scheduler.isRunning).toBe(false);
       await scheduler.tick();
       expect(scheduler.isRunning).toBe(false);
+      expect(scheduler._tickLock).toBe(false);
+    });
+
+    test('should skip tick when _tickLock is held', async () => {
+      scheduler._tickLock = true;
+      jest.spyOn(scheduler, 'shouldRunUnification').mockResolvedValue(true);
+
+      await scheduler.tick();
+
+      expect(scheduler.shouldRunUnification).not.toHaveBeenCalled();
+      expect(unificationService.runUnification).not.toHaveBeenCalled();
+      // Clean up
+      scheduler._tickLock = false;
+    });
+
+    test('should release _tickLock after completion', async () => {
+      jest.spyOn(scheduler, 'shouldRunUnification').mockResolvedValue(true);
+      unificationService.runUnification.mockResolvedValue({ entityCount: 1 });
+
+      expect(scheduler._tickLock).toBe(false);
+      await scheduler.tick();
+      expect(scheduler._tickLock).toBe(false);
+    });
+  });
+
+  describe('themeDiscoveryTick()', () => {
+    test('should call themeDiscoveryEngine.discover with scheduler trigger', async () => {
+      themeDiscoveryEngine.discover.mockResolvedValue({
+        status: 'completed',
+        themesFound: 2,
+      });
+
+      const result = await scheduler.themeDiscoveryTick();
+
+      expect(themeDiscoveryEngine.discover).toHaveBeenCalledWith('scheduler');
+      expect(result).toEqual({ status: 'completed', themesFound: 2 });
+    });
+
+    test('should reject when discovery is already running', async () => {
+      scheduler._isDiscoveryRunning = true;
+
+      const result = await scheduler.themeDiscoveryTick();
+
+      expect(result.status).toBe('rejected');
+      expect(result.reason).toBe('Theme discovery is already running');
+      expect(result.isDiscoveryRunning).toBe(true);
+      expect(themeDiscoveryEngine.discover).not.toHaveBeenCalled();
+
+      // Clean up
+      scheduler._isDiscoveryRunning = false;
+    });
+
+    test('should skip when tick lock is held by unification', async () => {
+      scheduler._tickLock = true;
+
+      const result = await scheduler.themeDiscoveryTick();
+
+      expect(result.status).toBe('skipped');
+      expect(result.reason).toBe('Unification tick is currently running');
+      expect(themeDiscoveryEngine.discover).not.toHaveBeenCalled();
+
+      // Clean up
+      scheduler._tickLock = false;
+    });
+
+    test('should reset _isDiscoveryRunning and _tickLock after completion', async () => {
+      themeDiscoveryEngine.discover.mockResolvedValue({ status: 'completed' });
+
+      await scheduler.themeDiscoveryTick();
+
+      expect(scheduler._isDiscoveryRunning).toBe(false);
+      expect(scheduler._tickLock).toBe(false);
+    });
+
+    test('should reset _isDiscoveryRunning and _tickLock after error', async () => {
+      themeDiscoveryEngine.discover.mockRejectedValue(new Error('Discovery failed'));
+
+      const result = await scheduler.themeDiscoveryTick();
+
+      expect(result.status).toBe('error');
+      expect(result.reason).toBe('Discovery failed');
+      expect(scheduler._isDiscoveryRunning).toBe(false);
+      expect(scheduler._tickLock).toBe(false);
+    });
+
+    test('should serialize with unification tick (no concurrent execution)', async () => {
+      jest.useRealTimers();
+
+      jest.spyOn(scheduler, 'shouldRunUnification').mockResolvedValue(true);
+
+      let unificationRunning = false;
+      let discoveryRunning = false;
+      let concurrentDetected = false;
+
+      unificationService.runUnification.mockImplementation(async () => {
+        unificationRunning = true;
+        if (discoveryRunning) concurrentDetected = true;
+        await new Promise(resolve => setTimeout(resolve, 50));
+        unificationRunning = false;
+        return { entityCount: 1 };
+      });
+
+      themeDiscoveryEngine.discover.mockImplementation(async () => {
+        discoveryRunning = true;
+        if (unificationRunning) concurrentDetected = true;
+        await new Promise(resolve => setTimeout(resolve, 50));
+        discoveryRunning = false;
+        return { status: 'completed' };
+      });
+
+      // Start both ticks simultaneously
+      const tickPromise = scheduler.tick();
+      const discoveryPromise = scheduler.themeDiscoveryTick();
+
+      await Promise.all([tickPromise, discoveryPromise]);
+
+      expect(concurrentDetected).toBe(false);
+
+      jest.useFakeTimers();
+    });
+
+    test('should call themeDiscoveryTick immediately on start', async () => {
+      const tickSpy = jest.spyOn(scheduler, 'tick').mockResolvedValue();
+      const discoveryTickSpy = jest.spyOn(scheduler, 'themeDiscoveryTick').mockResolvedValue();
+
+      scheduler.start();
+
+      // themeDiscoveryTick should be called immediately on start (Req 5.5)
+      expect(discoveryTickSpy).toHaveBeenCalledTimes(1);
+
+      tickSpy.mockRestore();
+      discoveryTickSpy.mockRestore();
+    });
+
+    test('should call themeDiscoveryTick every 1 hour when started', async () => {
+      const tickSpy = jest.spyOn(scheduler, 'tick').mockResolvedValue();
+      const discoveryTickSpy = jest.spyOn(scheduler, 'themeDiscoveryTick').mockResolvedValue();
+
+      scheduler.start();
+
+      // Initial immediate call
+      expect(discoveryTickSpy).toHaveBeenCalledTimes(1);
+
+      // Fast-forward 1 hour
+      jest.advanceTimersByTime(60 * 60 * 1000);
+      expect(discoveryTickSpy).toHaveBeenCalledTimes(2); // Immediate + 1 hour
+
+      // Fast-forward another hour
+      jest.advanceTimersByTime(60 * 60 * 1000);
+      expect(discoveryTickSpy).toHaveBeenCalledTimes(3); // Immediate + 2 hours
+
+      tickSpy.mockRestore();
+      discoveryTickSpy.mockRestore();
     });
   });
 });

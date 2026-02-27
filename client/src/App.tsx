@@ -11,6 +11,8 @@ import Register from './pages/Register';
 import DocumentDetail from './pages/DocumentDetail';
 import CreateDocument from './pages/CreateDocument';
 import { Editor } from './pages/Editor';
+import { KnowledgeGrowth } from './pages/KnowledgeGrowth';
+import { KnowledgeBodyDetail } from './pages/KnowledgeBodyDetail';
 import { ServerConfig } from './pages/ServerConfig';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
@@ -34,6 +36,8 @@ function App() {
             <Route path="/documents/new" element={<CreateDocument />} />
             <Route path="/graph" element={<Graph />} />
             <Route path="/community" element={<Community />} />
+            <Route path="/knowledge-growth" element={<KnowledgeGrowth />} />
+            <Route path="/knowledge-growth/:id" element={<KnowledgeBodyDetail />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/editor" element={<Editor />} />
           </Route>

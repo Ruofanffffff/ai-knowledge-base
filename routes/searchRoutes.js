@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../services/authService');
 const searchService = require('../services/notes/searchService');
+const fragmentCollector = require('../services/fragmentCollector');
 
 // ============================================
 // Search Routes
@@ -106,6 +107,17 @@ router.get('/', authMiddleware, async (req, res) => {
     res.json({
       success: true,
       data: result
+    });
+
+    // 异步采集 search_query 碎片，不阻塞主请求
+    setImmediate(() => {
+      fragmentCollector.collect({
+        userId,
+        fragmentType: 'search_query',
+        content: query,
+        sourceId: `search-${Date.now()}`,
+        sourceMeta: { tags: parsedTags, resultCount: result.total }
+      }).catch(err => console.error('[FragmentCollector] search_query collection error:', err));
     });
   } catch (error) {
     console.error('Error searching notes:', error);

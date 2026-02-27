@@ -12,6 +12,7 @@ const { initDatabase } = require('../database/initUserDB');
 const { CoverGenerationService } = require('../services/coverGenerationService');
 const { JimengClient } = require('../services/jimengClient');
 const { notesConfig } = require('../config/notes.config');
+const fragmentCollector = require('../services/fragmentCollector');
 
 let db;
 let coverGenerationService = null;
@@ -218,6 +219,18 @@ router.post('/publish', authMiddleware, requirePermission('community:publish'), 
                       .catch(err => console.error('[CoverGen] 封面生成失败:', err.message));
                   }
 
+                  // 异步采集 community_publish 碎片（不阻塞主请求）
+                  setImmediate(() => {
+                    const fragmentContent = [doc.title, summary].filter(Boolean).join(' ');
+                    fragmentCollector.collect({
+                      userId,
+                      fragmentType: 'community_publish',
+                      content: fragmentContent,
+                      sourceId: String(postId),
+                      sourceMeta: { title: doc.title, summary, documentId: numericDocId }
+                    }).catch(err => console.error('[FragmentCollector] community_publish collection error:', err));
+                  });
+
                   published.push({
                     id: postId,
                     documentId: numericDocId,
@@ -394,9 +407,13 @@ router.post('/posts/:id/like', authMiddleware, (req, res) => {
       });
     }
 
-    // 先检查帖子是否存在
+    // 先检查帖子是否存在（含标题、摘要和作者信息，用于碎片采集）
     db.get(
-      'SELECT id, likes FROM community_posts WHERE id = ?',
+      `SELECT cp.id, cp.likes, cp.title, cp.summary, cp.user_id,
+              u.username AS authorName
+       FROM community_posts cp
+       LEFT JOIN users u ON cp.user_id = u.id
+       WHERE cp.id = ?`,
       [postId],
       (err, post) => {
         if (err) {
@@ -515,6 +532,20 @@ router.post('/posts/:id/like', authMiddleware, (req, res) => {
                             });
                           }
 
+                          // 异步采集 community_like 碎片（不阻塞主请求）
+                          process.nextTick(() => {
+                            const postTitle = post.title || '';
+                            const postSummary = post.summary || '';
+                            const postAuthor = post.authorName || '';
+                            fragmentCollector.collect({
+                              userId,
+                              fragmentType: 'community_like',
+                              content: `点赞: ${postTitle} - ${postSummary}`,
+                              sourceId: String(postId),
+                              sourceMeta: { postTitle, postAuthor }
+                            }).catch(err => console.error('[FragmentCollector] community_like collection error:', err));
+                          });
+
                           res.json({
                             success: true,
                             data: { liked: true, likes: updated.likes }
@@ -559,9 +590,13 @@ router.post('/posts/:id/bookmark', authMiddleware, (req, res) => {
       });
     }
 
-    // 先检查帖子是否存在
+    // 先检查帖子是否存在（含标题、摘要和作者信息，用于碎片采集）
     db.get(
-      'SELECT id FROM community_posts WHERE id = ?',
+      `SELECT cp.id, cp.title, cp.summary, cp.user_id,
+              u.username AS authorName
+       FROM community_posts cp
+       LEFT JOIN users u ON cp.user_id = u.id
+       WHERE cp.id = ?`,
       [postId],
       (err, post) => {
         if (err) {
@@ -626,6 +661,20 @@ router.post('/posts/:id/bookmark', authMiddleware, (req, res) => {
                     });
                   }
 
+                  // 异步采集 community_favorite 碎片（不阻塞主请求）
+                  process.nextTick(() => {
+                    const postTitle = post.title || '';
+                    const postSummary = post.summary || '';
+                    const postAuthor = post.authorName || '';
+                    fragmentCollector.collect({
+                      userId,
+                      fragmentType: 'community_favorite',
+                      content: `收藏: ${postTitle} - ${postSummary}`,
+                      sourceId: String(postId),
+                      sourceMeta: { postTitle, postAuthor }
+                    }).catch(err => console.error('[FragmentCollector] community_favorite collection error:', err));
+                  });
+
                   res.json({
                     success: true,
                     data: { bookmarked: true }
@@ -675,9 +724,9 @@ router.post('/posts/:id/comments', authMiddleware, requirePermission('community:
       });
     }
 
-    // 验证帖子存在
+    // 验证帖子存在（同时获取标题用于碎片采集）
     db.get(
-      'SELECT id FROM community_posts WHERE id = ?',
+      'SELECT id, title FROM community_posts WHERE id = ?',
       [postId],
       (err, post) => {
         if (err) {
@@ -738,6 +787,19 @@ router.post('/posts/:id/comments', authMiddleware, requirePermission('community:
                     authorName: comment.authorName,
                     authorAvatar: comment.authorAvatar
                   }
+                });
+
+                // 异步采集 community_comment 碎片（不阻塞主请求）
+                process.nextTick(() => {
+                  const postTitle = post.title || '';
+                  const commentContent = content;
+                  fragmentCollector.collect({
+                    userId,
+                    fragmentType: 'community_comment',
+                    content: commentContent,
+                    sourceId: String(commentId),
+                    sourceMeta: { postId: String(postId), postTitle, commentContent }
+                  }).catch(err => console.error('[FragmentCollector] community_comment collection error:', err));
                 });
               }
             );

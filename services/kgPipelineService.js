@@ -347,11 +347,11 @@ ${indexText}`;
 
           const existingRelationsRaw = await prisma.docRelation.findMany({
             where: { docId },
-            include: { source: true, target: true },
+            include: { sourceEntity: true, targetEntity: true },
           });
           const existingRelations = existingRelationsRaw.map((r) => ({
-            source: r.source.cleanedName,
-            target: r.target.cleanedName,
+            source: r.sourceEntity.cleanedName,
+            target: r.targetEntity.cleanedName,
             name: r.cleanedName,
             description: r.description,
             layer: r.layer || 'how',

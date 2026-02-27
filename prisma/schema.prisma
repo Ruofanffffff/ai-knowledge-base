@@ -400,3 +400,116 @@ model ImageAnalysis {
   @@index([documentId])
   @@index([status])
 }
+
+
+// ============================================
+// Knowledge Growth Models (知识生长)
+// ============================================
+
+// 认知碎片表
+model CognitiveFragment {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  fragmentType String   @map("fragment_type")
+  content      String
+  sourceId     String   @map("source_id")
+  sourceMeta   String?  @map("source_meta")
+  embedding    String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("cognitive_fragments")
+  @@index([userId, createdAt])
+  @@index([sourceId, createdAt])
+}
+
+// 知识体表
+model KnowledgeBody {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  themeName          String   @map("theme_name")
+  themeDescription   String   @map("theme_description")
+  confidenceScore    Float    @default(0.3) @map("confidence_score")
+  growthPhase        String   @default("discovery") @map("growth_phase")
+  relatedFragmentIds String   @map("related_fragment_ids")
+  relatedEntityIds   String?  @map("related_entity_ids")
+  exportedDocId      String?  @map("exported_doc_id")
+  themeEmbedding     String?  @map("theme_embedding")
+  parentId           String?  @map("parent_id")
+  bodyType           String   @default("topic") @map("body_type")
+  lifecycleStatus    String   @default("active") @map("lifecycle_status")
+  lastActiveAt       DateTime @default(now()) @map("last_active_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  parent             KnowledgeBody?      @relation("BodyHierarchy", fields: [parentId], references: [id])
+  children           KnowledgeBody[]     @relation("BodyHierarchy")
+  nodes              KnowledgeBodyNode[]
+  themeEvolutionLogs ThemeEvolutionLog[]
+
+  @@map("knowledge_bodies")
+  @@index([userId, growthPhase])
+  @@index([parentId])
+  @@index([userId, bodyType])
+  @@index([userId, lifecycleStatus])
+}
+
+// 知识体大纲节点表
+model KnowledgeBodyNode {
+  id             String   @id @default(uuid())
+  bodyId         String   @map("body_id")
+  parentNodeId   String?  @map("parent_node_id")
+  title          String
+  status         String   @default("gap")
+  content        String?
+  generationMode String?  @map("generation_mode")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  body       KnowledgeBody      @relation(fields: [bodyId], references: [id], onDelete: Cascade)
+  parent     KnowledgeBodyNode?  @relation("NodeHierarchy", fields: [parentNodeId], references: [id])
+  children   KnowledgeBodyNode[] @relation("NodeHierarchy")
+
+  @@map("knowledge_body_nodes")
+  @@index([bodyId])
+  @@index([parentNodeId])
+}
+
+// 主题发现日志表
+model ThemeDiscoveryLog {
+  id                  String    @id @default(uuid())
+  status              String
+  themesFound         Int       @default(0) @map("themes_found")
+  fragmentsScanned    Int       @default(0) @map("fragments_scanned")
+  triggeredBy         String    @map("triggered_by")
+  error               String?
+  intentBodiesCreated Int       @default(0) @map("intent_bodies_created")
+  bodiesMerged        Int       @default(0) @map("bodies_merged")
+  stage4Error         String?   @map("stage4_error")
+  staleCount          Int       @default(0) @map("stale_count")
+  archivedCount       Int       @default(0) @map("archived_count")
+  stage5Error         String?   @map("stage5_error")
+  startedAt           DateTime  @default(now()) @map("started_at")
+  completedAt         DateTime? @map("completed_at")
+
+  @@map("theme_discovery_logs")
+  @@index([startedAt])
+}
+
+// 主题演化日志表
+model ThemeEvolutionLog {
+  id                       String   @id @default(uuid())
+  bodyId                   String   @map("body_id")
+  previousThemeName        String   @map("previous_theme_name")
+  previousThemeDescription String   @map("previous_theme_description")
+  newThemeName             String   @map("new_theme_name")
+  newThemeDescription      String   @map("new_theme_description")
+  driftScore               Float    @map("drift_score")
+  createdAt                DateTime @default(now()) @map("created_at")
+
+  body KnowledgeBody @relation(fields: [bodyId], references: [id], onDelete: Cascade)
+
+  @@map("theme_evolution_logs")
+  @@index([bodyId])
+  @@index([createdAt])
+}
