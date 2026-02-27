@@ -1,0 +1,208 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* Utility: hide scrollbars while keeping scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth scrolling */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+}
+
+/* ── Tiptap editor: pasted / inserted images ───────────────────── */
+.tiptap-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  margin: 6px 0;
+}
+
+/* ── Tiptap editor: gradient headings ──────────────────────────────
+   H1 / H2 / H3 inside the rich-text editor get the app's signature
+   indigo → violet → sky gradient text effect.                       */
+.tiptap-prose h1,
+.tiptap-prose h2,
+.tiptap-prose h3 {
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 45%, #38BDF8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Tiptap editor: blockquote ──────────────────────────────────────
+   渐变左边框 + 淡紫背景 + 顶部大引号装饰                             */
+.tiptap-prose blockquote {
+  position: relative;
+  margin: 1em 0;
+  padding: 0.85em 1.1em 0.85em 1.4em;
+  background: linear-gradient(135deg,
+    rgba(99, 102, 241, 0.07) 0%,
+    rgba(139, 92, 246, 0.04) 100%);
+  border-radius: 0 12px 12px 0;
+  overflow: visible;
+}
+
+/* 渐变左边框：用伪元素实现（border 不支持渐变） */
+.tiptap-prose blockquote::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3.5px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, #6366F1 0%, #8B5CF6 50%, #38BDF8 100%);
+}
+
+/* 顶部装饰引号 */
+.tiptap-prose blockquote::after {
+  content: '\201C';
+  position: absolute;
+  top: -4px;
+  left: 12px;
+  font-size: 2.4em;
+  line-height: 1;
+  font-weight: 800;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  opacity: 0.35;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 引用块内的段落：斜体 + 稍微收敛的颜色 */
+.tiptap-prose blockquote p {
+  margin: 0;
+  font-style: italic;
+  color: #4B4E72;
+  line-height: 1.7;
+}
+
+/* ── Tiptap editor: lists ───────────────────────────────────────────
+   Tailwind preflight 清零了 ul/ol 的 list-style / padding / margin，
+   这里统一还原并加上主题色圆点 / 数字样式。                          */
+.tiptap-prose ul,
+.tiptap-prose ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+/* 无序列表：渐变色实心圆点 */
+.tiptap-prose ul {
+  list-style: none;
+}
+.tiptap-prose ul > li {
+  position: relative;
+  padding-left: 0.2em;
+  margin: 0.25em 0;
+  line-height: 1.7;
+}
+.tiptap-prose ul > li::before {
+  content: '';
+  position: absolute;
+  left: -1.1em;
+  top: 0.62em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  flex-shrink: 0;
+}
+
+/* 有序列表：主题色数字 */
+.tiptap-prose ol {
+  list-style: none;
+  counter-reset: tiptap-ol;
+}
+.tiptap-prose ol > li {
+  position: relative;
+  padding-left: 0.2em;
+  margin: 0.25em 0;
+  line-height: 1.7;
+  counter-increment: tiptap-ol;
+}
+.tiptap-prose ol > li::before {
+  content: counter(tiptap-ol) '.';
+  position: absolute;
+  left: -1.5em;
+  top: 0;
+  width: 1.3em;
+  text-align: right;
+  font-size: 0.85em;
+  font-weight: 600;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Tiptap editor: table ────────────────────────────────────────────
+   与 AI 面板内联表格保持视觉一致：圆角边框、紫色表头、交替行色。   */
+.tiptap-prose table {
+  border-collapse: collapse;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #EEECF8;
+  margin: 1em 0;
+  font-size: 13px;
+}
+.tiptap-prose table thead tr {
+  background: #F5F3FF;
+}
+.tiptap-prose table th {
+  padding: 9px 14px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1A1A2E;
+  border-bottom: 1.5px solid #E4E0F5;
+  white-space: nowrap;
+}
+.tiptap-prose table tbody tr:nth-child(even) {
+  background: #FAFAF8;
+}
+.tiptap-prose table tbody tr:nth-child(odd) {
+  background: #FFFFFF;
+}
+.tiptap-prose table td {
+  padding: 9px 14px;
+  font-size: 12px;
+  color: #5A5A70;
+  border-bottom: 1px solid #F3F1F8;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.tiptap-prose table tbody tr:last-child td {
+  border-bottom: none;
+}
+.tiptap-prose table td:first-child {
+  font-weight: 600;
+  color: #1A1A2E;
+}
+/* 选中的单元格高亮（Tiptap Table 扩展默认行为） */
+.tiptap-prose .selectedCell {
+  background: rgba(99, 102, 241, 0.08) !important;
+  outline: 2px solid rgba(99, 102, 241, 0.3);
+  outline-offset: -1px;
+}
