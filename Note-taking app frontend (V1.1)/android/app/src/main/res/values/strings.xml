@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Note-taking App V1.1</string>
+    <string name="title_activity_main">Note-taking App V1.1</string>
+    <string name="package_name">com.example.notetakingappv11</string>
+    <string name="custom_url_scheme">com.example.notetakingappv11</string>
+</resources>
