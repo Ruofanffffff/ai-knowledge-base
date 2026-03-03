@@ -6,6 +6,12 @@ const http = require('http');
 const os = require('os');
 const multer = require('multer');
 const cors = require('cors');
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true
+}));
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 const { Document, Packer, Paragraph, TextRun } = require('docx');
 const JSZip = require('jszip');

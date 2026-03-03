@@ -744,9 +744,29 @@ const handleSubmit = async () => {
     if (!ok) return;
     setRegNickErr(''); setRegPwdErr(''); setRegPwd2Err('');
     setRegLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setRegLoading(false);
-    goForward(setPhoneStep);
+    
+    try {
+      const { data } = await api.post('/auth/register', {
+        phone: regPhone,
+        password: regPwd,
+        username: regNick,
+        email: '' // Optional for phone registration
+      });
+      
+      if (data.success) {
+        setRegLoading(false);
+        goForward(setPhoneStep);
+      } else {
+        setRegLoading(false);
+        setRegPhoneErr(data.error || '注册失败');
+        shake();
+      }
+    } catch (err: any) {
+      setRegLoading(false);
+      const msg = err.response?.data?.error || '网络错误';
+      setRegPhoneErr(msg);
+      shake();
+    }
   };
 
   // Email step 0 → 1
@@ -769,9 +789,29 @@ const handleSubmit = async () => {
     if (!regNick.trim()) { setRegNickErr('请输入昵称'); return; }
     setRegNickErr('');
     setRegLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setRegLoading(false);
-    goForward(setEmailStep);
+    
+    try {
+      const { data } = await api.post('/auth/register', {
+        email: regEmail,
+        password: regPwd,
+        username: regNick,
+        phone: '' // Optional for email registration
+      });
+      
+      if (data.success) {
+        setRegLoading(false);
+        goForward(setEmailStep);
+      } else {
+        setRegLoading(false);
+        setRegEmailErr(data.error || '注册失败');
+        shake();
+      }
+    } catch (err: any) {
+      setRegLoading(false);
+      const msg = err.response?.data?.error || '网络错误';
+      setRegEmailErr(msg);
+      shake();
+    }
   };
 
   const resetReg = () => {
