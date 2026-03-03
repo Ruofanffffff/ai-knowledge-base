@@ -78,6 +78,9 @@ app.use(cors({
   credentials: true
 }));
 
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
 const isElectron = process.env.NODE_ENV === 'production' && process.type !== undefined;
 
 // 静态文件服务
@@ -108,7 +111,7 @@ const userDb = initDatabase();
 const authRouter = authRoutes.initAuthRoutes();
 const userCenterRouter = userCenterRoutes.initUserCenterRoutes();
 const adminRouter = adminRoutes.initAdminRoutes();
-app.use('/api', chatRoutes);
+// app.use('/api', chatRoutes); // Moved to later with other routes
 initCommunityRoutes(userDb, kgPrisma);
 
 // Initialize storage and deduplication services
@@ -607,13 +610,10 @@ async function callDeepSeekModel(modelConfig, prompt, options = {}) {
   }
 }
 
-// 中间件
-app.use(cors({
-  origin: '*',
-  credentials: true
-}));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 中间件 - Moved to top
+// app.use(cors(...));
+// app.use(express.json());
+// app.use(express.urlencoded({ extended: true }));
 
 // 添加访问日志中间件
 app.use(accessLogMiddleware);
@@ -696,6 +696,9 @@ app.use('/api/notes', notesRoutes);
 
 // 社区路由
 app.use('/api/community', communityRouter);
+
+// 聊天路由
+app.use('/api', chatRoutes);
 
 // 附件路由
 const attachmentRoutes = require('./routes/attachmentRoutes');
