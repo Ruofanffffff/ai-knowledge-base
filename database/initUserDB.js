@@ -249,6 +249,39 @@ function createTables(db) {
       FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE
     )`);
 
+    // ============================================================
+    // IM / Chat Tables
+    // ============================================================
+    db.run(`CREATE TABLE IF NOT EXISTS conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type VARCHAR(20) DEFAULT 'direct', -- 'direct', 'group'
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS conversation_participants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(conversation_id, user_id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL,
+      sender_id INTEGER NOT NULL,
+      content TEXT,
+      type VARCHAR(20) DEFAULT 'text', -- 'text', 'image', 'note'
+      metadata TEXT, -- JSON string for extra data
+      is_read BOOLEAN DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
     console.log('Database tables created successfully.');
     
     createDefaultAdmin(db);

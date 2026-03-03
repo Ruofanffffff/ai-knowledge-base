@@ -89,6 +89,7 @@ const { initStatsService } = require('./services/statsService');
 const authRoutes = require('./routes/authRoutes');
 const userCenterRoutes = require('./routes/userCenterRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 const { router: communityRouter, initCommunityRoutes } = require('./routes/communityRoutes');
 const { initDatabase } = require('./database/initUserDB');
 const { PrismaClient } = require('@prisma/client');
@@ -100,6 +101,7 @@ const userDb = initDatabase();
 const authRouter = authRoutes.initAuthRoutes();
 const userCenterRouter = userCenterRoutes.initUserCenterRoutes();
 const adminRouter = adminRoutes.initAdminRoutes();
+app.use('/api', chatRoutes);
 initCommunityRoutes(userDb, kgPrisma);
 
 // Initialize storage and deduplication services
@@ -4433,7 +4435,25 @@ function getLocalIP() {
 const localIP = getLocalIP();
 
 if (process.env.NODE_ENV !== 'test') {
-  http.createServer(app).listen(PORT, '0.0.0.0', async () => {
+  const server = http.createServer(app);
+  
+  // Initialize Socket.IO
+  const { Server } = require("socket.io");
+  const io = new Server(server, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+  app.set('io', io);
+  
+  io.on('connection', (socket) => {
+    socket.on('join', (userId) => {
+      socket.join(`user:${userId}`);
+    });
+  });
+
+  server.listen(PORT, '0.0.0.0', async () => {
     console.log(`Server is running on http://0.0.0.0:${PORT}`);
     console.log(`Server is running on http://localhost:${PORT}`);
     console.log(`Server is accessible on network: http://${localIP}:${PORT}`);

@@ -4,26 +4,7 @@ import {
   ChevronLeft, Send, Smile, Phone, X, CornerUpLeft,
   Plus, Image as ImageIcon, FileText, ChevronRight, Check, Search,
 } from 'lucide-react';
-import {
-  getConversation, sendMessage, receiveMessage, deleteMessage,
-  formatMsgTime, groupByDate, ChatMessage,
-} from '../services/messageStore';
-
-// ── Auto-reply pools ──────────────────────────────────────────────────────────
-const AUTO_REPLIES = [
-  '哈哈，好的！有空详细聊聊 😊', '说得很有道理，我也有同感',
-  '这个想法很棒！期待后续 🙌', '嗯嗯，我最近也在研究这个方向',
-  '完全同意！知识管理确实是个大话题', '有意思，能展开讲讲吗？',
-  '受教了！收藏这条对话 ✨',
-];
-const AUTO_REPLIES_PHOTO = [
-  '好美的照片！在哪里拍的？📸', '哇，构图绝了！✨',
-  '太治愈了，我也想去这里 😍', '拍得很棒！用什么相机呀？',
-];
-const AUTO_REPLIES_NOTE = [
-  '这篇笔记写得很有深度！收藏了 ⭐', '受益匪浅，谢谢分享！🙌',
-  '这个角度很独特，期待更多干货 ✨', '已经转发给我的团队了 👏',
-];
+import { chatService, ChatMessage } from '../services/chatService';
 
 // ── Mock gallery ──────────────────────────────────────────────────────────────
 interface GalleryPhoto { id: string; url: string; }
@@ -54,6 +35,33 @@ const MY_NOTES: NoteItem[] = [
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props { userId: string; userName: string; userColor: string; userLetter: string; onClose: () => void; }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function formatMsgTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const d = new Date(timestamp);
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
+  if (diff < 86400000)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if (diff < 604800000) return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function groupByDate(messages: ChatMessage[]): { label: string; msgs: ChatMessage[] }[] {
+  const map = new Map<string, ChatMessage[]>();
+  messages.forEach(msg => {
+    const diff = Date.now() - msg.timestamp;
+    const d = new Date(msg.timestamp);
+    let key: string;
+    if (diff < 86400000) key = '今天';
+    else if (diff < 172800000) key = '昨天';
+    else key = `${d.getMonth() + 1}月${d.getDate()}日`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(msg);
+  });
+  return Array.from(map.entries()).map(([label, msgs]) => ({ label, msgs }));
+}
+
 // ── Emoji Support Detection ────────────────────────────────────────────────────
 let _emojiCanvas: HTMLCanvasElement | null = null;
 let _emojiCtx: CanvasRenderingContext2D | null = null;
@@ -74,7 +82,6 @@ function isEmojiSupported(emoji: string): boolean {
     ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 20, 20);
     ctx.fillStyle = 'black'; ctx.fillText(emoji, 0, 2);
     const d = ctx.getImageData(0, 0, 20, 20).data;
-    // Color emoji → colored pixels; unsupported/tofu → grayscale only
     let supported = false;
     for (let i = 0; i < d.length; i += 4) {
       if (d[i + 3] > 50 && (Math.abs(d[i] - d[i+1]) > 22 || Math.abs(d[i+1] - d[i+2]) > 22 || Math.abs(d[i] - d[i+2]) > 22)) {
@@ -123,7 +130,6 @@ function EmojiPickerPanel({
   const [search, setSearch] = useState('');
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Filter emoji data once at mount — removes anything that renders as a tofu box
   const filteredData = useMemo(() => {
     const result: Record<string, string[]> = {};
     Object.entries(EMOJI_DATA).forEach(([cat, emojis]) => {
@@ -148,7 +154,6 @@ function EmojiPickerPanel({
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#F4F4F7', userSelect: 'none' }}>
-
       {/* Search */}
       <div style={{ padding: '8px 12px 5px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '7px', background: 'rgba(60,60,67,0.12)', borderRadius: '10px', padding: '7px 11px' }}>
@@ -210,27 +215,22 @@ function EmojiPickerPanel({
         )}
       </div>
 
-      {/* Category tab bar — iOS keyboard style */}
+      {/* Category tab bar */}
       <div style={{
         flexShrink: 0, display: 'flex', alignItems: 'center',
         borderTop: '0.5px solid rgba(0,0,0,0.14)',
         background: 'linear-gradient(180deg,#DEDEE4 0%,#D8D8DE 100%)',
         padding: '3px 4px 5px',
       }}>
-        {/* Recent */}
         <button onClick={() => handleCatChange('recent')}
           style={{ flex: 1, aspectRatio: '1', border: 'none', cursor: 'pointer', borderRadius: '7px', background: activeCategory === 'recent' ? 'rgba(255,255,255,0.75)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', WebkitTapHighlightColor: 'transparent', boxShadow: activeCategory === 'recent' ? '0 1px 3px rgba(0,0,0,0.15)' : 'none', transition: 'all 0.15s' }}
         >🕐</button>
-
         {EMOJI_CATS.map(cat => (
           <button key={cat.id} onClick={() => handleCatChange(cat.id)}
             style={{ flex: 1, aspectRatio: '1', border: 'none', cursor: 'pointer', borderRadius: '7px', background: activeCategory === cat.id ? 'rgba(255,255,255,0.75)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', WebkitTapHighlightColor: 'transparent', boxShadow: activeCategory === cat.id ? '0 1px 3px rgba(0,0,0,0.15)' : 'none', transition: 'all 0.15s' }}
           >{cat.icon}</button>
         ))}
-
         <div style={{ width: '0.5px', height: '20px', background: 'rgba(0,0,0,0.18)', margin: '0 2px', flexShrink: 0 }} />
-
-        {/* ⌫ Backspace */}
         <button onClick={onDelete}
           style={{ flexShrink: 0, width: '38px', aspectRatio: '1', border: 'none', cursor: 'pointer', borderRadius: '7px', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', WebkitTapHighlightColor: 'transparent', color: '#3C3C43' }}
           onMouseDown={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.10)')}
@@ -345,7 +345,7 @@ function MessageBubble({ msg, userColor, userLetter, userName, isNew, onLongPres
   );
 }
 
-// ── ContextMenu ───────────────────���───────────────────────────────────────────
+// ── ContextMenu ──────────────────────────────────────────────────────────────
 function ContextMenu({ msg, userName, userColor, userLetter, onReply, onCopy, onDelete, onDismiss }: {
   msg: ChatMessage; userName: string; userColor: string; userLetter: string;
   onReply: () => void; onCopy: () => void; onDelete: () => void; onDismiss: () => void;
@@ -521,8 +521,8 @@ function NotePicker({ selectedId, onSelect, onSend, onClose }: { selectedId: str
 
 // ── DirectMessageSheet ────────────────────────────────────────────────────────
 export function DirectMessageSheet({ userId, userName, userColor, userLetter, onClose }: Props) {
-  const [conv, setConv]                       = useState(() => getConversation(userId));
-  const [newMsgIds, setNewMsgIds]             = useState<Set<string>>(new Set());
+  const [messages, setMessages]               = useState<ChatMessage[]>([]);
+  const [newMsgIds, setNewMsgIds]             = useState<Set<string | number>>(new Set());
   const [inputText, setInputText]             = useState('');
   const [isTyping, setIsTyping]               = useState(false);
   const [replyTarget, setReplyTarget]         = useState<ChatMessage | null>(null);
@@ -544,12 +544,23 @@ export function DirectMessageSheet({ userId, userName, userColor, userLetter, on
   const replyTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollToBottom = useCallback(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, []);
-  useEffect(() => { setTimeout(scrollToBottom, 120); }, [conv.messages.length, scrollToBottom]);
-  useEffect(() => {
-    const h = () => setConv(getConversation(userId));
-    window.addEventListener('hibrain_dm_update', h);
-    return () => window.removeEventListener('hibrain_dm_update', h);
+  
+  const loadMessages = useCallback(async () => {
+    try {
+      const { messages } = await chatService.getConversationMessages(userId);
+      setMessages(messages);
+    } catch (e) { console.error(e); }
   }, [userId]);
+
+  useEffect(() => { setTimeout(scrollToBottom, 120); }, [messages.length, scrollToBottom]);
+  
+  useEffect(() => {
+    loadMessages();
+    const handler = () => loadMessages();
+    window.addEventListener('hibrain_dm_new_message', handler);
+    return () => window.removeEventListener('hibrain_dm_new_message', handler);
+  }, [loadMessages]);
+
   useEffect(() => () => { if (typingTimer.current) clearTimeout(typingTimer.current); if (replyTimer.current) clearTimeout(replyTimer.current); }, []);
 
   const handleTextareaChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -563,22 +574,11 @@ export function DirectMessageSheet({ userId, userName, userColor, userLetter, on
   const handleCopy  = useCallback(() => { if (!contextMsg) return; navigator.clipboard.writeText(contextMsg.text || contextMsg.noteData?.title || '[图片]').catch(() => {}); setContextMsg(null); }, [contextMsg]);
   const handleDelete = useCallback(() => {
     if (!contextMsg) return;
-    deleteMessage(userId, contextMsg.id);
-    setConv(getConversation(userId));
+    // deleteMessage(userId, contextMsg.id); // TODO: Implement delete in chatService
+    // loadMessages();
     if (replyTarget?.id === contextMsg.id) setReplyTarget(null);
     setContextMsg(null);
   }, [contextMsg, userId, replyTarget]);
-
-  const triggerAutoReply = useCallback((pool: string[]) => {
-    const tD = 700 + Math.random() * 500, rD = tD + 900 + Math.random() * 800;
-    typingTimer.current = setTimeout(() => setIsTyping(true), tD);
-    replyTimer.current  = setTimeout(() => {
-      setIsTyping(false);
-      const r = receiveMessage(userId, pool[Math.floor(Math.random() * pool.length)]);
-      setNewMsgIds(p => new Set([...p, r.id]));
-      setConv(getConversation(userId));
-    }, rD);
-  }, [userId]);
 
   const insertEmoji = useCallback((emoji: string) => {
     const ta = textareaRef.current;
@@ -617,35 +617,41 @@ export function DirectMessageSheet({ userId, userName, userColor, userLetter, on
     });
   }, []);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = inputText.trim(); if (!text) return;
     const replyTo = replyTarget ? { text: replyTarget.text || (replyTarget.type === 'photo' ? '[图片]' : replyTarget.noteData?.title || '[笔记]'), fromMe: replyTarget.fromMe } : undefined;
     setInputText(''); setReplyTarget(null); setShowEmojiPicker(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    const sent = sendMessage(userId, text, { replyTo });
-    setNewMsgIds(p => new Set([...p, sent.id]));
-    setConv(getConversation(userId));
-    triggerAutoReply(AUTO_REPLIES);
+    
+    try {
+      const sent = await chatService.sendMessage(userId, text, { replyTo });
+      setNewMsgIds(p => new Set([...p, sent.id]));
+      loadMessages();
+    } catch (e) { console.error(e); }
   };
 
-  const handleSendPhotos = () => {
+  const handleSendPhotos = async () => {
     if (!selectedPhotos.size) return;
     const photoUrls = [...selectedPhotos].map(id => GALLERY_PHOTOS.find(p => p.id === id)!.url);
-    const sent = sendMessage(userId, '', { type: 'photo', photoUrls });
-    setNewMsgIds(p => new Set([...p, sent.id])); setConv(getConversation(userId));
+    try {
+      const sent = await chatService.sendMessage(userId, '', { type: 'photo', photoUrls });
+      setNewMsgIds(p => new Set([...p, sent.id])); 
+      loadMessages();
+    } catch (e) { console.error(e); }
     setSelectedPhotos(new Set()); setShowPhotoPicker(false);
-    triggerAutoReply(AUTO_REPLIES_PHOTO);
   };
 
-  const handleSendNote = () => {
+  const handleSendNote = async () => {
     const note = MY_NOTES.find(n => n.id === selectedNoteId); if (!note) return;
-    const sent = sendMessage(userId, '', { type: 'note', noteData: { id: note.id, title: note.title, cover: note.cover, tags: note.tags, excerpt: note.excerpt } });
-    setNewMsgIds(p => new Set([...p, sent.id])); setConv(getConversation(userId));
+    try {
+      const sent = await chatService.sendMessage(userId, '', { type: 'note', noteData: { id: note.id, title: note.title, cover: note.cover, tags: note.tags, excerpt: note.excerpt } });
+      setNewMsgIds(p => new Set([...p, sent.id]));
+      loadMessages();
+    } catch (e) { console.error(e); }
     setSelectedNoteId(null); setShowNotePicker(false);
-    triggerAutoReply(AUTO_REPLIES_NOTE);
   };
 
-  const groups = groupByDate(conv.messages);
+  const groups = groupByDate(messages);
 
   return (
     <>
@@ -751,7 +757,7 @@ export function DirectMessageSheet({ userId, userName, userColor, userLetter, on
                     <FileText size={22} color="white" />
                   </div>
                   <span style={{ color: '#1E1B4B', fontSize: '13px', fontWeight: 700 }}>发笔记</span>
-                  <span style={{ color: '#9CA3AF', fontSize: '11px' }}>分享我的��记</span>
+                  <span style={{ color: '#9CA3AF', fontSize: '11px' }}>分享我的笔记</span>
                 </button>
               </div>
             )}
@@ -820,7 +826,13 @@ export function DirectMessageSheet({ userId, userName, userColor, userLetter, on
                 </button>
               ) : (
                 <button
-                  onClick={() => { const s = sendMessage(userId,'👍',{}); setNewMsgIds(p=>new Set([...p,s.id])); setConv(getConversation(userId)); triggerAutoReply(AUTO_REPLIES); }}
+                  onClick={async () => { 
+                    try {
+                      const sent = await chatService.sendMessage(userId, '👍', {}); 
+                      setNewMsgIds(p=>new Set([...p,sent.id])); 
+                      loadMessages(); 
+                    } catch(e) { console.error(e); }
+                  }}
                   style={{ width: '36px', height: '36px', borderRadius: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,102,241,0.09)', border: 'none', cursor: 'pointer', fontSize: '20px', lineHeight: 1 }}>
                   👍
                 </button>

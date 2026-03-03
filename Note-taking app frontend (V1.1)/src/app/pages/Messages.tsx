@@ -5,12 +5,10 @@ import { ArrowLeft, Edit2, Search, MessageCircle } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { DirectMessageSheet } from '../components/DirectMessageSheet';
-import {
-  getAllConversations, getUnreadCount,
-  formatMsgTime, Conversation,
-} from '../services/messageStore';
+import { chatService } from '../services/chatService';
 
 // ── Shared user lookup ────────────────────────────────────────────────────────
+// Keeping this for fallback or static data if API doesn't provide enough info yet
 export const DM_USER_INFO: Record<string, { name: string; color: string; letter: string; bio: string }> = {
   '1': { name: '小明同学', color: '#6366F1', letter: '明', bio: '设计师 × 思考者' },
   '2': { name: '阿博读书', color: '#8B5CF6', letter: '博', bio: '每年读100本书' },
@@ -22,12 +20,18 @@ export const DM_USER_INFO: Record<string, { name: string; color: string; letter:
 
 // ── ConversationCard ──────────────────────────────────────────────────────────
 function ConversationCard({ conv, index, onOpen }: {
-  conv: Conversation; index: number; onOpen: () => void;
+  conv: any; index: number; onOpen: () => void;
 }) {
-  const info = DM_USER_INFO[conv.userId];
-  if (!info) return null;
+  // Use API data if available, fallback to static
+  const info = DM_USER_INFO[conv.userId] || {
+    name: conv.other_username || 'User ' + conv.userId,
+    color: '#6366F1',
+    letter: (conv.other_username || 'U')[0],
+    bio: ''
+  };
+  
   const lastMsg = conv.messages[conv.messages.length - 1];
-  const isUnread = !!lastMsg && !lastMsg.fromMe;
+  const isUnread = !!lastMsg && !lastMsg.fromMe && (conv.unread_count > 0); // Use backend count if available
   const preview = lastMsg
     ? (lastMsg.fromMe ? `我：${lastMsg.text}` : lastMsg.text)
     : '暂无消息';
@@ -57,7 +61,11 @@ function ConversationCard({ conv, index, onOpen }: {
           className="w-13 h-13 rounded-2xl flex items-center justify-center"
           style={{ width: '52px', height: '52px', background: `${info.color}18` }}
         >
-          <span style={{ color: info.color, fontSize: '20px', fontWeight: 900 }}>{info.letter}</span>
+          {conv.other_avatar ? (
+             <img src={conv.other_avatar} alt="" className="w-full h-full rounded-2xl object-cover" />
+          ) : (
+            <span style={{ color: info.color, fontSize: '20px', fontWeight: 900 }}>{info.letter}</span>
+          )}
         </div>
         {isUnread && (
           <motion.div
@@ -68,7 +76,7 @@ function ConversationCard({ conv, index, onOpen }: {
             style={{ background: '#EF4444' }}
           >
             <span style={{ color: 'white', fontSize: '9px', fontWeight: 800 }}>
-              {conv.messages.filter(m => !m.fromMe).length > 9 ? '9+' : '1'}
+              {conv.unread_count > 9 ? '9+' : conv.unread_count || '1'}
             </span>
           </motion.div>
         )}
@@ -120,39 +128,57 @@ function ConversationCard({ conv, index, onOpen }: {
   );
 }
 
+// Helper for time format (copied from messageStore)
+function formatMsgTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const d = new Date(timestamp);
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
+  if (diff < 86400000)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if (diff < 604800000) return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
 // ── Messages page ─────────────────────────────────────────────────────────────
 export function Messages() {
   const navigate = useNavigate();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [unread, setUnread] = useState(0);
 
-  const loadConvs = useCallback(() => {
-    const convs = getAllConversations().sort((a, b) => {
-      const tA = a.messages[a.messages.length - 1]?.timestamp ?? 0;
-      const tB = b.messages[b.messages.length - 1]?.timestamp ?? 0;
-      return tB - tA;
-    });
-    setConversations(convs);
-    setUnread(getUnreadCount());
+  const loadConvs = useCallback(async () => {
+    try {
+      const convs = await chatService.getConversations();
+      setConversations(convs);
+      // setUnread(convs.reduce((acc: number, c: any) => acc + (c.unread_count || 0), 0));
+    } catch (e) { console.error(e); }
   }, []);
 
   useEffect(() => {
+    chatService.connect();
     loadConvs();
-    window.addEventListener('hibrain_dm_update', loadConvs);
-    return () => window.removeEventListener('hibrain_dm_update', loadConvs);
+    window.addEventListener('hibrain_dm_new_message', loadConvs);
+    return () => {
+      window.removeEventListener('hibrain_dm_new_message', loadConvs);
+    };
   }, [loadConvs]);
 
   const filtered = conversations.filter(c => {
     if (!searchQuery) return true;
     const info = DM_USER_INFO[c.userId];
-    return info?.name.includes(searchQuery) ||
-      c.messages.some(m => m.text.includes(searchQuery));
+    const name = c.other_username || info?.name || '';
+    return name.includes(searchQuery) ||
+      c.messages?.some((m: any) => m.text.includes(searchQuery));
   });
 
-  const selectedUser = selectedUserId ? DM_USER_INFO[selectedUserId] : null;
+  const selectedUser = selectedUserId ? (DM_USER_INFO[selectedUserId] || { 
+     name: conversations.find(c => c.userId === selectedUserId)?.other_username || 'User',
+     color: '#6366F1', letter: 'U', bio: ''
+  }) : null;
+
 
   return (
     <div
