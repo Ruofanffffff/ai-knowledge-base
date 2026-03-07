@@ -38,6 +38,11 @@ api.interceptors.response.use(
 
     // Prevent infinite loops
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Don't intercept 401 for login requests - let the component handle "Wrong Password"
+      if (originalRequest.url?.includes('/auth/login')) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
       
       const refreshToken = localStorage.getItem('refresh_token');
