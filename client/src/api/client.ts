@@ -79,6 +79,11 @@ apiClient.interceptors.response.use(
 
     // --- 401 Token Refresh Logic ---
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      // Don't intercept 401 for login requests - let the component handle "Wrong Password"
+      if (originalRequest.url?.includes('/auth/login')) {
+        return Promise.reject(error);
+      }
+
       // If already refreshing, queue this request
       if (isRefreshing) {
         return new Promise<string>((resolve, reject) => {
