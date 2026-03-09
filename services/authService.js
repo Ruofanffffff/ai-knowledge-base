@@ -252,15 +252,17 @@ function legacyAuthMiddleware(req, res, next) {
   }
   
   const token = authHeader.substring(7);
-  const decoded = verifyAccessToken(token);
+  let decoded;
   
-  if (!decoded) {
+  try {
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
     return res.status(401).json({ error: '认证令牌无效或已过期' });
   }
   
   if (!db) db = initDatabase();
   
-  db.get('SELECT status FROM users WHERE id = ?', [decoded.userId], (err, user) => {
+  db.get('SELECT * FROM users WHERE id = ?', [decoded.userId], (err, user) => {
     if (err) {
       console.error('Auth middleware DB error:', err);
       return res.status(500).json({ error: '服务器内部错误' });
@@ -274,7 +276,7 @@ function legacyAuthMiddleware(req, res, next) {
       return res.status(403).json({ error: '账号已被禁用' });
     }
     
-    req.userId = decoded.userId;
+    req.userId = user.id;
     req.user = user;
     next();
   });
