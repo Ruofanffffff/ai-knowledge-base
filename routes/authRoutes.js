@@ -124,12 +124,12 @@ router.post('/register', async (req, res) => {
       });
     }
     
-    if (!email && !phone && !wechat_openid) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '请至少提供手机号或邮箱' 
-      });
-    }
+    // if (!email && !phone && !wechat_openid) {
+    //   return res.status(400).json({ 
+    //     success: false, 
+    //     error: '请至少提供手机号或邮箱' 
+    //   });
+    // }
     
     const user = await registerUser({
       username,

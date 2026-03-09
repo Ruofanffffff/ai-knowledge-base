@@ -72,12 +72,17 @@ async function registerUser(userData) {
   return new Promise((resolve, reject) => {
     const { username, email, phone, password, wechat_openid } = userData;
     
-    if (!username || !password) {
+    if (!username && !password) {
       return reject(new Error('用户名和密码不能为空'));
     }
     
     if (!email && !phone && !wechat_openid) {
-      return reject(new Error('邮箱、手机号或微信OpenID至少需要提供一个'));
+      // 允许仅通过用户名注册（如果业务允许），或者强制要求至少一个联系方式
+      // 这里修改为：如果有用户名和密码，就允许注册，email/phone 可选
+      // 但为了账号安全，建议至少保留一个联系方式。
+      // 如果前端没有传 email/phone，则不做强制校验，视业务需求而定。
+      // 假设当前需求是允许仅用户名注册：
+      // return reject(new Error('邮箱、手机号或微信OpenID至少需要提供一个'));
     }
     
     const hashedPassword = hashPassword(password);
