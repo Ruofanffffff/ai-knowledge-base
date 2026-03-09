@@ -71,25 +71,29 @@ function verifyAccessToken(token) {
 
 async function registerUser(userData) {
   return new Promise((resolve, reject) => {
-    const { username, email, phone, password, wechat_openid } = userData;
+    let { username, email, phone, password, wechat_openid } = userData;
     
-    if (!username && !password) {
-      return reject(new Error('用户名和密码不能为空'));
+    // 如果没有提供用户名，但提供了手机号，尝试使用手机号作为用户名
+    if (!username && phone) {
+      username = phone;
     }
     
-    if (!email && !phone && !wechat_openid) {
-      // 允许仅通过用户名注册（如果业务允许），或者强制要求至少一个联系方式
-      // 这里修改为：如果有用户名和密码，就允许注册，email/phone 可选
-      // 但为了账号安全，建议至少保留一个联系方式。
-      // 如果前端没有传 email/phone，则不做强制校验，视业务需求而定。
-      // 假设当前需求是允许仅用户名注册：
-      // return reject(new Error('邮箱、手机号或微信OpenID至少需要提供一个'));
+    if (!username) {
+      return reject(new Error('用户名不能为空'));
     }
+
+    if (!password) {
+      return reject(new Error('密码不能为空'));
+    }
+    
+    // 允许仅通过用户名注册，email/phone 可选
+    // 只要有 username 和 password 即可（username 在上面已经保证不为空，除非是仅有 password 的情况，但上面也校验了）
+    // 且这里我们增加了对 phone 的支持，如果有 phone 没有 username，会使用 phone 作为 username
     
     const hashedPassword = hashPassword(password);
     
     db.get(
-      'SELECT id FROM users WHERE username = ? OR email = ? OR phone = ? OR wechat_openid = ?',
+      'SELECT id FROM users WHERE username = ? OR (email IS NOT NULL AND email = ?) OR (phone IS NOT NULL AND phone = ?) OR (wechat_openid IS NOT NULL AND wechat_openid = ?)',
       [username, email, phone, wechat_openid],
       (err, row) => {
         if (err) {

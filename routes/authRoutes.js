@@ -111,28 +111,57 @@ router.post('/register/phone', async (req, res) => {
 });
 
 // ============================================================
+// 发送验证码（Mock）
+// ============================================================
+router.post('/send-code', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      return res.status(400).json({ success: false, error: '手机号不能为空' });
+    }
+    
+    // Mock: 总是发送成功，验证码假设为 123456
+    console.log(`向手机号 ${phone} 发送验证码: 123456`);
+    
+    res.json({
+      success: true,
+      message: '验证码发送成功',
+      data: { code: '123456' } // 在实际生产环境中不要返回验证码
+    });
+  } catch (error) {
+    console.error('发送验证码失败:', error);
+    res.status(500).json({ success: false, error: '发送验证码失败' });
+  }
+});
+
+// ============================================================
 // 注册路由（本地模式保留）
 // ============================================================
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, phone, password, wechat_openid } = req.body;
+    const { username, email, phone, code, password, wechat_openid } = req.body;
     
-    if (!username || !password) {
+    // 验证逻辑调整：
+    // 1. 如果提供了手机号和验证码，则必须有密码，用户名可选（如果没有提供用户名，后端自动生成或使用手机号）
+    // 2. 如果没有提供手机号/验证码，则必须提供用户名和密码
+    
+    if (phone && code) {
+      if (!password) {
+        return res.status(400).json({ success: false, error: '密码不能为空' });
+      }
+      // Mock 验证码校验
+      if (code !== '123456') {
+        return res.status(400).json({ success: false, error: '验证码错误' });
+      }
+    } else if (!username || !password) {
       return res.status(400).json({ 
         success: false, 
         error: '用户名和密码不能为空' 
       });
     }
     
-    // if (!email && !phone && !wechat_openid) {
-    //   return res.status(400).json({ 
-    //     success: false, 
-    //     error: '请至少提供手机号或邮箱' 
-    //   });
-    // }
-    
     const user = await registerUser({
-      username,
+      username: username, // 如果未提供用户名，authService 会尝试使用手机号作为用户名
       email,
       phone,
       password,

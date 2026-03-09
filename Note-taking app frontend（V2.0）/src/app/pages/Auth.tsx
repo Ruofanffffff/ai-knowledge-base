@@ -1,50 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { ParticleBackground } from '../components/ParticleBackground';
+import { api } from '../services/api';
 import { motion, AnimatePresence, useAnimate } from 'motion/react';
 import {
   Eye, EyeOff, Lock, Mail, User, ArrowRight, Brain,
   Phone, ShieldCheck, CheckCircle2, Sparkles, X, ChevronLeft,
 } from 'lucide-react';
-import { api } from '../services/api';
 
 /* ─────────────────────────────────────────────────────
    Global styles
 ───────────────────────────────────────────────────── */
 const GLOBAL_CSS = `
-  .auth-input::placeholder  { color: rgba(115,135,185,0.52); }
-  .auth-input               { caret-color: rgba(85,110,220,0.90); }
+  .auth-input::placeholder  { color: rgba(99,102,241,0.38); }
+  .auth-input               { caret-color: rgba(99,102,241,0.90); }
   .otp-input                { caret-color: transparent; text-align: center; }
-  .otp-input::selection     { background: rgba(90,125,225,0.25); }
-  @keyframes pulse-ring {
-    0%   { transform: scale(0.85); opacity: 0.7; }
-    70%  { transform: scale(1.25); opacity: 0;   }
-    100% { transform: scale(1.25); opacity: 0;   }
-  }
-  @keyframes bk-a{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(16px,-28px) scale(1.13)}55%{transform:translate(-12px,16px) scale(0.93)}80%{transform:translate(10px,-18px) scale(1.08)}}
-  @keyframes bk-b{0%,100%{transform:translate(0,0) scale(1)}35%{transform:translate(-20px,-16px) scale(1.09)}70%{transform:translate(14px,14px) scale(0.95)}}
-  @keyframes bk-c{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(12px,-22px) scale(1.11)}75%{transform:translate(-16px,10px) scale(0.94)}}
-  @keyframes bk-d{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-14px,-18px) scale(1.14)}85%{transform:translate(16px,8px) scale(0.97)}}
-  @keyframes shaft-pulse{0%,100%{opacity:0.28}38%{opacity:0.82}72%{opacity:0.18}}
+  .otp-input::selection     { background: rgba(99,102,241,0.22); }
 `;
 
-// Spring cherry-blossom trees in bright daylight — soft white sky
-const BG_URL =
-  'https://images.unsplash.com/photo-1609149786017-e674eeb08209?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVycnklMjBibG9zc29tJTIwdHJlZXMlMjBicmlnaHQlMjBkYXlsaWdodCUyMHNvZnQlMjB3aGl0ZSUyMHNreSUyMHNwcmluZ3xlbnwxfHx8fDE3NzI0MTQ4ODJ8MA&ixlib=rb-4.1.0&q=80&w=1080';
 
-// Keyframe name assigned to each bokeh blob (4 variants, cycling)
-const BK_ANIMS = ['bk-a','bk-b','bk-c','bk-d','bk-a','bk-b','bk-c','bk-d'] as const;
-
-// Spring bokeh — airy sky blues, warm sunlight, fresh mint, gentle pastels
-const BOKEH = [
-  { w: 260, h: 280, x: 6,  y: 7,  c: 'rgba(195,225,255,0.55)', dur: 10, d:  0  }, // clear sky
-  { w: 320, h: 285, x: 80, y: 4,  c: 'rgba(255,240,195,0.50)', dur: 13, d: -4  }, // warm sunlight
-  { w: 170, h: 185, x: 50, y: 56, c: 'rgba(210,242,228,0.52)', dur:  9, d: -6  }, // fresh mint
-  { w: 265, h: 230, x: 90, y: 42, c: 'rgba(235,222,255,0.50)', dur: 15, d: -2  }, // soft wisteria
-  { w: 145, h: 158, x: 16, y: 75, c: 'rgba(255,228,205,0.48)', dur:  8, d: -5  }, // peach blossom
-  { w: 225, h: 205, x: 64, y: 18, c: 'rgba(205,240,225,0.50)', dur: 16, d: -9  }, // spring green
-  { w: 175, h: 188, x: 36, y: 86, c: 'rgba(255,215,228,0.50)', dur: 11, d: -3  }, // pale sakura
-  { w: 158, h: 148, x: 95, y: 76, c: 'rgba(215,232,255,0.50)', dur: 12, d: -7  }, // sky blue
-];
 
 const SLIDE = {
   enter: (dir: number) => ({ x: dir > 0 ? 56 : -56, opacity: 0 }),
@@ -53,94 +27,8 @@ const SLIDE = {
 };
 
 /* ─────────────────────────────────────────────────────
-   Cherry-petal canvas
+   Confetti canvas (success burst)
 ───────────────────────────────────────────────────── */
-/* ── Optimised SpringPetals ──────────────────────────────────────────
-   Key changes vs original:
-   • 42 petals (was 65) — same density on mobile screens
-   • Time-based throttle at ~30 fps via delta-time (no frame-skip jitter)
-   • Petal vein stroke preserved — it's only 2 draw calls per petal
-   • Visibility pause — halts RAF when tab is hidden
-   All physics scaled by dt so motion speed is identical at any fps.    */
-function SpringPetals() {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = ref.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
-    const resize = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize(); window.addEventListener('resize', resize);
-
-    let paused = false;
-    let lastTs = 0;
-    const FPS_MS = 1000 / 30;
-    const onVis = () => { paused = document.hidden; };
-    document.addEventListener('visibilitychange', onVis);
-
-    interface P { x:number;y:number;vx:number;vy:number;sz:number;rot:number;rv:number;op:number;hue:number;st:number;ss:number; }
-    const mk = (): P => ({
-      x: Math.random()*canvas.width, y: -20-Math.random()*canvas.height*0.6,
-      vx: (Math.random()-0.5)*0.55, vy: Math.random()*0.65+0.22,
-      sz: Math.random()*11+4, rot: Math.random()*Math.PI*2, rv: (Math.random()-0.5)*0.022,
-      // Higher opacity range for visibility against the light spring background
-      op: Math.random()*0.55+0.32, hue: Math.random()*40-12,
-      st: Math.random()*Math.PI*2, ss: Math.random()*0.009+0.004,
-    });
-    const petals: P[] = Array.from({ length: 42 }, mk);
-
-    const drawPetal = (p: P) => {
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = p.op;
-      const h = 338 + p.hue;
-      // More saturated and slightly darker so petals pop on the light background
-      ctx.fillStyle = `hsl(${h},78%,81%)`;
-      ctx.beginPath();
-      ctx.moveTo(0, -p.sz);
-      ctx.bezierCurveTo( p.sz*0.65, -p.sz*0.25,  p.sz*0.65,  p.sz*0.35, 0,  p.sz*0.22);
-      ctx.bezierCurveTo(-p.sz*0.65,  p.sz*0.35, -p.sz*0.65, -p.sz*0.25, 0, -p.sz);
-      ctx.fill();
-      /* Vein */
-      ctx.globalAlpha = p.op * 0.40;
-      ctx.strokeStyle = `hsl(${h+12},55%,92%)`;
-      ctx.lineWidth = p.sz * 0.12; ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(0, -p.sz*0.85);
-      ctx.quadraticCurveTo(p.sz*0.18, -p.sz*0.1, 0, p.sz*0.18);
-      ctx.stroke();
-      ctx.restore();
-    };
-
-    let raf: number;
-    const tick = (ts: number) => {
-      raf = requestAnimationFrame(tick);
-      if (paused) return;
-      const elapsed = ts - lastTs;
-      if (elapsed < FPS_MS) return;
-      const dt = Math.min(elapsed / 16.67, 3); // frames since last draw, capped
-      lastTs = ts - (elapsed % FPS_MS);
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (const p of petals) {
-        p.st  += p.ss * dt;
-        p.x   += (p.vx + Math.sin(p.st) * 0.7) * dt;
-        p.y   += p.vy  * dt;
-        p.rot += p.rv  * dt;
-        if (p.y > canvas.height+30 || p.x < -50 || p.x > canvas.width+50)
-          Object.assign(p, mk(), { y: -22, x: Math.random()*canvas.width });
-        drawPetal(p);
-      }
-    };
-    tick(0);
-    return () => {
-      window.removeEventListener('resize', resize);
-      document.removeEventListener('visibilitychange', onVis);
-      cancelAnimationFrame(raf);
-    };
-  }, []);
-  return <canvas ref={ref} className="absolute inset-0 w-full h-full pointer-events-none" />;
-}
-
 /* ─────────────────────────────────────────────────────
    Confetti canvas (success burst)
 ───────────────────────────────────────────────────── */
@@ -280,25 +168,25 @@ function GlassInput({ icon: Icon, type, placeholder, value, onChange,
     <div>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderRadius: 16,
-        background: focused ? 'rgba(242,247,255,0.92)' : 'rgba(235,243,255,0.72)',
-        border: `1.5px solid ${focused ? 'rgba(95,135,225,0.65)' : error ? 'rgba(215,65,65,0.52)' : 'rgba(178,205,242,0.50)'}`,
+        background: focused ? 'rgba(242,241,255,0.92)' : 'rgba(238,237,255,0.65)',
+        border: `1.5px solid ${focused ? 'rgba(99,102,241,0.55)' : error ? 'rgba(220,60,60,0.48)' : 'rgba(168,162,255,0.38)'}`,
         boxShadow: focused
-          ? 'inset 0 1px 0 rgba(255,255,255,0.62), 0 0 0 3px rgba(95,135,225,0.10), 0 4px 20px rgba(80,120,215,0.08)'
-          : 'inset 0 1px 0 rgba(255,255,255,0.50)',
+          ? 'inset 0 1px 0 rgba(255,255,255,0.70), 0 0 0 3px rgba(99,102,241,0.08), 0 4px 20px rgba(99,102,241,0.06)'
+          : 'inset 0 1px 0 rgba(255,255,255,0.60)',
         transition: 'all 0.22s ease',
       }}>
-        <Icon size={15} style={{ color: focused ? 'rgba(78,115,218,0.92)' : 'rgba(128,152,208,0.65)', flexShrink: 0, transition: 'color 0.2s' }} />
+        <Icon size={15} style={{ color: focused ? '#6366F1' : 'rgba(139,138,230,0.60)', flexShrink: 0, transition: 'color 0.2s' }} />
         <input type={type ?? 'text'} inputMode={inputMode} placeholder={placeholder} value={value}
           onChange={e => onChange(e.target.value)} onFocus={onFocus} onBlur={onBlur}
           className="flex-1 bg-transparent outline-none auth-input"
-          style={{ color: 'rgba(18,28,75,0.88)', fontSize: '14px', minWidth: 0 }} />
+          style={{ color: '#1E1B4B', fontSize: '14px', minWidth: 0 }} />
         {rightSlot}
       </div>
       <AnimatePresence>
         {error && (
           <motion.p key="err" initial={{ opacity: 0, y: -4, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: -4, height: 0 }} transition={{ duration: 0.18 }}
-            style={{ color: 'rgba(255,110,100,0.92)', fontSize: '11.5px', marginTop: 5, paddingLeft: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
+            style={{ color: 'rgba(220,60,60,0.88)', fontSize: '11.5px', marginTop: 5, paddingLeft: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
             <span style={{ fontSize: '10px' }}>⚠</span>{error}
           </motion.p>
         )}
@@ -310,8 +198,8 @@ function GlassInput({ icon: Icon, type, placeholder, value, onChange,
 function EyeBtn({ show, toggle }: { show: boolean; toggle: () => void }) {
   return (
     <motion.button whileTap={{ scale: 0.85 }} onClick={toggle} type="button" style={{ flexShrink: 0 }}>
-      {show ? <EyeOff size={14} style={{ color: 'rgba(125,148,200,0.60)' }} />
-             : <Eye    size={14} style={{ color: 'rgba(125,148,200,0.60)' }} />}
+      {show ? <EyeOff size={14} style={{ color: 'rgba(139,138,230,0.58)' }} />
+             : <Eye    size={14} style={{ color: 'rgba(139,138,230,0.58)' }} />}
     </motion.button>
   );
 }
@@ -332,9 +220,9 @@ function StepDots({ total, current }: { total: number; current: number }) {
   return (
     <div className="flex items-center justify-center gap-2 mb-5">
       {Array.from({ length: total }, (_, i) => (
-        <motion.div key={i} animate={{ width: i === current ? 22 : 8, background: i < current ? '#22C55E' : i === current ? '#6C7EDF' : 'rgba(185,205,238,0.55)' }}
+        <motion.div key={i} animate={{ width: i === current ? 22 : 8, background: i < current ? '#22C55E' : i === current ? '#6366F1' : 'rgba(200,198,255,0.50)' }}
           transition={{ duration: 0.32, ease: [0.16,1,0.3,1] }}
-          style={{ height: 8, borderRadius: 4, boxShadow: i === current ? '0 0 8px rgba(108,126,223,0.50)' : 'none' }} />
+          style={{ height: 8, borderRadius: 4, boxShadow: i === current ? '0 0 8px rgba(99,102,241,0.50)' : 'none' }} />
       ))}
     </div>
   );
@@ -386,10 +274,10 @@ function OtpBoxes({ value, onChange, error, shake: shakeIt }: {
               className="otp-input outline-none"
               style={{
                 width: 44, height: 54, borderRadius: 14, fontSize: '24px', fontWeight: 800,
-                background: d ? 'rgba(210,226,255,0.88)' : 'rgba(233,241,255,0.72)',
-                border: `2px solid ${d ? 'rgba(98,132,222,0.75)' : error ? 'rgba(215,65,65,0.50)' : 'rgba(178,203,242,0.50)'}`,
-                color: 'rgba(18,28,75,0.90)',
-                boxShadow: d ? '0 0 10px rgba(98,132,222,0.22)' : 'none',
+                background: d ? 'rgba(225,222,255,0.90)' : 'rgba(238,237,255,0.70)',
+                border: `2px solid ${d ? 'rgba(99,102,241,0.72)' : error ? 'rgba(220,60,60,0.50)' : 'rgba(168,162,255,0.38)'}`,
+                color: '#1E1B4B',
+                boxShadow: d ? '0 0 10px rgba(99,102,241,0.22)' : 'none',
                 transition: 'all 0.2s ease',
               }}
             />
@@ -400,7 +288,7 @@ function OtpBoxes({ value, onChange, error, shake: shakeIt }: {
         {error && (
           <motion.p key="otp-err" initial={{ opacity: 0, y: -4, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: -4, height: 0 }} transition={{ duration: 0.18 }}
-            className="text-center mt-3" style={{ color: 'rgba(255,110,100,0.92)', fontSize: '12px' }}>
+            className="text-center mt-3" style={{ color: 'rgba(220,60,60,0.88)', fontSize: '12px' }}>
             <span style={{ fontSize: '11px' }}>⚠</span> {error}
           </motion.p>
         )}
@@ -431,12 +319,12 @@ function StrengthBar({ pwd }: { pwd: string }) {
     <div className="mt-2 flex items-center gap-2">
       <div className="flex gap-1 flex-1">
         {[1,2,3,4].map(i => (
-          <motion.div key={i} animate={{ background: i <= s ? STRENGTH_COLOR[s] : 'rgba(195,215,245,0.60)', scaleX: i <= s ? 1 : 0.5 }}
+          <motion.div key={i} animate={{ background: i <= s ? STRENGTH_COLOR[s] : 'rgba(200,198,255,0.55)', scaleX: i <= s ? 1 : 0.5 }}
             transition={{ duration: 0.3 }} style={{ flex: 1, height: 3, borderRadius: 2, transformOrigin: 'left' }} />
         ))}
       </div>
       <motion.span key={s} initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
-        style={{ fontSize: '11px', color: STRENGTH_COLOR[s] || 'rgba(138,155,202,0.65)', minWidth: 20, textAlign: 'right' }}>
+        style={{ fontSize: '11px', color: STRENGTH_COLOR[s] || 'rgba(139,138,230,0.60)', minWidth: 20, textAlign: 'right' }}>
         {STRENGTH_LABEL[s]}
       </motion.span>
     </div>
@@ -462,7 +350,7 @@ function SuccessScreen({ onDone }: { onDone: () => void }) {
         <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.4, 0, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
           className="absolute inset-0 rounded-full"
-          style={{ background: 'rgba(108,126,223,0.22)' }} />
+          style={{ background: 'rgba(99,102,241,0.18)' }} />
         <motion.div initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }}
           transition={{ type: 'spring', stiffness: 220, damping: 16, delay: 0.1 }}
           className="w-20 h-20 rounded-full flex items-center justify-center relative"
@@ -479,12 +367,12 @@ function SuccessScreen({ onDone }: { onDone: () => void }) {
       {/* Title */}
       <motion.p initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.45, duration: 0.5, ease: [0.16,1,0.3,1] }}
-        style={{ color: 'rgba(18,28,75,0.92)', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 6 }}>
+        style={{ color: '#1E1B4B', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 6 }}>
         注册成功！🎉
       </motion.p>
       <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6, duration: 0.5 }}
-        style={{ color: 'rgba(75,95,155,0.72)', fontSize: '13.5px', marginBottom: 24, textAlign: 'center' }}>
+        style={{ color: 'rgba(99,102,241,0.65)', fontSize: '13.5px', marginBottom: 24, textAlign: 'center' }}>
         欢迎加入 Hi Brain，探索你的思维宇宙
       </motion.p>
 
@@ -500,12 +388,12 @@ function SuccessScreen({ onDone }: { onDone: () => void }) {
       </motion.div>
 
       {/* Progress bar */}
-      <div className="w-full" style={{ background: 'rgba(200,218,248,0.55)', borderRadius: 4, height: 4, overflow: 'hidden' }}>
+      <div className="w-full" style={{ background: 'rgba(200,198,255,0.50)', borderRadius: 4, height: 4, overflow: 'hidden' }}>
         <motion.div initial={{ width: '100%' }} animate={{ width: '0%' }}
           transition={{ duration: 3, ease: 'linear' }}
           style={{ height: '100%', background: 'linear-gradient(90deg,#C084FC,#7C3AED)', borderRadius: 4 }} />
       </div>
-      <p className="mt-2" style={{ color: 'rgba(125,142,190,0.68)', fontSize: '12px' }}>{countdown}s 后进入 Hi Brain</p>
+      <p className="mt-2" style={{ color: 'rgba(99,102,241,0.52)', fontSize: '12px' }}>{countdown}s 后进入 Hi Brain</p>
     </div>
   );
 }
@@ -613,40 +501,35 @@ export function Auth() {
     setErrors(e); return Object.keys(e).length === 0;
   };
 
-const handleSubmit = async () => {
+  const handleSubmit = async () => {
     if (!validate()) { shake(); return; }
     setLoading(true);
-    
     try {
-      const payload = method === 'phone' 
-        ? { phone: form.phone, password: form.password }
+      const payload = method === 'phone'
+        ? { phone: form.phone, code: form.code }
         : { email: form.email, password: form.password };
-        
+
       const { data } = await api.post('/auth/login', payload);
-      
+
       if (data.success) {
-        setSuccess(true);
+        setLoading(false); setSuccess(true);
         localStorage.setItem('access_token', data.data.accessToken);
         localStorage.setItem('refresh_token', data.data.refreshToken);
         localStorage.setItem('user_info', JSON.stringify(data.data.user));
-        localStorage.setItem('hi_brain_authed','1');
-        
+        localStorage.setItem('hi_brain_authed', '1');
+
         await new Promise(r => setTimeout(r, 900));
         navigate('/home');
       } else {
-        // Handle error (show toast or set error)
-        if (method === 'email') setErrors(e => ({ ...e, password: data.error || '登录失败' }));
-        else setErrors(e => ({ ...e, password: data.error || '登录失败' }));
+        setLoading(false);
+        setErrors(prev => ({ ...prev, [method === 'phone' ? 'code' : 'password']: data.message || '登录失败' }));
         shake();
       }
     } catch (err: any) {
-      console.error(err);
-      const msg = err.response?.data?.error || '网络错误';
-      if (method === 'email') setErrors(e => ({ ...e, password: msg }));
-      else setErrors(e => ({ ...e, password: msg }));
-      shake();
-    } finally {
       setLoading(false);
+      const msg = err.response?.data?.message || '登录失败，请稍后重试';
+      setErrors(prev => ({ ...prev, [method === 'phone' ? 'code' : 'password']: msg }));
+      shake();
     }
   };
 
@@ -656,13 +539,13 @@ const handleSubmit = async () => {
     return (
       <motion.button whileTap={{ scale: 0.9 }} onClick={sendCode} disabled={countdown > 0} type="button"
         style={{ flexShrink:0, whiteSpace:'nowrap', fontSize:'12px', fontWeight:600,
-          color: countdown > 0 ? 'rgba(135,155,205,0.62)' : 'rgba(82,105,218,0.92)',
+          color: countdown > 0 ? 'rgba(139,138,230,0.55)' : '#6366F1',
           display:'flex', alignItems:'center', gap:4, padding:'2px 0' }}>
         {countdown > 0 ? (
           <>
             <svg width="20" height="20" style={{ transform: 'rotate(-90deg)', flexShrink:0 }}>
-              <circle cx="10" cy="10" r={r} fill="none" stroke="rgba(195,215,248,0.60)" strokeWidth="2.2" />
-              <circle cx="10" cy="10" r={r} fill="none" stroke="rgba(95,125,222,0.80)" strokeWidth="2.2"
+              <circle cx="10" cy="10" r={r} fill="none" stroke="rgba(200,198,255,0.55)" strokeWidth="2.2" />
+              <circle cx="10" cy="10" r={r} fill="none" stroke="rgba(99,102,241,0.80)" strokeWidth="2.2"
                 strokeDasharray={circ} strokeDashoffset={circ*(countdown/60)} style={{ transition:'stroke-dashoffset 1s linear' }} />
             </svg>
             <span style={{ minWidth:22 }}>{countdown}s</span>
@@ -716,34 +599,33 @@ const handleSubmit = async () => {
   const handlePhoneSend = async () => {
     if (regPhone.replace(/\D/g,'').length !== 11) { setRegPhoneErr('请输入正确的11位手机号'); return; }
     setRegPhoneErr('');
-    
-    // Call backend to send mock code
     try {
-      await api.post('/auth/send-code', { phone: regPhone });
-      // Mock success even if network fails in dev, but here we assume backend is up
-    } catch (e) {
-      console.warn('Mock SMS send failed, continuing anyway for dev');
+      const { data } = await api.post('/auth/send-code', { phone: regPhone.replace(/\D/g,'') });
+      if (data.success) {
+        startRegCd();
+        goForward(setPhoneStep);
+      } else {
+        setRegPhoneErr(data.message || '发送失败');
+      }
+    } catch (err: any) {
+      setRegPhoneErr(err.response?.data?.message || '发送验证码失败');
     }
-
-    startRegCd();
-    goForward(setPhoneStep);
   };
 
   // Phone step 1 → 2
   const handleOtpVerify = async () => {
     if (otp.some(d => !d)) { setOtpError('请输入完整的6位验证码'); setOtpShake(true); setTimeout(() => setOtpShake(false), 600); return; }
     
-    // Check mock code
-    if (otp.join('') !== '123456') {
-      setOtpError('验证码错误 (测试请用 123456)');
-      setOtpShake(true); 
-      setTimeout(() => setOtpShake(false), 600); 
-      return; 
+    const code = otp.join('');
+    if (code !== '123456') {
+      setOtpError('验证码错误 (测试环境请输入 123456)');
+      setOtpShake(true); setTimeout(() => setOtpShake(false), 600);
+      return;
     }
 
     setOtpError('');
     setRegLoading(true);
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 900));
     setRegLoading(false);
     goForward(setPhoneStep);
   };
@@ -760,26 +642,27 @@ const handleSubmit = async () => {
     
     try {
       const { data } = await api.post('/auth/register', {
-        phone: regPhone,
+        phone: regPhone.replace(/\D/g,''),
         password: regPwd,
         username: regNick,
-        code: '123456', // Pass the verified code to backend
-        email: '' // Optional for phone registration
+        code: '123456'
       });
       
       if (data.success) {
+        if (data.data?.accessToken) {
+          localStorage.setItem('access_token', data.data.accessToken);
+          localStorage.setItem('refresh_token', data.data.refreshToken);
+          localStorage.setItem('user_info', JSON.stringify(data.data.user));
+        }
         setRegLoading(false);
         goForward(setPhoneStep);
       } else {
         setRegLoading(false);
-        setRegPhoneErr(data.error || '注册失败');
-        shake();
+        setRegPwdErr(data.message || '注册失败');
       }
     } catch (err: any) {
       setRegLoading(false);
-      const msg = err.response?.data?.error || '网络错误';
-      setRegPhoneErr(msg);
-      shake();
+      setRegPwdErr(err.response?.data?.message || '注册失败');
     }
   };
 
@@ -808,23 +691,24 @@ const handleSubmit = async () => {
       const { data } = await api.post('/auth/register', {
         email: regEmail,
         password: regPwd,
-        username: regNick,
-        phone: '' // Optional for email registration
+        username: regNick
       });
       
       if (data.success) {
+        if (data.data?.accessToken) {
+          localStorage.setItem('access_token', data.data.accessToken);
+          localStorage.setItem('refresh_token', data.data.refreshToken);
+          localStorage.setItem('user_info', JSON.stringify(data.data.user));
+        }
         setRegLoading(false);
         goForward(setEmailStep);
       } else {
         setRegLoading(false);
-        setRegEmailErr(data.error || '注册失败');
-        shake();
+        setRegNickErr(data.message || '注册失败');
       }
     } catch (err: any) {
       setRegLoading(false);
-      const msg = err.response?.data?.error || '网络错误';
-      setRegEmailErr(msg);
-      shake();
+      setRegNickErr(err.response?.data?.message || '注册失败');
     }
   };
 
@@ -855,7 +739,7 @@ const handleSubmit = async () => {
   const RegMethodSelect = () => (
     <div className="px-5 pb-5">
       <motion.p initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.05 }}
-        style={{ color:'rgba(75,95,158,0.72)', fontSize:'13px', marginBottom:16, textAlign:'center' }}>
+        style={{ color:'rgba(99,102,241,0.65)', fontSize:'13px', marginBottom:16, textAlign:'center' }}>
         选择注册方式
       </motion.p>
       <div className="grid grid-cols-2 gap-3">
@@ -887,7 +771,7 @@ const handleSubmit = async () => {
         ))}
       </div>
       <motion.p initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.4 }}
-        className="text-center mt-4" style={{ color:'rgba(132,150,200,0.62)', fontSize:'11px' }}>
+        className="text-center mt-4" style={{ color:'rgba(99,102,241,0.42)', fontSize:'11px' }}>
         注册即代表同意《用户协议》及《隐私政策》
       </motion.p>
     </div>
@@ -903,8 +787,8 @@ const handleSubmit = async () => {
           style={{ background:'linear-gradient(135deg,#8B5CF6,#6D28D9)', boxShadow:'0 8px 24px rgba(109,40,217,0.5)' }}>
           <Phone size={24} color="white" />
         </motion.div>
-        <p style={{ color:'rgba(18,28,75,0.88)', fontSize:'17px', fontWeight:800 }}>输入手机号</p>
-        <p style={{ color:'rgba(88,108,165,0.65)', fontSize:'12.5px', marginTop:3 }}>我们将向您发送6位验证码</p>
+        <p style={{ color:'#1E1B4B', fontSize:'17px', fontWeight:800 }}>输入手机号</p>
+        <p style={{ color:'rgba(99,102,241,0.62)', fontSize:'12.5px', marginTop:3 }}>我们将向您发送6位验证码</p>
       </div>
       <GlassInput icon={Phone} placeholder="请输入11位手机号" value={regPhone} inputMode="numeric"
         onChange={v => { setRegPhone(v.replace(/\D/g,'').slice(0,11)); setRegPhoneErr(''); }}
@@ -930,9 +814,9 @@ const handleSubmit = async () => {
             style={{ background:'linear-gradient(135deg,#8B5CF6,#6D28D9)', boxShadow:'0 8px 24px rgba(109,40,217,0.5)' }}>
             <ShieldCheck size={24} color="white" />
           </motion.div>
-          <p style={{ color:'rgba(18,28,75,0.88)', fontSize:'17px', fontWeight:800 }}>输入验证码</p>
-          <p style={{ color:'rgba(88,108,165,0.65)', fontSize:'12.5px', marginTop:3 }}>
-            已发送至 <span style={{ color:'rgba(88,75,218,0.90)', fontWeight:600 }}>{regPhone.slice(0,3)}****{regPhone.slice(-4)}</span>
+          <p style={{ color:'#1E1B4B', fontSize:'17px', fontWeight:800 }}>输入验证码</p>
+          <p style={{ color:'rgba(99,102,241,0.62)', fontSize:'12.5px', marginTop:3 }}>
+            已发送至 <span style={{ color:'#6366F1', fontWeight:600 }}>{regPhone.slice(0,3)}****{regPhone.slice(-4)}</span>
           </p>
         </div>
 
@@ -942,13 +826,13 @@ const handleSubmit = async () => {
         <div className="flex justify-center">
           <motion.button whileTap={{ scale:0.9 }} onClick={() => { if (regCd === 0) startRegCd(); }}
             disabled={regCd > 0}
-            style={{ fontSize:'12.5px', color: regCd > 0 ? 'rgba(142,160,208,0.62)' : 'rgba(82,102,218,0.90)',
+            style={{ fontSize:'12.5px', color: regCd > 0 ? 'rgba(139,138,230,0.55)' : '#6366F1',
               display:'flex', alignItems:'center', gap:4, fontWeight:500 }}>
             {regCd > 0 ? (
               <>
                 <svg width="18" height="18" style={{ transform:'rotate(-90deg)' }}>
-                  <circle cx="9" cy="9" r={r} fill="none" stroke="rgba(195,215,248,0.60)" strokeWidth="2" />
-                  <circle cx="9" cy="9" r={r} fill="none" stroke="rgba(92,115,222,0.80)" strokeWidth="2"
+                  <circle cx="9" cy="9" r={r} fill="none" stroke="rgba(200,198,255,0.55)" strokeWidth="2" />
+                  <circle cx="9" cy="9" r={r} fill="none" stroke="rgba(99,102,241,0.80)" strokeWidth="2"
                     strokeDasharray={circ} strokeDashoffset={circ*(regCd/60)} style={{ transition:'stroke-dashoffset 1s linear' }} />
                 </svg>
                 {regCd}s 后可重发
@@ -959,8 +843,8 @@ const handleSubmit = async () => {
 
         <motion.button whileTap={{ scale:0.97 }} onClick={handleOtpVerify} disabled={regLoading}
           className="w-full py-[14px] rounded-2xl flex items-center justify-center gap-2 relative overflow-hidden"
-          style={{ background: otp.every(d=>d) ? 'linear-gradient(135deg,#8B5CF6,#6D28D9)' : 'rgba(255,255,255,0.12)',
-            boxShadow: otp.every(d=>d) ? '0 8px 28px rgba(109,40,217,0.45)' : 'none',
+          style={{ background: otp.every(d=>d) ? 'linear-gradient(135deg,#8B5CF6,#6366F1)' : 'rgba(238,237,255,0.65)',
+            boxShadow: otp.every(d=>d) ? '0 8px 28px rgba(99,102,241,0.42)' : 'none',
             transition:'all 0.3s ease' }}>
           {otp.every(d=>d) && <Shimmer delay={0.5} />}
           <AnimatePresence mode="wait">
@@ -971,7 +855,7 @@ const handleSubmit = async () => {
               </motion.div>
             ) : (
               <motion.span key="lbl" initial={{ opacity:0 }} animate={{ opacity:1 }}
-                style={{ color: otp.every(d=>d) ? 'white' : 'rgba(255,255,255,0.4)', fontSize:'15px', fontWeight:800 }}>
+                style={{ color: otp.every(d=>d) ? 'white' : 'rgba(140,138,220,0.65)', fontSize:'15px', fontWeight:800 }}>
                 下一步
               </motion.span>
             )}
@@ -989,8 +873,8 @@ const handleSubmit = async () => {
           style={{ background:'linear-gradient(135deg,#8B5CF6,#6D28D9)', boxShadow:'0 8px 24px rgba(109,40,217,0.5)' }}>
           <User size={24} color="white" />
         </motion.div>
-        <p style={{ color:'rgba(255,255,255,0.9)', fontSize:'17px', fontWeight:800 }}>完善个人资料</p>
-        <p style={{ color:'rgba(255,255,255,0.42)', fontSize:'12.5px', marginTop:3 }}>设置昵称与密码，开启探索之旅</p>
+        <p style={{ color:'#1E1B4B', fontSize:'17px', fontWeight:800 }}>完善个人资料</p>
+        <p style={{ color:'rgba(99,102,241,0.62)', fontSize:'12.5px', marginTop:3 }}>设置昵称与密码，开启探索之旅</p>
       </div>
 
       {/* Nickname */}
@@ -999,7 +883,7 @@ const handleSubmit = async () => {
           onChange={v => { setRegNick(v.slice(0,16)); setRegNickErr(''); }}
           focused={regFocused==='nick'} onFocus={() => setRegFocused('nick')} onBlur={() => setRegFocused(null)}
           error={regNickErr}
-          rightSlot={<span style={{ color:'rgba(255,255,255,0.28)', fontSize:'11px', flexShrink:0 }}>{regNick.length}/16</span>} />
+          rightSlot={<span style={{ color:'rgba(99,102,241,0.45)', fontSize:'11px', flexShrink:0 }}>{regNick.length}/16</span>} />
       </div>
 
       {/* Password */}
@@ -1051,8 +935,8 @@ const handleSubmit = async () => {
           style={{ background:'linear-gradient(135deg,#3B82F6,#1D4ED8)', boxShadow:'0 8px 24px rgba(29,78,216,0.5)' }}>
           <Mail size={24} color="white" />
         </motion.div>
-        <p style={{ color:'rgba(255,255,255,0.9)', fontSize:'17px', fontWeight:800 }}>输入邮箱地址</p>
-        <p style={{ color:'rgba(255,255,255,0.42)', fontSize:'12.5px', marginTop:3 }}>请使用有效的邮箱地址</p>
+        <p style={{ color:'#1E1B4B', fontSize:'17px', fontWeight:800 }}>输入邮箱地址</p>
+        <p style={{ color:'rgba(99,102,241,0.62)', fontSize:'12.5px', marginTop:3 }}>请使用有效的邮箱地址</p>
       </div>
       <GlassInput icon={Mail} placeholder="请输入邮箱地址" value={regEmail} inputMode="email"
         onChange={v => { setRegEmail(v); setRegEmailErr(''); }}
@@ -1076,8 +960,8 @@ const handleSubmit = async () => {
           style={{ background:'linear-gradient(135deg,#3B82F6,#1D4ED8)', boxShadow:'0 8px 24px rgba(29,78,216,0.5)' }}>
           <Lock size={24} color="white" />
         </motion.div>
-        <p style={{ color:'rgba(255,255,255,0.9)', fontSize:'17px', fontWeight:800 }}>设置登录密码</p>
-        <p style={{ color:'rgba(255,255,255,0.42)', fontSize:'12.5px', marginTop:3 }}>请设置一个安全的密码</p>
+        <p style={{ color:'#1E1B4B', fontSize:'17px', fontWeight:800 }}>设置登录密码</p>
+        <p style={{ color:'rgba(99,102,241,0.62)', fontSize:'12.5px', marginTop:3 }}>请设置一个安全的密码</p>
       </div>
       <div>
         <GlassInput icon={Lock} type={showRegPwd ? 'text' : 'password'} placeholder="登录密码（至少6位）"
@@ -1110,14 +994,14 @@ const handleSubmit = async () => {
           style={{ background:'linear-gradient(135deg,#3B82F6,#1D4ED8)', boxShadow:'0 8px 24px rgba(29,78,216,0.5)' }}>
           <User size={24} color="white" />
         </motion.div>
-        <p style={{ color:'rgba(255,255,255,0.9)', fontSize:'17px', fontWeight:800 }}>设置昵称</p>
-        <p style={{ color:'rgba(255,255,255,0.42)', fontSize:'12.5px', marginTop:3 }}>告诉我们如何称呼您</p>
+        <p style={{ color:'#1E1B4B', fontSize:'17px', fontWeight:800 }}>设置昵称</p>
+        <p style={{ color:'rgba(99,102,241,0.62)', fontSize:'12.5px', marginTop:3 }}>告诉我们如何称呼您</p>
       </div>
       <GlassInput icon={User} placeholder="起个好听的昵称" value={regNick}
         onChange={v => { setRegNick(v.slice(0,16)); setRegNickErr(''); }}
         focused={regFocused==='nick'} onFocus={() => setRegFocused('nick')} onBlur={() => setRegFocused(null)}
         error={regNickErr}
-        rightSlot={<span style={{ color:'rgba(255,255,255,0.28)', fontSize:'11px', flexShrink:0 }}>{regNick.length}/16</span>} />
+        rightSlot={<span style={{ color:'rgba(99,102,241,0.45)', fontSize:'11px', flexShrink:0 }}>{regNick.length}/16</span>} />
       <motion.button whileTap={{ scale:0.97 }} onClick={handleEmailProfile} disabled={regLoading}
         className="w-full py-[14px] rounded-2xl flex items-center justify-center gap-2 relative overflow-hidden"
         style={{ background:'linear-gradient(135deg,#3B82F6,#1D4ED8)', boxShadow:'0 8px 28px rgba(29,78,216,0.45)' }}>
@@ -1158,7 +1042,7 @@ const handleSubmit = async () => {
               else goBack(isPhone ? setPhoneStep : setEmailStep);
             }}
               className="flex items-center gap-1.5 rounded-full px-2 py-1"
-              style={{ background:'rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.6)' }}>
+              style={{ background:'rgba(238,237,255,0.65)', color:'rgba(99,102,241,0.78)' }}>
               <ChevronLeft size={15} />
               <span style={{ fontSize:'12px' }}>返回</span>
             </motion.button>
@@ -1193,85 +1077,40 @@ const handleSubmit = async () => {
      RENDER
   ──────────────────────────────────────────────────*/
   return (
-    <div className="fixed inset-0 overflow-hidden select-none" style={{ background:'#FFF6FA' }}>
+    <div className="fixed inset-0 overflow-hidden select-none"
+      style={{ background:'linear-gradient(160deg, #FDFDFF 0%, #F8F5FF 40%, #F3F8FF 100%)' }}>
       <style>{GLOBAL_CSS}</style>
 
-      {/* ── L0: Ken-Burns bg — bright spring daylight ── */}
-      <motion.div className="absolute inset-[-8%]"
-        animate={{ scale:[1,1.09,1.05,1.07,1], x:[0,-28,20,-14,0], y:[0,-14,10,-8,0] }}
-        transition={{ duration:26, repeat:Infinity, ease:'easeInOut' }}
-        style={{ transformOrigin:'center center' }}>
-        <img src={BG_URL} className="w-full h-full object-cover"
-          style={{ filter:'brightness(1.10) saturate(1.25)' }} alt="" draggable={false} />
-      </motion.div>
+      {/* ── Particle canvas — same as all other pages ── */}
+      <ParticleBackground />
 
-      {/* ── L1: Spring light overlays (no dark vignette) ── */}
-      {/* Warm spring colour wash */}
-      <div className="absolute inset-0 z-[1]" style={{ background:'linear-gradient(155deg,rgba(255,235,240,0.55) 0%,rgba(255,210,230,0.30) 35%,rgba(235,210,255,0.35) 65%,rgba(210,235,255,0.30) 100%)' }} />
-      {/* Bright centre sun-glow — makes the card float in light */}
-      <div className="absolute inset-0 z-[1]" style={{ background:'radial-gradient(ellipse 75% 60% at 50% 30%, rgba(255,255,255,0.52) 0%, transparent 70%)' }} />
-      {/* Soft spring bloom at the bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-2/5 z-[1]" style={{ background:'linear-gradient(0deg,rgba(255,200,220,0.38) 0%,transparent 100%)' }} />
-
-      {/* ── L2: Bokeh (pure CSS animation — no JS frame callbacks) ── */}
-      <div className="absolute inset-0 z-[2] pointer-events-none overflow-hidden">
-        {BOKEH.map((b, i) => (
-          <div key={i} style={{
-            position:'absolute', left:`${b.x}%`, top:`${b.y}%`,
-            animation:`${BK_ANIMS[i]} ${b.dur}s ease-in-out ${b.d}s infinite`,
-            willChange:'transform',
-          }}>
-            <div style={{
-              width:b.w, height:b.h, background:b.c, borderRadius:'50%',
-              filter:`blur(${Math.max(b.w,b.h)*0.34}px)`,
-              transform:'translate(-50%,-50%)',
-            }} />
-          </div>
-        ))}
+      {/* ── Ambient glow blobs ── */}
+      <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
+        <motion.div animate={{ scale:[1,1.18,1], opacity:[0.22,0.38,0.22] }}
+          transition={{ duration:9, repeat:Infinity, ease:'easeInOut' }}
+          className="absolute top-[-8%] right-[-5%] w-[320px] h-[320px] rounded-full"
+          style={{ background:'radial-gradient(circle, rgba(139,92,246,0.18) 0%, transparent 65%)' }} />
+        <motion.div animate={{ scale:[1,1.12,1], opacity:[0.15,0.28,0.15] }}
+          transition={{ duration:11, repeat:Infinity, ease:'easeInOut', delay:3 }}
+          className="absolute bottom-[20%] left-[-8%] w-[280px] h-[280px] rounded-full"
+          style={{ background:'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 65%)' }} />
+        <motion.div animate={{ opacity:[0.18,0.30,0.18] }}
+          transition={{ duration:7, repeat:Infinity, ease:'easeInOut', delay:1 }}
+          className="absolute inset-0"
+          style={{ background:'radial-gradient(ellipse 65% 55% at 50% 50%, rgba(139,92,246,0.06) 0%, transparent 70%)' }} />
       </div>
 
-      {/* ── L3: Petals ── */}
-      <div className="absolute inset-0 z-[3]"><SpringPetals /></div>
-
-      {/* ── L4: Light shafts (CSS opacity-only — filter is static, no repaint) ── */}
-      <div className="absolute inset-0 z-[4] pointer-events-none overflow-hidden">
-        {([
-          { left:'28%', rot:7,  dur:6,  delay:0  },
-          { left:'52%', rot:-5, dur:9,  delay:-3 },
-          { left:'70%', rot:3,  dur:7,  delay:-6 },
-        ] as const).map((s, i) => (
-          <div key={i} style={{
-            position:'absolute', top:0, left:s.left,
-            width:2, height:'75%',
-            background:'linear-gradient(180deg,rgba(255,220,140,0.45) 0%,rgba(255,190,180,0.15) 60%,transparent 100%)',
-            filter:'blur(12px)',
-            transform:`rotate(${s.rot}deg)`,
-            transformOrigin:'top center',
-            animation:`shaft-pulse ${s.dur}s ease-in-out ${s.delay}s infinite`,
-          }} />
-        ))}
-      </div>
-
-      {/* ── L5: Poem ── */}
-      <motion.p initial={{ opacity:0 }} animate={{ opacity:[0,0.45,0.28,0.45] }}
-        transition={{ duration:6, delay:2.5, repeat:Infinity, ease:'easeInOut' }}
-        className="absolute bottom-[13%] left-0 right-0 text-center z-[5] pointer-events-none"
-        style={{ color:'rgba(200,80,120,0.65)', fontSize:'11px', fontWeight:400, letterSpacing:'0.42em', textShadow:'0 1px 8px rgba(255,200,220,0.6)' }}>
-        春风拂面 · 万物生长
-      </motion.p>
-
-      {/* ── L6: Glass card ── */}
+      {/* ── Glass card ── */}
       <div className="absolute inset-0 z-[10] flex items-center justify-center px-5 overflow-y-auto py-8">
-        <motion.div initial={{ opacity:0, y:44, scale:0.92 }} animate={{ opacity:1, y:0, scale:1 }}
-          transition={{ duration:2.6, ease:[0.12,1,0.22,1] }}
+        <motion.div initial={{ opacity:0, y:36, scale:0.94 }} animate={{ opacity:1, y:0, scale:1 }}
+          transition={{ duration:1.6, ease:[0.12,1,0.22,1] }}
           className="w-full max-w-[360px]"
           style={{
-            /* Deep cherry-rose glass — floats over the bright spring scene */
-            background:'rgba(85,15,50,0.46)',
-            backdropFilter:'blur(28px)', WebkitBackdropFilter:'blur(28px)',
+            background:'rgba(255,255,255,0.88)',
+            backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)',
             borderRadius:30,
-            border:'1px solid rgba(255,195,220,0.55)',
-            boxShadow:'0 28px 72px rgba(200,50,110,0.22), 0 4px 20px rgba(255,170,200,0.18), inset 0 1px 0 rgba(255,220,235,0.55)',
+            border:'1px solid rgba(139,92,246,0.12)',
+            boxShadow:'0 24px 64px rgba(99,102,241,0.10), 0 4px 16px rgba(139,92,246,0.08), inset 0 1px 0 rgba(255,255,255,0.95)',
             overflow:'hidden',
           }}>
 
@@ -1281,14 +1120,14 @@ const handleSubmit = async () => {
               transition={{ duration:1.8, delay:0.5, ease:[0.16,1,0.3,1] }}
               className="flex flex-col items-center pt-7 pb-4 px-7">
               <div className="w-14 h-14 rounded-[20px] flex items-center justify-center mb-3 relative"
-                style={{ background:'linear-gradient(135deg,rgba(255,130,170,0.95),rgba(220,60,140,0.92))', boxShadow:'0 10px 32px rgba(220,60,130,0.50),inset 0 1px 0 rgba(255,200,220,0.5)' }}>
+                style={{ background:'linear-gradient(135deg,#8B5CF6,#6366F1)', boxShadow:'0 10px 32px rgba(99,102,241,0.38), inset 0 1px 0 rgba(255,255,255,0.35)' }}>
                 <Brain size={27} color="white" strokeWidth={1.8} />
                 <motion.div animate={{ scale:[1,1.6], opacity:[0.5,0] }} transition={{ duration:2, repeat:Infinity, ease:'easeOut' }}
                   className="absolute inset-0 rounded-[20px]"
-                  style={{ background:'linear-gradient(135deg,rgba(255,140,175,0.5),rgba(130,70,220,0.5))' }} />
+                  style={{ background:'linear-gradient(135deg,rgba(139,92,246,0.5),rgba(99,102,241,0.5))' }} />
               </div>
-              <p style={{ color:'rgba(255,255,255,0.96)', fontSize:'22px', fontWeight:900, letterSpacing:'-0.03em' }}>Hi Brain</p>
-              <p style={{ color:'rgba(255,255,255,0.45)', fontSize:'12px', marginTop:2 }}>
+              <p style={{ color:'#1E1B4B', fontSize:'22px', fontWeight:900, letterSpacing:'-0.03em' }}>Hi Brain</p>
+              <p style={{ color:'rgba(99,102,241,0.62)', fontSize:'12px', marginTop:2 }}>
                 {tab === 'register' ? '创建你的账号 🚀' : '探索你的思维宇宙 ✨'}
               </p>
             </motion.div>
@@ -1297,14 +1136,14 @@ const handleSubmit = async () => {
           {/* ── Tab switcher ── */}
           {!(tab === 'register' && ((regMode === 'phone' && phoneStep === 3) || (regMode === 'email' && emailStep === 3))) && (
             <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ duration:1.4, delay:1.1 }}
-              className="mx-5 mb-4 p-1 rounded-2xl flex relative" style={{ background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,185,210,0.22)' }}>
+              className="mx-5 mb-4 p-1 rounded-2xl flex relative" style={{ background:'rgba(230,228,255,0.45)', border:'1px solid rgba(139,92,246,0.10)' }}>
               <motion.div className="absolute top-1 bottom-1 rounded-xl"
                 animate={{ left: tab === 'login' ? '4px' : 'calc(50%)', right: tab === 'login' ? 'calc(50%)' : '4px' }}
                 transition={{ duration:0.3, ease:[0.16,1,0.3,1] }}
-                style={{ background:'rgba(255,180,210,0.28)', backdropFilter:'blur(8px)', boxShadow:'0 2px 10px rgba(200,50,100,0.18)', border:'1px solid rgba(255,200,225,0.40)' }} />
+                style={{ background:'rgba(255,255,255,0.92)', backdropFilter:'blur(8px)', boxShadow:'0 2px 10px rgba(99,102,241,0.12)' }} />
               {(['login','register'] as const).map(t => (
                 <button key={t} onClick={() => switchTab(t)} className="flex-1 py-2.5 z-10 relative transition-all"
-                  style={{ color: tab===t ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.4)', fontSize:'14px', fontWeight: tab===t ? 700 : 400 }}>
+                  style={{ color: tab===t ? '#1E1B4B' : 'rgba(99,102,241,0.50)', fontSize:'14px', fontWeight: tab===t ? 700 : 400 }}>
                   {t === 'login' ? '登录' : '注册'}
                 </button>
               ))}
@@ -1323,9 +1162,9 @@ const handleSubmit = async () => {
                   {(['phone','email'] as const).map(m => (
                     <motion.button key={m} whileTap={{ scale:0.95 }} onClick={() => { setMethod(m); setErrors({}); }}
                       className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all"
-                      style={{ background: method===m ? 'rgba(255,130,175,0.25)' : 'rgba(255,255,255,0.07)',
-                        border:`1px solid ${method===m ? 'rgba(255,150,195,0.65)' : 'rgba(255,190,215,0.22)'}`,
-                        color: method===m ? 'rgba(255,190,218,0.98)' : 'rgba(255,200,220,0.52)',
+                      style={{ background: method===m ? 'rgba(99,102,241,0.10)' : 'rgba(238,237,255,0.55)',
+                        border:`1px solid ${method===m ? 'rgba(99,102,241,0.42)' : 'rgba(168,162,255,0.28)'}`,
+                        color: method===m ? '#6366F1' : 'rgba(99,102,241,0.48)',
                         fontSize:'12.5px', fontWeight: method===m ? 600 : 400 }}>
                       {m === 'phone' ? <><Phone size={11} /><span>手机号</span></> : <><Mail size={11} /><span>邮箱</span></>}
                     </motion.button>
@@ -1342,10 +1181,10 @@ const handleSubmit = async () => {
                         <GlassInput icon={Phone} placeholder="手机号（11位）"
                           value={form.phone} onChange={setF('phone')} inputMode="numeric"
                           focused={focusedField==='phone'} onFocus={() => setFocused('phone')} onBlur={() => setFocused(null)} error={errors.phone} />
-                        <GlassInput icon={Lock} type={showPwd ? 'text' : 'password'} placeholder="密码"
-                          value={form.password} onChange={setF('password')}
-                          focused={focusedField==='pass'} onFocus={() => setFocused('pass')} onBlur={() => setFocused(null)} error={errors.password}
-                          rightSlot={<EyeBtn show={showPwd} toggle={() => setShowPwd(v => !v)} />} />
+                        <GlassInput icon={ShieldCheck} placeholder="验证码"
+                          value={form.code} onChange={setF('code')} inputMode="numeric"
+                          focused={focusedField==='code'} onFocus={() => setFocused('code')} onBlur={() => setFocused(null)} error={errors.code}
+                          rightSlot={<SmsBtn />} />
                       </>)}
 
                       {method === 'email' && (<>
@@ -1359,14 +1198,14 @@ const handleSubmit = async () => {
                       </>)}
 
                       <div className="flex justify-end -mt-1">
-                        <motion.button whileTap={{ scale:0.92 }} style={{ color:'rgba(255,200,228,0.7)', fontSize:'12px' }}>忘记密码？</motion.button>
+                        <motion.button whileTap={{ scale:0.92 }} style={{ color:'rgba(99,102,241,0.72)', fontSize:'12px' }}>忘记密码？</motion.button>
                       </div>
 
                       {/* Login button */}
                       <motion.button whileTap={{ scale:0.97 }} onClick={handleSubmit} disabled={loading || success}
                         className="w-full py-[14px] rounded-2xl flex items-center justify-center gap-2 relative overflow-hidden mt-1"
-                        animate={{ background: success ? ['linear-gradient(135deg,#22C55E,#16A34A)'] : ['linear-gradient(135deg,rgba(255,100,155,0.95) 0%,rgba(215,50,120,0.95) 100%)'] }}
-                        style={{ boxShadow: success ? '0 8px 28px rgba(34,197,94,0.45)' : '0 8px 28px rgba(215,50,120,0.45)' }}>
+                        animate={{ background: success ? ['linear-gradient(135deg,#22C55E,#16A34A)'] : ['linear-gradient(135deg,#8B5CF6 0%,#6366F1 100%)'] }}
+                        style={{ boxShadow: success ? '0 8px 28px rgba(34,197,94,0.45)' : '0 8px 28px rgba(99,102,241,0.38)' }}>
                         {!success && !loading && <Shimmer delay={1.4} />}
                         <AnimatePresence mode="wait">
                           {loading ? (
@@ -1388,10 +1227,10 @@ const handleSubmit = async () => {
                         </AnimatePresence>
                       </motion.button>
 
-                      <p className="text-center" style={{ color:'rgba(255,255,255,0.38)', fontSize:'13px' }}>
+                      <p className="text-center" style={{ color:'rgba(99,102,241,0.55)', fontSize:'13px' }}>
                         还没有账号？{' '}
                         <motion.button whileTap={{ scale:0.94 }} onClick={() => switchTab('register')}
-                          style={{ color:'rgba(255,210,235,0.88)', fontWeight:700 }}>立即注册</motion.button>
+                          style={{ color:'#6366F1', fontWeight:700 }}>立即注册</motion.button>
                       </p>
                     </motion.div>
                   </AnimatePresence>
@@ -1399,9 +1238,9 @@ const handleSubmit = async () => {
 
                 {/* Divider */}
                 <div className="flex items-center gap-3 my-4">
-                  <div className="flex-1 h-px" style={{ background:'rgba(255,255,255,0.12)' }} />
-                  <span style={{ color:'rgba(255,255,255,0.28)', fontSize:'11.5px', whiteSpace:'nowrap' }}>其他方式</span>
-                  <div className="flex-1 h-px" style={{ background:'rgba(255,255,255,0.12)' }} />
+                  <div className="flex-1 h-px" style={{ background:'rgba(99,102,241,0.12)' }} />
+                  <span style={{ color:'rgba(99,102,241,0.45)', fontSize:'11.5px', whiteSpace:'nowrap' }}>其他方式</span>
+                  <div className="flex-1 h-px" style={{ background:'rgba(99,102,241,0.12)' }} />
                 </div>
 
                 {/* Social */}
@@ -1422,9 +1261,9 @@ const handleSubmit = async () => {
 
                 <motion.button whileTap={{ scale:0.97 }} onClick={() => navigate('/home')}
                   className="w-full mt-3 py-3 rounded-2xl flex items-center justify-center gap-2"
-                  style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.14)' }}>
-                  <span style={{ color:'rgba(255,255,255,0.44)', fontSize:'13px', fontWeight:500 }}>游客模式探索</span>
-                  <ArrowRight size={13} style={{ color:'rgba(255,255,255,0.32)' }} />
+                  style={{ background:'rgba(238,237,255,0.60)', border:'1px solid rgba(99,102,241,0.12)' }}>
+                  <span style={{ color:'rgba(99,102,241,0.62)', fontSize:'13px', fontWeight:500 }}>游客模式探索</span>
+                  <ArrowRight size={13} style={{ color:'rgba(99,102,241,0.40)' }} />
                 </motion.button>
               </motion.div>
 
@@ -1435,10 +1274,10 @@ const handleSubmit = async () => {
                 {renderRegContent()}
                 {/* Switch to login link (only on select screen) */}
                 {regMode === 'select' && (
-                  <p className="text-center pb-5" style={{ color:'rgba(255,255,255,0.38)', fontSize:'13px' }}>
+                  <p className="text-center pb-5" style={{ color:'rgba(99,102,241,0.55)', fontSize:'13px' }}>
                     已有账号？{' '}
                     <motion.button whileTap={{ scale:0.94 }} onClick={() => switchTab('login')}
-                      style={{ color:'rgba(255,210,235,0.88)', fontWeight:700 }}>立即登录</motion.button>
+                      style={{ color:'#6366F1', fontWeight:700 }}>立即登录</motion.button>
                   </p>
                 )}
               </motion.div>

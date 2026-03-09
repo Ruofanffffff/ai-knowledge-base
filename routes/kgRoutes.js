@@ -44,9 +44,9 @@ router.post('/build', authMiddleware, requirePermission('kg:run'), async (req, r
 
     // 异步启动Pipeline（不等待完成）
     kgPipelineService.runPipeline(docId).then(() => {
-      console.log(`Pipeline completed for docId: ${docId}`);
+      console.log(`[KG Routes] Pipeline completed for docId: ${docId}`);
     }).catch((err) => {
-      console.error(`Pipeline failed for docId: ${docId}`, err.message);
+      console.error(`[KG Routes] Pipeline failed for docId: ${docId}`, err);
     });
 
     res.json({
@@ -58,10 +58,10 @@ router.post('/build', authMiddleware, requirePermission('kg:run'), async (req, r
       }
     });
   } catch (error) {
-    console.error('Error starting KG build:', error);
+    console.error('[KG Routes] Error starting KG build:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Internal server error'
     });
   }
 });
@@ -104,10 +104,10 @@ router.get('/graph', authMiddleware, requirePermission('kg:read'), async (req, r
       }
     });
   } catch (error) {
-    console.error('Error fetching graph data:', error);
+    console.error('[KG Routes] Error fetching graph data:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Internal server error'
     });
   }
 });
@@ -146,10 +146,10 @@ router.get('/status/:docId', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting KG status:', error);
+    console.error('[KG Routes] Error getting KG status:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Internal server error'
     });
   }
 });
@@ -192,10 +192,10 @@ router.get('/unified/graph', authMiddleware, requirePermission('kg:read'), async
       }
     });
   } catch (error) {
-    console.error('Error fetching unified graph data:', error);
+    console.error('[KG Routes] Error fetching unified graph data:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Internal server error'
     });
   }
 });
@@ -250,10 +250,10 @@ router.get('/doc/:docId/graph', authMiddleware, requirePermission('kg:read'), as
       }
     });
   } catch (error) {
-    console.error('Error fetching doc graph data:', error);
+    console.error('[KG Routes] Error fetching doc graph data:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Internal server error'
     });
   }
 });
@@ -279,9 +279,9 @@ router.post('/unified/trigger', authMiddleware, requirePermission('kg:run'), asy
 
     // 异步启动统一归纳（不等待完成）
     unificationService.runUnification('manual').then((result) => {
-      console.log('Manual unification completed:', result);
+      console.log('[KG Routes] Manual unification completed:', result);
     }).catch((err) => {
-      console.error('Manual unification failed:', err.message);
+      console.error('[KG Routes] Manual unification failed:', err);
     });
 
     res.json({
@@ -292,10 +292,10 @@ router.post('/unified/trigger', authMiddleware, requirePermission('kg:run'), asy
       }
     });
   } catch (error) {
-    console.error('Error triggering unification:', error);
+    console.error('[KG Routes] Error triggering unification:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Internal server error'
     });
   }
 });
@@ -332,10 +332,10 @@ router.get('/unified/status', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting unification status:', error);
+    console.error('[KG Routes] Error getting unification status:', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Internal server error'
     });
   }
 });
