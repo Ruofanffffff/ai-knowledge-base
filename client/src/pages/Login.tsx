@@ -91,8 +91,18 @@ export default function Login() {
   }, [lockoutInfo]);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError('请输入邮箱和密码');
+    if (!email.trim() && !password.trim()) {
+      setError('请输入用户名/邮箱和密码');
+      return;
+    }
+
+    if (!email.trim()) {
+      setError('请输入用户名或邮箱');
+      return;
+    }
+
+    if (!password.trim()) {
+      setError('请输入密码');
       return;
     }
 
@@ -101,7 +111,8 @@ export default function Login() {
     setLockoutInfo(null);
 
     try {
-      await login({ email, password });
+      // Allow username login by passing email field as username/email/phone
+      await login({ username: email, password });
       // Show success animation, then navigate after 500ms
       setLoginSuccess(true);
       setTimeout(() => {
@@ -160,14 +171,14 @@ export default function Login() {
         </div>
 
         <div className="space-y-4">
-          {/* Email input */}
+          {/* Email/Username input */}
           <div className="group">
-            <label className="block text-sm font-medium text-slate-700 mb-1 ml-1">邮箱</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1 ml-1">用户名 / 邮箱</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-purple-500 transition-colors" size={20} />
               <input 
-                type="email" 
-                placeholder="your@email.com"
+                type="text" 
+                placeholder="用户名或邮箱"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}

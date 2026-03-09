@@ -97,23 +97,14 @@ export default function Register() {
   };
 
   const handleRegister = async () => {
+    // 1. Basic validation
     if (!email.trim() || !password.trim()) {
       setError('请填写所有必填字段');
       return;
     }
 
-    if (!verificationCode.trim()) {
-      setError('请输入邮箱验证码');
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('密码长度至少为8位');
-      return;
-    }
-
-    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
-      setError('密码必须包含大写字母、小写字母和数字');
+    if (password.length < 6) {
+      setError('密码长度至少为6位');
       return;
     }
 
@@ -126,7 +117,17 @@ export default function Register() {
     setError('');
 
     try {
-      await register({ username: '', email, password, verification_code: verificationCode });
+      // 2. Call register API (supports username-only or email)
+      // If email field contains '@', treat as email; otherwise username
+      const isEmail = email.includes('@');
+      
+      await register({
+        username: isEmail ? email.split('@')[0] : email,
+        email: isEmail ? email : '',
+        password,
+        verification_code: verificationCode // Optional based on backend config
+      });
+      
       setRegisterSuccess(true);
       setTimeout(() => {
         navigate('/login');
@@ -171,14 +172,14 @@ export default function Register() {
         </div>
 
         <div className="space-y-4">
-          {/* Email input */}
+          {/* Email/Username input */}
           <div className="group">
-            <label className="block text-sm font-medium text-slate-700 mb-1 ml-1">邮箱 *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1 ml-1">用户名 / 邮箱 *</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-purple-500 transition-colors" size={20} />
               <input
-                type="email"
-                placeholder="your@email.com"
+                type="text"
+                placeholder="用户名或邮箱"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading || registerSuccess}
@@ -187,7 +188,8 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Verification code input */}
+          {/* Verification code input - Only show if email is entered */}
+          {email.includes('@') && (
           <div className="group">
             <label className="block text-sm font-medium text-slate-700 mb-1 ml-1">邮箱验证码 *</label>
             <div className="relative flex gap-2">
@@ -221,6 +223,7 @@ export default function Register() {
               </button>
             </div>
           </div>
+          )}
 
           {/* Password input */}
           <div className="group">
