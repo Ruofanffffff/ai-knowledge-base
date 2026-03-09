@@ -332,6 +332,9 @@ function requirePermission(permissionCode) {
   return async (req, res, next) => {
     // When Authen is not enabled, skip permission check (local dev mode)
     if (!isAuthenEnabled()) return next();
+    
+    // In local mode or if Authen is disabled, we might want to bypass strict permission checks
+    // or implement local role-based checks. For now, if Authen is enabled, we check it.
     try {
       const result = await authenClient.checkPermission(
         req.userId, permissionCode, extractBearerToken(req)
@@ -339,6 +342,9 @@ function requirePermission(permissionCode) {
       if (result.has_permission) return next();
       return res.status(403).json({ error: '权限不足' });
     } catch (err) {
+      // If Authen service is down or errors, we might want to fail safe or open.
+      // Failing safe (deny) is usually better for security.
+      console.error('Permission check failed:', err);
       return res.status(503).json({ error: '认证服务暂时不可用' });
     }
   };
