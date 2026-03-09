@@ -697,6 +697,10 @@ app.use('/api/notes', notesRoutes);
 // 社区路由
 app.use('/api/community', communityRouter);
 
+// 知识图谱路由（新版）
+const kgRoutes = require('./routes/kgRoutes');
+app.use('/api/kg', kgRoutes);
+
 // 聊天路由
 app.use('/api', chatRoutes);
 
