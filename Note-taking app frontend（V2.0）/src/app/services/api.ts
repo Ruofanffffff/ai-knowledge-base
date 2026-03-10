@@ -65,14 +65,18 @@ api.interceptors.response.use(
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('user_info');
           localStorage.removeItem('hi_brain_authed');
-          window.location.href = '/auth'; // Redirect to login
+          if (!window.location.pathname.includes('/auth')) {
+            window.location.href = '/auth'; // Redirect to login
+          }
         }
       } else {
         // No refresh token available
         localStorage.removeItem('access_token');
         localStorage.removeItem('user_info');
         localStorage.removeItem('hi_brain_authed');
-        window.location.href = '/auth'; // Redirect to login
+        if (!window.location.pathname.includes('/auth')) {
+          window.location.href = '/auth'; // Redirect to login
+        }
       }
     }
     return Promise.reject(error);

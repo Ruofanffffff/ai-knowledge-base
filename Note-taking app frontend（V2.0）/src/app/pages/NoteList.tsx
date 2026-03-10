@@ -944,7 +944,7 @@ export function NoteList() {
                     key={note.id}
                     note={note}
                     index={i}
-                    onDelete={id => setDeleteTarget(id)}
+                    onDelete={id => deleteNote(id)}
                     onClick={(id) => navigate(`/siku/${id}`)}
                     onTagClick={tag => {
                       setTagFilter(tag);

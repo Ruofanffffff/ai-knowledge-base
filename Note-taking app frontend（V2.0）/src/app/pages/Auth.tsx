@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { api } from '../services/api';
+import { useNotes } from '../components/context/NoteContext';
 import { motion, AnimatePresence, useAnimate } from 'motion/react';
 import {
   Eye, EyeOff, Lock, Mail, User, ArrowRight, Brain,
@@ -412,6 +413,7 @@ type RegMode = 'select' | 'phone' | 'email';
 ───────────────────────────────────────────────────── */
 export function Auth() {
   const navigate = useNavigate();
+  const { refreshNotes } = useNotes();
 
   /* ── Login state ──────────────────────────────── */
   const [tab,        setTab]       = useState<Tab>('login');
@@ -523,6 +525,7 @@ export function Auth() {
         localStorage.setItem('hi_brain_authed', '1');
 
         await new Promise(r => setTimeout(r, 900));
+        await refreshNotes();
         navigate('/home');
       } else {
         setLoading(false);
@@ -565,11 +568,14 @@ export function Auth() {
     setModalIsReg(isReg); setWxStep('qr'); setWechatOpen(true);
     wxTimers.current.push(setTimeout(() => setWxStep('scanned'), 3200));
     wxTimers.current.push(setTimeout(() => {
-      setWxStep('done');
-      wxTimers.current.push(setTimeout(() => {
-        setWechatOpen(false); localStorage.setItem('hi_brain_authed','1'); navigate('/home');
-      }, 800));
-    }, 5200));
+        setWxStep('done');
+        wxTimers.current.push(setTimeout(async () => {
+          setWechatOpen(false); 
+          localStorage.setItem('hi_brain_authed','1'); 
+          await refreshNotes();
+          navigate('/home');
+        }, 800));
+      }, 5200));
   };
   const closeWeChat = () => { setWechatOpen(false); wxTimers.current.forEach(clearTimeout); wxTimers.current = []; };
 
@@ -578,11 +584,14 @@ export function Auth() {
     setApStep('idle');
     apTimers.current.push(setTimeout(() => setApStep('scanned'), 3600));
     apTimers.current.push(setTimeout(() => {
-      setApStep('done');
-      apTimers.current.push(setTimeout(() => {
-        setAlipayOpen(false); localStorage.setItem('hi_brain_authed','1'); navigate('/home');
-      }, 800));
-    }, 5500));
+        setApStep('done');
+        apTimers.current.push(setTimeout(async () => {
+          setAlipayOpen(false); 
+          localStorage.setItem('hi_brain_authed','1'); 
+          await refreshNotes();
+          navigate('/home');
+        }, 800));
+      }, 5500));
   };
   const openAlipay = (isReg = false) => { setModalIsReg(isReg); setAlipayOpen(true); startAlipayQR(); };
   const closeAlipay = () => { setAlipayOpen(false); apTimers.current.forEach(clearTimeout); apTimers.current = []; };
@@ -667,6 +676,7 @@ export function Auth() {
           localStorage.setItem('user_info', JSON.stringify(data.data.user));
         }
         setRegLoading(false);
+        await refreshNotes();
         goForward(setPhoneStep);
       } else {
         setRegLoading(false);
@@ -713,6 +723,7 @@ export function Auth() {
           localStorage.setItem('user_info', JSON.stringify(data.data.user));
         }
         setRegLoading(false);
+        await refreshNotes();
         goForward(setEmailStep);
       } else {
         setRegLoading(false);
@@ -1072,7 +1083,7 @@ export function Auth() {
               initial="enter" animate="center" exit="exit"
               transition={{ duration:0.3, ease:[0.16,1,0.3,1] }}>
               {isDone ? (
-                <SuccessScreen onDone={() => { localStorage.setItem('hi_brain_authed','1'); navigate('/home'); }} />
+                <SuccessScreen onDone={async () => { localStorage.setItem('hi_brain_authed','1'); await refreshNotes(); navigate('/home'); }} />
               ) : isPhone ? (
                 step === 0 ? PhoneStep0() : step === 1 ? PhoneStep1() : PhoneStep2()
               ) : (

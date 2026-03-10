@@ -1318,7 +1318,7 @@ export function NoteCreate() {
   const handleDragLeave = () => setIsDragging(false);
 
   /* ── Save / Update ─────────────────────────────────────────── */
-  const handleSave = () => {
+  const handleSave = async () => {
     if (savingRef.current) return;
     if (!editor || editor.isEmpty) {
       toast.error('请输入笔记内容');
@@ -1339,31 +1339,40 @@ export function NoteCreate() {
     // Phase 1 — start saving animation
     setSavePhase('saving');
 
-    // Phase 2 — commit to localStorage + show success
-    setTimeout(() => {
+    try {
+      // Minimum delay for animation
+      await new Promise(resolve => setTimeout(resolve, 700));
+
       if (existingNote) {
-        updateNote(existingNote.id, noteData);
+        await updateNote(existingNote.id, noteData);
       } else {
-        addNote(noteData);
+        await addNote(noteData);
       }
+
+      // Phase 2 — show success
       setSavePhase('success');
-    }, 700);
 
-    // Phase 3 — signal SiChain + show syncing
-    setTimeout(() => {
-      try {
-        localStorage.setItem('hi_graph_gen', JSON.stringify({
-          noteTitle: title || '无标题笔记',
-          noteTags:  tags.slice(0, 5),
-          isNew:     !existingNote,
-          ts:        Date.now(),
-        }));
-      } catch { /* ignore quota errors */ }
-      setSavePhase('syncing');
-    }, 2000);
+      // Phase 3 — signal SiChain + show syncing
+      setTimeout(() => {
+        try {
+          localStorage.setItem('hi_graph_gen', JSON.stringify({
+            noteTitle: title || '无标题笔记',
+            noteTags:  tags.slice(0, 5),
+            isNew:     !existingNote,
+            ts:        Date.now(),
+          }));
+        } catch { /* ignore quota errors */ }
+        setSavePhase('syncing');
+      }, 1300);
 
-    // Navigate to SiChain
-    setTimeout(() => navigate('/sichain'), 2900);
+      // Navigate to SiChain
+      setTimeout(() => navigate('/sichain'), 2200);
+    } catch (error) {
+      console.error('Save failed:', error);
+      toast.error('保存失败，请重试');
+      setSavePhase('idle');
+      savingRef.current = false;
+    }
   };
 
   /* ── Tag management ────────────────────────────────────────── */

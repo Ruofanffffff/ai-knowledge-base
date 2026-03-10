@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, X, Send, Plus, UserPlus, EyeOff, Link2, Flag, Check } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
+import { api } from '../services/api';
 
 interface Post {
   id: string;
@@ -21,92 +22,70 @@ interface Post {
   bookmarked: boolean;
 }
 
-const INITIAL_POSTS: Post[] = [
-  {
-    id: '1',
-    user: { name: '小明同学', username: 'xiaoming', avatarColor: '#6366F1', avatarLetter: '明', verified: true },
-    content: '今天整理了关于设计系统的笔记 📐\n\n发现一个有趣的规律：好的设计总是在极度简约和极度复杂之间寻找平衡点。留白不是空洞，而是另一种语言。\n\n用 Hi Brain 整理完之后，知识图谱居然自动将"设计"和"心理学"连接在了一起，太神奇了！',
-    image: 'https://images.unsplash.com/photo-1597514110707-b988d3a08652?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600',
-    tags: ['设计', '灵感', '知识管理'],
-    likes: 128, comments: 24, shares: 18, bookmarks: 56,
-    timestamp: '2小时前',
-    liked: false, bookmarked: false,
-  },
-  {
-    id: '2',
-    user: { name: '阿博读书', username: 'abo_reads', avatarColor: '#8B5CF6', avatarLetter: '博', verified: false },
-    content: '《心流》读书笔记精华 🌊\n\n「当一个人能全身心投入某项活动，忘却时间流逝，这种状态就是心流。」\n\n挑战与技能的完美匹配，才能进入心流状态。这也解释了为什么游戏让人上瘾——它总是给你刚好合适的挑战。',
-    image: 'https://images.unsplash.com/photo-1649220058039-e81e690e28ef?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600',
-    tags: ['读书', '心理学', '效率'],
-    likes: 342, comments: 67, shares: 89, bookmarks: 201,
-    timestamp: '5小时前',
-    liked: true, bookmarked: true,
-  },
-  {
-    id: '3',
-    user: { name: 'TechNote', username: 'tech_note', avatarColor: '#3B82F6', avatarLetter: 'T', verified: true },
-    content: 'React Server Components 深度解析 ⚛️\n\n用思链生成了知识图谱，发现 RSC 与传统 SSR 的本质区别在于：\n• 组件树的渲染位置\n• 数据获取的时机\n• Bundle size 的影响范围\n\n清晰多了！推荐大家也用思链梳理技术知识～',
-    imageGradient: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 40%, #1D4ED8 100%)',
-    tags: ['技术', 'React', 'AI'],
-    likes: 256, comments: 43, shares: 37, bookmarks: 128,
-    timestamp: '昨天',
-    liked: false, bookmarked: false,
-  },
-  {
-    id: '4',
-    user: { name: '晓雯创作', username: 'xiaowen', avatarColor: '#EC4899', avatarLetter: '晓', verified: false },
-    content: '用 AI 帮我整理了3年的旅行笔记 ✈️\n\n从日本到冰岛，从咖啡厅到山顶，每一个片段都被整理成了结构化的知识。\n\n最惊喜的是：AI 发现了一条我自己都没意识到的规律——我总是在"孤独感"中获得最深刻的灵感。',
-    image: 'https://images.unsplash.com/photo-1601907482852-9b02d7a8716f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600',
-    tags: ['旅行', 'AI', '灵感'],
-    likes: 512, comments: 88, shares: 134, bookmarks: 267,
-    timestamp: '2天前',
-    liked: true, bookmarked: false,
-  },
-  {
-    id: '5',
-    user: { name: '思维实验室', username: 'mind_lab', avatarColor: '#10B981', avatarLetter: '思', verified: true },
-    content: '如何用知识图谱打败信息焦虑？🧠\n\n每天我们接收到的信息量是10年前的500倍，但大脑的处理能力基本没变。\n\n解法不是更努力地记录，而是建立「知识关系网」——思链帮我把碎片连成网，焦虑感减少了80%。',
-    image: 'https://images.unsplash.com/photo-1758657286956-f944e1d2e75a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600',
-    tags: ['知识管理', '方法论', 'AI'],
-    likes: 687, comments: 112, shares: 203, bookmarks: 445,
-    timestamp: '3天前',
-    liked: false, bookmarked: true,
-  },
-  {
-    id: '6',
-    user: { name: '好奇心驱动', username: 'curious_one', avatarColor: '#F59E0B', avatarLetter: '奇', verified: false },
-    content: '手写笔记 vs 数字笔记，哪个更好？📝\n\n研究了3个月后我的结论：\n\n手写更好地编码记忆，数字更好地建立连接。最佳方案是混合使用——手写捕捉灵感，然后拍照让 AI 帮你结构化到思库中！',
-    image: 'https://images.unsplash.com/photo-1710447503692-8364152e431c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=600',
-    tags: ['笔记方法', '学习', '效率'],
-    likes: 923, comments: 156, shares: 89, bookmarks: 332,
-    timestamp: '5天前',
-    liked: false, bookmarked: false,
-  },
-];
 
-const STORIES = [
-  { id: '1', name: '我的故事', color: 'linear-gradient(135deg, #6366F1, #8B5CF6)', letter: '我', isMe: true },
-  { id: '2', name: '小明同学', color: 'linear-gradient(135deg, #6366F1, #3B82F6)', letter: '明' },
-  { id: '3', name: '阿博读书', color: 'linear-gradient(135deg, #8B5CF6, #EC4899)', letter: '博' },
-  { id: '4', name: 'TechNote', color: 'linear-gradient(135deg, #3B82F6, #06B6D4)', letter: 'T' },
-  { id: '5', name: '晓雯创作', color: 'linear-gradient(135deg, #EC4899, #F59E0B)', letter: '晓' },
-  { id: '6', name: '思维实验室', color: 'linear-gradient(135deg, #10B981, #3B82F6)', letter: '思' },
-];
 
 interface CommentDrawerProps {
   post: Post;
   onClose: () => void;
 }
 
-const MOCK_COMMENTS = [
-  { id: '1', user: '设计师小鱼', color: '#6366F1', text: '这个观点太到位了！设计中的平衡感真的需要反复练习。', time: '1小时前', likes: 12 },
-  { id: '2', user: '产品er阿杰', color: '#8B5CF6', text: '我也用思链整理了产品知识，效果超好！', time: '2小时前', likes: 8 },
-  { id: '3', user: 'UI工程师', color: '#3B82F6', text: '分享给了我们整个设计团队，非常有价值～', time: '3小时前', likes: 23 },
-  { id: '4', name: '读书爱好者', color: '#EC4899', text: '能分享一下你的笔记模板吗？', time: '5小时前', likes: 5 },
-];
+interface Comment {
+  id: number;
+  postId: number;
+  userId: number;
+  content: string;
+  createdAt: string;
+  authorName: string;
+  authorAvatar: string;
+}
 
 function CommentDrawer({ post, onClose }: CommentDrawerProps) {
   const [comment, setComment] = useState('');
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchComments();
+  }, [post.id]);
+
+  const fetchComments = async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get(`/community/posts/${post.id}/comments`);
+      if (data.success) {
+        setComments(data.data.comments);
+      }
+    } catch (error) {
+      console.error('Failed to fetch comments', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!comment.trim()) return;
+    try {
+      const { data } = await api.post(`/community/posts/${post.id}/comments`, { content: comment });
+      if (data.success) {
+        setComments(prev => [data.data, ...prev]);
+        setComment('');
+      }
+    } catch (error) {
+      console.error('Failed to post comment', error);
+    }
+  };
+
+  // Helper to format time
+  const formatTime = (isoString: string) => {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHrs < 1) return '刚刚';
+    if (diffHrs < 24) return `${diffHrs}小时前`;
+    return `${Math.floor(diffHrs / 24)}天前`;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -121,40 +100,59 @@ function CommentDrawer({ post, onClose }: CommentDrawerProps) {
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-        className="w-full max-w-lg rounded-t-3xl overflow-hidden"
+        className="w-full max-w-lg rounded-t-3xl overflow-hidden flex flex-col"
         style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', maxHeight: '80vh' }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 pt-4 pb-3"
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 flex-shrink-0"
           style={{ borderBottom: '1px solid rgba(99,102,241,0.08)' }}>
-          <p style={{ color: '#1E1B4B', fontSize: '16px', fontWeight: 800 }}>评论 ({post.comments})</p>
+          <p style={{ color: '#1E1B4B', fontSize: '16px', fontWeight: 800 }}>评论 ({comments.length})</p>
           <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center"
             style={{ background: 'rgba(99,102,241,0.08)' }}>
             <X size={16} style={{ color: '#6366F1' }} />
           </button>
         </div>
-        <div className="overflow-y-auto px-5 py-3 space-y-4" style={{ maxHeight: '50vh' }}>
-          {MOCK_COMMENTS.map((c, i) => (
-            <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-              className="flex gap-3">
-              <div className="w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: `${c.color}20` }}>
-                <span style={{ color: c.color, fontSize: '13px', fontWeight: 700 }}>{c.user[0]}</span>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span style={{ color: '#1E1B4B', fontSize: '13px', fontWeight: 700 }}>{c.user}</span>
-                  <span style={{ color: '#9CA3AF', fontSize: '11px' }}>{c.time}</span>
-                </div>
-                <p style={{ color: '#4B5563', fontSize: '13px', lineHeight: 1.6 }}>{c.text}</p>
-                <button className="mt-1 flex items-center gap-1" style={{ color: '#9CA3AF', fontSize: '11px' }}>
-                  <Heart size={11} /> {c.likes}
-                </button>
-              </div>
-            </motion.div>
-          ))}
+        
+        <div className="overflow-y-auto px-5 py-3 space-y-4 flex-1" style={{ minHeight: '200px' }}>
+          {loading ? (
+            <div className="flex justify-center py-8 text-gray-400 text-sm">加载中...</div>
+          ) : comments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+              <MessageCircle size={32} className="mb-2 opacity-50" />
+              <p className="text-sm">暂无评论，快来抢沙发吧~</p>
+            </div>
+          ) : (
+            comments.map((c, i) => {
+              // Generate a consistent color for avatar based on name length or something
+              const colors = ['#6366F1', '#8B5CF6', '#3B82F6', '#EC4899', '#10B981', '#F59E0B'];
+              const color = colors[(c.authorName || 'U').length % colors.length];
+              const letter = (c.authorName || 'U').charAt(0).toUpperCase();
+              
+              return (
+                <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+                  className="flex gap-3">
+                  <div className="w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${color}20` }}>
+                    {c.authorAvatar ? (
+                      <img src={c.authorAvatar} alt="" className="w-full h-full rounded-2xl object-cover" />
+                    ) : (
+                      <span style={{ color: color, fontSize: '13px', fontWeight: 700 }}>{letter}</span>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span style={{ color: '#1E1B4B', fontSize: '13px', fontWeight: 700 }}>{c.authorName}</span>
+                      <span style={{ color: '#9CA3AF', fontSize: '11px' }}>{formatTime(c.createdAt)}</span>
+                    </div>
+                    <p style={{ color: '#4B5563', fontSize: '13px', lineHeight: 1.6 }}>{c.content}</p>
+                  </div>
+                </motion.div>
+              );
+            })
+          )}
         </div>
-        <div className="px-4 py-3" style={{ borderTop: '1px solid rgba(99,102,241,0.08)' }}>
+
+        <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid rgba(99,102,241,0.08)' }}>
           <div className="flex gap-2 items-center">
             <div className="w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}>
@@ -168,9 +166,14 @@ function CommentDrawer({ post, onClose }: CommentDrawerProps) {
                 placeholder="说点什么..."
                 className="flex-1 bg-transparent outline-none"
                 style={{ color: '#1E1B4B', fontSize: '13px' }}
+                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               />
-              <button className="active:scale-90 transition-all">
-                <Send size={16} style={{ color: comment ? '#6366F1' : '#D1D5DB' }} />
+              <button 
+                onClick={handleSubmit}
+                className="active:scale-90 transition-all"
+                disabled={!comment.trim()}
+              >
+                <Send size={16} style={{ color: comment.trim() ? '#6366F1' : '#D1D5DB' }} />
               </button>
             </div>
           </div>
@@ -193,61 +196,7 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
   const [profileOpen, setProfileOpen] = useState(false);
   const [followed, setFollowed] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [activeNote, setActiveNote] = useState(0);
-  const [noteDir, setNoteDir] = useState(1);
 
-  // ── Mock notes per post ──
-  const USER_NOTES: Record<string, { title: string; snippet: string; tag: string; date: string; emoji: string; cover: string }[]> = {
-    '1': [
-      { title: '设计系统原则', snippet: '原子设计：将界面分解为原子、分子、有机体，逐层构建一致体验。', tag: '设计', date: '1天前', emoji: '🎨', cover: 'https://images.unsplash.com/photo-1615387000571-bdcfe92eb67c?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '留白与空间感', snippet: '留白不是空洞，是另一种语言。让眼睛呼吸，让思维流动。', tag: '灵感', date: '3天前', emoji: '✨', cover: 'https://images.unsplash.com/photo-1769690398694-9c5d5ca4b4ea?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '色彩心理学', snippet: '蓝色传递信任，红色激发行动，绿色带来平静——色彩是无声的沟通。', tag: '知识管理', date: '5天前', emoji: '🖌️', cover: 'https://images.unsplash.com/photo-1654028122846-4910bf0db38c?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-    ],
-    '2': [
-      { title: '《心流》核心摘要', snippet: '心流需要：明确目标 + 即时反馈 + 挑战与技能匹配，缺一不可。', tag: '读书', date: '1天前', emoji: '🌊', cover: 'https://images.unsplash.com/photo-1687292291646-9bf8a20f99df?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '专注力管理策略', snippet: '番茄工作法本质：用仪式感欺骗大脑，触发深度工作模式。', tag: '效率', date: '4天前', emoji: '🍅', cover: 'https://images.unsplash.com/photo-1748609422318-7301636fb625?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '游戏化学习原理', snippet: '关卡、奖励、进度条——最好的学习系统都借鉴了游戏设计。', tag: '心理学', date: '1周前', emoji: '🎮', cover: 'https://images.unsplash.com/photo-1687292291646-9bf8a20f99df?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-    ],
-    '3': [
-      { title: 'RSC 核心原理', snippet: '服务端组件在服务器渲染，不发送 JS 到客户端，Bundle 更小更快。', tag: 'React', date: '昨天', emoji: '⚛️', cover: 'https://images.unsplash.com/photo-1770734360042-676ef707d022?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '状态管理选型', snippet: 'Zustand vs Redux：小项目轻量选前者，大型团队规范选后者。', tag: '技术', date: '3天前', emoji: '🗂️', cover: 'https://images.unsplash.com/photo-1770734360042-676ef707d022?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: 'AI 辅助编程笔记', snippet: 'Copilot 补全、ChatGPT 架构、Claude 文档——三者协作最高效。', tag: 'AI', date: '5天前', emoji: '🤖', cover: 'https://images.unsplash.com/photo-1770734360042-676ef707d022?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-    ],
-    '4': [
-      { title: '日本旅行碎片', snippet: '京都寺庙第一次感受到「静」的重量，不是空洞，是满溢的宁静。', tag: '旅行', date: '2天前', emoji: '🗾', cover: 'https://images.unsplash.com/photo-1717060773466-2bd7b1039f85?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '灵感捕捉系统', snippet: '随时记录 → AI 结构化 → 思库归档 → 思链连接，四步灵感漏斗。', tag: '灵感', date: '4天前', emoji: '💡', cover: 'https://images.unsplash.com/photo-1678845536613-5cf0ec5245cd?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '冰岛极光笔记', snippet: '零下20°抬头看见绿色光幕，突然明白什么是「渺小的震撼」。', tag: 'AI', date: '1周前', emoji: '🌌', cover: 'https://images.unsplash.com/photo-1681834418277-b01c30279693?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-    ],
-    '5': [
-      { title: '信息焦虑解法', snippet: '不是更努力地记录，而是建立关系网——节点少但连接密，才是知识本质。', tag: '知识管理', date: '昨天', emoji: '🧠', cover: 'https://images.unsplash.com/photo-1678845536613-5cf0ec5245cd?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '思链使用心得', snippet: '用思链3个月，500条碎片整理成47个核心节点，清晰了整整10倍。', tag: 'AI', date: '3天前', emoji: '🔗', cover: 'https://images.unsplash.com/photo-1678845536613-5cf0ec5245cd?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '第一原理思维', snippet: '剥离表象，找到最基础的假设，然后从头重建——这才是真正的创新。', tag: '方法论', date: '5天前', emoji: '🏗️', cover: 'https://images.unsplash.com/photo-1615387000571-bdcfe92eb67c?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-    ],
-    '6': [
-      { title: '手写笔记实验', snippet: '连续30天手写，记忆留存率提升约40%。慢即是快，纸笔有魔力。', tag: '笔记方法', date: '1天前', emoji: '✍️', cover: 'https://images.unsplash.com/photo-1748609422318-7301636fb625?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '数字笔记系统', snippet: '每条笔记至少关联两个已有节点，否则不录入——这条规则改变了一切。', tag: '效率', date: '4天前', emoji: '💻', cover: 'https://images.unsplash.com/photo-1770734360042-676ef707d022?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-      { title: '混合记录法', snippet: '手写捕捉（5分钟）→ 拍照 → AI 结构化 → 思库归档，最佳实践。', tag: '学习', date: '1周前', emoji: '🔄', cover: 'https://images.unsplash.com/photo-1748609422318-7301636fb625?crop=entropy&cs=tinysrgb&fit=crop&w=300&h=300&q=75' },
-    ],
-  };
-  const userNotes = USER_NOTES[post.id] ?? USER_NOTES['1'];
-
-  // ── Auto-advance carousel when profile card is open ──
-  useEffect(() => {
-    if (!profileOpen) return;
-    setActiveNote(0);
-    setNoteDir(1);
-    const id = setInterval(() => {
-      setNoteDir(1);
-      setActiveNote(v => (v + 1) % 3);
-    }, 3000);
-    return () => clearInterval(id);
-  }, [profileOpen]);
-
-  const noteVariants = {
-    enter: (dir: number) => ({ x: dir > 0 ? 72 : -72, opacity: 0, scale: 0.92, filter: 'blur(4px)' }),
-    center: { x: 0, opacity: 1, scale: 1, filter: 'blur(0px)' },
-    exit: (dir: number) => ({ x: dir > 0 ? -72 : 72, opacity: 0, scale: 0.92, filter: 'blur(4px)' }),
-  };
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -678,142 +627,7 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
               {/* Bottom actions — notes carousel + buttons */}
               <div className="pb-2">
 
-                {/* ── Notes carousel ── */}
-                <motion.div
-                  initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}
-                  className="px-5 mb-1"
-                >
-                  {/* Header row */}
-                  <div className="flex items-center justify-between mb-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1 h-3.5 rounded-full" style={{ background: `linear-gradient(to bottom, ${post.user.avatarColor}, ${post.user.avatarColor}60)` }} />
-                      <p style={{ color: '#6B7280', fontSize: '10.5px', fontWeight: '700', letterSpacing: '0.05em', textTransform: 'uppercase' }}>最近笔记</p>
-                    </div>
-                    {/* Pill dots */}
-                    <div className="flex items-center gap-1">
-                      {[0, 1, 2].map(i => (
-                        <motion.button
-                          key={i}
-                          onClick={() => { setNoteDir(i > activeNote ? 1 : -1); setActiveNote(i); }}
-                          animate={{
-                            width: activeNote === i ? 18 : 5,
-                            background: activeNote === i ? post.user.avatarColor : 'rgba(156,163,175,0.35)',
-                          }}
-                          transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-                          className="h-[5px] rounded-full"
-                        />
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Card stage */}
-                  <div className="relative overflow-hidden rounded-2xl" style={{ height: '108px' }}>
-                    {/* Background shimmer track */}
-                    <div className="absolute inset-0 rounded-2xl"
-                      style={{ background: `linear-gradient(135deg, ${post.user.avatarColor}07 0%, ${post.user.avatarColor}03 100%)` }} />
-
-                    <AnimatePresence mode="popLayout" custom={noteDir}>
-                      <motion.div
-                        key={activeNote}
-                        custom={noteDir}
-                        variants={noteVariants}
-                        initial="enter"
-                        animate="center"
-                        exit="exit"
-                        transition={{ type: 'spring', stiffness: 360, damping: 32 }}
-                        drag="x"
-                        dragConstraints={{ left: 0, right: 0 }}
-                        dragElastic={0.12}
-                        onDragEnd={(_, info) => {
-                          if (info.offset.x < -28) {
-                            setNoteDir(1);
-                            setActiveNote(v => (v + 1) % 3);
-                          } else if (info.offset.x > 28) {
-                            setNoteDir(-1);
-                            setActiveNote(v => (v + 2) % 3);
-                          }
-                        }}
-                        className="absolute inset-0 flex cursor-grab active:cursor-grabbing select-none overflow-hidden"
-                        style={{ border: `1px solid ${post.user.avatarColor}18` }}
-                      >
-                        {/* ── Cover image strip (left) ── */}
-                        <div className="relative flex-shrink-0 overflow-hidden" style={{ width: '90px' }}>
-                          <motion.img
-                            key={`cover-${activeNote}`}
-                            src={userNotes[activeNote].cover}
-                            alt=""
-                            initial={{ scale: 1.1, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                            className="absolute inset-0 w-full h-full object-cover"
-                          />
-                          {/* Right-edge fade blending into card background */}
-                          <div
-                            className="absolute inset-y-0 right-0 w-8 pointer-events-none"
-                            style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.97))' }}
-                          />
-                          {/* Emoji badge floating on cover */}
-                          <motion.div
-                            key={`emoji-${activeNote}`}
-                            initial={{ scale: 0.3, opacity: 0, y: 8 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            transition={{ type: 'spring', stiffness: 440, damping: 18, delay: 0.1 }}
-                            className="absolute bottom-2 left-2 w-7 h-7 rounded-xl flex items-center justify-center"
-                            style={{
-                              background: 'rgba(255,255,255,0.9)',
-                              backdropFilter: 'blur(8px)',
-                              boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
-                              fontSize: '14px',
-                            }}
-                          >
-                            {userNotes[activeNote].emoji}
-                          </motion.div>
-                        </div>
-
-                        {/* ── Text content (right) ── */}
-                        <div className="flex-1 min-w-0 flex flex-col justify-between px-3 py-3">
-                          <div>
-                            <div className="flex items-start justify-between gap-1 mb-1">
-                              <p className="line-clamp-2" style={{ color: '#1E1B4B', fontSize: '12.5px', fontWeight: 700, lineHeight: 1.35, flex: 1 }}>
-                                {userNotes[activeNote].title}
-                              </p>
-                              <span className="flex-shrink-0 ml-1" style={{ color: '#C4C9D4', fontSize: '9.5px', lineHeight: 1, paddingTop: '1px' }}>
-                                {userNotes[activeNote].date}
-                              </span>
-                            </div>
-                            <p className="line-clamp-2" style={{ color: '#6B7280', fontSize: '11px', lineHeight: 1.5 }}>
-                              {userNotes[activeNote].snippet}
-                            </p>
-                          </div>
-
-                          {/* Tag + swipe hint */}
-                          <div className="flex items-center justify-between mt-1.5">
-                            <span className="px-2 py-0.5 rounded-full"
-                              style={{ background: `${post.user.avatarColor}12`, color: post.user.avatarColor, fontSize: '10px', fontWeight: 600 }}>
-                              #{userNotes[activeNote].tag}
-                            </span>
-                            <div className="flex items-center gap-0.5" style={{ color: '#D1D5DB', fontSize: '9.5px' }}>
-                              <span>←</span>
-                              <span style={{ fontSize: '8.5px' }}>滑动</span>
-                              <span>→</span>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    </AnimatePresence>
-
-                    {/* Progress bar at bottom */}
-                    <div className="absolute bottom-0 left-0 right-0 h-[2px]"
-                      style={{ background: `${post.user.avatarColor}10` }}>
-                      <motion.div
-                        className="h-full rounded-full"
-                        style={{ background: `linear-gradient(to right, ${post.user.avatarColor}80, ${post.user.avatarColor})` }}
-                        animate={{ width: `${((activeNote + 1) / 3) * 100}%` }}
-                        transition={{ type: 'spring', stiffness: 180, damping: 26 }}
-                      />
-                    </div>
-                  </div>
-                </motion.div>
 
                 {/* ── Bottom buttons ── */}
                 <div className="flex gap-2.5 px-5 pt-3 pb-4">
@@ -868,16 +682,135 @@ function StatusBar() {
 }
 
 export function SiCircle() {
-  const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [commentPost, setCommentPost] = useState<Post | null>(null);
   const [activeTab, setActiveTab] = useState<'follow' | 'discover'>('discover');
   const navigate = useNavigate();
 
-  const handleLike = (id: string) => {
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, liked: !p.liked } : p));
+  // Dynamic Stories from Posts
+  const stories = useMemo(() => {
+    const authors = new Map();
+    // Add "Me" first
+    authors.set('me', { 
+      id: 'me', 
+      name: '我的故事', 
+      color: 'linear-gradient(135deg, #6366F1, #8B5CF6)', 
+      letter: '我', 
+      isMe: true 
+    });
+
+    posts.forEach(post => {
+      if (!authors.has(post.user.username)) {
+        authors.set(post.user.username, {
+          id: post.user.username,
+          name: post.user.name,
+          color: `linear-gradient(135deg, ${post.user.avatarColor}, ${post.user.avatarColor}80)`,
+          letter: post.user.avatarLetter,
+          isMe: false
+        });
+      }
+    });
+    return Array.from(authors.values());
+  }, [posts]);
+
+  useEffect(() => {
+    fetchPosts();
+  }, [activeTab]);
+
+  const fetchPosts = async () => {
+    try {
+      // Fetch posts based on activeTab ('discover' -> latest/hottest, 'follow' -> mine or similar?)
+      // For now, mapping 'discover' to general list.
+      const response = await api.get('/community/posts', {
+        params: {
+          limit: 20,
+          sort: activeTab === 'discover' ? 'latest' : 'hottest', // Just an example logic
+        }
+      });
+
+      if (response.data.success && response.data.data.posts) {
+        const fetchedPosts = response.data.data.posts.map((p: any) => {
+          // Helper to generate consistent color/letter from name
+          const colorList = ['#6366F1', '#8B5CF6', '#3B82F6', '#EC4899', '#10B981', '#F59E0B'];
+          const name = p.authorName || 'User';
+          const avatarColor = colorList[name.length % colorList.length];
+          const avatarLetter = name.charAt(0).toUpperCase();
+
+          // Parse tags if string
+          let tags = [];
+          if (Array.isArray(p.tags)) {
+            tags = p.tags;
+          } else if (typeof p.tags === 'string') {
+            try {
+              tags = JSON.parse(p.tags);
+            } catch {
+              tags = p.tags.split(',').filter(Boolean);
+            }
+          }
+
+          // Format timestamp relative time
+          const date = new Date(p.createdAt);
+          const now = new Date();
+          const diffMs = now.getTime() - date.getTime();
+          const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+          let timeStr = '';
+          if (diffHrs < 1) timeStr = '刚刚';
+          else if (diffHrs < 24) timeStr = `${diffHrs}小时前`;
+          else timeStr = `${Math.floor(diffHrs / 24)}天前`;
+
+          return {
+            id: String(p.id),
+            user: {
+              name: name,
+              username: name, // Using name as username for now
+              avatarColor,
+              avatarLetter,
+              verified: false // Backend doesn't return verified status yet
+            },
+            content: (p.title ? `${p.title}\n\n` : '') + (p.summary || ''),
+            image: p.coverImage || undefined,
+            // imageGradient: ... // Could add logic if no image
+            tags: tags,
+            likes: p.likes || 0,
+            comments: p.commentCount || 0,
+            shares: 0, // Not in backend yet
+            bookmarks: 0, // Not in backend yet (or isBookmarked only?)
+            timestamp: timeStr,
+            liked: p.isLiked,
+            bookmarked: p.isBookmarked
+          };
+        });
+        setPosts(fetchedPosts);
+      }
+    } catch (error) {
+      console.error('Failed to fetch community posts:', error);
+    }
   };
-  const handleBookmark = (id: string) => {
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, bookmarked: !p.bookmarked } : p));
+
+  const handleLike = async (id: string) => {
+    try {
+      const { data } = await api.post(`/community/posts/${id}/like`);
+      if (data.success) {
+        setPosts(prev => prev.map(p => 
+          p.id === id ? { ...p, liked: data.data.liked, likes: data.data.likes } : p
+        ));
+      }
+    } catch (error) {
+      console.error('Like failed', error);
+    }
+  };
+
+  const handleBookmark = async (id: string) => {
+    try {
+      const { data } = await api.post(`/community/posts/${id}/bookmark`);
+      if (data.success) {
+        setPosts(prev => prev.map(p => 
+          p.id === id ? { ...p, bookmarked: data.data.bookmarked } : p
+        ));
+      }
+    } catch (error) {
+      console.error('Bookmark failed', error);
+    }
   };
 
   return (
@@ -933,7 +866,7 @@ export function SiCircle() {
         {/* Stories row */}
         <div className="px-4 pt-4 pb-2">
           <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-            {STORIES.map(s => (
+            {stories.map(s => (
               <button key={s.id} className="flex flex-col items-center gap-1.5 flex-shrink-0 active:scale-95 transition-all">
                 <div
                   className="p-0.5 rounded-[18px]"

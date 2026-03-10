@@ -36,16 +36,21 @@ async function createNote({ userId, content, tags }) {
     data: {
       userId,
       content,
-      tags: finalTags
+      tags: JSON.stringify(finalTags)
     },
     include: {
-      attachments: {
-        include: {
-          analysis: true
-        }
-      }
+      attachments: true
     }
   });
+
+  // Parse tags back to array for response
+  if (note.tags) {
+    try {
+      note.tags = JSON.parse(note.tags);
+    } catch (e) {
+      note.tags = [];
+    }
+  }
 
   return note;
 }
@@ -69,13 +74,17 @@ async function getNoteById(noteId, userId) {
   const note = await prisma.note.findUnique({
     where,
     include: {
-      attachments: {
-        include: {
-          analysis: true
-        }
-      }
+      attachments: true
     }
   });
+
+  if (note && note.tags) {
+    try {
+      note.tags = JSON.parse(note.tags);
+    } catch (e) {
+      note.tags = [];
+    }
+  }
 
   return note;
 }
@@ -117,20 +126,24 @@ async function updateNote(noteId, data, userId) {
   }
   
   if (data.tags !== undefined) {
-    updateData.tags = normalizeTags(data.tags);
+    updateData.tags = JSON.stringify(normalizeTags(data.tags));
   }
 
   const note = await prisma.note.update({
     where: { id: noteId },
     data: updateData,
     include: {
-      attachments: {
-        include: {
-          analysis: true
-        }
-      }
+      attachments: true
     }
   });
+
+  if (note && note.tags) {
+    try {
+      note.tags = JSON.parse(note.tags);
+    } catch (e) {
+      note.tags = [];
+    }
+  }
 
   return note;
 }
@@ -160,6 +173,14 @@ async function deleteNote(noteId, userId) {
   const note = await prisma.note.delete({
     where: { id: noteId }
   });
+
+  if (note && note.tags) {
+    try {
+      note.tags = JSON.parse(note.tags);
+    } catch (e) {
+      note.tags = [];
+    }
+  }
 
   return note;
 }
@@ -192,9 +213,10 @@ async function listNotes(options = {}) {
   }
   
   if (tags && tags.length > 0) {
-    where.tags = {
-      hasSome: tags
-    };
+    // Fix for SQLite JSON string storage: use string contains instead of array hasSome
+    where.OR = tags.map(t => ({
+      tags: { contains: `"${t}"` }
+    }));
   }
 
   const skip = (page - 1) * limit;
@@ -207,15 +229,22 @@ async function listNotes(options = {}) {
       take: limit,
       orderBy,
       include: {
-        attachments: {
-          include: {
-            analysis: true
-          }
-        }
+        attachments: true
       }
     }),
     prisma.note.count({ where })
   ]);
+
+  // Parse tags for each note
+  notes.forEach(note => {
+    if (note.tags) {
+      try {
+        note.tags = JSON.parse(note.tags);
+      } catch (e) {
+        note.tags = [];
+      }
+    }
+  });
 
   return {
     notes,
@@ -289,13 +318,12 @@ async function searchNotes(options) {
     OR: [
       {
         content: {
-          contains: query,
-          mode: 'insensitive'
+          contains: query
         }
       },
       {
         tags: {
-          hasSome: [query]
+          contains: `"${query}"`
         }
       }
     ]
@@ -314,15 +342,21 @@ async function searchNotes(options) {
       take: limit,
       orderBy: { createdAt: 'desc' },
       include: {
-        attachments: {
-          include: {
-            analysis: true
-          }
-        }
+        attachments: true
       }
     }),
     prisma.note.count({ where })
   ]);
+
+  notes.forEach(note => {
+    if (note.tags) {
+      try {
+        note.tags = JSON.parse(note.tags);
+      } catch (e) {
+        note.tags = [];
+      }
+    }
+  });
 
   return {
     notes,

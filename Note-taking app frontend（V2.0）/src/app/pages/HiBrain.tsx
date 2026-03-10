@@ -180,16 +180,49 @@ const AI_RESPONSES: Record<string, string> = {
   整合: '📊 **今日碎片整合**\n\n你积累的碎片正在形成知识结构：\n• 可串联主题：查看知识生长板\n• 碎片密度最高：与你最感兴趣的领域一致\n• 待补全内容：AI 可基于你的偏好自动生成\n\n**核心理念**：你负责记录灵感碎片，我负责把它们拼成完整的知识体系 🧠\n\n现在就去点击「AI 帮我串联」试试吧！',
 };
 
-function getAIResponse(input: string): string {
+function getAIResponse(input: string, notes: Note[]): string {
   const m = input.toLowerCase();
+
+  // Search logic
+  const isSearch = m.includes('找') || m.includes('查找') || m.includes('搜索') || m.includes('查询');
+  if (isSearch) {
+    // Extract keyword: remove common verbs/stopwords
+    const keyword = m.replace(/帮我|请|去|找|查找|搜索|查询|一下|有没有|关于|的|笔记|记录|内容|之前|上次/g, '').trim();
+    
+    if (keyword) {
+      const matches = notes.filter(n => 
+        (n.title?.toLowerCase().includes(keyword) || 
+         n.content.replace(/<[^>]*>/g, '').toLowerCase().includes(keyword) ||
+         n.tags?.some(t => t.toLowerCase().includes(keyword)))
+      );
+
+      if (matches.length > 0) {
+        const top = matches.slice(0, 3);
+        const titles = top.map(n => `**${n.title || n.content.replace(/<[^>]*>/g, '').slice(0, 10)}**`).join('、');
+        return `🔍 找到了 ${matches.length} 条与“${keyword}”相关的笔记：\n${titles}${matches.length > 3 ? ' 等' : ''}。\n\n你可以点击卡片查看详情，或让我帮你把这些碎片串联起来。`;
+      } else {
+        return `🔍 抱歉，我在你的笔记库中没有找到关于“${keyword}”的内容。\n\n建议你现在记录下来，我会帮你自动归类整理 🧠`;
+      }
+    }
+  }
+
   if (m.includes('图谱') || m.includes('关联') || m.includes('结构') || m.includes('网络'))
     return '📊 这是你当前的**知识关联图谱**——可以点击任意节点查看它与其他主题的连接关系：';
   if (m.includes('图片') || m.includes('照片') || m.includes('长什么样') || m.includes('看看'))
     return '🖼️ 找到了，这是相关的参考图片：';
   if (/北海道|京都|东京|日本|hokkaido|kyoto|tokyo/.test(m))
     return `🗺️ 关于 **${input.slice(0, 10)}**，我找到了一张参考图片，同时建议把相关记录都标上地点标签，方便后续串联成完整旅行攻略：`;
-  if (m.includes('找') || m.includes('查找') || m.includes('上次') || m.includes('之前'))
-    return '🔍 找到了最近的一条相关笔记：';
+  
+  // Fallback for generic "find" without keyword or if keyword extraction failed
+  if (m.includes('找') || m.includes('查找') || m.includes('上次') || m.includes('之前')) {
+     if (notes.length > 0) {
+       const latest = [...notes].sort((a, b) => b.createdAt - a.createdAt)[0];
+       const title = latest.title || latest.content.replace(/<[^>]*>/g, '').slice(0, 10);
+       return `🔍 帮你找到了最近的一条笔记：**${title}**。`;
+     }
+     return '🔍 你的笔记库还是空的，快去记录第一条灵感吧！';
+  }
+
   if (m.includes('串联') || m.includes('整理') || m.includes('碎片')) return AI_RESPONSES['串联'];
   if (m.includes('攻略') || m.includes('生成') || m.includes('完整')) return AI_RESPONSES['攻略'];
   if (m.includes('发现') || m.includes('关联') || m.includes('规律') || m.includes('分析')) return AI_RESPONSES['发现'];
@@ -984,7 +1017,7 @@ function HiBrainNewDesign() {
     const card = getCardForMessage(msg, clusters, notes);
     setMessages(prev => [...prev, {
       id: (Date.now() + 1).toString(), role: 'ai',
-      content: getAIResponse(msg), timestamp: new Date(),
+      content: getAIResponse(msg, notes), timestamp: new Date(),
       ...(card ? { card } : {}),
     }]);
   };
