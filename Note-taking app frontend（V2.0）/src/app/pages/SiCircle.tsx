@@ -826,8 +826,14 @@ export function SiCircle() {
 
       {/* Header */}
       <div className="relative z-20 flex-shrink-0"
-        style={{ background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: '1px solid rgba(255,255,255,0.75)' }}>
-        <StatusBar />
+        style={{ 
+          background: 'rgba(255,255,255,0.55)', 
+          backdropFilter: 'blur(24px)', 
+          WebkitBackdropFilter: 'blur(24px)', 
+          borderBottom: '1px solid rgba(255,255,255,0.75)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 8px)'
+        }}>
+        {/* <StatusBar /> */}
         <div className="flex items-center justify-between px-5 py-2">
           <div>
             <p style={{ color: '#3B82F6', fontSize: '12px', fontWeight: 500 }}>灵感共享社区</p>

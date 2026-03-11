@@ -23,12 +23,19 @@ class LLMClient {
       maxTokens = 2000,
       timeout = DEFAULT_TIMEOUT,
       model = this.model,
+      systemPrompt = null, // New option
     } = options;
+
+    const messages = [];
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt });
+    }
+    messages.push({ role: 'user', content: prompt });
 
     const body = {
       model,
       input: {
-        messages: [{ role: 'user', content: prompt }],
+        messages,
       },
       parameters: {
         temperature,

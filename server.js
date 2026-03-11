@@ -700,6 +700,10 @@ app.use('/api/community', communityRouter);
 // 聊天路由
 app.use('/api', chatRoutes);
 
+// HiBrain (Agentic RAG) Routes
+const hibrainRoutes = require('./routes/hibrainRoutes');
+app.use('/api/hibrain', hibrainRoutes);
+
 // 附件路由
 const attachmentRoutes = require('./routes/attachmentRoutes');
 app.use('/api/attachments', attachmentRoutes);

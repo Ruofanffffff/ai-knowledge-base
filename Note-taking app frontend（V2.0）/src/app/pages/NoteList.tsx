@@ -663,9 +663,10 @@ export function NoteList() {
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
           borderBottom: '1px solid var(--hi-header-border)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 8px)',
         }}
       >
-        <StatusBar />
+        {/* <StatusBar /> */}
 
         {/* App header row */}
         <div className="flex items-center justify-between px-5 pb-3 pt-1">

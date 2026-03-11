@@ -23,6 +23,7 @@ model User {
   settings  Setting[]
   backups   Backup[]
   notes     Note[]     // 新增: 便签关联
+  // memories  Memory[] // Relation removed to avoid foreign key issues with legacy DB
   
   @@map("users")
 }
@@ -512,4 +513,26 @@ model ThemeEvolutionLog {
   @@map("theme_evolution_logs")
   @@index([bodyId])
   @@index([createdAt])
+}
+
+// ============================================
+// Memory Models (记忆模型)
+// ============================================
+
+model Memory {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  type            String
+  content         String
+  embedding       String
+  importanceScore Float    @map("importance_score")
+  lastAccessedAt  DateTime @map("last_accessed_at")
+  metadata        String
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // user            User     @relation(fields: [userId], references: [id], onDelete: Cascade) // Removed
+
+  @@map("memories")
+  @@index([userId])
 }

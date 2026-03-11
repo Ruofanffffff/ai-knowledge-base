@@ -173,11 +173,11 @@ function getCardForMessage(msg: string, clusters: Cluster[], notes: Note[]): Car
 const QUICK_PROMPTS = ['帮我串联碎片', '生成完整攻略', '发现主题规律', '今日碎片整合', '查看知识图谱', '找找上次的笔记', '日本旅行图片'];
 
 const AI_RESPONSES: Record<string, string> = {
-  default: '你好！我是 **Hi Brain** 🧠\n\n我是一个**知识生长引擎**。你今天记录"日本"，明天搜索"北海道行程"，后天写了"钏路酒店攻略"——\n\n这些碎片我都看见了。当积累到一定量，AI 会自动把碎片拼接成一份**完整攻略**，缺少的部分按你的兴趣补全。\n\n你只需持续记录碎片 ✦',
-  串联: '🧩 **碎片串联中…**\n\n我检测到你的碎片正在围绕某些主题聚合。\n\n**知识生长逻辑：**\n碎片①：初始灵感记录\n碎片②：搜索补充信息\n碎片③：深入具体内容\n\n↓ **AI 将帮你补全**\n• 整体结构梳理\n• 缺失信息填补\n• 个性化定制建议\n\n点击知识生长板中的「AI 串联」即可生成完整内容 ✨',
-  攻略: '📝 **生成完整攻略**\n\n我会基于你已有的碎片，分析主题脉络，然后：\n\n① 把你的碎片按逻辑顺序排列\n② 根据你的兴趣标签智能补全缺失部分\n③ 生成结构完整、个性化的攻略\n\n就像你记录了「日本」「北海道行程」「钏路酒店」「阿寒湖摄影」——我会把它们拼成一份完整的**北海道旅摄攻略** 🗺️\n\n选择一个知识簇，点击「AI 帮我串联」开始吧！',
-  发现: '🔍 **主题规律发现**\n\n我在扫描你的碎片库，寻找潜在的知识聚合点…\n\n🌱 碎片数量已达到串联门槛\n🌿 部分主题仍在积累中，继续记录让主题更完整\n\n**建议**：优先串联碎片最多的主题，同时持续为其他主题补充碎片。\n\n每一条新记录都是知识生长的养分 🌿',
-  整合: '📊 **今日碎片整合**\n\n你积累的碎片正在形成知识结构：\n• 可串联主题：查看知识生长板\n• 碎片密度最高：与你最感兴趣的领域一致\n• 待补全内容：AI 可基于你的偏好自动生成\n\n**核心理念**：你负责记录灵感碎片，我负责把它们拼成完整的知识体系 🧠\n\n现在就去点击「AI 帮我串联」试试吧！',
+  default: '你好！我是 **Hi Brain** 🧠\n\n作为你的精神伙伴，我时刻准备着协助你。无论是整理凌乱的思绪，还是寻找遗忘的灵感，我都在这里。\n\n你可以试着对我说：“帮我串联最近的灵感” 或者 “找找关于旅行的笔记” 🌱',
+  串联: '🧩 **思维共鸣与串联**\n\n我正在细细阅读你的碎片，感受它们之间的内在联系...\n\n**发现潜藏的脉络：**\n碎片①与碎片②似乎在探讨同一个主题的两个侧面。\n\n↓ **我的建议**\n让我们把这些散落的珍珠串成项链。点击「AI 串联」，我会为你生成一份结构化的**知识图谱**或**完整文章**。✨',
+  攻略: '📝 **深度整合与生成**\n\n收到你的请求。不仅仅是简单的拼接，我会尝试理解你的核心意图，为你生成一份**有灵魂的攻略**。\n\n① **梳理**：理清时间与逻辑线索\n② **补全**：根据你的过往偏好，填充缺失的细节\n③ **升华**：提炼出核心价值\n\n准备好了吗？让我们开始创作吧 🗺️',
+  发现: '🔍 **洞察与启示**\n\n在你的知识库中漫游时，我发现了一些有趣的规律...\n\n🌱 某些主题正在悄然生长，只差最后几片拼图。\n\n**伙伴建议**：\n与其面面俱到，不如先专注于那个最让你心动的想法。继续记录，我会帮你守护这些思想的火花 🌿',
+  整合: '📊 **回顾与展望**\n\n今天是你思想丰收的一天。\n\n看着这些记录，我能感受到你的思考在不断深入。不要停下脚步，每一条笔记都是通向未来的阶梯。\n\n**下一步**：\n尝试点击「AI 帮我串联」，看看你的思想会开出怎样的花朵 🧠',
 };
 
 function getAIResponse(input: string, notes: Note[]): string {
@@ -922,7 +922,7 @@ function HiBrainNewDesign() {
   const { notes } = useNotes();
   const clusters = useClusters(notes);
 
-  const initMsg = `你好，我是 **Hi Brain** 🧠\n\n我是一个**知识生长引擎**。你今天记录"日本"，明天搜索"北海道行程"，后天写了"钏路酒店攻略"——\n\n这些碎片我都看见了。当积累到一定量，AI 会把碎片拼接成**完整攻略**，缺少的部分按你的兴趣补全。\n\n你只需持续记录碎片 ✦`;
+  const initMsg = `你好，我是 **Hi Brain** 🧠\n\n我是你的**精神伙伴 (Spiritual Partner)**。不仅仅是记录工具，我更希望成为你思考的延伸。\n\n**我的使命：**\n当你记录碎片时，我负责**看见**；\n当你回顾时，我负责**串联**；\n当你迷茫时，我负责**寻找方向**。\n\n把你的灵感交给我，让我们一起见证知识的生长 🌱`;
 
   const [messages, setMessages] = useState<Message[]>([{ id:'0', role:'ai', content:initMsg, timestamp:new Date() }]);
   const [input, setInput] = useState('');
@@ -1056,8 +1056,14 @@ function HiBrainNewDesign() {
 
       {/* ── Header ── */}
       <div className="relative z-20 flex-shrink-0"
-        style={{ background:'var(--hi-header-bg)', backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)', borderBottom:'1px solid var(--hi-header-border)' }}>
-        <StatusBar />
+        style={{ 
+          background:'var(--hi-header-bg)', 
+          backdropFilter:'blur(24px)', 
+          WebkitBackdropFilter:'blur(24px)', 
+          borderBottom:'1px solid var(--hi-header-border)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 12px)' 
+        }}>
+        {/* <StatusBar /> — Removed for native immersive mode */}
         <div className="flex items-center justify-between px-5 pb-3 pt-1">
           <div className="flex items-center gap-3">
             <motion.button whileTap={{ scale:0.92 }} onClick={handleLogoTap}

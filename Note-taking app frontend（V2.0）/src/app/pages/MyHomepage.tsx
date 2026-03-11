@@ -369,6 +369,7 @@ export function MyHomepage() {
         style={{
           background: 'linear-gradient(160deg, #4F46E5 0%, #7C3AED 45%, #2563EB 100%)',
           paddingBottom: 0,
+          paddingTop: 'env(safe-area-inset-top)',
         }}
       >
         {/* Decorative circles */}
@@ -390,7 +391,7 @@ export function MyHomepage() {
         </div>
 
         {/* Status bar */}
-        <StatusBar />
+        {/* <StatusBar /> */}
 
         {/* Top nav */}
         <div className="relative z-10 flex items-center justify-between px-4 py-2">

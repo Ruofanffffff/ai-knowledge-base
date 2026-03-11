@@ -110,6 +110,12 @@ class ChatService {
       WHERE m.id = ?
     `, [result.lastID]);
     
+    // Asynchronously add to episodic memory if it's a text message
+    if (type === 'text' && content && content.length > 5) {
+      memoryService.addMemory(String(senderId), content, 'episodic', { conversationId, messageId: msg.id })
+        .catch(err => console.error('[ChatService] Failed to add episodic memory:', err.message));
+    }
+
     return msg;
   }
 
