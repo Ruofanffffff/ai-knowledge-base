@@ -16,7 +16,7 @@ interface NoteContextType {
   notes: Note[];
   loading: boolean;
   error: string | null;
-  addNote: (note: Omit<Note, "id" | "createdAt">) => Promise<void>;
+  addNote: (note: Omit<Note, "id" | "createdAt">) => Promise<Note | undefined>;
   deleteNote: (id: string) => Promise<void>;
   updateNote: (id: string, updates: Partial<Note>) => Promise<void>;
   refreshNotes: () => Promise<void>;
@@ -72,7 +72,7 @@ export function NoteProvider({ children }: { children: ReactNode }) {
     fetchNotes();
   }, []);
 
-  const addNote = async (note: Omit<Note, "id" | "createdAt">) => {
+  const addNote = async (note: Omit<Note, "id" | "createdAt">): Promise<Note | undefined> => {
     try {
       // Optimistic update could be implemented here, but for now let's wait for server
       const response = await api.post('/notes', {
@@ -82,6 +82,8 @@ export function NoteProvider({ children }: { children: ReactNode }) {
 
       if (response.data.success) {
         await fetchNotes(); // Refresh list to get the new note with server ID
+        // Try to find the new note in the updated list or return from response if available
+        return response.data.data;
       }
     } catch (err) {
       console.error('Failed to add note:', err);

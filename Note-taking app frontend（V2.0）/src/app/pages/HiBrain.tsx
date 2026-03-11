@@ -19,6 +19,7 @@ import { ClusterCard } from '../components/ClusterCard';
 import { KnowledgePushNotification } from '../components/KnowledgePushNotification';
 import { ChatCard, CardPayload, GraphNode, GraphEdge } from '../components/ChatCards';
 import { InlineSearch } from '../components/InlineSearch';
+import { hibrainService } from '../services/hibrainService';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants & types
@@ -171,64 +172,6 @@ function getCardForMessage(msg: string, clusters: Cluster[], notes: Note[]): Car
 }
 
 const QUICK_PROMPTS = ['帮我串联碎片', '生成完整攻略', '发现主题规律', '今日碎片整合', '查看知识图谱', '找找上次的笔记', '日本旅行图片'];
-
-const AI_RESPONSES: Record<string, string> = {
-  default: '你好！我是 **Hi Brain** 🧠\n\n作为你的精神伙伴，我时刻准备着协助你。无论是整理凌乱的思绪，还是寻找遗忘的灵感，我都在这里。\n\n你可以试着对我说：“帮我串联最近的灵感” 或者 “找找关于旅行的笔记” 🌱',
-  串联: '🧩 **思维共鸣与串联**\n\n我正在细细阅读你的碎片，感受它们之间的内在联系...\n\n**发现潜藏的脉络：**\n碎片①与碎片②似乎在探讨同一个主题的两个侧面。\n\n↓ **我的建议**\n让我们把这些散落的珍珠串成项链。点击「AI 串联」，我会为你生成一份结构化的**知识图谱**或**完整文章**。✨',
-  攻略: '📝 **深度整合与生成**\n\n收到你的请求。不仅仅是简单的拼接，我会尝试理解你的核心意图，为你生成一份**有灵魂的攻略**。\n\n① **梳理**：理清时间与逻辑线索\n② **补全**：根据你的过往偏好，填充缺失的细节\n③ **升华**：提炼出核心价值\n\n准备好了吗？让我们开始创作吧 🗺️',
-  发现: '🔍 **洞察与启示**\n\n在你的知识库中漫游时，我发现了一些有趣的规律...\n\n🌱 某些主题正在悄然生长，只差最后几片拼图。\n\n**伙伴建议**：\n与其面面俱到，不如先专注于那个最让你心动的想法。继续记录，我会帮你守护这些思想的火花 🌿',
-  整合: '📊 **回顾与展望**\n\n今天是你思想丰收的一天。\n\n看着这些记录，我能感受到你的思考在不断深入。不要停下脚步，每一条笔记都是通向未来的阶梯。\n\n**下一步**：\n尝试点击「AI 帮我串联」，看看你的思想会开出怎样的花朵 🧠',
-};
-
-function getAIResponse(input: string, notes: Note[]): string {
-  const m = input.toLowerCase();
-
-  // Search logic
-  const isSearch = m.includes('找') || m.includes('查找') || m.includes('搜索') || m.includes('查询');
-  if (isSearch) {
-    // Extract keyword: remove common verbs/stopwords
-    const keyword = m.replace(/帮我|请|去|找|查找|搜索|查询|一下|有没有|关于|的|笔记|记录|内容|之前|上次/g, '').trim();
-    
-    if (keyword) {
-      const matches = notes.filter(n => 
-        (n.title?.toLowerCase().includes(keyword) || 
-         n.content.replace(/<[^>]*>/g, '').toLowerCase().includes(keyword) ||
-         n.tags?.some(t => t.toLowerCase().includes(keyword)))
-      );
-
-      if (matches.length > 0) {
-        const top = matches.slice(0, 3);
-        const titles = top.map(n => `**${n.title || n.content.replace(/<[^>]*>/g, '').slice(0, 10)}**`).join('、');
-        return `🔍 找到了 ${matches.length} 条与“${keyword}”相关的笔记：\n${titles}${matches.length > 3 ? ' 等' : ''}。\n\n你可以点击卡片查看详情，或让我帮你把这些碎片串联起来。`;
-      } else {
-        return `🔍 抱歉，我在你的笔记库中没有找到关于“${keyword}”的内容。\n\n建议你现在记录下来，我会帮你自动归类整理 🧠`;
-      }
-    }
-  }
-
-  if (m.includes('图谱') || m.includes('关联') || m.includes('结构') || m.includes('网络'))
-    return '📊 这是你当前的**知识关联图谱**——可以点击任意节点查看它与其他主题的连接关系：';
-  if (m.includes('图片') || m.includes('照片') || m.includes('长什么样') || m.includes('看看'))
-    return '🖼️ 找到了，这是相关的参考图片：';
-  if (/北海道|京都|东京|日本|hokkaido|kyoto|tokyo/.test(m))
-    return `🗺️ 关于 **${input.slice(0, 10)}**，我找到了一张参考图片，同时建议把相关记录都标上地点标签，方便后续串联成完整旅行攻略：`;
-  
-  // Fallback for generic "find" without keyword or if keyword extraction failed
-  if (m.includes('找') || m.includes('查找') || m.includes('上次') || m.includes('之前')) {
-     if (notes.length > 0) {
-       const latest = [...notes].sort((a, b) => b.createdAt - a.createdAt)[0];
-       const title = latest.title || latest.content.replace(/<[^>]*>/g, '').slice(0, 10);
-       return `🔍 帮你找到了最近的一条笔记：**${title}**。`;
-     }
-     return '🔍 你的笔记库还是空的，快去记录第一条灵感吧！';
-  }
-
-  if (m.includes('串联') || m.includes('整理') || m.includes('碎片')) return AI_RESPONSES['串联'];
-  if (m.includes('攻略') || m.includes('生成') || m.includes('完整')) return AI_RESPONSES['攻略'];
-  if (m.includes('发现') || m.includes('关联') || m.includes('规律') || m.includes('分析')) return AI_RESPONSES['发现'];
-  if (m.includes('整合') || m.includes('今日') || m.includes('报告')) return AI_RESPONSES['整合'];
-  return AI_RESPONSES['default'];
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // StatusBar
@@ -1012,14 +955,30 @@ function HiBrainNewDesign() {
     setInput('');
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: msg, timestamp: new Date() }]);
     setIsTyping(true);
-    await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
-    setIsTyping(false);
-    const card = getCardForMessage(msg, clusters, notes);
-    setMessages(prev => [...prev, {
-      id: (Date.now() + 1).toString(), role: 'ai',
-      content: getAIResponse(msg, notes), timestamp: new Date(),
-      ...(card ? { card } : {}),
-    }]);
+    
+    try {
+      // Use real backend service instead of mock
+      const result = await hibrainService.query(msg);
+      const card = getCardForMessage(msg, clusters, notes);
+      
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(), 
+        role: 'ai',
+        content: typeof result === 'string' ? result : (result.answer || result.content || '我收到你的消息了，但暂时无法回答。'),
+        timestamp: new Date(),
+        ...(card ? { card } : {}),
+      }]);
+    } catch (error) {
+      console.error('HiBrain error:', error);
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: '抱歉，连接 HiBrain 大脑时出现了一些问题，请检查网络或稍后再试。',
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const formatContent = (text: string) => text.split('\n').map((line, i) => (

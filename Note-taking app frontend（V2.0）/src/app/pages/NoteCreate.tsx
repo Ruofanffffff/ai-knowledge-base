@@ -23,6 +23,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { ParticleBackground } from '../components/ParticleBackground';
 
+import { documentService } from '../services/documentService';
+
 /* ═══════════════════════════════════════════════════════════════
    FormatToolbar — iPhone Notes keyboard-accessory-style bar
    Defined at MODULE SCOPE to avoid React's hook-recreation issue.
@@ -664,28 +666,6 @@ const AI_ACTIONS = [
   { id: 'mindmap', label: '生成思维导图', icon: GitFork, color: '#EC4899', bg: 'rgba(236,72,153,0.08)' },
 ] as const;
 
-const SAMPLE_CONTENTS = [
-  `# AI 技术趋势分析 2024
-
-## 多模态融合
-
-当前AI系统正从文本处理向视觉、音频、代码等多模态融合演进。GPT-4V、Gemini Ultra 等模型已能同时理解图像与语言。
-
-## 具身智能
-
-机器人与AI的深度融合催生了"具身智能"浪潮，Boston Dynamics 等公司正将大模型注入机器人大脑。`,
-
-  `# 产品设计中的用户体验原则
-
-## 以用户为中心
-
-优秀的产品设计始终将用户需求置于首位。通过用户研究、可用性测试和数据分析，设计师能够深入理解用户的真实痛点。
-
-## 简洁即美
-
-"Less is More"不仅是设计哲学，更是产品策略。减少认知负担往往能带来更高的用户满意度。`,
-];
-
 /* ─────────────────────────────────────────────────────────────────
    AnimatedDots — 3 pulsing dots for loading state
 ───────────────────────────────────────────────────────────────── */
@@ -1019,7 +999,9 @@ export function NoteCreate() {
   const { id } = useParams();
   const { addNote, notes, updateNote } = useNotes();
 
-  const existingNote = id ? notes.find(n => n.id === id) : undefined;
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const activeNoteId = id || draftId;
+  const existingNote = activeNoteId ? notes.find(n => n.id === activeNoteId) : undefined;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
@@ -1303,16 +1285,47 @@ export function NoteCreate() {
       };
       reader.readAsText(file);
     } else {
-      setTimeout(() => {
-        const possibleTitle = file.name.replace(/\.\w+$/, '');
-        setTitle(possibleTitle);
-        editor?.commands.setContent(toHtml(SAMPLE_CONTENTS[Math.floor(Math.random() * SAMPLE_CONTENTS.length)]));
+      // For PDF/Word/etc, use backend processing
+      try {
+        let targetNoteId = existingNote?.id;
+        
+        // If no existing note, create a draft one to attach the file to
+        if (!targetNoteId) {
+          const newNote = await addNote({
+            content: '', // Empty content initially
+            type: 'text',
+            tags: [],
+            title: file.name.replace(/\.\w+$/, '') // Use filename as preliminary title
+          });
+          
+          if (newNote) {
+            targetNoteId = newNote.id;
+            setDraftId(newNote.id);
+          } else {
+            throw new Error('Failed to create draft note');
+          }
+        }
+
+        if (targetNoteId) {
+          const text = await documentService.uploadDocument(file, targetNoteId);
+          if (text) {
+             const possibleTitle = file.name.replace(/\.\w+$/, '');
+             setTitle(possibleTitle);
+             editor?.commands.setContent(toHtml(text));
+             toast.success('文档解析完成，内容已导入');
+             setCreateMode('write');
+          } else {
+             toast.warning('文档解析结果为空');
+          }
+        }
+      } catch (err) {
+        console.error('Document processing failed:', err);
+        toast.error('文档解析失败，请重试');
+      } finally {
         setUploadParsing(false);
-        toast.success('文档解析完成，内容已导入');
-        setCreateMode('write');
-      }, 1500);
+      }
     }
-  }, [editor]);
+  }, [editor, existingNote, addNote]);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = () => setIsDragging(false);

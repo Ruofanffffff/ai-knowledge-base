@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shisi_flutter/presentation/blocs/auth/auth_bloc.dart';
 import 'package:shisi_flutter/presentation/pages/auth/login_page.dart';
+import 'package:shisi_flutter/presentation/pages/main_screen.dart';
+import 'package:shisi_flutter/presentation/pages/note/note_list_page.dart';
+import 'package:shisi_flutter/presentation/pages/hibrain/hibrain_page.dart';
+import 'package:shisi_flutter/presentation/pages/profile/profile_page.dart';
 
 class AppRouter {
   final AuthBloc authBloc;
@@ -32,11 +36,22 @@ class AppRouter {
         path: '/login',
         builder: (context, state) => const LoginPage(),
       ),
-      GoRoute(
-        path: '/home',
-        builder: (context, state) => const Scaffold(
-          body: Center(child: Text('Home')),
-        ),
+      ShellRoute(
+        builder: (context, state, child) => MainScreen(child: child),
+        routes: [
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const NoteListPage(),
+          ),
+          GoRoute(
+            path: '/hibrain',
+            builder: (context, state) => const HiBrainPage(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfilePage(),
+          ),
+        ],
       ),
     ],
   );

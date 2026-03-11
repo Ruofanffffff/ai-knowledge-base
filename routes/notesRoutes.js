@@ -43,7 +43,8 @@ const fragmentCollector = require('../services/fragmentCollector');
 router.post('/', authMiddleware, requirePermission('document:write'), async (req, res) => {
   try {
     const { content, tags } = req.body;
-    const userId = req.user.id;
+    const user = req.user;
+    const userId = user.id;
 
     // Validate required fields
     if (!content) {
@@ -55,7 +56,7 @@ router.post('/', authMiddleware, requirePermission('document:write'), async (req
 
     // Create note
     const note = await noteDAL.createNote({
-      userId,
+      user,
       content,
       tags
     });

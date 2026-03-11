@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
 
 // Base URL configuration
 // In development, we use the proxy defined in vite.config.ts or VITE_API_URL if set
@@ -6,7 +7,11 @@ import axios from 'axios';
 const isDev = import.meta.env.DEV;
 
 // Remove hardcoded IP. Use VITE_API_URL from .env or fallback to /api (proxy)
-const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+let BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+if (Capacitor.isNativePlatform() || import.meta.env.PROD) {
+  BASE_URL = 'http://120.26.35.225:3000/api';
+}
 
 export const api = axios.create({
   baseURL: BASE_URL,

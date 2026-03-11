@@ -11,16 +11,77 @@ const { extractTags, normalizeTags } = require('./tagExtractor');
 const prisma = new PrismaClient();
 
 /**
+ * Ensures user exists in the database to satisfy foreign key constraints.
+ * @param {Object} user - User object from req.user
+ * @returns {Promise<void>}
+ */
+async function ensureUserExists(user) {
+  if (!user || !user.id) {
+    console.warn('ensureUserExists called without valid user object');
+    return;
+  }
+
+  try {
+    // Use username or fallback to id if username is missing/empty
+    // We must ensure username is unique.
+    // If username is empty, we use user.id which is unique.
+    const username = user.username || user.id;
+    
+    // Use a placeholder password since auth is handled externally
+    // This hash is invalid but satisfies the non-null constraint
+    const passwordPlaceholder = '$2b$10$EpMq.0.0.0.0.0.0.0.0.0'; 
+
+    await prisma.user.upsert({
+      where: { id: user.id },
+      update: {
+        // Only update fields that might have changed from external provider
+        username: username,
+        email: user.email || undefined,
+        // Don't update password
+      },
+      create: {
+        id: user.id,
+        username: username,
+        email: user.email || undefined,
+        password: passwordPlaceholder,
+        role: user.role || 'user',
+        // status: 'active' // status is not in schema based on previous read, let me check schema again
+      }
+    });
+  } catch (error) {
+    console.error('Error ensuring user exists:', error);
+    // Continue execution, let the foreign key constraint fail if it must
+    // But usually this prevents the FK error.
+  }
+}
+
+/**
  * Creates a new note
  * @param {Object} data - Note data
- * @param {string} data.userId - User ID
+ * @param {Object} data.user - User object (required)
  * @param {string} data.content - Note content
  * @param {string[]} [data.tags] - Optional tags (will be extracted from content if not provided)
  * @returns {Promise<Object>} Created note
  */
-async function createNote({ userId, content, tags }) {
-  if (!userId || !content) {
-    throw new Error('userId and content are required');
+async function createNote({ user, content, tags }) {
+  // Support legacy call with userId only if user object is not provided (though new requirement says pass user)
+  // But to be safe, if user is missing but userId is present (from tests?), we might fail or try to proceed.
+  // The requirement is to call ensureUserExists(user).
+  
+  if (!user && !arguments[0].userId) {
+     throw new Error('user object or userId is required');
+  }
+
+  let userId;
+  if (user) {
+    userId = user.id;
+    await ensureUserExists(user);
+  } else {
+    userId = arguments[0].userId;
+  }
+
+  if (!content) {
+    throw new Error('content is required');
   }
 
   // Extract tags from content if not provided
@@ -121,7 +182,8 @@ async function updateNote(noteId, data, userId) {
     
     // Re-extract tags from new content if tags not explicitly provided
     if (data.tags === undefined) {
-      updateData.tags = extractTags(data.content);
+      const extractedTags = extractTags(data.content);
+      updateData.tags = JSON.stringify(extractedTags);
     }
   }
   
@@ -376,6 +438,7 @@ async function disconnect() {
 
 module.exports = {
   createNote,
+  ensureUserExists,
   getNoteById,
   updateNote,
   deleteNote,

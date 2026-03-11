@@ -1,0 +1,62 @@
+Running `(cd /Users/ruofanfeng/.pub-cache/hosted/pub.dev/objective_c-9.3.0/; TMPDIR=/var/folders/ll/dyww46ds5fn9dppqz5z53h_c0000gn/T/ PATH=/Users/ruofanfeng/.trae/binaries/node/versions/24.13.1/bin:/Users/ruofanfeng/.trae/tools/trae-gopls/current:/Users/ruofanfeng/.trae/sdks/workspaces/85e183cd/versions/node/current:/Users/ruofanfeng/.trae/sdks/versions/node/current:/Users/ruofanfeng/.trae/sdks/workspaces/85e183cd/versions/node/current:/Users/ruofanfeng/.trae/sdks/versions/node/current:/Users/ruofanfeng/.trae/tools/trae-gopls/current:/Users/ruofanfeng/.trae/binaries/node/versions/24.13.1/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/Applications/Trae.app/Contents/Resources/app/bin:/Users/ruofanfeng/.trae/binaries/node/versions/24.13.1/bin:/Users/ruofanfeng/.trae/tools/trae-gopls/current:/Users/ruofanfeng/.trae/sdks/workspaces/85e183cd/versions/node/current:/Users/ruofanfeng/.trae/sdks/versions/node/current:/opt/anaconda3/bin:/opt/anaconda3/condabin HOME=/Users/ruofanfeng /Users/ruofanfeng/flutter/bin/cache/dart-sdk/bin/dart --packages=/Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/package_config.json /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/objective_c/cf32afd5ca/hook.dill --config=/Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/objective_c/cf32afd5ca/input.json )`.
+INFO: 2026-03-11 22:12:09.616097: Running `which clang`.
+
+INFO: 2026-03-11 22:12:09.655489: Running `/usr/bin/clang --version`.
+
+INFO: 2026-03-11 22:12:09.937109: Running `/usr/bin/clang --version`.
+
+INFO: 2026-03-11 22:12:09.983821: Running: /usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target x86_64-apple-darwin -mmacos-version-min=12 -c /Users/ruofanfeng/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/include/dart_api_dl.c -fpic -I src -o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/include/dart_api_dl.c.o
+
+INFO: 2026-03-11 22:12:09.984590: Running: /usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target x86_64-apple-darwin -mmacos-version-min=12 -c /Users/ruofanfeng/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/objective_c.c -fpic -I src -o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/objective_c.c.o
+
+INFO: 2026-03-11 22:12:09.985046: Running: /usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target x86_64-apple-darwin -mmacos-version-min=12 -c /Users/ruofanfeng/.pub-cache/hosted/pub.dev/objective_c-9.3.0/test/util.c -fpic -I src -o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/test/util.c.o
+
+INFO: 2026-03-11 22:12:09.985481: Running: /usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target x86_64-apple-darwin -mmacos-version-min=12 -x objective-c -fobjc-arc -c /Users/ruofanfeng/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/input_stream_adapter.m -fpic -I src -o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/input_stream_adapter.m.o
+
+INFO: 2026-03-11 22:12:09.985707: Running: /usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target x86_64-apple-darwin -mmacos-version-min=12 -x objective-c -fobjc-arc -c /Users/ruofanfeng/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/objective_c.m -fpic -I src -o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/objective_c.m.o
+
+INFO: 2026-03-11 22:12:09.985922: Running: /usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target x86_64-apple-darwin -mmacos-version-min=12 -x objective-c -fobjc-arc -c /Users/ruofanfeng/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/observer.m -fpic -I src -o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/observer.m.o
+
+INFO: 2026-03-11 22:12:09.986235: Running: /usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target x86_64-apple-darwin -mmacos-version-min=12 -x objective-c -fobjc-arc -c /Users/ruofanfeng/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/ns_number.m -fpic -I src -o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/ns_number.m.o
+
+INFO: 2026-03-11 22:12:09.986441: Running: /usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target x86_64-apple-darwin -mmacos-version-min=12 -x objective-c -fobjc-arc -c /Users/ruofanfeng/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/protocol.m -fpic -I src -o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/protocol.m.o
+
+INFO: 2026-03-11 22:12:09.986710: Running: /usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target x86_64-apple-darwin -mmacos-version-min=12 -x objective-c -fobjc-arc -c /Users/ruofanfeng/.pub-cache/hosted/pub.dev/objective_c-9.3.0/src/objective_c_bindings_generated.m -fpic -I src -o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/objective_c_bindings_generated.m.o
+
+INFO: 2026-03-11 22:12:10.337816: Generated /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/test/util.c.o
+
+INFO: 2026-03-11 22:12:10.338172: 
+INFO: 2026-03-11 22:12:10.338219: 
+INFO: 2026-03-11 22:12:10.338252: Generated /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/objective_c.c.o
+
+INFO: 2026-03-11 22:12:10.341413: 
+INFO: 2026-03-11 22:12:10.341502: 
+INFO: 2026-03-11 22:12:10.341546: Generated /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/include/dart_api_dl.c.o
+
+INFO: 2026-03-11 22:12:10.354499: 
+INFO: 2026-03-11 22:12:10.354577: 
+INFO: 2026-03-11 22:12:10.354612: Generated /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/observer.m.o
+
+INFO: 2026-03-11 22:12:10.354888: 
+INFO: 2026-03-11 22:12:10.354933: Generated /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/protocol.m.o
+
+INFO: 2026-03-11 22:12:11.136960: 
+INFO: 2026-03-11 22:12:11.137023: 
+INFO: 2026-03-11 22:12:11.137046: Generated /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/ns_number.m.o
+
+INFO: 2026-03-11 22:12:11.163491: 
+INFO: 2026-03-11 22:12:11.163561: 
+INFO: 2026-03-11 22:12:11.163586: Generated /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/objective_c.m.o
+
+INFO: 2026-03-11 22:12:11.164835: Generated /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/input_stream_adapter.m.o
+
+INFO: 2026-03-11 22:12:11.198805: 
+INFO: 2026-03-11 22:12:11.198874: 
+INFO: 2026-03-11 22:12:11.198898: Generated /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/objective_c_bindings_generated.m.o
+
+INFO: 2026-03-11 22:12:11.199649: Running: /usr/bin/clang -shared -Wl,-encryptable -undefined dynamic_lookup -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -target x86_64-apple-darwin -mmacos-version-min=12 /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/include/dart_api_dl.c.o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/objective_c.c.o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/test/util.c.o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/input_stream_adapter.m.o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/objective_c.m.o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/observer.m.o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/ns_number.m.o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/protocol.m.o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/obj/src/objective_c_bindings_generated.m.o -o /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/objective_c.dylib
+
+INFO: 2026-03-11 22:12:11.553226: 
+INFO: 2026-03-11 22:12:11.553346: 
+INFO: 2026-03-11 22:12:11.553367: Generated /Users/ruofanfeng/Documents/trae_projects/shisi_flutter/.dart_tool/hooks_runner/shared/objective_c/build/cf32afd5ca/objective_c.dylib
+

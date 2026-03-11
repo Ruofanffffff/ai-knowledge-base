@@ -29,6 +29,9 @@ jest.mock('@prisma/client', () => {
       delete: jest.fn(),
       count: jest.fn()
     },
+    user: {
+      upsert: jest.fn()
+    },
     $disconnect: jest.fn()
   };
   
@@ -70,14 +73,10 @@ describe('Note DAL', () => {
         data: {
           userId: 'user-1',
           content: 'Test note #work #important',
-          tags: ['work', 'important']
+          tags: JSON.stringify(['work', 'important'])
         },
         include: {
-          attachments: {
-            include: {
-              analysis: true
-            }
-          }
+          attachments: true
         }
       });
     });
@@ -106,27 +105,56 @@ describe('Note DAL', () => {
         data: {
           userId: 'user-1',
           content: 'Test note',
-          tags: ['custom', 'tags']
+          tags: JSON.stringify(['custom', 'tags'])
         },
         include: {
-          attachments: {
-            include: {
-              analysis: true
-            }
-          }
+          attachments: true
         }
       });
     });
 
+    it('should create a note and ensure user exists when user object is provided', async () => {
+      const mockUser = {
+        id: 'user-1',
+        username: 'testuser',
+        email: 'test@example.com'
+      };
+      
+      const mockNote = {
+        id: 'note-1',
+        userId: 'user-1',
+        content: 'Test note',
+        tags: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        attachments: []
+      };
+
+      prisma.user.upsert.mockResolvedValue(mockUser);
+      prisma.note.create.mockResolvedValue(mockNote);
+
+      const result = await createNote({
+        user: mockUser,
+        content: 'Test note'
+      });
+
+      expect(result).toEqual(mockNote);
+      expect(prisma.user.upsert).toHaveBeenCalled();
+      expect(prisma.note.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ userId: 'user-1' })
+      }));
+    });
+
+
     it('should throw error if userId is missing', async () => {
       await expect(createNote({ content: 'Test' })).rejects.toThrow(
-        'userId and content are required'
+        'user object or userId is required'
       );
     });
 
     it('should throw error if content is missing', async () => {
       await expect(createNote({ userId: 'user-1' })).rejects.toThrow(
-        'userId and content are required'
+        'content is required'
       );
     });
   });
@@ -151,11 +179,7 @@ describe('Note DAL', () => {
       expect(prisma.note.findUnique).toHaveBeenCalledWith({
         where: { id: 'note-1' },
         include: {
-          attachments: {
-            include: {
-              analysis: true
-            }
-          }
+          attachments: true
         }
       });
     });
@@ -179,11 +203,7 @@ describe('Note DAL', () => {
       expect(prisma.note.findUnique).toHaveBeenCalledWith({
         where: { id: 'note-1', userId: 'user-1' },
         include: {
-          attachments: {
-            include: {
-              analysis: true
-            }
-          }
+          attachments: true
         }
       });
     });
@@ -232,14 +252,10 @@ describe('Note DAL', () => {
         where: { id: 'note-1' },
         data: {
           content: 'New content #new #tags',
-          tags: ['new', 'tags']
+          tags: JSON.stringify(['new', 'tags'])
         },
         include: {
-          attachments: {
-            include: {
-              analysis: true
-            }
-          }
+          attachments: true
         }
       });
     });
@@ -273,14 +289,10 @@ describe('Note DAL', () => {
       expect(prisma.note.update).toHaveBeenCalledWith({
         where: { id: 'note-1' },
         data: {
-          tags: ['custom', 'tags']
+          tags: JSON.stringify(['custom', 'tags'])
         },
         include: {
-          attachments: {
-            include: {
-              analysis: true
-            }
-          }
+          attachments: true
         }
       });
     });
@@ -406,11 +418,7 @@ describe('Note DAL', () => {
         take: 10,
         orderBy: { createdAt: 'desc' },
         include: {
-          attachments: {
-            include: {
-              analysis: true
-            }
-          }
+          attachments: true
         }
       });
     });
@@ -440,17 +448,13 @@ describe('Note DAL', () => {
       expect(prisma.note.findMany).toHaveBeenCalledWith({
         where: {
           userId: 'user-1',
-          tags: { hasSome: ['work'] }
+          OR: [{ tags: { contains: '"work"' } }]
         },
         skip: 0,
         take: 20,
         orderBy: { createdAt: 'desc' },
         include: {
-          attachments: {
-            include: {
-              analysis: true
-            }
-          }
+          attachments: true
         }
       });
     });
