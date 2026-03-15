@@ -330,6 +330,9 @@ router.get('/', authMiddleware, async (req, res) => {
       });
     }
 
+    // Ensure user exists in DB (sync from Auth) to avoid query issues
+    await noteDAL.ensureUserExists(req.user);
+
     // List notes
     const result = await noteDAL.listNotes({
       userId,

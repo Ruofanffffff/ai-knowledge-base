@@ -1292,7 +1292,7 @@ export function NoteCreate() {
         // If no existing note, create a draft one to attach the file to
         if (!targetNoteId) {
           const newNote = await addNote({
-            content: '', // Empty content initially
+            content: `[Draft] Uploading document: ${file.name}...`, // Placeholder content to satisfy validation
             type: 'text',
             tags: [],
             title: file.name.replace(/\.\w+$/, '') // Use filename as preliminary title

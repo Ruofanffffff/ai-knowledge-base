@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:shisi_flutter/core/network/dio_client.dart';
 import 'package:shisi_flutter/domain/entities/note.dart';
 import 'package:shisi_flutter/domain/repositories/note_repository.dart';
