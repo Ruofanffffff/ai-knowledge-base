@@ -997,7 +997,7 @@ function SaveOverlay({
 export function NoteCreate() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { addNote, notes, updateNote } = useNotes();
+  const { addNote, notes, updateNote, deleteNote } = useNotes();
 
   const [draftId, setDraftId] = useState<string | null>(null);
   const activeNoteId = id || draftId;
@@ -1286,13 +1286,14 @@ export function NoteCreate() {
       reader.readAsText(file);
     } else {
       // For PDF/Word/etc, use backend processing
+      let createdDraftNoteId: string | null = null;
       try {
         let targetNoteId = existingNote?.id;
         
         // If no existing note, create a draft one to attach the file to
         if (!targetNoteId) {
           const newNote = await addNote({
-            content: `[Draft] Uploading document: ${file.name}...`, // Placeholder content to satisfy validation
+            content: `文档《${file.name}》上传中，请稍候…`,
             type: 'text',
             tags: [],
             title: file.name.replace(/\.\w+$/, '') // Use filename as preliminary title
@@ -1301,6 +1302,7 @@ export function NoteCreate() {
           if (newNote) {
             targetNoteId = newNote.id;
             setDraftId(newNote.id);
+            createdDraftNoteId = newNote.id;
           } else {
             throw new Error('Failed to create draft note');
           }
@@ -1308,24 +1310,45 @@ export function NoteCreate() {
 
         if (targetNoteId) {
           const text = await documentService.uploadDocument(file, targetNoteId);
-          if (text) {
-             const possibleTitle = file.name.replace(/\.\w+$/, '');
-             setTitle(possibleTitle);
-             editor?.commands.setContent(toHtml(text));
-             toast.success('文档解析完成，内容已导入');
-             setCreateMode('write');
+          const possibleTitle = file.name.replace(/\.\w+$/, '');
+          const parsedText = text?.trim();
+          const importedContent = parsedText || `文档《${file.name}》上传成功，但暂未提取到文本内容，请手动补充。`;
+          const importedHtml = toHtml(importedContent);
+
+          setTitle(possibleTitle);
+          editor?.commands.setContent(importedHtml);
+          setCreateMode('write');
+
+          // 上传场景下为临时草稿自动回填内容，避免出现 Draft 标题和空白内容
+          if (createdDraftNoteId) {
+            await updateNote(createdDraftNoteId, {
+              content: importedHtml,
+              tags
+            });
+          }
+
+          if (parsedText) {
+            toast.success('文档解析完成，内容已导入');
           } else {
-             toast.warning('文档解析结果为空');
+            toast.warning('文档解析完成，但未提取到文本内容');
           }
         }
       } catch (err) {
         console.error('Document processing failed:', err);
+        if (createdDraftNoteId) {
+          try {
+            await deleteNote(createdDraftNoteId);
+            setDraftId(null);
+          } catch (cleanupError) {
+            console.error('Failed to cleanup draft note after upload failure:', cleanupError);
+          }
+        }
         toast.error('文档解析失败，请重试');
       } finally {
         setUploadParsing(false);
       }
     }
-  }, [editor, existingNote, addNote]);
+  }, [editor, existingNote, addNote, updateNote, deleteNote, tags]);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = () => setIsDragging(false);

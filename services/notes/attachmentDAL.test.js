@@ -161,6 +161,25 @@ describe('Attachment DAL', () => {
       expect(result).toBeNull();
     });
 
+    it('should normalize analysis tags and metadata from JSON strings', async () => {
+      prisma.attachment.findUnique.mockResolvedValue({
+        id: 'attachment-1',
+        noteId: 'note-1',
+        type: 'DOCUMENT',
+        analysis: {
+          id: 'analysis-1',
+          tags: '["ocr","doc"]',
+          metadata: '{"pageCount":3}'
+        },
+        note: { id: 'note-1', content: 'Test note' }
+      });
+
+      const result = await getAttachmentById('attachment-1');
+
+      expect(result.analysis.tags).toEqual(['ocr', 'doc']);
+      expect(result.analysis.metadata).toEqual({ pageCount: 3 });
+    });
+
     it('should throw error if attachmentId is missing', async () => {
       await expect(getAttachmentById()).rejects.toThrow('attachmentId is required');
     });
@@ -306,14 +325,14 @@ describe('Attachment DAL', () => {
           attachmentId: 'attachment-1',
           textContent: 'Extracted text',
           description: 'Image description',
-          tags: ['tag1', 'tag2'],
-          metadata: { width: 800, height: 600 }
+          tags: JSON.stringify(['tag1', 'tag2']),
+          metadata: JSON.stringify({ width: 800, height: 600 })
         },
         update: {
           textContent: 'Extracted text',
           description: 'Image description',
-          tags: ['tag1', 'tag2'],
-          metadata: { width: 800, height: 600 }
+          tags: JSON.stringify(['tag1', 'tag2']),
+          metadata: JSON.stringify({ width: 800, height: 600 })
         }
       });
     });

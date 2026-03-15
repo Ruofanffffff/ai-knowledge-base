@@ -9,6 +9,33 @@ const { PrismaClient, AttachmentType } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+function safeParseJson(value, fallback) {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function normalizeAnalysis(analysis) {
+  if (!analysis) return analysis;
+  return {
+    ...analysis,
+    tags: safeParseJson(analysis.tags, []),
+    metadata: safeParseJson(analysis.metadata, {})
+  };
+}
+
+function normalizeAttachment(attachment) {
+  if (!attachment) return attachment;
+  return {
+    ...attachment,
+    analysis: normalizeAnalysis(attachment.analysis)
+  };
+}
+
 /**
  * Creates a new attachment
  * @param {Object} data - Attachment data
@@ -67,7 +94,7 @@ async function getAttachmentById(attachmentId) {
     }
   });
 
-  return attachment;
+  return normalizeAttachment(attachment);
 }
 
 /**
@@ -88,7 +115,7 @@ async function getAttachmentsByNoteId(noteId) {
     orderBy: { createdAt: 'asc' }
   });
 
-  return attachments;
+  return attachments.map(normalizeAttachment);
 }
 
 /**
@@ -110,7 +137,7 @@ async function updateAttachment(attachmentId, data) {
     }
   });
 
-  return attachment;
+  return normalizeAttachment(attachment);
 }
 
 /**
@@ -156,24 +183,27 @@ async function upsertAttachmentAnalysis(data) {
     throw new Error('Attachment not found');
   }
 
+  const serializedTags = JSON.stringify(Array.isArray(tags) ? tags : []);
+  const serializedMetadata = JSON.stringify(metadata || {});
+
   const analysis = await prisma.attachmentAnalysis.upsert({
     where: { attachmentId },
     create: {
       attachmentId,
       textContent,
       description,
-      tags,
-      metadata
+      tags: serializedTags,
+      metadata: serializedMetadata
     },
     update: {
       textContent,
       description,
-      tags,
-      metadata
+      tags: serializedTags,
+      metadata: serializedMetadata
     }
   });
 
-  return analysis;
+  return normalizeAnalysis(analysis);
 }
 
 /**
@@ -193,7 +223,14 @@ async function getAttachmentAnalysis(attachmentId) {
     }
   });
 
-  return analysis;
+  if (!analysis) {
+    return null;
+  }
+  return {
+    ...analysis,
+    tags: safeParseJson(analysis.tags, []),
+    metadata: safeParseJson(analysis.metadata, {})
+  };
 }
 
 /**
@@ -239,7 +276,7 @@ async function getAttachmentsByType(noteId, type) {
     orderBy: { createdAt: 'asc' }
   });
 
-  return attachments;
+  return attachments.map(normalizeAttachment);
 }
 
 /**
