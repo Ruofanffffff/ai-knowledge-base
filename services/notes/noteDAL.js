@@ -30,19 +30,30 @@ async function ensureUserExists(user) {
     // Use a placeholder password since auth is handled externally
     // This hash is invalid but satisfies the non-null constraint
     const passwordPlaceholder = '$2b$10$EpMq.0.0.0.0.0.0.0.0.0'; 
+    
+    // Check if username already exists for a DIFFERENT user ID (collision case)
+    // If so, we append a random suffix to the new username to satisfy unique constraint
+    const existingUser = await prisma.user.findUnique({
+      where: { username: username }
+    });
+    
+    let finalUsername = username;
+    if (existingUser && existingUser.id !== user.id) {
+       finalUsername = `${username}_${Math.random().toString(36).substring(2, 7)}`;
+    }
 
     await prisma.user.upsert({
       where: { id: user.id },
       update: {
         // Only update fields that might have changed from external provider
-        username: username,
-        email: user.email || undefined,
+        username: finalUsername,
+        // email: user.email || undefined, // Email might also conflict, so skip updating email for now to be safe
         // Don't update password
       },
       create: {
         id: user.id,
-        username: username,
-        email: user.email || undefined,
+        username: finalUsername,
+        // email: user.email || undefined, // Skip email to avoid unique constraint if another user has same email
         password: passwordPlaceholder,
         // role: user.role || 'user', // role field does not exist in User schema
       }
