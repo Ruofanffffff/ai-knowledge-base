@@ -25,6 +25,7 @@ jest.mock('../services/notes/imageAnalysisService', () => ({
   createImageAnalysisService: jest.fn()
 }));
 jest.mock('../services/notes/documentProcessingService', () => ({
+  uploadAndProcessDocument: jest.fn(),
   processDocument: jest.fn()
 }));
 jest.mock('../services/notes/tableProcessingService', () => ({
@@ -61,7 +62,7 @@ const attachmentRoutes = require('./attachmentRoutes');
 const attachmentDAL = require('../services/notes/attachmentDAL');
 const { uploadFileWithRetry, validateFileSize, validateMimeType, downloadFile } = require('../services/notes/s3Client');
 const { uploadAndAnalyzeImage } = require('../services/notes/imageAnalysisService');
-const { processDocument } = require('../services/notes/documentProcessingService');
+const { uploadAndProcessDocument } = require('../services/notes/documentProcessingService');
 const { processTable } = require('../services/notes/tableProcessingService');
 
 // Create Express app for testing
@@ -136,7 +137,7 @@ describe('Attachment Routes', () => {
 
       validateFileSize.mockReturnValue(true);
       validateMimeType.mockReturnValue(true);
-      processDocument.mockResolvedValue(mockResult);
+      uploadAndProcessDocument.mockResolvedValue(mockResult);
 
       const response = await request(app)
         .post('/api/attachments/upload')
@@ -147,7 +148,7 @@ describe('Attachment Routes', () => {
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
       expect(response.body.data.type).toBe('DOCUMENT');
-      expect(processDocument).toHaveBeenCalled();
+      expect(uploadAndProcessDocument).toHaveBeenCalled();
     });
 
     it('should upload and process a table attachment', async () => {

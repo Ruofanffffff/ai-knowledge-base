@@ -12,7 +12,7 @@ const { authMiddleware } = require('../services/authService');
 const attachmentDAL = require('../services/notes/attachmentDAL');
 const { uploadFileWithRetry, validateFileSize, validateMimeType, downloadFile } = require('../services/notes/s3Client');
 const { uploadAndAnalyzeImage } = require('../services/notes/imageAnalysisService');
-const { processDocument } = require('../services/notes/documentProcessingService');
+const { uploadAndProcessDocument } = require('../services/notes/documentProcessingService');
 const { processTable } = require('../services/notes/tableProcessingService');
 const { notesConfig } = require('../config/notes.config');
 
@@ -132,7 +132,7 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
       case 'DOCUMENT':
         // Upload and process document
         // Requirement 3.1, 3.2, 3.3
-        result = await processDocument({
+        result = await uploadAndProcessDocument({
           fileData: file.buffer,
           originalFilename: file.originalname,
           userId,
