@@ -12,14 +12,34 @@ const { notesConfig } = require('../../config/notes.config');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const LOCAL_FALLBACK_DIR = process.env.NOTES_STORAGE_FALLBACK_DIR
   || path.join(process.cwd(), '.cache', 'notes-storage');
 
+function getFallbackDirCandidates() {
+  return [
+    LOCAL_FALLBACK_DIR,
+    path.join(os.tmpdir(), 'notes-storage'),
+    path.join('/tmp', 'notes-storage')
+  ];
+}
+
 function ensureFallbackDir() {
-  if (!fs.existsSync(LOCAL_FALLBACK_DIR)) {
-    fs.mkdirSync(LOCAL_FALLBACK_DIR, { recursive: true });
+  const candidates = getFallbackDirCandidates();
+  let lastError;
+  for (const dir of candidates) {
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.accessSync(dir, fs.constants.W_OK);
+      return dir;
+    } catch (error) {
+      lastError = error;
+    }
   }
+  throw lastError || new Error('No writable fallback directory available');
 }
 
 function buildStorageError(message, options = {}) {
@@ -105,20 +125,30 @@ function extractFallbackId(key = '') {
   return parts[1] || null;
 }
 
-function buildFallbackPaths(fallbackId) {
+function buildFallbackPaths(fallbackId, baseDir = LOCAL_FALLBACK_DIR) {
   return {
-    filePath: path.join(LOCAL_FALLBACK_DIR, `${fallbackId}.bin`),
-    metaPath: path.join(LOCAL_FALLBACK_DIR, `${fallbackId}.meta.json`)
+    filePath: path.join(baseDir, `${fallbackId}.bin`),
+    metaPath: path.join(baseDir, `${fallbackId}.meta.json`)
   };
+}
+
+function resolveFallbackPaths(fallbackId) {
+  for (const dir of getFallbackDirCandidates()) {
+    const paths = buildFallbackPaths(fallbackId, dir);
+    if (fs.existsSync(paths.filePath) || fs.existsSync(paths.metaPath)) {
+      return paths;
+    }
+  }
+  return buildFallbackPaths(fallbackId, LOCAL_FALLBACK_DIR);
 }
 
 function saveUploadToLocalFallback(options, sourceError, retryErrors = []) {
   const { fileData, originalFilename, userId, mimeType, prefix = 'attachments', metadata = {} } = options;
-  ensureFallbackDir();
+  const fallbackDir = ensureFallbackDir();
 
   const fallbackId = uuidv4();
   const safeFilename = sanitizeFilename(originalFilename);
-  const { filePath, metaPath } = buildFallbackPaths(fallbackId);
+  const { filePath, metaPath } = buildFallbackPaths(fallbackId, fallbackDir);
 
   fs.writeFileSync(filePath, fileData);
   const fallbackMeta = {
@@ -154,8 +184,45 @@ function saveUploadToLocalFallback(options, sourceError, retryErrors = []) {
     degraded: true,
     degradationMode: 'LOCAL_CACHE',
     fallbackId,
-    fallbackPath: filePath
+    fallbackPath: filePath,
+    fallbackDir
   };
+}
+
+function tryLocalFallbackOrThrow(options, sourceError, retryErrors, meta = {}) {
+  try {
+    const fallbackResult = saveUploadToLocalFallback(options, sourceError, retryErrors);
+    console.warn('[S3UploadRetry] switched to local fallback', {
+      operation: 'upload',
+      fallbackId: fallbackResult.fallbackId,
+      degradationMode: fallbackResult.degradationMode,
+      originalFilename: options?.originalFilename,
+      reason: meta.reason || 'retry_exhausted'
+    });
+    return fallbackResult;
+  } catch (fallbackError) {
+    throw buildStorageError(
+      `Failed to upload file after ${meta.maxAttempts || retryErrors.length || 1} attempts and local fallback failed: ${sourceError?.message}`,
+      {
+        code: meta.errorCode || 'STORAGE_UPLOAD_RETRY_EXHAUSTED',
+        statusCode: 503,
+        operation: 'upload',
+        retryable: false,
+        attempt: meta.attempt || retryErrors.length || 1,
+        maxAttempts: meta.maxAttempts || retryErrors.length || 1,
+        cause: fallbackError,
+        retryErrors,
+        context: {
+          originalFilename: options?.originalFilename,
+          mimeType: options?.mimeType,
+          userId: options?.userId,
+          prefix: options?.prefix || 'attachments',
+          fallbackError: fallbackError.message,
+          reason: meta.reason || 'retry_exhausted'
+        }
+      }
+    );
+  }
 }
 
 /**
@@ -342,7 +409,7 @@ async function downloadFile(key) {
         });
       }
 
-      const { filePath, metaPath } = buildFallbackPaths(fallbackId);
+      const { filePath, metaPath } = resolveFallbackPaths(fallbackId);
       if (!fs.existsSync(filePath) || !fs.existsSync(metaPath)) {
         throw buildStorageError(`File not found: ${key}`, {
           code: 'STORAGE_FALLBACK_NOT_FOUND',
@@ -417,7 +484,7 @@ async function deleteFile(key) {
           deletedAt: new Date().toISOString()
         };
       }
-      const { filePath, metaPath } = buildFallbackPaths(fallbackId);
+      const { filePath, metaPath } = resolveFallbackPaths(fallbackId);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
       return {
@@ -459,7 +526,7 @@ async function fileExists(key) {
     if (key.startsWith('local-cache/')) {
       const fallbackId = extractFallbackId(key);
       if (!fallbackId) return false;
-      const { filePath, metaPath } = buildFallbackPaths(fallbackId);
+      const { filePath, metaPath } = resolveFallbackPaths(fallbackId);
       return fs.existsSync(filePath) && fs.existsSync(metaPath);
     }
 
@@ -495,7 +562,7 @@ async function getFileMetadata(key) {
       if (!fallbackId) {
         throw new Error(`File not found: ${key}`);
       }
-      const { metaPath } = buildFallbackPaths(fallbackId);
+      const { metaPath } = resolveFallbackPaths(fallbackId);
       if (!fs.existsSync(metaPath)) {
         throw new Error(`File not found: ${key}`);
       }
@@ -570,25 +637,12 @@ async function uploadFileWithRetry(options, maxRetries = notesConfig.retry.maxRe
       });
 
       if (!retryable) {
-        throw buildStorageError(
-          `Failed to upload file: non-retryable error on attempt ${attemptNo} - ${error.message}`,
-          {
-            code: 'STORAGE_UPLOAD_NON_RETRYABLE',
-            statusCode: getErrorStatusCode(error) || 502,
-            operation: 'upload',
-            retryable: false,
-            attempt: attemptNo,
-            maxAttempts,
-            cause: error,
-            retryErrors,
-            context: {
-              originalFilename: options?.originalFilename,
-              mimeType: options?.mimeType,
-              userId: options?.userId,
-              prefix: options?.prefix || 'attachments'
-            }
-          }
-        );
+        return tryLocalFallbackOrThrow(options, error, retryErrors, {
+          reason: 'non_retryable',
+          maxAttempts,
+          attempt: attemptNo,
+          errorCode: 'STORAGE_UPLOAD_NON_RETRYABLE'
+        });
       }
 
       if (!isLastAttempt) {
@@ -599,38 +653,12 @@ async function uploadFileWithRetry(options, maxRetries = notesConfig.retry.maxRe
     }
   }
 
-  try {
-    const fallbackResult = saveUploadToLocalFallback(options, lastError, retryErrors);
-    console.warn('[S3UploadRetry] switched to local fallback', {
-      operation: 'upload',
-      fallbackId: fallbackResult.fallbackId,
-      degradationMode: fallbackResult.degradationMode,
-      attempts: maxAttempts,
-      originalFilename: options?.originalFilename
-    });
-    return fallbackResult;
-  } catch (fallbackError) {
-    throw buildStorageError(
-      `Failed to upload file after ${maxAttempts} attempts and local fallback failed: ${lastError?.message}`,
-      {
-        code: 'STORAGE_UPLOAD_RETRY_EXHAUSTED',
-        statusCode: 503,
-        operation: 'upload',
-        retryable: false,
-        attempt: maxAttempts,
-        maxAttempts,
-        cause: fallbackError,
-        retryErrors,
-        context: {
-          originalFilename: options?.originalFilename,
-          mimeType: options?.mimeType,
-          userId: options?.userId,
-          prefix: options?.prefix || 'attachments',
-          fallbackError: fallbackError.message
-        }
-      }
-    );
-  }
+  return tryLocalFallbackOrThrow(options, lastError, retryErrors, {
+    reason: 'retry_exhausted',
+    maxAttempts,
+    attempt: maxAttempts,
+    errorCode: 'STORAGE_UPLOAD_RETRY_EXHAUSTED'
+  });
 }
 
 /**

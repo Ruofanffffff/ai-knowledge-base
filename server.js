@@ -2487,14 +2487,31 @@ app.post('/api/ai/search', authMiddleware, async (req, res) => {
       const contentLower = (doc.content || '').toLowerCase();
       const tags = Array.isArray(doc.tags) ? doc.tags : [];
       const tagsLower = tags.map(tag => String(tag).toLowerCase());
+      let matchedKeywordCount = 0;
       
       searchPlan.keywords.forEach(kw => {
         const kwLower = String(kw || '').toLowerCase();
         if (!kwLower) return;
-        if (titleLower.includes(kwLower)) score += 12;
-        if (contentLower.includes(kwLower)) score += 6;
-        if (tagsLower.some(tag => tag.includes(kwLower))) score += 4;
+        let matched = false;
+        if (titleLower.includes(kwLower)) {
+          score += 12;
+          matched = true;
+        }
+        if (contentLower.includes(kwLower)) {
+          score += 6;
+          matched = true;
+        }
+        if (tagsLower.some(tag => tag.includes(kwLower))) {
+          score += 4;
+          matched = true;
+        }
+        if (matched) matchedKeywordCount += 1;
       });
+
+      // 优先召回思库笔记，避免“已存在笔记但命中文档”的偏差
+      if (doc.sourceType === 'note' && matchedKeywordCount > 0) {
+        score += 2 + matchedKeywordCount;
+      }
       
       return { doc, score, source: 'keyword' };
     })
@@ -2593,6 +2610,8 @@ ${webSearchContext}
       sources: relevantDocs.map(doc => ({
         id: doc.id,
         sourceType: doc.sourceType || 'document',
+        source_type: doc.sourceType || 'document',
+        sourceLabel: doc.sourceType === 'note' ? '思库笔记' : '文档',
         title: doc.title,
         preview: (doc.content || '').substring(0, 100) + ((doc.content || '').length > 100 ? '...' : '')
       })),

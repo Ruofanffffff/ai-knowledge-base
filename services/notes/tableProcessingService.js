@@ -137,6 +137,11 @@ class TableProcessingService {
           rowCount: processingResult.rowCount || 0,
           columnCount: processingResult.columnCount || 0,
           processedAt: new Date().toISOString(),
+          ...(uploadResult.degraded && {
+            storageDegraded: true,
+            degradationMode: uploadResult.degradationMode || 'LOCAL_CACHE',
+            fallbackId: uploadResult.fallbackId || null
+          }),
           ...(processingResult.error && { error: processingResult.error })
         }
       });
@@ -151,7 +156,12 @@ class TableProcessingService {
           storageKey: attachment.storageKey,
           size: attachment.size,
           mimeType: attachment.mimeType,
-          createdAt: attachment.createdAt
+          createdAt: attachment.createdAt,
+          ...(uploadResult.degraded && {
+            degraded: true,
+            degradationMode: uploadResult.degradationMode || 'LOCAL_CACHE',
+            fallbackId: uploadResult.fallbackId || null
+          })
         },
         analysis: {
           id: analysis.id,
@@ -163,7 +173,21 @@ class TableProcessingService {
         }
       };
     } catch (error) {
-      throw new Error(`Failed to upload and process table: ${error.message}`);
+      const wrappedError = new Error(`Failed to upload and process table: ${error.message}`);
+      wrappedError.code = error.code || 'TABLE_UPLOAD_PROCESS_FAILED';
+      wrappedError.statusCode = error.statusCode || 500;
+      wrappedError.retryable = error.retryable;
+      wrappedError.operation = error.operation || 'tableUpload';
+      wrappedError.context = {
+        noteId,
+        userId,
+        originalFilename,
+        mimeType,
+        ...(error.context || {})
+      };
+      wrappedError.retryErrors = error.retryErrors || [];
+      wrappedError.cause = error;
+      throw wrappedError;
     }
   }
 
@@ -193,11 +217,22 @@ class TableProcessingService {
       await fs.writeFile(tempFilePath, fileData);
 
       // Process table with existing pipeline (Excel parser)
-      const ckbs = await parseDocument(
-        attachmentId,
-        tempFilePath,
-        fileType
-      );
+      let ckbs = [];
+      if (typeof parseDocument === 'function') {
+        ckbs = await parseDocument(
+          attachmentId,
+          tempFilePath,
+          fileType
+        );
+      } else {
+        const rawText = fileData.toString('utf8');
+        const lines = rawText.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 300);
+        ckbs = lines.map((line, index) => ({
+          id: `${attachmentId}_${index}`,
+          text: line,
+          metadata: { row: index }
+        }));
+      }
 
       // Extract table data from CKBs
       const tableData = this._extractTableData(ckbs);

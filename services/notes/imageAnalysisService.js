@@ -139,6 +139,11 @@ class ImageAnalysisService {
           llmProvider: analysisResult.provider || null,
           tokens: analysisResult.tokens || 0,
           analyzedAt: new Date().toISOString(),
+          ...(uploadResult.degraded && {
+            storageDegraded: true,
+            degradationMode: uploadResult.degradationMode || 'LOCAL_CACHE',
+            fallbackId: uploadResult.fallbackId || null
+          }),
           ...(analysisResult.error && { error: analysisResult.error })
         }
       });
@@ -153,7 +158,12 @@ class ImageAnalysisService {
           storageKey: attachment.storageKey,
           size: attachment.size,
           mimeType: attachment.mimeType,
-          createdAt: attachment.createdAt
+          createdAt: attachment.createdAt,
+          ...(uploadResult.degraded && {
+            degraded: true,
+            degradationMode: uploadResult.degradationMode || 'LOCAL_CACHE',
+            fallbackId: uploadResult.fallbackId || null
+          })
         },
         analysis: {
           id: analysis.id,
@@ -165,7 +175,21 @@ class ImageAnalysisService {
         }
       };
     } catch (error) {
-      throw new Error(`Failed to upload and analyze image: ${error.message}`);
+      const wrappedError = new Error(`Failed to upload and analyze image: ${error.message}`);
+      wrappedError.code = error.code || 'IMAGE_UPLOAD_ANALYZE_FAILED';
+      wrappedError.statusCode = error.statusCode || 500;
+      wrappedError.retryable = error.retryable;
+      wrappedError.operation = error.operation || 'imageUpload';
+      wrappedError.context = {
+        noteId,
+        userId,
+        originalFilename,
+        mimeType,
+        ...(error.context || {})
+      };
+      wrappedError.retryErrors = error.retryErrors || [];
+      wrappedError.cause = error;
+      throw wrappedError;
     }
   }
 

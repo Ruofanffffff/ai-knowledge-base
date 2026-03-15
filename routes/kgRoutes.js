@@ -14,6 +14,125 @@ const unificationService = require('../services/unificationService');
 // 正在执行中的Pipeline状态（收到重复请求时应拒绝）
 const ACTIVE_STATUSES = ['pending', 'indexing', 'extracting_four_layers', 'merging', 'saving'];
 
+function stripHtmlToText(raw) {
+  if (raw === null || raw === undefined) return '';
+  return String(raw)
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseTags(rawTags) {
+  if (Array.isArray(rawTags)) {
+    return rawTags.map(tag => String(tag).trim()).filter(Boolean);
+  }
+  if (typeof rawTags === 'string') {
+    const text = rawTags.trim();
+    if (!text) return [];
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) return parseTags(parsed);
+    } catch (_) {}
+    return text.split(/[，,\s|/]+/).map(tag => tag.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function tokenizeText(text) {
+  return String(text || '')
+    .split(/[\s，,。！？；;、|/]+/)
+    .map(token => token.trim())
+    .filter(token => token.length >= 2 && token.length <= 12);
+}
+
+function createHeuristicGraphFromNote(note) {
+  const plain = stripHtmlToText(note?.content || '');
+  const tags = parseTags(note?.tags);
+  const stopwords = new Set([
+    '我们', '你们', '他们', '这个', '那个', '一个', '一种', '可以', '进行', '以及', '因为',
+    '所以', '然后', '如果', '但是', '通过', '对于', '关于', '其中', '自己', '已经', '需要',
+    '比较', '非常', '还是', '就是', '还有', '并且', '以及', 'the', 'and', 'for', 'with'
+  ]);
+  const tokenFreq = new Map();
+  tags.forEach(tag => tokenFreq.set(tag, (tokenFreq.get(tag) || 0) + 3));
+  tokenizeText(plain).forEach(token => {
+    const lower = token.toLowerCase();
+    if (stopwords.has(lower)) return;
+    tokenFreq.set(token, (tokenFreq.get(token) || 0) + 1);
+  });
+  const entities = Array.from(tokenFreq.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name], idx) => ({
+      id: `${note.id}_entity_${idx + 1}`,
+      name,
+      description: `来自《${stripHtmlToText(note.content).slice(0, 18) || '笔记'}》`,
+      noteId: note.id
+    }));
+  const relations = [];
+  for (let i = 0; i < entities.length - 1; i++) {
+    relations.push({
+      id: `${note.id}_rel_${i + 1}`,
+      source: entities[i].id,
+      target: entities[i + 1].id,
+      name: '共现',
+      description: '在同一笔记中共同出现',
+      noteId: note.id
+    });
+  }
+  return {
+    entities,
+    relations
+  };
+}
+
+async function buildNoteGraph(note) {
+  const plain = stripHtmlToText(note?.content || '');
+  if (!plain) {
+    return createHeuristicGraphFromNote(note);
+  }
+  try {
+    const indexText = await kgPipelineService.generateIndex(plain);
+    const extracted = await kgPipelineService.extractFourLayers(indexText);
+    const completed = await kgPipelineService.ensureExtractionCompleteness(indexText, extracted);
+    const entities = (completed.entities || []).map((entity, idx) => ({
+      id: `${note.id}_entity_${idx + 1}`,
+      name: entity.name,
+      description: entity.definition || '',
+      noteId: note.id
+    }));
+    const entityIdByName = new Map(entities.map(entity => [entity.name, entity.id]));
+    const relations = (completed.relations || [])
+      .map((relation, idx) => ({
+        id: `${note.id}_rel_${idx + 1}`,
+        source: entityIdByName.get(relation.source),
+        target: entityIdByName.get(relation.target),
+        name: relation.name || '关联',
+        description: relation.description || '',
+        noteId: note.id
+      }))
+      .filter(relation => relation.source && relation.target);
+    if (!entities.length) {
+      return createHeuristicGraphFromNote(note);
+    }
+    return {
+      entities,
+      relations
+    };
+  } catch (error) {
+    console.warn('[KG Routes] buildNoteGraph fallback:', error.message);
+    return createHeuristicGraphFromNote(note);
+  }
+}
+
 /**
  * POST /api/kg/build
  * 触发文档图谱构建（异步）
@@ -334,6 +453,75 @@ router.get('/unified/status', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('[KG Routes] Error getting unification status:', error);
     res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
+  }
+});
+
+router.get('/note/:noteId/graph', authMiddleware, requirePermission('kg:read'), async (req, res) => {
+  try {
+    const { noteId } = req.params;
+    const userId = req.user.id;
+    const note = await prisma.note.findFirst({
+      where: { id: noteId, userId },
+      select: { id: true, content: true, tags: true, updatedAt: true }
+    });
+    if (!note) {
+      return res.status(404).json({
+        success: false,
+        error: 'Note not found'
+      });
+    }
+    const graph = await buildNoteGraph(note);
+    return res.json({
+      success: true,
+      data: {
+        noteId,
+        entities: graph.entities,
+        relations: graph.relations,
+        updatedAt: note.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error('[KG Routes] Error building note graph:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
+  }
+});
+
+router.get('/notes/graph', authMiddleware, requirePermission('kg:read'), async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const notes = await prisma.note.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+      select: { id: true, content: true, tags: true, updatedAt: true }
+    });
+    const noteGraphs = notes.map(note => createHeuristicGraphFromNote(note));
+    const entities = [];
+    const relations = [];
+    const noteEntityMap = {};
+    noteGraphs.forEach((graph, idx) => {
+      const noteId = notes[idx].id;
+      noteEntityMap[noteId] = graph.entities.map(entity => entity.name);
+      entities.push(...graph.entities);
+      relations.push(...graph.relations);
+    });
+    return res.json({
+      success: true,
+      data: {
+        entities,
+        relations,
+        noteEntityMap
+      }
+    });
+  } catch (error) {
+    console.error('[KG Routes] Error building notes graph:', error);
+    return res.status(500).json({
       success: false,
       error: error.message || 'Internal server error'
     });

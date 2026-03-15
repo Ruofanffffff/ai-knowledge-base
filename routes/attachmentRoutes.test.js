@@ -29,7 +29,7 @@ jest.mock('../services/notes/documentProcessingService', () => ({
   processDocument: jest.fn()
 }));
 jest.mock('../services/notes/tableProcessingService', () => ({
-  processTable: jest.fn()
+  uploadAndProcessTable: jest.fn()
 }));
 jest.mock('../config/notes.config', () => ({
   notesConfig: {
@@ -63,7 +63,7 @@ const attachmentDAL = require('../services/notes/attachmentDAL');
 const { uploadFileWithRetry, validateFileSize, validateMimeType, downloadFile } = require('../services/notes/s3Client');
 const { uploadAndAnalyzeImage } = require('../services/notes/imageAnalysisService');
 const { uploadAndProcessDocument } = require('../services/notes/documentProcessingService');
-const { processTable } = require('../services/notes/tableProcessingService');
+const { uploadAndProcessTable } = require('../services/notes/tableProcessingService');
 
 // Create Express app for testing
 const app = express();
@@ -287,7 +287,7 @@ describe('Attachment Routes', () => {
 
       validateFileSize.mockReturnValue(true);
       validateMimeType.mockReturnValue(true);
-      processTable.mockResolvedValue(mockResult);
+      uploadAndProcessTable.mockResolvedValue(mockResult);
 
       const response = await request(app)
         .post('/api/attachments/upload')
@@ -298,7 +298,7 @@ describe('Attachment Routes', () => {
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
       expect(response.body.data.type).toBe('TABLE');
-      expect(processTable).toHaveBeenCalled();
+      expect(uploadAndProcessTable).toHaveBeenCalled();
     });
 
     it('should return 400 if file is missing', async () => {

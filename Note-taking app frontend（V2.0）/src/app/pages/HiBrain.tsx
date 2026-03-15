@@ -983,11 +983,16 @@ function HiBrainNewDesign() {
       // Use real backend service instead of mock
       const result = await hibrainService.query(msg);
       const card = getCardForMessage(msg, clusters, notes);
+      const notesSourceCount = Array.isArray(result?.sources?.notes) ? result.sources.notes.length : 0;
+      const answer = resolveAiAnswer(result);
+      const answerWithSource = notesSourceCount > 0
+        ? `${answer}\n\n（已检索思库笔记 ${notesSourceCount} 条）`
+        : answer;
       
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(), 
         role: 'ai',
-        content: resolveAiAnswer(result),
+        content: answerWithSource,
         timestamp: new Date(),
         ...(card ? { card } : {}),
       }]);

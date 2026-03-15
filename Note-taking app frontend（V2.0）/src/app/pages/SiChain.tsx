@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
@@ -6,6 +6,7 @@ import { GitBranch, X, ZoomIn, ZoomOut, RotateCcw, ChevronRight, FileText, Tag, 
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { useNotes, Note } from '../components/context/NoteContext';
+import { api } from '../services/api';
 
 // ── Graph-gen signal (written by NoteCreate after save) ─────────────
 const GG_KEY = 'hi_graph_gen';
@@ -500,6 +501,22 @@ interface GraphEdge {
   label: string;   // relationship name shown on edge
 }
 
+interface BackendKgEntity {
+  id: string;
+  name: string;
+  description?: string;
+  noteId?: string;
+}
+
+interface BackendKgRelation {
+  id?: string;
+  source: string;
+  target: string;
+  name?: string;
+  description?: string;
+  noteId?: string;
+}
+
 const NODE_COLORS = [
   '#6366F1', '#8B5CF6', '#3B82F6', '#06B6D4',
   '#10B981', '#F59E0B', '#EC4899', '#14B8A6',
@@ -530,14 +547,25 @@ function normalizeNoteTags(raw: unknown): string[] {
   return [];
 }
 
-function buildGraph(notes: Note[], mode: 'all' | string) {
+function mergeNoteTags(note: Note, noteEntityMap: Record<string, string[]>) {
+  const originalTags = normalizeNoteTags(note.tags);
+  const backendEntities = Array.isArray(noteEntityMap[note.id]) ? noteEntityMap[note.id] : [];
+  return Array.from(new Set([...originalTags, ...backendEntities])).slice(0, 30);
+}
+
+function buildGraph(
+  notes: Note[],
+  mode: 'all' | string,
+  noteEntityMap: Record<string, string[]>,
+  singleGraph: { entities: BackendKgEntity[]; relations: BackendKgRelation[] } | null
+) {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
 
   if (mode === 'all') {
     const tagSet = new Map<string, number[]>();
     notes.forEach((note, ni) => {
-      const tags = normalizeNoteTags(note.tags);
+      const tags = mergeNoteTags(note, noteEntityMap);
       tags.forEach(tag => {
         if (!tagSet.has(tag)) tagSet.set(tag, []);
         tagSet.get(tag)!.push(ni);
@@ -545,7 +573,7 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
     });
 
     notes.forEach((note, ni) => {
-      const tags = normalizeNoteTags(note.tags);
+      const tags = mergeNoteTags(note, noteEntityMap);
       nodes.push({
         id: note.id,
         label: note.title || note.content.slice(0, 12) + '…',
@@ -580,10 +608,10 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
 
     for (let i = 0; i < notes.length; i++) {
       for (let j = i + 1; j < notes.length; j++) {
-        const leftTags = normalizeNoteTags(notes[i].tags);
-        const rightTags = normalizeNoteTags(notes[j].tags);
+        const leftTags = mergeNoteTags(notes[i], noteEntityMap);
+        const rightTags = mergeNoteTags(notes[j], noteEntityMap);
         const shared = leftTags.filter(t => rightTags.includes(t));
-        if (shared.length >= 2) {
+        if (shared.length >= 1) {
           edges.push({ sourceIdx: i, targetIdx: j, weight: shared.length, color: '#6366F1', label: `共${shared.length}标签` });
         }
       }
@@ -591,7 +619,7 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
   } else {
     const note = notes.find(n => n.id === mode);
     if (!note) return { nodes, edges };
-    const noteTags = normalizeNoteTags(note.tags);
+    const noteTags = mergeNoteTags(note, noteEntityMap);
 
     nodes.push({
       id: note.id,
@@ -602,6 +630,42 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
       r: 32,
       tags: noteTags,
     });
+
+    if (singleGraph && singleGraph.entities.length > 0) {
+      const entityNodeIdx = new Map<string, number>();
+      singleGraph.entities.forEach((entity, index) => {
+        const angle = (index / Math.max(singleGraph.entities.length, 1)) * Math.PI * 2;
+        const nodeIdx = nodes.length;
+        nodes.push({
+          id: entity.id || `kg_entity_${index}`,
+          label: entity.name || `实体${index + 1}`,
+          x: 200 + Math.cos(angle) * 155,
+          y: 200 + Math.sin(angle) * 155,
+          vx: 0, vy: 0, fx: 0, fy: 0,
+          color: getColor(index + 1),
+          r: 20,
+          tags: [],
+          isTag: true,
+        });
+        entityNodeIdx.set(entity.id, nodeIdx);
+        edges.push({ sourceIdx: 0, targetIdx: nodeIdx, weight: 1, color: getColor(index + 1), label: '提及' });
+      });
+
+      singleGraph.relations.forEach((relation, index) => {
+        const sourceIdx = entityNodeIdx.get(relation.source);
+        const targetIdx = entityNodeIdx.get(relation.target);
+        if (sourceIdx === undefined || targetIdx === undefined || sourceIdx === targetIdx) return;
+        edges.push({
+          sourceIdx,
+          targetIdx,
+          weight: 1,
+          color: getColor(index + 2),
+          label: relation.name || '关联'
+        });
+      });
+
+      return { nodes, edges };
+    }
 
     noteTags.forEach((tag, ti) => {
       const angle = (ti / (noteTags.length || 1)) * Math.PI * 2;
@@ -619,7 +683,7 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
       });
       edges.push({ sourceIdx: 0, targetIdx: tagIdx, weight: 1, color: getColor(ti + 1), label: '含标签' });
 
-      notes.filter(n => n.id !== note.id && normalizeNoteTags(n.tags).includes(tag)).slice(0, 3).forEach((rel, ri) => {
+      notes.filter(n => n.id !== note.id && mergeNoteTags(n, noteEntityMap).includes(tag)).slice(0, 3).forEach((rel, ri) => {
         const relAngle = angle + (ri - 1) * 0.5;
         const relIdx = nodes.findIndex(n => n.id === rel.id);
         if (relIdx === -1) {
@@ -723,8 +787,15 @@ function drawRoundRect(
 }
 
 function KnowledgeGraphCanvas({
-  notes, mode, onNodeClick, highlightType,
-}: { notes: Note[]; mode: 'all' | string; onNodeClick: (id: string) => void; highlightType: 'note' | 'tag' | null }) {
+  notes, mode, onNodeClick, highlightType, noteEntityMap, singleGraph,
+}: {
+  notes: Note[];
+  mode: 'all' | string;
+  onNodeClick: (id: string) => void;
+  highlightType: 'note' | 'tag' | null;
+  noteEntityMap: Record<string, string[]>;
+  singleGraph: { entities: BackendKgEntity[]; relations: BackendKgRelation[] } | null;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nodesRef = useRef<GraphNode[]>([]);
   const edgesRef = useRef<GraphEdge[]>([]);
@@ -1072,7 +1143,7 @@ function KnowledgeGraphCanvas({
   // ── Build graph + animation loop ──
   useEffect(() => {
     if (notes.length === 0) return;
-    const { nodes, edges } = buildGraph(notes, mode);
+    const { nodes, edges } = buildGraph(notes, mode, noteEntityMap, singleGraph);
     nodesRef.current = nodes;
     edgesRef.current = edges;
     setSettled(false);
@@ -1103,7 +1174,7 @@ function KnowledgeGraphCanvas({
     cancelAnimationFrame(animRef.current);
     animRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animRef.current);
-  }, [notes, mode, draw]);
+  }, [notes, mode, draw, noteEntityMap, singleGraph]);
 
   // Canvas DPR sizing (once)
   useEffect(() => {
@@ -1248,6 +1319,8 @@ function StatusBar() {
 export function SiChain() {
   const navigate = useNavigate();
   const { notes } = useNotes();
+  const [noteEntityMap, setNoteEntityMap] = useState<Record<string, string[]>>({});
+  const [singleGraphMap, setSingleGraphMap] = useState<Record<string, { entities: BackendKgEntity[]; relations: BackendKgRelation[] }>>({});
   const [mode, setMode] = useState<'all' | string>('all');
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'combined' | 'single'>('combined');
@@ -1273,8 +1346,65 @@ export function SiChain() {
     highlightTimerRef.current = setTimeout(() => setHighlightType(null), 3000);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadCombinedGraph = async () => {
+      if (!notes.length) {
+        if (!cancelled) setNoteEntityMap({});
+        return;
+      }
+      try {
+        const response = await api.get('/kg/notes/graph');
+        const serverMap = response.data?.data?.noteEntityMap;
+        if (!cancelled && serverMap && typeof serverMap === 'object') {
+          setNoteEntityMap(serverMap);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setNoteEntityMap({});
+        }
+      }
+    };
+    loadCombinedGraph();
+    return () => {
+      cancelled = true;
+    };
+  }, [notes]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSingleGraph = async () => {
+      if (mode === 'all' || singleGraphMap[mode]) return;
+      try {
+        const response = await api.get(`/kg/note/${mode}/graph`);
+        const entities = Array.isArray(response.data?.data?.entities) ? response.data.data.entities : [];
+        const relations = Array.isArray(response.data?.data?.relations) ? response.data.data.relations : [];
+        if (!cancelled) {
+          setSingleGraphMap(prev => ({ ...prev, [mode]: { entities, relations } }));
+          if (entities.length > 0) {
+            setNoteEntityMap(prev => ({
+              ...prev,
+              [mode]: Array.from(new Set(entities.map((entity: BackendKgEntity) => String(entity.name || '').trim()).filter(Boolean)))
+            }));
+          }
+        }
+      } catch (error) {}
+    };
+    loadSingleGraph();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, singleGraphMap]);
+
+  const graphNotes = useMemo(() => {
+    return notes.map(note => ({
+      ...note,
+      tags: mergeNoteTags(note, noteEntityMap)
+    }));
+  }, [notes, noteEntityMap]);
+
   const selectedNote = selectedNode && !selectedNode.startsWith('tag_')
-    ? notes.find(n => n.id === selectedNode)
+    ? graphNotes.find(n => n.id === selectedNode)
     : null;
 
   const handleNodeClick = (id: string) => {
@@ -1285,10 +1415,10 @@ export function SiChain() {
     }
   };
 
-  const allTags = Array.from(new Set(notes.flatMap(n => normalizeNoteTags(n.tags))));
+  const allTags = Array.from(new Set(graphNotes.flatMap(n => normalizeNoteTags(n.tags))));
   const tagStats = allTags.map(tag => ({
     tag,
-    count: notes.filter(n => normalizeNoteTags(n.tags).includes(tag)).length,
+    count: graphNotes.filter(n => normalizeNoteTags(n.tags).includes(tag)).length,
   })).sort((a, b) => b.count - a.count);
 
   return (
@@ -1348,7 +1478,7 @@ export function SiChain() {
             {/* Graph */}
             <div className="mx-3 mt-3 rounded-3xl overflow-hidden"
               style={{ background: 'var(--hi-card-bg)', backdropFilter: 'blur(14px)', border: '1px solid var(--hi-card-border)', boxShadow: 'var(--hi-card-shadow)' }}>
-              {notes.length === 0 ? (
+              {graphNotes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16">
                   <GitBranch size={40} style={{ color: '#C4B5FD' }} />
                   <p className="mt-3" style={{ color: 'var(--hi-text-primary)', fontSize: '16px', fontWeight: 700 }}>暂无知识图谱</p>
@@ -1359,7 +1489,14 @@ export function SiChain() {
                   </button>
                 </div>
               ) : (
-                <KnowledgeGraphCanvas notes={notes} mode={mode} onNodeClick={handleNodeClick} highlightType={highlightType} />
+                <KnowledgeGraphCanvas
+                  notes={graphNotes}
+                  mode={mode}
+                  onNodeClick={handleNodeClick}
+                  highlightType={highlightType}
+                  noteEntityMap={noteEntityMap}
+                  singleGraph={mode === 'all' ? null : (singleGraphMap[mode] || null)}
+                />
               )}
             </div>
 
@@ -1643,7 +1780,7 @@ export function SiChain() {
                       <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(99,102,241,0.08)' }}>
                         <motion.div
                           initial={{ width: 0 }}
-                          animate={{ width: `${(ts.count / notes.length) * 100}%` }}
+                          animate={{ width: `${(ts.count / Math.max(graphNotes.length, 1)) * 100}%` }}
                           transition={{ delay: i * 0.1, duration: 0.6, ease: 'easeOut' }}
                           className="h-full rounded-full"
                           style={{ background: `linear-gradient(to right, ${getColor(i)}, ${getColor(i + 1)})` }}
@@ -1662,7 +1799,7 @@ export function SiChain() {
             <p style={{ color: '#6B7280', fontSize: '11.5px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               选择笔记查看单篇图谱
             </p>
-            {notes.map((note, i) => (
+            {graphNotes.map((note, i) => (
               <motion.button
                 key={note.id}
                 initial={{ opacity: 0, y: 14 }}
@@ -1720,7 +1857,14 @@ export function SiChain() {
                         <X size={13} style={{ color: '#6366F1' }} />
                       </button>
                     </div>
-                    <KnowledgeGraphCanvas notes={notes} mode={mode} onNodeClick={handleNodeClick} highlightType={highlightType} />
+                    <KnowledgeGraphCanvas
+                      notes={graphNotes}
+                      mode={mode}
+                      onNodeClick={handleNodeClick}
+                      highlightType={highlightType}
+                      noteEntityMap={noteEntityMap}
+                      singleGraph={mode === 'all' ? null : (singleGraphMap[mode] || null)}
+                    />
                   </div>
                 </motion.div>
               )}
@@ -1761,12 +1905,12 @@ export function SiChain() {
                             #{selectedNode.replace('tag_', '')}
                           </p>
                           <p style={{ color: '#9CA3AF', fontSize: '12px' }}>
-                            {notes.filter(n => normalizeNoteTags(n.tags).includes(selectedNode.replace('tag_', ''))).length} 篇笔记使用此标签
+                            {graphNotes.filter(n => normalizeNoteTags(n.tags).includes(selectedNode.replace('tag_', ''))).length} 篇笔记使用此标签
                           </p>
                         </div>
                       </div>
                       <div className="space-y-2">
-                        {notes.filter(n => normalizeNoteTags(n.tags).includes(selectedNode.replace('tag_', ''))).map(n => (
+                        {graphNotes.filter(n => normalizeNoteTags(n.tags).includes(selectedNode.replace('tag_', ''))).map(n => (
                           <button key={n.id} onClick={() => { navigate(`/siku/${n.id}`); setSelectedNode(null); }}
                             className="w-full text-left p-3 rounded-2xl"
                             style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)' }}>

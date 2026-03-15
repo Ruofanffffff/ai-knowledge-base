@@ -14,7 +14,7 @@ const attachmentDAL = require('../services/notes/attachmentDAL');
 const { uploadFileWithRetry, validateFileSize, validateMimeType, downloadFile } = require('../services/notes/s3Client');
 const { uploadAndAnalyzeImage } = require('../services/notes/imageAnalysisService');
 const { uploadAndProcessDocument } = require('../services/notes/documentProcessingService');
-const { processTable } = require('../services/notes/tableProcessingService');
+const { uploadAndProcessTable } = require('../services/notes/tableProcessingService');
 const { notesConfig } = require('../config/notes.config');
 
 // Configure multer for memory storage (files will be uploaded to S3)
@@ -36,6 +36,12 @@ function inferMimeTypeByFilename(filename = '') {
       return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     case '.txt':
       return 'text/plain';
+    case '.xlsx':
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case '.xls':
+      return 'application/vnd.ms-excel';
+    case '.csv':
+      return 'text/csv';
     default:
       return '';
   }
@@ -176,7 +182,7 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
       case 'TABLE':
         // Upload and process table
         // Requirement 4.1, 4.2, 4.3
-        result = await processTable({
+        result = await uploadAndProcessTable({
           fileData: file.buffer,
           originalFilename: file.originalname,
           userId,
