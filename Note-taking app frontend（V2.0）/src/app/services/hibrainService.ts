@@ -22,12 +22,15 @@ function normalizeQueryResponse(payload: unknown): HiBrainQueryResponse {
   const answer =
     pickString(root.answer) ||
     pickString(root.content) ||
+    pickString(root.response) ||
     pickString(root.message) ||
     pickString(data?.answer) ||
     pickString(data?.content) ||
+    pickString(data?.response) ||
     pickString(data?.message) ||
     pickString(result?.answer) ||
     pickString(result?.content) ||
+    pickString(result?.response) ||
     pickString(result?.message) ||
     pickString(root.choices?.[0]?.message?.content) ||
     pickString(root.choices?.[0]?.text) ||
