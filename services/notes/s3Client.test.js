@@ -334,18 +334,23 @@ describe('S3 Client', () => {
       expect(mockUpload.done).toHaveBeenCalledTimes(2);
     });
 
-    it('should fail after max retries', async () => {
+    it('should degrade to local fallback after max retries', async () => {
       const mockUpload = {
         done: jest.fn().mockRejectedValue(new Error('Persistent failure'))
       };
       Upload.mockImplementation(() => mockUpload);
 
-      await expect(uploadFileWithRetry({
+      const result = await uploadFileWithRetry({
         fileData: Buffer.from('test'),
         originalFilename: 'test.jpg',
         userId: 'user123',
         mimeType: 'image/jpeg'
-      }, 2)).rejects.toThrow('Failed to upload file after 3 attempts');
+      }, 2);
+
+      expect(result.degraded).toBe(true);
+      expect(result.degradationMode).toBe('LOCAL_CACHE');
+      expect(result.key).toMatch(/^local-cache\//);
+      expect(mockUpload.done).toHaveBeenCalledTimes(3);
     });
   });
 

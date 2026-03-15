@@ -230,6 +230,43 @@ describe('Attachment Routes', () => {
       }));
     });
 
+    it('should include degradation fields when storage fallback is used', async () => {
+      const mockResult = {
+        attachment: {
+          id: 'attachment-degraded-1',
+          url: 'local://notes-fallback/fallback-1/test.pdf',
+          type: 'DOCUMENT',
+          size: 2048,
+          mimeType: 'application/pdf',
+          createdAt: new Date().toISOString(),
+          degraded: true,
+          degradationMode: 'LOCAL_CACHE',
+          fallbackId: 'fallback-1'
+        },
+        analysis: {
+          textContent: 'PDF content',
+          description: null,
+          tags: [],
+          metadata: { storageDegraded: true }
+        }
+      };
+
+      validateFileSize.mockReturnValue(true);
+      validateMimeType.mockReturnValue(true);
+      uploadAndProcessDocument.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .post('/api/attachments/upload')
+        .field('type', 'DOCUMENT')
+        .field('noteId', 'note-1')
+        .attach('file', Buffer.from('fake pdf data'), 'test.pdf');
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.degraded).toBe(true);
+      expect(response.body.data.degradationMode).toBe('LOCAL_CACHE');
+      expect(response.body.data.fallbackId).toBe('fallback-1');
+    });
+
     it('should upload and process a table attachment', async () => {
       const mockResult = {
         attachment: {
@@ -356,6 +393,26 @@ describe('Attachment Routes', () => {
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBe('Note not found');
+    });
+
+    it('should return storage error metadata for S3 retry exhaustion', async () => {
+      validateFileSize.mockReturnValue(true);
+      validateMimeType.mockReturnValue(true);
+      const storageError = new Error('Failed to upload file after retries');
+      storageError.code = 'STORAGE_UPLOAD_RETRY_EXHAUSTED';
+      storageError.statusCode = 503;
+      uploadAndProcessDocument.mockRejectedValue(storageError);
+
+      const response = await request(app)
+        .post('/api/attachments/upload')
+        .field('type', 'DOCUMENT')
+        .field('noteId', 'note-1')
+        .attach('file', Buffer.from('fake pdf data'), 'test.pdf');
+
+      expect(response.status).toBe(503);
+      expect(response.body.success).toBe(false);
+      expect(response.body.errorCode).toBe('STORAGE_UPLOAD_RETRY_EXHAUSTED');
+      expect(response.body.errorId).toMatch(/^att_upload_/);
     });
 
     it('should return 413 when multer rejects oversized upload', async () => {

@@ -11,6 +11,152 @@ const { v4: uuidv4 } = require('uuid');
 const { notesConfig } = require('../../config/notes.config');
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
+
+const LOCAL_FALLBACK_DIR = process.env.NOTES_STORAGE_FALLBACK_DIR
+  || path.join(process.cwd(), '.cache', 'notes-storage');
+
+function ensureFallbackDir() {
+  if (!fs.existsSync(LOCAL_FALLBACK_DIR)) {
+    fs.mkdirSync(LOCAL_FALLBACK_DIR, { recursive: true });
+  }
+}
+
+function buildStorageError(message, options = {}) {
+  const {
+    code = 'STORAGE_OPERATION_FAILED',
+    statusCode = 500,
+    operation,
+    retryable,
+    attempt,
+    maxAttempts,
+    context = {},
+    cause,
+    retryErrors = []
+  } = options;
+
+  const error = new Error(message);
+  error.name = 'StorageError';
+  error.code = code;
+  error.statusCode = statusCode;
+  error.operation = operation;
+  error.retryable = retryable;
+  error.attempt = attempt;
+  error.maxAttempts = maxAttempts;
+  error.context = context;
+  error.retryErrors = retryErrors.map(err => ({
+    name: err?.name,
+    message: err?.message,
+    code: err?.code,
+    statusCode: err?.statusCode || err?.$metadata?.httpStatusCode
+  }));
+  error.observedAt = new Date().toISOString();
+
+  if (cause) {
+    error.cause = cause;
+    error.causeName = cause.name;
+    error.causeCode = cause.code;
+    error.causeStatusCode = cause.statusCode || cause.$metadata?.httpStatusCode;
+  }
+
+  return error;
+}
+
+function getErrorStatusCode(error) {
+  return error?.statusCode
+    || error?.$metadata?.httpStatusCode
+    || error?.response?.status
+    || undefined;
+}
+
+function isRetryableStorageError(error) {
+  const statusCode = getErrorStatusCode(error);
+  if ([400, 401, 403, 404, 405, 409, 422].includes(statusCode)) {
+    return false;
+  }
+
+  const nonRetryableNames = new Set([
+    'AccessDenied',
+    'InvalidAccessKeyId',
+    'SignatureDoesNotMatch',
+    'NoSuchBucket',
+    'NotFound'
+  ]);
+  if (nonRetryableNames.has(error?.name)) {
+    return false;
+  }
+
+  if (/credentials|signature|access denied|no such bucket/i.test(error?.message || '')) {
+    return false;
+  }
+
+  return true;
+}
+
+function sanitizeFilename(filename = '') {
+  return path.basename(filename).replace(/[^\w.\-]/g, '_') || 'file.bin';
+}
+
+function extractFallbackId(key = '') {
+  const parts = key.split('/');
+  if (parts[0] !== 'local-cache' || parts.length < 2) {
+    return null;
+  }
+  return parts[1] || null;
+}
+
+function buildFallbackPaths(fallbackId) {
+  return {
+    filePath: path.join(LOCAL_FALLBACK_DIR, `${fallbackId}.bin`),
+    metaPath: path.join(LOCAL_FALLBACK_DIR, `${fallbackId}.meta.json`)
+  };
+}
+
+function saveUploadToLocalFallback(options, sourceError, retryErrors = []) {
+  const { fileData, originalFilename, userId, mimeType, prefix = 'attachments', metadata = {} } = options;
+  ensureFallbackDir();
+
+  const fallbackId = uuidv4();
+  const safeFilename = sanitizeFilename(originalFilename);
+  const { filePath, metaPath } = buildFallbackPaths(fallbackId);
+
+  fs.writeFileSync(filePath, fileData);
+  const fallbackMeta = {
+    fallbackId,
+    userId,
+    mimeType,
+    originalFilename: safeFilename,
+    size: fileData.length || 0,
+    createdAt: new Date().toISOString(),
+    sourceError: {
+      name: sourceError?.name,
+      message: sourceError?.message,
+      code: sourceError?.code,
+      statusCode: getErrorStatusCode(sourceError)
+    },
+    retryErrors: retryErrors.map(err => ({
+      name: err?.name,
+      message: err?.message,
+      code: err?.code,
+      statusCode: getErrorStatusCode(err)
+    })),
+    metadata
+  };
+  fs.writeFileSync(metaPath, JSON.stringify(fallbackMeta, null, 2), 'utf8');
+
+  return {
+    key: `local-cache/${fallbackId}/${safeFilename}`,
+    url: `local://notes-fallback/${fallbackId}/${encodeURIComponent(safeFilename)}`,
+    bucket: notesConfig.storage.bucketName,
+    size: fallbackMeta.size,
+    mimeType,
+    uploadedAt: fallbackMeta.createdAt,
+    degraded: true,
+    degradationMode: 'LOCAL_CACHE',
+    fallbackId,
+    fallbackPath: filePath
+  };
+}
 
 /**
  * Initialize S3 client with configuration
@@ -156,7 +302,19 @@ async function uploadFile(options) {
       uploadedAt: new Date().toISOString()
     };
   } catch (error) {
-    throw new Error(`Failed to upload file: ${error.message}`);
+    throw buildStorageError(`Failed to upload file: ${error.message}`, {
+      code: 'STORAGE_UPLOAD_FAILED',
+      statusCode: getErrorStatusCode(error) || 502,
+      operation: 'upload',
+      retryable: isRetryableStorageError(error),
+      cause: error,
+      context: {
+        bucket: notesConfig.storage.bucketName,
+        originalFilename,
+        mimeType,
+        prefix
+      }
+    });
   }
 }
 
@@ -172,6 +330,43 @@ async function downloadFile(key) {
   }
 
   try {
+    if (key.startsWith('local-cache/')) {
+      const fallbackId = extractFallbackId(key);
+      if (!fallbackId) {
+        throw buildStorageError(`Invalid local fallback key: ${key}`, {
+          code: 'STORAGE_FALLBACK_KEY_INVALID',
+          statusCode: 400,
+          operation: 'download',
+          retryable: false,
+          context: { key }
+        });
+      }
+
+      const { filePath, metaPath } = buildFallbackPaths(fallbackId);
+      if (!fs.existsSync(filePath) || !fs.existsSync(metaPath)) {
+        throw buildStorageError(`File not found: ${key}`, {
+          code: 'STORAGE_FALLBACK_NOT_FOUND',
+          statusCode: 404,
+          operation: 'download',
+          retryable: false,
+          context: { key, fallbackId }
+        });
+      }
+
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+      const data = fs.readFileSync(filePath);
+      return {
+        data,
+        contentType: meta.mimeType || 'application/octet-stream',
+        contentLength: meta.size || data.length,
+        metadata: {
+          source: 'local-fallback',
+          fallbackId
+        },
+        lastModified: new Date(meta.createdAt || Date.now())
+      };
+    }
+
     const command = new GetObjectCommand({
       Bucket: notesConfig.storage.bucketName,
       Key: key,
@@ -194,7 +389,7 @@ async function downloadFile(key) {
       lastModified: response.LastModified,
     };
   } catch (error) {
-    if (error.name === 'NoSuchKey') {
+    if (error.name === 'NoSuchKey' || error.code === 'STORAGE_FALLBACK_NOT_FOUND') {
       throw new Error(`File not found: ${key}`);
     }
     throw new Error(`Failed to download file: ${error.message}`);
@@ -213,6 +408,25 @@ async function deleteFile(key) {
   }
 
   try {
+    if (key.startsWith('local-cache/')) {
+      const fallbackId = extractFallbackId(key);
+      if (!fallbackId) {
+        return {
+          deleted: false,
+          key,
+          deletedAt: new Date().toISOString()
+        };
+      }
+      const { filePath, metaPath } = buildFallbackPaths(fallbackId);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
+      return {
+        deleted: true,
+        key,
+        deletedAt: new Date().toISOString()
+      };
+    }
+
     const command = new DeleteObjectCommand({
       Bucket: notesConfig.storage.bucketName,
       Key: key,
@@ -242,6 +456,13 @@ async function fileExists(key) {
   }
 
   try {
+    if (key.startsWith('local-cache/')) {
+      const fallbackId = extractFallbackId(key);
+      if (!fallbackId) return false;
+      const { filePath, metaPath } = buildFallbackPaths(fallbackId);
+      return fs.existsSync(filePath) && fs.existsSync(metaPath);
+    }
+
     const command = new HeadObjectCommand({
       Bucket: notesConfig.storage.bucketName,
       Key: key,
@@ -269,6 +490,29 @@ async function getFileMetadata(key) {
   }
 
   try {
+    if (key.startsWith('local-cache/')) {
+      const fallbackId = extractFallbackId(key);
+      if (!fallbackId) {
+        throw new Error(`File not found: ${key}`);
+      }
+      const { metaPath } = buildFallbackPaths(fallbackId);
+      if (!fs.existsSync(metaPath)) {
+        throw new Error(`File not found: ${key}`);
+      }
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+      return {
+        contentType: meta.mimeType || 'application/octet-stream',
+        contentLength: meta.size || 0,
+        lastModified: new Date(meta.createdAt || Date.now()),
+        metadata: {
+          source: 'local-fallback',
+          fallbackId,
+          originalFilename: meta.originalFilename
+        },
+        etag: null
+      };
+    }
+
     const command = new HeadObjectCommand({
       Bucket: notesConfig.storage.bucketName,
       Key: key,
@@ -302,14 +546,52 @@ async function getFileMetadata(key) {
 async function uploadFileWithRetry(options, maxRetries = notesConfig.retry.maxRetries) {
   let lastError;
   let delay = notesConfig.retry.initialDelay;
+  const retryErrors = [];
+  const maxAttempts = maxRetries + 1;
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       return await uploadFile(options);
     } catch (error) {
       lastError = error;
-      
-      if (attempt < maxRetries) {
+      retryErrors.push(error);
+      const attemptNo = attempt + 1;
+      const retryable = isRetryableStorageError(error);
+      const isLastAttempt = attempt === maxAttempts - 1;
+
+      console.warn('[S3UploadRetry] attempt failed', {
+        operation: 'upload',
+        attempt: attemptNo,
+        maxAttempts,
+        retryable,
+        errorCode: error.code,
+        statusCode: getErrorStatusCode(error),
+        message: error.message
+      });
+
+      if (!retryable) {
+        throw buildStorageError(
+          `Failed to upload file: non-retryable error on attempt ${attemptNo} - ${error.message}`,
+          {
+            code: 'STORAGE_UPLOAD_NON_RETRYABLE',
+            statusCode: getErrorStatusCode(error) || 502,
+            operation: 'upload',
+            retryable: false,
+            attempt: attemptNo,
+            maxAttempts,
+            cause: error,
+            retryErrors,
+            context: {
+              originalFilename: options?.originalFilename,
+              mimeType: options?.mimeType,
+              userId: options?.userId,
+              prefix: options?.prefix || 'attachments'
+            }
+          }
+        );
+      }
+
+      if (!isLastAttempt) {
         // Wait before retrying with exponential backoff
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= notesConfig.retry.backoffMultiplier;
@@ -317,7 +599,38 @@ async function uploadFileWithRetry(options, maxRetries = notesConfig.retry.maxRe
     }
   }
 
-  throw new Error(`Failed to upload file after ${maxRetries + 1} attempts: ${lastError.message}`);
+  try {
+    const fallbackResult = saveUploadToLocalFallback(options, lastError, retryErrors);
+    console.warn('[S3UploadRetry] switched to local fallback', {
+      operation: 'upload',
+      fallbackId: fallbackResult.fallbackId,
+      degradationMode: fallbackResult.degradationMode,
+      attempts: maxAttempts,
+      originalFilename: options?.originalFilename
+    });
+    return fallbackResult;
+  } catch (fallbackError) {
+    throw buildStorageError(
+      `Failed to upload file after ${maxAttempts} attempts and local fallback failed: ${lastError?.message}`,
+      {
+        code: 'STORAGE_UPLOAD_RETRY_EXHAUSTED',
+        statusCode: 503,
+        operation: 'upload',
+        retryable: false,
+        attempt: maxAttempts,
+        maxAttempts,
+        cause: fallbackError,
+        retryErrors,
+        context: {
+          originalFilename: options?.originalFilename,
+          mimeType: options?.mimeType,
+          userId: options?.userId,
+          prefix: options?.prefix || 'attachments',
+          fallbackError: fallbackError.message
+        }
+      }
+    );
+  }
 }
 
 /**

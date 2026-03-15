@@ -138,6 +138,11 @@ class DocumentProcessingService {
           coverageRate: processingResult.coverageRate || null,
           qualityScore: processingResult.qualityScore || null,
           processedAt: new Date().toISOString(),
+          ...(uploadResult.degraded && {
+            storageDegraded: true,
+            degradationMode: uploadResult.degradationMode || 'LOCAL_CACHE',
+            fallbackId: uploadResult.fallbackId || null
+          }),
           ...(processingResult.error && { error: processingResult.error })
         }
       });
@@ -152,7 +157,12 @@ class DocumentProcessingService {
           storageKey: attachment.storageKey,
           size: attachment.size,
           mimeType: attachment.mimeType,
-          createdAt: attachment.createdAt
+          createdAt: attachment.createdAt,
+          ...(uploadResult.degraded && {
+            degraded: true,
+            degradationMode: uploadResult.degradationMode || 'LOCAL_CACHE',
+            fallbackId: uploadResult.fallbackId || null
+          })
         },
         analysis: {
           id: analysis.id,
@@ -164,7 +174,21 @@ class DocumentProcessingService {
         }
       };
     } catch (error) {
-      throw new Error(`Failed to upload and process document: ${error.message}`);
+      const wrappedError = new Error(`Failed to upload and process document: ${error.message}`);
+      wrappedError.code = error.code || 'DOCUMENT_UPLOAD_PROCESS_FAILED';
+      wrappedError.statusCode = error.statusCode || 500;
+      wrappedError.retryable = error.retryable;
+      wrappedError.operation = error.operation || 'documentUpload';
+      wrappedError.context = {
+        noteId,
+        userId,
+        originalFilename,
+        mimeType,
+        ...(error.context || {})
+      };
+      wrappedError.retryErrors = error.retryErrors || [];
+      wrappedError.cause = error;
+      throw wrappedError;
     }
   }
 

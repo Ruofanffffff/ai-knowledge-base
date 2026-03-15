@@ -45,7 +45,7 @@ describe('Property 18: Storage Retry Mechanism', () => {
       expect(mockDone).toHaveBeenCalledTimes(1);
     });
 
-    it('should retry up to 3 times on failure', async () => {
+    it('should retry up to 3 times on failure then fallback to local cache', async () => {
       // Mock failing upload
       const mockDone = jest.fn()
         .mockRejectedValueOnce(new Error('Network error'))
@@ -64,8 +64,12 @@ describe('Property 18: Storage Retry Mechanism', () => {
         mimeType: 'image/jpeg'
       };
 
-      await expect(uploadFileWithRetry(options, 3)).rejects.toThrow('Failed to upload file after 4 attempts');
-      
+      const result = await uploadFileWithRetry(options, 3);
+
+      expect(result.degraded).toBe(true);
+      expect(result.degradationMode).toBe('LOCAL_CACHE');
+      expect(result.key).toMatch(/^local-cache\//);
+
       // Should be called 4 times (initial + 3 retries)
       expect(mockDone).toHaveBeenCalledTimes(4);
     });
@@ -174,7 +178,7 @@ describe('Property 18: Storage Retry Mechanism', () => {
       expect(duration).toBeGreaterThanOrEqual(300);
     });
 
-    it('should throw error with original error message after all retries fail', async () => {
+    it('should fallback with degraded response after all retries fail', async () => {
       const errorMessage = 'Persistent network failure';
       const mockDone = jest.fn().mockRejectedValue(new Error(errorMessage));
 
@@ -189,7 +193,10 @@ describe('Property 18: Storage Retry Mechanism', () => {
         mimeType: 'image/jpeg'
       };
 
-      await expect(uploadFileWithRetry(options, 3)).rejects.toThrow(errorMessage);
+      const result = await uploadFileWithRetry(options, 3);
+      expect(result.degraded).toBe(true);
+      expect(result.degradationMode).toBe('LOCAL_CACHE');
+      expect(result.key).toMatch(/^local-cache\//);
     });
 
     it('should respect custom maxRetries parameter', async () => {
@@ -207,8 +214,9 @@ describe('Property 18: Storage Retry Mechanism', () => {
       };
 
       // Set maxRetries to 1
-      await expect(uploadFileWithRetry(options, 1)).rejects.toThrow();
-      
+      const result = await uploadFileWithRetry(options, 1);
+      expect(result.degraded).toBe(true);
+
       // Should be called 2 times (initial + 1 retry)
       expect(mockDone).toHaveBeenCalledTimes(2);
     });
@@ -261,8 +269,9 @@ describe('Property 18: Storage Retry Mechanism', () => {
         mimeType: 'image/jpeg'
       };
 
-      await expect(uploadFileWithRetry(options, 0)).rejects.toThrow();
-      
+      const result = await uploadFileWithRetry(options, 0);
+      expect(result.degraded).toBe(true);
+
       // Should only be called once (no retries)
       expect(mockDone).toHaveBeenCalledTimes(1);
     });
@@ -289,8 +298,9 @@ describe('Property 18: Storage Retry Mechanism', () => {
           mimeType: 'image/jpeg'
         };
 
-        await expect(uploadFileWithRetry(options, 3)).rejects.toThrow();
-        
+        const result = await uploadFileWithRetry(options, 3);
+        expect(result.degraded).toBe(true);
+
         // Should retry for all error types
         expect(mockDone).toHaveBeenCalledTimes(4);
       }
@@ -298,7 +308,7 @@ describe('Property 18: Storage Retry Mechanism', () => {
   });
 
   describe('Requirement 12.5: Local data retention on failure', () => {
-    it('should throw error indicating need for local retention after all retries fail', async () => {
+    it('should return local retention result after all retries fail', async () => {
       const mockDone = jest.fn().mockRejectedValue(new Error('Persistent failure'));
 
       Upload.mockImplementation(() => ({
@@ -312,17 +322,10 @@ describe('Property 18: Storage Retry Mechanism', () => {
         mimeType: 'image/jpeg'
       };
 
-      try {
-        await uploadFileWithRetry(options, 3);
-        fail('Should have thrown error');
-      } catch (error) {
-        // Error should indicate that local retention is needed
-        expect(error.message).toContain('Failed to upload file after');
-        expect(error.message).toContain('attempts');
-        
-        // In a real implementation, this error would trigger local data retention
-        // The calling code should catch this error and save data locally
-      }
+      const result = await uploadFileWithRetry(options, 3);
+      expect(result.degraded).toBe(true);
+      expect(result.degradationMode).toBe('LOCAL_CACHE');
+      expect(result.fallbackId).toBeDefined();
     });
   });
 });

@@ -202,6 +202,13 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
       createdAt: result.attachment.createdAt
     };
 
+    // Include degradation info (storage fallback) if available
+    if (result.attachment.degraded) {
+      response.degraded = true;
+      response.degradationMode = result.attachment.degradationMode || 'LOCAL_CACHE';
+      response.fallbackId = result.attachment.fallbackId || null;
+    }
+
     // Include analysis if available
     if (result.analysis) {
       response.analysis = {
@@ -217,7 +224,31 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
       data: response
     });
   } catch (error) {
-    console.error('Error uploading attachment:', error);
+    const errorId = `att_upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const statusCode = Number(error.statusCode) || 500;
+    const isStorageError = String(error.code || '').startsWith('STORAGE_');
+    const normalizedStatusCode = isStorageError
+      ? (statusCode >= 400 && statusCode < 600 ? statusCode : 503)
+      : statusCode;
+
+    const safeErrorContext = {
+      errorId,
+      route: 'POST /api/attachments/upload',
+      code: error.code || 'ATTACHMENT_UPLOAD_FAILED',
+      statusCode: normalizedStatusCode,
+      retryable: error.retryable,
+      operation: error.operation,
+      noteId: req.body?.noteId,
+      type: req.body?.type,
+      userId: req.user?.id,
+      fileName: req.file?.originalname,
+      fileSize: req.file?.size,
+      mimeType: req.file?.mimetype,
+      retryErrors: Array.isArray(error.retryErrors) ? error.retryErrors : undefined,
+      context: error.context
+    };
+
+    console.error('Error uploading attachment:', safeErrorContext, error);
     
     // Handle specific error types
     if (error.message.includes('Note not found')) {
@@ -234,9 +265,11 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
       });
     }
 
-    res.status(500).json({
+    res.status(normalizedStatusCode).json({
       success: false,
-      error: error.message
+      error: error.message,
+      errorCode: error.code || 'ATTACHMENT_UPLOAD_FAILED',
+      errorId
     });
   }
 });
