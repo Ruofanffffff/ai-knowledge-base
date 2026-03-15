@@ -949,6 +949,26 @@ function HiBrainNewDesign() {
     messagesEndRef.current?.scrollIntoView({ behavior:'smooth' });
   }, [messages, isTyping]);
 
+  const resolveAiAnswer = (result: any) => {
+    if (typeof result === 'string' && result.trim()) return result.trim();
+
+    const fromCandidates = [
+      result?.answer,
+      result?.content,
+      result?.message,
+      result?.data?.answer,
+      result?.data?.content,
+      result?.data?.message,
+      result?.result?.answer,
+      result?.result?.content,
+      result?.result?.message,
+      result?.choices?.[0]?.message?.content,
+      result?.choices?.[0]?.text,
+    ].find((v): v is string => typeof v === 'string' && v.trim().length > 0);
+
+    return fromCandidates?.trim() || '我收到你的消息了，但暂时无法回答。';
+  };
+
   const sendMessage = async (text?: string) => {
     const msg = (text || input).trim();
     if (!msg) return;
@@ -964,7 +984,7 @@ function HiBrainNewDesign() {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(), 
         role: 'ai',
-        content: typeof result === 'string' ? result : (result.answer || result.content || '我收到你的消息了，但暂时无法回答。'),
+        content: resolveAiAnswer(result),
         timestamp: new Date(),
         ...(card ? { card } : {}),
       }]);
