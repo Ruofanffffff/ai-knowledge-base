@@ -507,6 +507,29 @@ const NODE_COLORS = [
 
 function getColor(idx: number) { return NODE_COLORS[idx % NODE_COLORS.length]; }
 
+function normalizeNoteTags(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map(tag => (typeof tag === 'string' ? tag.trim() : String(tag ?? '').trim()))
+      .filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    const text = raw.trim();
+    if (!text) return [];
+    if ((text.startsWith('[') && text.endsWith(']')) || (text.startsWith('"[') && text.endsWith(']"'))) {
+      try {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) return normalizeNoteTags(parsed);
+      } catch {}
+    }
+    return text
+      .split(/[，,\s|/]+/)
+      .map(tag => tag.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 function buildGraph(notes: Note[], mode: 'all' | string) {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -514,13 +537,15 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
   if (mode === 'all') {
     const tagSet = new Map<string, number[]>();
     notes.forEach((note, ni) => {
-      (note.tags || []).forEach(tag => {
+      const tags = normalizeNoteTags(note.tags);
+      tags.forEach(tag => {
         if (!tagSet.has(tag)) tagSet.set(tag, []);
         tagSet.get(tag)!.push(ni);
       });
     });
 
     notes.forEach((note, ni) => {
+      const tags = normalizeNoteTags(note.tags);
       nodes.push({
         id: note.id,
         label: note.title || note.content.slice(0, 12) + '…',
@@ -529,7 +554,7 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
         vx: 0, vy: 0, fx: 0, fy: 0,
         color: getColor(ni),
         r: 20,
-        tags: note.tags || [],
+        tags,
       });
     });
 
@@ -555,7 +580,9 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
 
     for (let i = 0; i < notes.length; i++) {
       for (let j = i + 1; j < notes.length; j++) {
-        const shared = (notes[i].tags || []).filter(t => (notes[j].tags || []).includes(t));
+        const leftTags = normalizeNoteTags(notes[i].tags);
+        const rightTags = normalizeNoteTags(notes[j].tags);
+        const shared = leftTags.filter(t => rightTags.includes(t));
         if (shared.length >= 2) {
           edges.push({ sourceIdx: i, targetIdx: j, weight: shared.length, color: '#6366F1', label: `共${shared.length}标签` });
         }
@@ -564,6 +591,7 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
   } else {
     const note = notes.find(n => n.id === mode);
     if (!note) return { nodes, edges };
+    const noteTags = normalizeNoteTags(note.tags);
 
     nodes.push({
       id: note.id,
@@ -572,11 +600,11 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
       vx: 0, vy: 0, fx: 0, fy: 0,
       color: '#6366F1',
       r: 32,
-      tags: note.tags || [],
+      tags: noteTags,
     });
 
-    (note.tags || []).forEach((tag, ti) => {
-      const angle = (ti / (note.tags!.length || 1)) * Math.PI * 2;
+    noteTags.forEach((tag, ti) => {
+      const angle = (ti / (noteTags.length || 1)) * Math.PI * 2;
       const tagIdx = nodes.length;
       nodes.push({
         id: `tag_${tag}`,
@@ -591,7 +619,7 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
       });
       edges.push({ sourceIdx: 0, targetIdx: tagIdx, weight: 1, color: getColor(ti + 1), label: '含标签' });
 
-      notes.filter(n => n.id !== note.id && (n.tags || []).includes(tag)).slice(0, 3).forEach((rel, ri) => {
+      notes.filter(n => n.id !== note.id && normalizeNoteTags(n.tags).includes(tag)).slice(0, 3).forEach((rel, ri) => {
         const relAngle = angle + (ri - 1) * 0.5;
         const relIdx = nodes.findIndex(n => n.id === rel.id);
         if (relIdx === -1) {
@@ -604,7 +632,7 @@ function buildGraph(notes: Note[], mode: 'all' | string) {
             vx: 0, vy: 0, fx: 0, fy: 0,
             color: getColor(ti + ri + 2),
             r: 18,
-            tags: rel.tags || [],
+            tags: normalizeNoteTags(rel.tags),
           });
           edges.push({ sourceIdx: tagIdx, targetIdx: newIdx, weight: 1, color: getColor(ti + 1), label: '相关笔记' });
         } else {
@@ -1257,10 +1285,10 @@ export function SiChain() {
     }
   };
 
-  const allTags = Array.from(new Set(notes.flatMap(n => n.tags || [])));
+  const allTags = Array.from(new Set(notes.flatMap(n => normalizeNoteTags(n.tags))));
   const tagStats = allTags.map(tag => ({
     tag,
-    count: notes.filter(n => (n.tags || []).includes(tag)).length,
+    count: notes.filter(n => normalizeNoteTags(n.tags).includes(tag)).length,
   })).sort((a, b) => b.count - a.count);
 
   return (
@@ -1659,7 +1687,7 @@ export function SiChain() {
                       {note.title || note.content.slice(0, 20) + '…'}
                     </p>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      {(note.tags || []).slice(0, 3).map(tag => (
+                      {normalizeNoteTags(note.tags).slice(0, 3).map(tag => (
                         <span key={tag} className="px-1.5 py-0.5 rounded-full"
                           style={{ background: `${getColor(i)}15`, color: getColor(i), fontSize: '10px', fontWeight: 500 }}>
                           #{tag}
@@ -1733,12 +1761,12 @@ export function SiChain() {
                             #{selectedNode.replace('tag_', '')}
                           </p>
                           <p style={{ color: '#9CA3AF', fontSize: '12px' }}>
-                            {notes.filter(n => (n.tags || []).includes(selectedNode.replace('tag_', ''))).length} 篇笔记使用此标签
+                            {notes.filter(n => normalizeNoteTags(n.tags).includes(selectedNode.replace('tag_', ''))).length} 篇笔记使用此标签
                           </p>
                         </div>
                       </div>
                       <div className="space-y-2">
-                        {notes.filter(n => (n.tags || []).includes(selectedNode.replace('tag_', ''))).map(n => (
+                        {notes.filter(n => normalizeNoteTags(n.tags).includes(selectedNode.replace('tag_', ''))).map(n => (
                           <button key={n.id} onClick={() => { navigate(`/siku/${n.id}`); setSelectedNode(null); }}
                             className="w-full text-left p-3 rounded-2xl"
                             style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)' }}>
@@ -1761,7 +1789,7 @@ export function SiChain() {
                         {selectedNote.content}
                       </p>
                       <div className="flex flex-wrap gap-1.5 mt-3">
-                        {(selectedNote.tags || []).map(tag => (
+                        {normalizeNoteTags(selectedNote.tags).map(tag => (
                           <span key={tag} className="px-2 py-0.5 rounded-full"
                             style={{ background: 'rgba(99,102,241,0.08)', color: '#6366F1', fontSize: '11px', fontWeight: 500 }}>
                             #{tag}
