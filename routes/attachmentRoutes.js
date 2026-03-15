@@ -469,4 +469,26 @@ router.get('/note/:noteId', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * Multer error handler for attachment upload
+ * Ensures upload validation errors return 4xx instead of unhandled 500.
+ */
+router.use((err, req, res, next) => {
+  if (!(err instanceof multer.MulterError)) {
+    return next(err);
+  }
+
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({
+      success: false,
+      error: `File size exceeds maximum allowed size (${Math.round(notesConfig.attachments.maxSize / (1024 * 1024))}MB)`
+    });
+  }
+
+  return res.status(400).json({
+    success: false,
+    error: err.message || 'Invalid upload request'
+  });
+});
+
 module.exports = router;

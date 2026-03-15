@@ -278,6 +278,21 @@ describe('Attachment Routes', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBe('Note not found');
     });
+
+    it('should return 413 when multer rejects oversized upload', async () => {
+      const oversizedBuffer = Buffer.alloc((10 * 1024 * 1024) + 1, 'a');
+
+      const response = await request(app)
+        .post('/api/attachments/upload')
+        .field('type', 'IMAGE')
+        .field('noteId', 'note-1')
+        .attach('file', oversizedBuffer, 'oversized.jpg');
+
+      expect(response.status).toBe(413);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('File size exceeds maximum allowed size');
+      expect(uploadAndAnalyzeImage).not.toHaveBeenCalled();
+    });
   });
 
   describe('GET /api/attachments/:id', () => {
