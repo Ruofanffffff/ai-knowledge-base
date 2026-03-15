@@ -193,26 +193,47 @@ class DocumentProcessingService {
       // Write file data to temporary file
       await fs.writeFile(tempFilePath, fileData);
 
-      // Process document with existing pipeline
-      const result = await processDocumentWithFullProcessing(
-        attachmentId,
-        tempFilePath,
-        fileType
-      );
+      // Process document with existing pipeline when available
+      if (typeof processDocumentWithFullProcessing === 'function') {
+        const result = await processDocumentWithFullProcessing(
+          attachmentId,
+          tempFilePath,
+          fileType
+        );
 
-      // Extract relevant information from processing result
-      const textContent = this._extractTextContent(result.ckbs);
-      const structuredData = this._extractStructuredData(result);
-      const tags = this._extractTags(result.ckbs);
+        // Extract relevant information from processing result
+        const textContent = this._extractTextContent(result.ckbs);
+        const structuredData = this._extractStructuredData(result);
+        const tags = this._extractTags(result.ckbs);
+
+        return {
+          textContent,
+          description: `Processed ${fileType} document with ${result.ckbs.length} content blocks`,
+          tags,
+          structuredData,
+          ckbCount: result.ckbs.length,
+          coverageRate: result.validation_result?.coverage_rate || null,
+          qualityScore: result.report?.summary?.quality_score || null
+        };
+      }
+
+      // Fallback parser: keep upload usable for Word/PDF even without KG pipeline.
+      const fallbackText = await this._extractTextByFileType(fileData, fileType);
+      const safeText = (fallbackText || '').trim();
 
       return {
-        textContent,
-        description: `Processed ${fileType} document with ${result.ckbs.length} content blocks`,
-        tags,
-        structuredData,
-        ckbCount: result.ckbs.length,
-        coverageRate: result.validation_result?.coverage_rate || null,
-        qualityScore: result.report?.summary?.quality_score || null
+        textContent: safeText || null,
+        description: safeText
+          ? `Processed ${fileType} document with fallback parser`
+          : `Uploaded ${fileType} document (no parsable text extracted)`,
+        tags: safeText ? [fileType, 'document'] : [fileType],
+        structuredData: {
+          parser: 'fallback',
+          filename: originalFilename
+        },
+        ckbCount: safeText ? 1 : 0,
+        coverageRate: null,
+        qualityScore: null
       };
     } catch (error) {
       throw new Error(`Failed to process document: ${error.message}`);
@@ -223,6 +244,42 @@ class DocumentProcessingService {
       } catch (unlinkError) {
         console.error('[DocumentProcessingService] Failed to delete temp file:', unlinkError.message);
       }
+    }
+  }
+
+  async _extractTextByFileType(fileData, fileType) {
+    switch (fileType) {
+      case 'pdf':
+        return this._extractPdfText(fileData);
+      case 'word':
+        return this._extractWordText(fileData);
+      case 'markdown':
+      case 'excel':
+      default:
+        return fileData.toString('utf8');
+    }
+  }
+
+  async _extractPdfText(fileData) {
+    try {
+      const pdfParse = require('pdf-parse');
+      const result = await pdfParse(fileData);
+      return result?.text || '';
+    } catch (error) {
+      console.warn('[DocumentProcessingService] pdf fallback parse failed:', error.message);
+      return '';
+    }
+  }
+
+  async _extractWordText(fileData) {
+    try {
+      const mammoth = require('mammoth');
+      const result = await mammoth.extractRawText({ buffer: fileData });
+      return result?.value || '';
+    } catch (error) {
+      // .doc or damaged .docx may fail in mammoth; keep upload success.
+      console.warn('[DocumentProcessingService] word fallback parse failed:', error.message);
+      return '';
     }
   }
 

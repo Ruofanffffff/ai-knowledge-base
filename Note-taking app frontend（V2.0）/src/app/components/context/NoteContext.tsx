@@ -30,6 +30,29 @@ function normalizeContent(raw: unknown): string {
   return String(raw);
 }
 
+function stripHtmlToPlainText(raw: unknown): string {
+  const content = normalizeContent(raw);
+  return content
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function deriveDisplayTitle(inputTitle: unknown, content: unknown): string {
+  const titleText = stripHtmlToPlainText(inputTitle);
+  if (titleText) return titleText.slice(0, 20);
+  const contentText = stripHtmlToPlainText(content);
+  return contentText ? contentText.slice(0, 20) : '无标题';
+}
+
 function normalizeTags(raw: unknown): string[] {
   if (Array.isArray(raw)) {
     return raw
@@ -84,7 +107,7 @@ export function NoteProvider({ children }: { children: ReactNode }) {
           content: normalizeContent(n.content),
           tags: normalizeTags(n.tags),
           id: n.id,
-          title: normalizeContent(n.content).split('\n')[0]?.substring(0, 20) || '无标题',
+          title: deriveDisplayTitle(n.title, n.content),
           // Infer type from attachments if present
           type: n.attachments && n.attachments.length > 0 
             ? (n.attachments.some((a: any) => a.type === 'image' || a.type === 'IMAGE') ? 'image' : 'mixed') 

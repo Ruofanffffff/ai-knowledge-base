@@ -23,6 +23,61 @@ function getDocumentFromLegacyDB(docId) {
   });
 }
 
+/**
+ * 递归提取 Tiptap/富文本 JSON 节点中的纯文本
+ */
+function collectTextFromRichNode(node, chunks) {
+  if (!node) return;
+
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectTextFromRichNode(child, chunks));
+    return;
+  }
+
+  if (typeof node === 'object') {
+    if (typeof node.text === 'string' && node.text.trim()) {
+      chunks.push(node.text.trim());
+    }
+    if (Array.isArray(node.content)) {
+      node.content.forEach((child) => collectTextFromRichNode(child, chunks));
+    }
+  }
+}
+
+/**
+ * 将文档内容规整为可用于 LLM 的纯文本，避免把 Tiptap JSON 直接喂给模型。
+ */
+function normalizeDocumentContent(rawContent) {
+  if (rawContent === null || rawContent === undefined) return '';
+
+  if (typeof rawContent === 'object') {
+    const chunks = [];
+    collectTextFromRichNode(rawContent, chunks);
+    return chunks.join('\n').trim();
+  }
+
+  if (typeof rawContent !== 'string') {
+    return String(rawContent);
+  }
+
+  const trimmed = rawContent.trim();
+  if (!trimmed) return '';
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === 'object') {
+      const chunks = [];
+      collectTextFromRichNode(parsed, chunks);
+      const text = chunks.join('\n').trim();
+      if (text) return text;
+    }
+  } catch (_) {
+    // ignore parse error and fallback to plain text
+  }
+
+  return trimmed;
+}
+
 // 内存中的Pipeline状态追踪
 const pipelineStatus = new Map();
 
@@ -133,6 +188,91 @@ function validateAndCleanFourLayerResult(result) {
 }
 
 class KGPipelineService {
+  /**
+   * 当四层提取返回空实体/空关系时，降级调用旧版抽取，确保能产出基础实体与边。
+   */
+  async ensureExtractionCompleteness(indexText, extracted) {
+    const safe = {
+      entities: Array.isArray(extracted?.entities) ? extracted.entities : [],
+      relations: Array.isArray(extracted?.relations) ? extracted.relations : [],
+      principles: Array.isArray(extracted?.principles) ? extracted.principles : [],
+    };
+
+    if (safe.entities.length > 0 && safe.relations.length > 0) {
+      return safe;
+    }
+
+    console.warn(
+      `[KGPipeline] Four-layer extraction sparse result (entities=${safe.entities.length}, relations=${safe.relations.length}), fallback extraction enabled`
+    );
+
+    // 1) 兜底实体
+    let mergedEntities = [...safe.entities];
+    if (mergedEntities.length === 0) {
+      const fallbackLegacyEntities = await this.extractEntities(indexText);
+      mergedEntities = fallbackLegacyEntities
+        .map((e) =>
+          truncateEntityFourLayer({
+            name: e.name,
+            type: 'concept',
+            definition: e.description,
+            source: 'fact',
+          })
+        )
+        .filter((e) => e.name.length > 0);
+    }
+
+    // 按名称去重（保留首次出现）
+    const entityMap = new Map();
+    mergedEntities.forEach((e) => {
+      if (!entityMap.has(e.name)) entityMap.set(e.name, e);
+    });
+    mergedEntities = Array.from(entityMap.values());
+
+    // 2) 兜底关系（仅在当前关系为空且实体不少于2时）
+    let mergedRelations = [...safe.relations];
+    if (mergedRelations.length === 0 && mergedEntities.length >= 2) {
+      const legacyEntityInputs = mergedEntities.map((e) => ({
+        name: e.name,
+        description: e.definition || '',
+      }));
+      const fallbackLegacyRelations = await this.extractRelations(indexText, legacyEntityInputs);
+      const fallbackRelations = fallbackLegacyRelations
+        .map((r) =>
+          truncateRelationFourLayer({
+            source: r.source,
+            target: r.target,
+            name: r.name,
+            description: r.description,
+            layer: 'how',
+            source_tag: 'fact',
+          })
+        )
+        .filter((r) => r.name.length > 0)
+        .filter((r) => {
+          const names = new Set(mergedEntities.map((e) => e.name));
+          return names.has(r.source) && names.has(r.target);
+        });
+
+      const relationMap = new Map();
+      [...mergedRelations, ...fallbackRelations].forEach((r) => {
+        const key = `${r.source}::${r.target}::${r.name}::${r.layer}`;
+        if (!relationMap.has(key)) relationMap.set(key, r);
+      });
+      mergedRelations = Array.from(relationMap.values());
+    }
+
+    console.log(
+      `[KGPipeline] Fallback extraction result (entities=${mergedEntities.length}, relations=${mergedRelations.length})`
+    );
+
+    return {
+      entities: mergedEntities,
+      relations: mergedRelations,
+      principles: safe.principles,
+    };
+  }
+
   /**
    * Step 1: 生成LLM索引
    * @param {string} docContent - 文档全文
@@ -596,7 +736,11 @@ ${indexText}`;
 
         // indexing
         updateStatus('indexing');
-        const indexText = await this.generateIndex(doc.content);
+        const normalizedContent = normalizeDocumentContent(doc.content);
+        if (!normalizedContent.trim()) {
+          throw new Error(`Document content is empty after normalization: ${docId}`);
+        }
+        const indexText = await this.generateIndex(normalizedContent);
         await this.saveIndex(docId, indexText, {
           llm_model: 'qwen-plus',
           token_count: indexText.length,
@@ -605,7 +749,8 @@ ${indexText}`;
 
         // extracting_four_layers (replaces extracting_entities + extracting_relations)
         updateStatus('extracting_four_layers');
-        const { entities, relations, principles } = await this.extractFourLayers(indexText);
+        const extracted = await this.extractFourLayers(indexText);
+        const { entities, relations, principles } = await this.ensureExtractionCompleteness(indexText, extracted);
 
         // merging
         updateStatus('merging');

@@ -151,6 +151,85 @@ describe('Attachment Routes', () => {
       expect(uploadAndProcessDocument).toHaveBeenCalled();
     });
 
+    it('should infer PDF mime type when client sends application/octet-stream', async () => {
+      const mockResult = {
+        attachment: {
+          id: 'attachment-pdf-1',
+          url: 'https://s3.example.com/document.pdf',
+          type: 'DOCUMENT',
+          size: 2048,
+          mimeType: 'application/pdf',
+          createdAt: new Date().toISOString()
+        },
+        analysis: {
+          textContent: 'PDF content',
+          description: null,
+          tags: [],
+          metadata: {}
+        }
+      };
+
+      validateFileSize.mockReturnValue(true);
+      validateMimeType.mockReturnValue(true);
+      uploadAndProcessDocument.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .post('/api/attachments/upload')
+        .field('type', 'DOCUMENT')
+        .field('noteId', 'note-1')
+        .attach('file', Buffer.from('fake pdf data'), {
+          filename: 'test.pdf',
+          contentType: 'application/octet-stream'
+        });
+
+      expect(response.status).toBe(201);
+      expect(validateMimeType).toHaveBeenCalledWith('application/pdf', 'DOCUMENT');
+      expect(uploadAndProcessDocument).toHaveBeenCalledWith(expect.objectContaining({
+        mimeType: 'application/pdf'
+      }));
+    });
+
+    it('should infer DOCX mime type when client sends application/octet-stream', async () => {
+      const mockResult = {
+        attachment: {
+          id: 'attachment-docx-1',
+          url: 'https://s3.example.com/document.docx',
+          type: 'DOCUMENT',
+          size: 4096,
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          createdAt: new Date().toISOString()
+        },
+        analysis: {
+          textContent: 'DOCX content',
+          description: null,
+          tags: [],
+          metadata: {}
+        }
+      };
+
+      validateFileSize.mockReturnValue(true);
+      validateMimeType.mockReturnValue(true);
+      uploadAndProcessDocument.mockResolvedValue(mockResult);
+
+      const response = await request(app)
+        .post('/api/attachments/upload')
+        .field('type', 'DOCUMENT')
+        .field('noteId', 'note-1')
+        .attach('file', Buffer.from('fake docx data'), {
+          filename: 'test.docx',
+          contentType: 'application/octet-stream'
+        });
+
+      expect(response.status).toBe(201);
+      expect(validateMimeType).toHaveBeenCalledWith(
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'DOCUMENT'
+      );
+      expect(uploadAndProcessDocument).toHaveBeenCalledWith(expect.objectContaining({
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      }));
+    });
+
     it('should upload and process a table attachment', async () => {
       const mockResult = {
         attachment: {

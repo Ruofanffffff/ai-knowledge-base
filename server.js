@@ -2326,7 +2326,12 @@ app.put('/api/chat/sessions/:id', authMiddleware, (req, res) => {
 // AI搜索API
 app.post('/api/ai/search', authMiddleware, async (req, res) => {
   try {
-    const { query, model: requestedModel, topK = 5, messages: history } = req.body;
+    const { query, model: requestedModel, topK: requestedTopK, limit, messages: history } = req.body;
+    const topK = Number.isInteger(Number(requestedTopK))
+      ? Number(requestedTopK)
+      : (Number.isInteger(Number(limit)) ? Number(limit) : 5);
+    const normalizedTopK = Math.max(1, Math.min(topK, 20));
+    const userId = String(req.userId || req.user?.id || '');
     
     console.log('收到AI搜索请求:', query);
     console.log('请求的模型:', requestedModel);
@@ -2349,36 +2354,75 @@ app.post('/api/ai/search', authMiddleware, async (req, res) => {
       });
     }
     
-    // 从数据库获取所有文档，而不是从JSON文件
-    // 注意：这里没有用户ID过滤，在实际多用户系统中应该加上 WHERE user_id = ?
-    // 但为了保持当前上下文简单，我们先获取所有文档，或者假设这是一个单用户/演示环境
-    // 如果有 userId 在 request 中 (authMiddleware)，应该使用它
+    const safeParseJson = (value, fallback) => {
+      if (value === null || value === undefined || value === '') return fallback;
+      try {
+        return JSON.parse(value);
+      } catch {
+        return fallback;
+      }
+    };
     
     let documents = [];
+    let notes = [];
     try {
-      // 尝试从数据库获取文档
+      // 按用户隔离拉取文档，避免跨用户数据泄露
       const rows = await new Promise((resolve, reject) => {
-        userDb.all('SELECT * FROM documents ORDER BY created_at DESC', [], (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows || []);
-        });
+        userDb.all(
+          'SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC',
+          [userId],
+          (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows || []);
+          }
+        );
       });
       
       documents = rows.map(row => ({
         id: row.id.toString(),
         title: row.title,
-        content: row.content,
+        content: row.content || '',
         type: row.type,
         fileType: row.file_type,
-        metadata: row.metadata ? JSON.parse(row.metadata) : {},
-        tags: row.tags ? JSON.parse(row.tags) : [],
+        metadata: safeParseJson(row.metadata, {}),
+        tags: safeParseJson(row.tags, []),
+        embedding: row.embedding,
         createdAt: row.created_at,
-        updatedAt: row.updated_at
+        updatedAt: row.updated_at,
+        sourceType: 'document'
       }));
       console.log('从数据库加载文档成功，数量:', documents.length);
     } catch (dbError) {
       console.error('从数据库加载文档失败，回退到JSON文件:', dbError);
-      documents = loadDocuments();
+      documents = loadDocuments().map(doc => ({ ...doc, sourceType: doc.sourceType || 'document' }));
+    }
+
+    try {
+      // 拉取思库便签（Prisma notes），纳入同一条 Agentic RAG 调用链
+      const noteRows = await kgPrisma.note.findMany({
+        where: { userId },
+        select: { id: true, content: true, tags: true, createdAt: true, updatedAt: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 200
+      });
+
+      notes = noteRows.map(note => {
+        const normalizedContent = (note.content || '').trim();
+        const titleLine = normalizedContent.split('\n')[0] || '未命名笔记';
+        return {
+          id: `note:${note.id}`,
+          title: titleLine.slice(0, 80),
+          content: normalizedContent,
+          tags: safeParseJson(note.tags, []),
+          createdAt: note.createdAt,
+          updatedAt: note.updatedAt,
+          sourceType: 'note'
+        };
+      });
+      console.log('从思库加载笔记成功，数量:', notes.length);
+    } catch (noteError) {
+      console.error('加载思库笔记失败:', noteError);
+      notes = [];
     }
     
     // Agentic RAG 实现
@@ -2409,12 +2453,7 @@ app.post('/api/ai/search', authMiddleware, async (req, res) => {
     }
     
     // 步骤 2: 执行混合搜索 (向量 + 关键词)
-    const allDocs = await new Promise((resolve, reject) => {
-      userDb.all('SELECT id, title, content, embedding FROM documents', [], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows || []);
-      });
-    });
+    const allDocs = [...documents, ...notes];
     
     // 向量搜索
     let vectorResults = [];
@@ -2435,7 +2474,7 @@ app.post('/api/ai/search', authMiddleware, async (req, res) => {
           })
           .filter(item => item !== null)
           .sort((a, b) => b.score - a.score)
-          .slice(0, topK * 2);
+          .slice(0, normalizedTopK * 2);
       }
     } catch (e) {
       console.error('向量搜索失败:', e);
@@ -2444,20 +2483,24 @@ app.post('/api/ai/search', authMiddleware, async (req, res) => {
     // 关键词搜索
     const keywordResults = allDocs.map(doc => {
       let score = 0;
-      const titleLower = doc.title.toLowerCase();
-      const contentLower = doc.content.toLowerCase();
+      const titleLower = (doc.title || '').toLowerCase();
+      const contentLower = (doc.content || '').toLowerCase();
+      const tags = Array.isArray(doc.tags) ? doc.tags : [];
+      const tagsLower = tags.map(tag => String(tag).toLowerCase());
       
       searchPlan.keywords.forEach(kw => {
-        const kwLower = kw.toLowerCase();
-        if (titleLower.includes(kwLower)) score += 10;
-        if (contentLower.includes(kwLower)) score += 5;
+        const kwLower = String(kw || '').toLowerCase();
+        if (!kwLower) return;
+        if (titleLower.includes(kwLower)) score += 12;
+        if (contentLower.includes(kwLower)) score += 6;
+        if (tagsLower.some(tag => tag.includes(kwLower))) score += 4;
       });
       
       return { doc, score, source: 'keyword' };
     })
     .filter(item => item.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, topK * 2);
+    .slice(0, normalizedTopK * 3);
     
     // 合并去重
     const combinedMap = new Map();
@@ -2473,17 +2516,18 @@ app.post('/api/ai/search', authMiddleware, async (req, res) => {
     
     const relevantDocs = Array.from(combinedMap.values())
       .sort((a, b) => b.finalScore - a.finalScore)
-      .slice(0, topK)
+      .slice(0, normalizedTopK)
       .map(item => item.doc);
       
-    console.log(`检索到 ${relevantDocs.length} 个相关文档`);
+    console.log(`检索到 ${relevantDocs.length} 个相关知识源（文档+思库笔记）`);
     
     // 构建上下文
     const knowledgeBaseContext = relevantDocs.length > 0 ? 
-      relevantDocs.map((doc, index) => 
-        `【文档${index + 1}】标题：${doc.title}\n内容摘要：\n${doc.content.substring(0, 1500)}...\n`
-      ).join('\n\n') : 
-      '知识库中没有找到相关文档';
+      relevantDocs.map((doc, index) => {
+        const sourceLabel = doc.sourceType === 'note' ? '思库笔记' : '文档';
+        return `【${sourceLabel}${index + 1}】标题：${doc.title}\n来源ID：${doc.id}\n内容摘要：\n${(doc.content || '').substring(0, 1500)}...\n`;
+      }).join('\n\n') : 
+      '知识库中没有找到相关文档或思库笔记';
 
     // 步骤 3: 联网搜索 (如果知识库结果不足)
     // ... (保持原有的联网搜索逻辑)
@@ -2520,7 +2564,7 @@ app.post('/api/ai/search', authMiddleware, async (req, res) => {
 
 用户问题：${query}
 
-【检索到的知识库文档】：
+【检索到的知识库内容（含文档与思库笔记）】：
 ${knowledgeBaseContext}
 
 【联网搜索结果】：
@@ -2532,10 +2576,11 @@ ${webSearchContext}
 3. 综合多方信息，给出准确、结构化的回答。
 
 回答要求：
-1. 优先依据【知识库文档】中的信息。
-2. 如果知识库中有"AI内涝"等具体文档，必须详细引用其内容。
-3. 语言通顺，逻辑清晰，不要暴露系统内部的思考过程。
-4. 直接给出最终答案。`;
+1. 优先依据【检索到的知识库内容】中的信息，尤其优先使用思库笔记。
+2. 如果知识库中有"AI内涝"等具体内容，必须详细引用其内容。
+3. 若引用来源，请在句末追加来源标注，格式为 [思库笔记:标题] 或 [文档:标题]。
+4. 语言通顺，逻辑清晰，不要暴露系统内部的思考过程。
+5. 直接给出最终答案。`;
     
     // 设置SSE响应头
     res.setHeader('Content-Type', 'text/event-stream');
@@ -2547,8 +2592,9 @@ ${webSearchContext}
       type: 'sources',
       sources: relevantDocs.map(doc => ({
         id: doc.id,
+        sourceType: doc.sourceType || 'document',
         title: doc.title,
-        preview: doc.content.substring(0, 100) + (doc.content.length > 100 ? '...' : '')
+        preview: (doc.content || '').substring(0, 100) + ((doc.content || '').length > 100 ? '...' : '')
       })),
       webSources: webSearchResults.map(result => ({
         title: result.title,

@@ -10,6 +10,47 @@ const { extractTags, normalizeTags } = require('./tagExtractor');
 
 const prisma = new PrismaClient();
 
+function stripHtmlToPlainText(value) {
+  if (value === null || value === undefined) return '';
+  const text = String(value)
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, '\'')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text;
+}
+
+function deriveTitleFromContent(content, maxLength = 50) {
+  const plain = stripHtmlToPlainText(content || '');
+  if (!plain) return '无标题';
+  return plain.slice(0, maxLength);
+}
+
+function normalizeNote(note) {
+  if (!note) return note;
+  const normalized = { ...note };
+  if (Array.isArray(normalized.tags)) {
+    normalized.tags = normalized.tags;
+  } else if (normalized.tags) {
+    try {
+      normalized.tags = JSON.parse(normalized.tags);
+    } catch (e) {
+      normalized.tags = [];
+    }
+  } else {
+    normalized.tags = [];
+  }
+  normalized.title = deriveTitleFromContent(normalized.content);
+  return normalized;
+}
+
 /**
  * Ensures user exists in the database to satisfy foreign key constraints.
  * @param {Object} user - User object from req.user
@@ -144,16 +185,7 @@ async function createNote(input = {}) {
     });
   }
 
-  // Parse tags back to array for response
-  if (note.tags) {
-    try {
-      note.tags = JSON.parse(note.tags);
-    } catch (e) {
-      note.tags = [];
-    }
-  }
-
-  return note;
+  return normalizeNote(note);
 }
 
 /**
@@ -179,15 +211,7 @@ async function getNoteById(noteId, userId) {
     }
   });
 
-  if (note && note.tags) {
-    try {
-      note.tags = JSON.parse(note.tags);
-    } catch (e) {
-      note.tags = [];
-    }
-  }
-
-  return note;
+  return normalizeNote(note);
 }
 
 /**
@@ -239,15 +263,7 @@ async function updateNote(noteId, data, userId) {
     }
   });
 
-  if (note && note.tags) {
-    try {
-      note.tags = JSON.parse(note.tags);
-    } catch (e) {
-      note.tags = [];
-    }
-  }
-
-  return note;
+  return normalizeNote(note);
 }
 
 /**
@@ -276,15 +292,7 @@ async function deleteNote(noteId, userId) {
     where: { id: noteId }
   });
 
-  if (note && note.tags) {
-    try {
-      note.tags = JSON.parse(note.tags);
-    } catch (e) {
-      note.tags = [];
-    }
-  }
-
-  return note;
+  return normalizeNote(note);
 }
 
 /**
@@ -337,19 +345,10 @@ async function listNotes(options = {}) {
     prisma.note.count({ where })
   ]);
 
-  // Parse tags for each note
-  notes.forEach(note => {
-    if (note.tags) {
-      try {
-        note.tags = JSON.parse(note.tags);
-      } catch (e) {
-        note.tags = [];
-      }
-    }
-  });
+  const normalizedNotes = notes.map(normalizeNote);
 
   return {
-    notes,
+    notes: normalizedNotes,
     total,
     page,
     limit,
@@ -450,18 +449,10 @@ async function searchNotes(options) {
     prisma.note.count({ where })
   ]);
 
-  notes.forEach(note => {
-    if (note.tags) {
-      try {
-        note.tags = JSON.parse(note.tags);
-      } catch (e) {
-        note.tags = [];
-      }
-    }
-  });
+  const normalizedNotes = notes.map(normalizeNote);
 
   return {
-    notes,
+    notes: normalizedNotes,
     total,
     page,
     limit,

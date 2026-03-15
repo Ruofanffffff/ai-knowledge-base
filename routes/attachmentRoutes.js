@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const path = require('path');
 const { authMiddleware } = require('../services/authService');
 const attachmentDAL = require('../services/notes/attachmentDAL');
 const { uploadFileWithRetry, validateFileSize, validateMimeType, downloadFile } = require('../services/notes/s3Client');
@@ -23,6 +24,35 @@ const upload = multer({
     fileSize: notesConfig.attachments.maxSize
   }
 });
+
+function inferMimeTypeByFilename(filename = '') {
+  const ext = path.extname(filename).toLowerCase();
+  switch (ext) {
+    case '.pdf':
+      return 'application/pdf';
+    case '.doc':
+      return 'application/msword';
+    case '.docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case '.txt':
+      return 'text/plain';
+    default:
+      return '';
+  }
+}
+
+function resolveUploadMimeType(file, type) {
+  const rawMimeType = (file?.mimetype || '').trim().toLowerCase();
+  if (rawMimeType) {
+    if (type !== 'DOCUMENT') return rawMimeType;
+    // Some clients upload Word/PDF as octet-stream; infer by extension for DOCUMENT.
+    if (rawMimeType !== 'application/octet-stream') {
+      return rawMimeType;
+    }
+  }
+
+  return inferMimeTypeByFilename(file?.originalname);
+}
 
 // ============================================
 // Attachment Routes
@@ -102,9 +132,11 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
       });
     }
 
+    const effectiveMimeType = resolveUploadMimeType(file, type);
+
     // Validate MIME type
     try {
-      validateMimeType(file.mimetype, type);
+      validateMimeType(effectiveMimeType, type);
     } catch (error) {
       return res.status(400).json({
         success: false,
@@ -124,7 +156,7 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
           originalFilename: file.originalname,
           userId,
           noteId,
-          mimeType: file.mimetype,
+          mimeType: effectiveMimeType,
           analysisType: 'full'
         });
         break;
@@ -137,7 +169,7 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
           originalFilename: file.originalname,
           userId,
           noteId,
-          mimeType: file.mimetype
+          mimeType: effectiveMimeType
         });
         break;
 
@@ -149,7 +181,7 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
           originalFilename: file.originalname,
           userId,
           noteId,
-          mimeType: file.mimetype
+          mimeType: effectiveMimeType
         });
         break;
 

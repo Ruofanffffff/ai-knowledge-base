@@ -30,6 +30,7 @@ jest.mock('@prisma/client', () => {
       count: jest.fn()
     },
     user: {
+      findUnique: jest.fn(),
       upsert: jest.fn()
     },
     $disconnect: jest.fn()
@@ -43,6 +44,7 @@ jest.mock('@prisma/client', () => {
 describe('Note DAL', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.user.findUnique.mockResolvedValue(null);
   });
 
   afterAll(async () => {
@@ -68,7 +70,8 @@ describe('Note DAL', () => {
         content: 'Test note #work #important'
       });
 
-      expect(result).toEqual(mockNote);
+      expect(result).toMatchObject(mockNote);
+      expect(result.title).toEqual(expect.any(String));
       expect(prisma.note.create).toHaveBeenCalledWith({
         data: {
           userId: 'user-1',
@@ -100,7 +103,8 @@ describe('Note DAL', () => {
         tags: ['custom', 'tags']
       });
 
-      expect(result).toEqual(mockNote);
+      expect(result).toMatchObject(mockNote);
+      expect(result.title).toEqual(expect.any(String));
       expect(prisma.note.create).toHaveBeenCalledWith({
         data: {
           userId: 'user-1',
@@ -138,7 +142,8 @@ describe('Note DAL', () => {
         content: 'Test note'
       });
 
-      expect(result).toEqual(mockNote);
+      expect(result).toMatchObject(mockNote);
+      expect(result.title).toEqual(expect.any(String));
       expect(prisma.user.upsert).toHaveBeenCalled();
       expect(prisma.note.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ userId: 'user-1' })
@@ -175,13 +180,31 @@ describe('Note DAL', () => {
 
       const result = await getNoteById('note-1');
 
-      expect(result).toEqual(mockNote);
+      expect(result).toMatchObject(mockNote);
+      expect(result.title).toEqual(expect.any(String));
       expect(prisma.note.findUnique).toHaveBeenCalledWith({
         where: { id: 'note-1' },
         include: {
           attachments: true
         }
       });
+    });
+
+    it('should derive plain-text title from html content', async () => {
+      const mockNote = {
+        id: 'note-html-1',
+        userId: 'user-1',
+        content: '<h1>测试标题</h1><p>正文内容</p>',
+        tags: '[]',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        attachments: []
+      };
+
+      prisma.note.findUnique.mockResolvedValue(mockNote);
+
+      const result = await getNoteById('note-html-1');
+      expect(result?.title).toBe('测试标题 正文内容');
     });
 
     it('should get a note by ID with user filter', async () => {
@@ -199,7 +222,8 @@ describe('Note DAL', () => {
 
       const result = await getNoteById('note-1', 'user-1');
 
-      expect(result).toEqual(mockNote);
+      expect(result).toMatchObject(mockNote);
+      expect(result.title).toEqual(expect.any(String));
       expect(prisma.note.findUnique).toHaveBeenCalledWith({
         where: { id: 'note-1', userId: 'user-1' },
         include: {
@@ -247,7 +271,8 @@ describe('Note DAL', () => {
         content: 'New content #new #tags'
       });
 
-      expect(result).toEqual(updatedNote);
+      expect(result).toMatchObject(updatedNote);
+      expect(result.title).toEqual(expect.any(String));
       expect(prisma.note.update).toHaveBeenCalledWith({
         where: { id: 'note-1' },
         data: {
@@ -285,7 +310,8 @@ describe('Note DAL', () => {
         tags: ['custom', 'tags']
       });
 
-      expect(result).toEqual(updatedNote);
+      expect(result).toMatchObject(updatedNote);
+      expect(result.title).toEqual(expect.any(String));
       expect(prisma.note.update).toHaveBeenCalledWith({
         where: { id: 'note-1' },
         data: {
@@ -328,7 +354,8 @@ describe('Note DAL', () => {
 
       const result = await deleteNote('note-1');
 
-      expect(result).toEqual(deletedNote);
+      expect(result).toMatchObject(deletedNote);
+      expect(result.title).toEqual(expect.any(String));
       expect(prisma.note.delete).toHaveBeenCalledWith({
         where: { id: 'note-1' }
       });
@@ -373,12 +400,13 @@ describe('Note DAL', () => {
 
       const result = await listNotes({ userId: 'user-1' });
 
-      expect(result).toEqual({
-        notes: mockNotes,
-        total: 2,
-        page: 1,
-        limit: 20,
-        totalPages: 1
+      expect(result.total).toBe(2);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
+      expect(result.totalPages).toBe(1);
+      expect(result.notes).toHaveLength(2);
+      result.notes.forEach(note => {
+        expect(note.title).toEqual(expect.any(String));
       });
     });
 
@@ -404,13 +432,12 @@ describe('Note DAL', () => {
         limit: 10
       });
 
-      expect(result).toEqual({
-        notes: mockNotes,
-        total: 25,
-        page: 2,
-        limit: 10,
-        totalPages: 3
-      });
+      expect(result.total).toBe(25);
+      expect(result.page).toBe(2);
+      expect(result.limit).toBe(10);
+      expect(result.totalPages).toBe(3);
+      expect(result.notes).toHaveLength(1);
+      expect(result.notes[0].title).toEqual(expect.any(String));
 
       expect(prisma.note.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
@@ -444,7 +471,8 @@ describe('Note DAL', () => {
         tags: ['work']
       });
 
-      expect(result.notes).toEqual(mockNotes);
+      expect(result.notes).toMatchObject(mockNotes);
+      expect(result.notes[0].title).toEqual(expect.any(String));
       expect(prisma.note.findMany).toHaveBeenCalledWith({
         where: {
           userId: 'user-1',
@@ -527,7 +555,8 @@ describe('Note DAL', () => {
         userId: 'user-1'
       });
 
-      expect(result.notes).toEqual(mockNotes);
+      expect(result.notes).toMatchObject(mockNotes);
+      expect(result.notes[0].title).toEqual(expect.any(String));
       expect(result.total).toBe(1);
     });
 
@@ -552,7 +581,8 @@ describe('Note DAL', () => {
         userId: 'user-1'
       });
 
-      expect(result.notes).toEqual(mockNotes);
+      expect(result.notes).toMatchObject(mockNotes);
+      expect(result.notes[0].title).toEqual(expect.any(String));
     });
 
     it('should throw error if query is missing', async () => {
