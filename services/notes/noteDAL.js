@@ -44,8 +44,7 @@ async function ensureUserExists(user) {
         username: username,
         email: user.email || undefined,
         password: passwordPlaceholder,
-        role: user.role || 'user',
-        // status: 'active' // status is not in schema based on previous read, let me check schema again
+        // role: user.role || 'user', // role field does not exist in User schema
       }
     });
   } catch (error) {
