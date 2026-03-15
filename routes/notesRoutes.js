@@ -44,7 +44,14 @@ router.post('/', authMiddleware, requirePermission('document:write'), async (req
   try {
     const { content, tags } = req.body;
     const user = req.user;
-    const userId = user.id;
+    const userId = user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized'
+      });
+    }
 
     // Validate required fields
     if (!content) {
@@ -79,6 +86,15 @@ router.post('/', authMiddleware, requirePermission('document:write'), async (req
     });
   } catch (error) {
     console.error('Error creating note:', error);
+
+    // 常见部署问题兜底：数据库未迁移或表不存在
+    if (error?.code === 'P2021' || /table .*notes.* does not exist/i.test(error?.message || '')) {
+      return res.status(503).json({
+        success: false,
+        error: 'Notes storage is not initialized. Please run Prisma migrations.'
+      });
+    }
+
     res.status(500).json({
       success: false,
       error: error.message

@@ -17,7 +17,8 @@ jest.mock('../services/authService', () => ({
   authMiddleware: (req, res, next) => {
     req.user = { id: 'test-user-id' };
     next();
-  }
+  },
+  requirePermission: () => (req, res, next) => next()
 }));
 
 // Create Express app for testing
@@ -52,7 +53,7 @@ describe('Notes API Routes', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual(mockNote);
       expect(noteDAL.createNote).toHaveBeenCalledWith({
-        userId: 'test-user-id',
+        user: { id: 'test-user-id' },
         content: 'Test note #test',
         tags: undefined
       });

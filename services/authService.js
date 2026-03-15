@@ -286,8 +286,10 @@ function legacyAuthMiddleware(req, res, next) {
       return res.status(403).json({ error: '账号已被禁用' });
     }
     
-    req.userId = user.id;
-    req.user = user;
+    // Normalize to string to match Prisma schema (User.id / Note.userId are String)
+    const normalizedUserId = String(user.id);
+    req.userId = normalizedUserId;
+    req.user = { ...user, id: normalizedUserId };
     next();
   });
 }
@@ -312,14 +314,15 @@ function authMiddleware(req, res, next) {
     const decoded = jwt.verify(token, process.env.AUTHEN_JWT_SECRET, { algorithms: ['HS256'] });
 
     // Inject req.user compatible with existing format (id, username, email, role)
+    const normalizedUserId = String(decoded.sub);
     req.user = {
-      id: decoded.sub,
+      id: normalizedUserId,
       username: decoded.username || '',
       email: decoded.email || '',
       role: decoded.role || 'user',
       app_id: decoded.app_id,
     };
-    req.userId = decoded.sub;
+    req.userId = normalizedUserId;
     next();
   } catch (err) {
     return res.status(401).json({ error: '认证令牌无效或已过期' });

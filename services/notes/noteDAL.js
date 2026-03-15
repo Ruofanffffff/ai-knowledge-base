@@ -22,10 +22,11 @@ async function ensureUserExists(user) {
   }
 
   try {
+    const normalizedUserId = String(user.id);
     // Use username or fallback to id if username is missing/empty
     // We must ensure username is unique.
     // If username is empty, we use user.id which is unique.
-    const username = user.username || user.id;
+    const username = user.username || normalizedUserId;
     
     // Use a placeholder password since auth is handled externally
     // This hash is invalid but satisfies the non-null constraint
@@ -43,7 +44,7 @@ async function ensureUserExists(user) {
     }
 
     await prisma.user.upsert({
-      where: { id: user.id },
+      where: { id: normalizedUserId },
       update: {
         // Only update fields that might have changed from external provider
         username: finalUsername,
@@ -51,7 +52,7 @@ async function ensureUserExists(user) {
         // Don't update password
       },
       create: {
-        id: user.id,
+        id: normalizedUserId,
         username: finalUsername,
         // email: user.email || undefined, // Skip email to avoid unique constraint if another user has same email
         password: passwordPlaceholder,
@@ -73,26 +74,26 @@ async function ensureUserExists(user) {
  * @param {string[]} [data.tags] - Optional tags (will be extracted from content if not provided)
  * @returns {Promise<Object>} Created note
  */
-async function createNote({ user, content, tags }) {
-  // Support legacy call with userId only if user object is not provided (though new requirement says pass user)
-  // But to be safe, if user is missing but userId is present (from tests?), we might fail or try to proceed.
-  // The requirement is to call ensureUserExists(user).
-  
-  if (!user && !arguments[0].userId) {
-     throw new Error('user object or userId is required');
+async function createNote(input = {}) {
+  const { user, content, tags, userId: legacyUserId } = input;
+
+  const resolvedUserId = user?.id ?? legacyUserId;
+  if (!resolvedUserId) {
+    throw new Error('user object or userId is required');
   }
 
-  let userId;
-  if (user) {
-    userId = user.id;
-    await ensureUserExists(user);
-  } else {
-    userId = arguments[0].userId;
-  }
+  const userId = String(resolvedUserId);
 
   if (!content) {
     throw new Error('content is required');
   }
+
+  // Always ensure user exists, including legacy calls that only pass userId.
+  await ensureUserExists({
+    id: userId,
+    username: user?.username || userId,
+    email: user?.email
+  });
 
   // Extract tags from content if not provided
   let finalTags = tags;
@@ -103,16 +104,45 @@ async function createNote({ user, content, tags }) {
     finalTags = normalizeTags(finalTags);
   }
 
-  const note = await prisma.note.create({
-    data: {
-      userId,
-      content,
-      tags: JSON.stringify(finalTags)
-    },
-    include: {
-      attachments: true
+  let note;
+  try {
+    note = await prisma.note.create({
+      data: {
+        userId,
+        content,
+        tags: JSON.stringify(finalTags)
+      },
+      include: {
+        attachments: true
+      }
+    });
+  } catch (error) {
+    // Deployment fallback: if FK fails (legacy route / stale deployment data), re-sync user and retry once.
+    const isForeignKeyError =
+      error?.code === 'P2003' ||
+      /foreign key/i.test(error?.message || '');
+
+    if (!isForeignKeyError) {
+      throw error;
     }
-  });
+
+    await ensureUserExists({
+      id: userId,
+      username: user?.username || userId,
+      email: user?.email
+    });
+
+    note = await prisma.note.create({
+      data: {
+        userId,
+        content,
+        tags: JSON.stringify(finalTags)
+      },
+      include: {
+        attachments: true
+      }
+    });
+  }
 
   // Parse tags back to array for response
   if (note.tags) {
