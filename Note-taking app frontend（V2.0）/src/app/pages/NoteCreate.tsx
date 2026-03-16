@@ -662,7 +662,7 @@ type CreateMode = 'choose' | 'write';
 const AI_ACTIONS = [
   { id: 'generate', label: '智能扩写', icon: Sparkles, color: '#6366F1', bg: 'rgba(99,102,241,0.08)' },
   { id: 'proofread', label: '智能校对', icon: CheckCheck, color: '#10B981', bg: 'rgba(16,185,129,0.08)' },
-  { id: 'table', label: '生成表格', icon: LayoutGrid, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
+  { id: 'summary', label: 'AI总结', icon: LayoutGrid, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
   { id: 'mindmap', label: '生成思维导图', icon: GitFork, color: '#EC4899', bg: 'rgba(236,72,153,0.08)' },
 ] as const;
 
@@ -1216,11 +1216,19 @@ export function NoteCreate() {
           toast.success('校对完成，已更新内容');
           break;
         }
-        case 'table': {
-          setAiLoadingText('AI 正在生成结构化表格…');
-          const table = await aiService.generateTable(text);
-          setTableData(table);
-          setGeneratedContent(null);
+        case 'summary': {
+          setAiLoadingText('AI 正在生成结构化总结…');
+          const summary = await aiService.summarizeText(text);
+          const overview = String(summary?.overview || '').trim();
+          const keyPoints = Array.isArray(summary?.keyPoints) ? summary.keyPoints : [];
+          const keywords = Array.isArray(summary?.keywords) ? summary.keywords : [];
+          const formatted = [
+            overview,
+            keyPoints.length ? `要点：\n${keyPoints.slice(0, 8).map((kp: string) => `- ${kp}`).join('\n')}` : '',
+            keywords.length ? `关键词：${keywords.slice(0, 10).join('、')}` : '',
+          ].filter(Boolean).join('\n\n');
+          setGeneratedContent({ text: formatted, imagePrompt: '' });
+          setTableData(null);
           setMindmapData(null);
           setAiPanel('result');
           break;

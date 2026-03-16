@@ -5,7 +5,7 @@ import { Sparkles, CheckCheck, LayoutGrid, GitFork } from 'lucide-react';
 interface TextSelectionMenuProps {
   selectedText: string;
   position: { x: number; y: number };
-  onAction: (action: 'generate' | 'proofread' | 'table' | 'mindmap') => void;
+  onAction: (action: 'generate' | 'proofread' | 'summary' | 'mindmap') => void;
   onClose: () => void;
 }
 
@@ -27,9 +27,9 @@ const ACTIONS = [
     bgLight: 'rgba(14,165,233,0.06)',
   },
   {
-    id: 'table' as const,
+    id: 'summary' as const,
     icon: LayoutGrid,
-    label: '生成表格',
+    label: 'AI 总结',
     gradient: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
     glow: 'rgba(16,185,129,0.32)',
     bgLight: 'rgba(16,185,129,0.06)',

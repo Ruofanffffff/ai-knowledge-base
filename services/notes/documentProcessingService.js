@@ -306,11 +306,24 @@ class DocumentProcessingService {
     };
 
     try {
-      const pdfParse = require('pdf-parse');
-      const result = await pdfParse(fileData);
-      const rawText = (result?.text || '').trim();
-      const pageCount = Number(result?.numpages) || null;
-      meta.pageCount = pageCount;
+      const pdfParseModule = require('pdf-parse');
+      const pdfParseFn =
+        (typeof pdfParseModule === 'function' && pdfParseModule) ||
+        (typeof pdfParseModule?.default === 'function' && pdfParseModule.default) ||
+        (typeof pdfParseModule?.pdfParse === 'function' && pdfParseModule.pdfParse) ||
+        null;
+
+      let rawText = '';
+      let pageCount = null;
+
+      if (!pdfParseFn) {
+        meta.reason = 'PDF_PARSE_NOT_FUNCTION';
+      } else {
+        const result = await pdfParseFn(fileData);
+        rawText = (result?.text || '').trim();
+        pageCount = Number(result?.numpages) || null;
+        meta.pageCount = pageCount;
+      }
 
       if (rawText) {
         meta.method = 'text';
@@ -322,12 +335,12 @@ class DocumentProcessingService {
       if (ocrResult?.text) {
         meta.method = 'ocr';
         meta.textLength = ocrResult.text.length;
-        meta.reason = ocrResult.reason || null;
+        meta.reason = ocrResult.reason || meta.reason || null;
         return { text: ocrResult.text, pdfParse: meta };
       }
 
       meta.method = ocrResult?.method || 'none';
-      meta.reason = ocrResult?.reason || 'NO_TEXT_LAYER';
+      meta.reason = ocrResult?.reason || meta.reason || 'NO_TEXT_LAYER';
       return { text: '', pdfParse: meta };
     } catch (error) {
       meta.method = 'none';

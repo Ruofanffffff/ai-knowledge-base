@@ -20,6 +20,7 @@ import {
   Sparkles,
   CheckCircle,
   TableIcon,
+  Brain,
   Network,
   Undo2,
   Redo2,
@@ -335,7 +336,7 @@ async function processPastedHtmlWithImages(
 // AI Context Menu types & helpers
 // ============================================================================
 
-type AIActionType = 'generate' | 'proofread' | 'table' | 'mindmap';
+type AIActionType = 'generate' | 'proofread' | 'summary' | 'mindmap';
 
 // ============================================================================
 // Mind map helpers — layout, SVG, data conversion
@@ -440,6 +441,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     const [proofreadData, setProofreadData] = useState<{ original: string; corrected: string } | null>(null);
     const [showTable, setShowTable] = useState(false);
     const [tableData, setTableData] = useState<{ headers: string[]; rows: string[][] } | null>(null);
+    const [showSummary, setShowSummary] = useState(false);
+    const [summaryData, setSummaryData] = useState<any | null>(null);
 
     // Mind map Dialog state
     const [showMindMap, setShowMindMap] = useState(false);
@@ -614,7 +617,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     // AI Context Menu: action handler
     const handleMenuAction = useCallback((action: AIActionType, text: string) => {
       const actionLabels: Record<AIActionType, string> = {
-        generate: '智能生成', proofread: '智能校对', table: '生成表格', mindmap: '生成脑图',
+        generate: '智能生成', proofread: '智能校对', summary: 'AI总结', mindmap: '生成脑图',
       };
       setCtxMenu(prev => prev ? { ...prev, isLoading: true, loadingAction: actionLabels[action] } : prev);
 
@@ -688,7 +691,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         return;
       }
 
-      if (action === 'table') {
+      if (action === 'summary') {
         const sel = selectionRef.current;
         if (!editor || !sel) {
           setCtxMenu(null);
@@ -697,14 +700,20 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         }
         (async () => {
           try {
-            const response = await apiClient.post('/ai/generate-table', { text });
-            const { table } = response.data.data;
-
-            setTableData({ headers: table.headers, rows: table.rows });
-            setShowTable(true);
-            toast.success('表格生成完成', { description: `已生成 ${table.rows.length} 行数据` });
+            const response = await apiClient.post('/ai/summary/text', { text });
+            const payload = response.data;
+            const structured = payload?.structured || (() => {
+              try {
+                return payload?.summary ? JSON.parse(payload.summary) : null;
+              } catch {
+                return null;
+              }
+            })();
+            setSummaryData(structured || { overview: payload?.summary || '' });
+            setShowSummary(true);
+            toast.success('AI总结完成', { description: '请查看总结结果' });
           } catch {
-            toast.error('表格生成失败，请稍后重试');
+            toast.error('AI总结失败，请稍后重试');
           } finally {
             setCtxMenu(null);
             lastSelectionRef.current = null;
@@ -1135,7 +1144,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
                 ([
                   { action: 'generate' as AIActionType, label: '智能生成', icon: <Sparkles size={16} /> },
                   { action: 'proofread' as AIActionType, label: '智能校对', icon: <CheckCircle size={16} /> },
-                  { action: 'table' as AIActionType, label: '生成表格', icon: <TableIcon size={16} /> },
+                  { action: 'summary' as AIActionType, label: 'AI总结', icon: <Brain size={16} /> },
                   { action: 'mindmap' as AIActionType, label: '生成脑图', icon: <Network size={16} /> },
                 ]).map((item) => (
                   <button
@@ -1188,6 +1197,67 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
                 setShowProofread(false);
               }}>
                 采纳建议
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showSummary} onOpenChange={setShowSummary}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>AI 总结</DialogTitle>
+              <DialogDescription>基于选中文本生成的结构化总结。</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                {String(summaryData?.overview || '').trim() || '（无总结内容）'}
+              </div>
+              {Array.isArray(summaryData?.keyPoints) && summaryData.keyPoints.length > 0 && (
+                <div className="rounded-lg border border-slate-200 p-3">
+                  <div className="text-sm font-medium text-slate-700 mb-2">要点</div>
+                  <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
+                    {summaryData.keyPoints.slice(0, 8).map((kp: string, idx: number) => (
+                      <li key={idx}>{kp}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {Array.isArray(summaryData?.keywords) && summaryData.keywords.length > 0 && (
+                <div className="text-sm text-slate-600">
+                  关键词：{summaryData.keywords.slice(0, 10).join('、')}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <button className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50" onClick={() => setShowSummary(false)}>
+                关闭
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-700"
+                onClick={() => {
+                  const ed = editorRef.current ?? editor;
+                  const sel = selectionRef.current;
+                  if (!ed || !sel) {
+                    toast.error('插入失败：编辑器不可用');
+                    setShowSummary(false);
+                    return;
+                  }
+                  const overview = String(summaryData?.overview || '').trim();
+                  const keyPoints = Array.isArray(summaryData?.keyPoints) ? summaryData.keyPoints : [];
+                  const keywords = Array.isArray(summaryData?.keywords) ? summaryData.keywords : [];
+                  const summaryText = [
+                    '【AI总结】',
+                    overview || '',
+                    keyPoints.length ? `要点：\n${keyPoints.slice(0, 8).map((kp: string) => `- ${kp}`).join('\n')}` : '',
+                    keywords.length ? `关键词：${keywords.slice(0, 10).join('、')}` : '',
+                  ].filter(Boolean).join('\n\n');
+
+                  ed.chain().focus().deleteRange({ from: sel.from, to: sel.to }).insertContentAt(sel.from, summaryText).run();
+                  toast.success('已插入总结');
+                  setShowSummary(false);
+                }}
+              >
+                插入文档
               </button>
             </DialogFooter>
           </DialogContent>

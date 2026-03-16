@@ -1,4 +1,4 @@
-// Mock AI service to simulate LLM responses
+import { api } from './api';
 
 export const aiService = {
   // 智能生成 / 扩写
@@ -45,6 +45,20 @@ export const aiService = {
       ],
       summary: "基于文本内容生成的功能优先级表"
     };
+  },
+
+  async summarizeText(text: string): Promise<any> {
+    const response = await api.post('/ai/summary/text', { text });
+    const payload = response.data;
+    if (payload?.structured) return payload.structured;
+    if (payload?.summary) {
+      try {
+        return JSON.parse(payload.summary);
+      } catch {
+        return { overview: String(payload.summary || '') };
+      }
+    }
+    return { overview: '' };
   },
 
   // 生成脑图

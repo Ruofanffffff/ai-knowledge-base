@@ -582,14 +582,27 @@ export default function Documents() {
                                 <h3 className="font-medium text-slate-800 line-clamp-1">{document.title}</h3>
                               )}
                             </div>
-                            <Dropdown menu={getMenuItems(document)} trigger={['click']}>
+                            <div className="flex items-center gap-1">
                               <button
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-slate-400 hover:text-slate-600 p-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget({ id: document.id, title: document.title });
+                                }}
+                                className="text-slate-400 hover:text-red-500 p-1"
+                                aria-label="删除文档"
                               >
-                                <MoreVertical size={16} />
+                                <Trash2 size={16} />
                               </button>
-                            </Dropdown>
+                              <Dropdown menu={getMenuItems(document)} trigger={['click']}>
+                                <button
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-slate-400 hover:text-slate-600 p-1"
+                                  aria-label="更多操作"
+                                >
+                                  <MoreVertical size={16} />
+                                </button>
+                              </Dropdown>
+                            </div>
                           </div>
                           
                           <p className="text-sm text-slate-500 line-clamp-3 mb-4">

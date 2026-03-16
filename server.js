@@ -3095,6 +3095,178 @@ ${plainContent.substring(0, 6000)}
   }
 });
 
+app.post('/api/ai/summary/text', authMiddleware, async (req, res) => {
+  try {
+    const { text, title, model: requestedModel } = req.body;
+
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Text is required'
+      });
+    }
+
+    const safeTitle = title ? String(title).trim() : '';
+    const plainContent = String(text).trim();
+
+    const prompt = `请对以下内容进行结构化总结，返回严格的JSON格式（不要包含markdown代码块标记）：
+
+标题：${safeTitle || '（无）'}
+内容：
+${plainContent.substring(0, 6000)}
+
+请返回如下JSON格式（必须是合法JSON，不要有多余文字）：
+{
+  "documentType": "内容类型（如：技术笔记、会议纪要、产品文档、学习摘录等）",
+  "typeTags": ["类型标签1", "类型标签2"],
+  "overview": "一段话概括主要内容（100-200字）",
+  "keyPoints": [
+    "要点1",
+    "要点2",
+    "要点3"
+  ],
+  "keywords": ["关键词1", "关键词2", "关键词3", "关键词4", "关键词5"],
+  "applications": [
+    "应用方向1：具体说明",
+    "应用方向2：具体说明"
+  ],
+  "quality": {
+    "completeness": 85,
+    "clarity": 90,
+    "comment": "对内容质量的简短评价"
+  }
+}`;
+
+    const modelCallOrder = [];
+    if (requestedModel) modelCallOrder.push(requestedModel);
+    const cloudModels = ['deepseek-chat', 'qwen-plus', 'qwen-turbo'];
+    cloudModels.forEach(model => {
+      if (!modelCallOrder.includes(model)) modelCallOrder.push(model);
+    });
+
+    let summary = null;
+    let lastError = null;
+
+    for (const model of modelCallOrder) {
+      try {
+        if (LOCAL_MODELS.includes(model)) {
+          const localResponse = await fetch(`${OLLAMA_API_URL}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model,
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.7,
+              max_tokens: 2000
+            })
+          });
+
+          if (!localResponse.ok) {
+            throw new Error(`本地模型调用失败: ${localResponse.status}`);
+          }
+
+          const localData = await localResponse.json();
+          if (localData.message && localData.message.content) {
+            summary = localData.message.content;
+            break;
+          }
+          throw new Error('本地模型返回格式无效');
+        }
+
+        let apiKey, apiUrl, requestBody;
+        if (model.startsWith('qwen')) {
+          apiKey = process.env.QWEN_API_KEY;
+          apiUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+          requestBody = {
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 2000
+          };
+        } else if (model.startsWith('deepseek')) {
+          apiKey = process.env.DEEPSEEK_API_KEY;
+          apiUrl = 'https://api.deepseek.com/v1/chat/completions';
+          requestBody = {
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 2000
+          };
+        } else {
+          continue;
+        }
+
+        if (!apiKey) continue;
+
+        const cloudResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!cloudResponse.ok) {
+          const errorText = await cloudResponse.text();
+          lastError = `模型 ${model} API error: ${cloudResponse.status} - ${errorText}`;
+          continue;
+        }
+
+        const cloudData = await cloudResponse.json();
+        if (cloudData.choices && cloudData.choices.length > 0) {
+          summary = cloudData.choices[0].message.content;
+          break;
+        }
+        if (cloudData.output && cloudData.output.text) {
+          summary = cloudData.output.text;
+          break;
+        }
+
+        lastError = `模型 ${model} 返回格式无效`;
+      } catch (error) {
+        lastError = error.message;
+      }
+    }
+
+    if (!summary) {
+      return res.status(500).json({
+        success: false,
+        error: `生成总结失败: ${lastError || '所有模型调用失败'}`
+      });
+    }
+
+    let structuredSummary = null;
+    try {
+      let cleaned = summary.trim();
+      if (cleaned.startsWith('```json')) cleaned = cleaned.slice(7);
+      if (cleaned.startsWith('```')) cleaned = cleaned.slice(3);
+      if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3);
+      cleaned = cleaned.trim();
+      structuredSummary = JSON.parse(cleaned);
+    } catch {
+      structuredSummary = {
+        documentType: '内容',
+        typeTags: [],
+        overview: summary,
+        keyPoints: [],
+        keywords: [],
+        applications: [],
+        quality: { completeness: 0, clarity: 0, comment: '' }
+      };
+    }
+
+    const summaryToStore = JSON.stringify(structuredSummary);
+    res.json({
+      success: true,
+      summary: summaryToStore,
+      structured: structuredSummary
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Text summarization failed'
+    });
+  }
+});
+
 // 获取可用的AI模型列表
 app.get('/api/ai/models', async (req, res) => {
   try {

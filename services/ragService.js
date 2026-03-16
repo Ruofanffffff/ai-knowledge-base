@@ -19,6 +19,26 @@ const SYSTEM_PROMPT = `你是一个名为 "Hi Brain" 的 AI 助手，也是用�
 `;
 
 class RAGService {
+  detectOverviewIntent(query) {
+    const text = String(query || '').toLowerCase();
+    if (!text) return null;
+
+    const hasRecent = text.includes('最近') || text.includes('近期') || text.includes('近来') || text.includes('这段时间');
+    const isListAsk =
+      text.includes('有哪些') ||
+      text.includes('有什么') ||
+      text.includes('有啥') ||
+      text.includes('列出') ||
+      text.includes('清单') ||
+      text.includes('都有哪些');
+
+    if (!hasRecent || !isListAsk) return null;
+
+    if (text.includes('笔记') || text.includes('便签')) return { type: 'recent_notes' };
+    if (text.includes('文档') || text.includes('文件')) return { type: 'recent_documents' };
+    if (text.includes('附件')) return { type: 'recent_attachments' };
+    return { type: 'recent_all' };
+  }
   tokenizeQuery(query) {
     return String(query || '')
       .split(/[\s，,。！？；;、|/]+/)
@@ -285,6 +305,86 @@ class RAGService {
    */
   async generateResponse(userId, query) {
     try {
+      const overviewIntent = this.detectOverviewIntent(query);
+      if (overviewIntent?.type) {
+        const take = 8;
+        if (overviewIntent.type === 'recent_notes' || overviewIntent.type === 'recent_all') {
+          const rows = await prisma.note.findMany({
+            where: { userId },
+            orderBy: { updatedAt: 'desc' },
+            take,
+            select: { id: true, content: true, tags: true, updatedAt: true }
+          });
+          const items = rows.map((note, idx) => {
+            const title = this.deriveTitle(note.content);
+            const excerpt = this.stripHtmlToText(note.content).slice(0, 120);
+            const tags = this.parseTags(note.tags);
+            return `${idx + 1}. 《${title}》${tags.length ? `（${tags.slice(0, 4).join('、')}）` : ''}\n   ${excerpt}`;
+          });
+          const answer = items.length
+            ? `你最近的笔记有这些（按更新时间倒序）：\n${items.join('\n')}\n\n你想我展开哪一条？可以直接回复序号或标题。`
+            : '你最近还没有保存过笔记。你可以先创建一条，我再帮你回顾与串联。';
+          return {
+            answer,
+            response: answer,
+            sources: { notes: rows.map(r => r.id), documents: [], attachments: [], memories: [], kg_entities: [] },
+            contextStats: { notes: rows.length, documents: 0, attachments: 0, memories: 0, kgContextIncluded: false }
+          };
+        }
+
+        if (overviewIntent.type === 'recent_documents') {
+          const rows = await prisma.document.findMany({
+            where: { userId },
+            orderBy: { updatedAt: 'desc' },
+            take,
+            select: { id: true, title: true, content: true, updatedAt: true }
+          });
+          const items = rows.map((doc, idx) => {
+            const title = String(doc.title || '').trim() || this.deriveTitle(doc.content);
+            const excerpt = this.stripHtmlToText(doc.content).slice(0, 140);
+            return `${idx + 1}. 《${title}》\n   ${excerpt}`;
+          });
+          const answer = items.length
+            ? `你最近上传/编辑的文档有这些（按更新时间倒序）：\n${items.join('\n')}\n\n你想我总结哪一份？可以直接回复序号或标题。`
+            : '你最近还没有文档。你可以先在思库里上传一份，我再帮你总结与串联。';
+          return {
+            answer,
+            response: answer,
+            sources: { notes: [], documents: rows.map(r => r.id), attachments: [], memories: [], kg_entities: [] },
+            contextStats: { notes: 0, documents: rows.length, attachments: 0, memories: 0, kgContextIncluded: false }
+          };
+        }
+
+        if (overviewIntent.type === 'recent_attachments') {
+          const rows = await prisma.attachment.findMany({
+            where: { note: { userId } },
+            orderBy: { createdAt: 'desc' },
+            take,
+            select: {
+              id: true,
+              type: true,
+              url: true,
+              createdAt: true,
+              noteId: true,
+              analysis: { select: { textContent: true, description: true } }
+            }
+          });
+          const items = rows.map((att, idx) => {
+            const excerpt = String(att.analysis?.textContent || att.analysis?.description || '').trim().slice(0, 120);
+            return `${idx + 1}. ${att.type}（noteId: ${att.noteId}）\n   ${excerpt || '（暂无解析内容）'}`;
+          });
+          const answer = items.length
+            ? `你最近的附件有这些（按时间倒序）：\n${items.join('\n')}\n\n你想我展开哪一个？可以回复序号。`
+            : '你最近还没有上传附件。';
+          return {
+            answer,
+            response: answer,
+            sources: { notes: [], documents: [], attachments: rows.map(r => r.id), memories: [], kg_entities: [] },
+            contextStats: { notes: 0, documents: 0, attachments: rows.length, memories: 0, kgContextIncluded: false }
+          };
+        }
+      }
+
       // 1. Parallel Retrieval: Memories + Knowledge Graph
       const [memories, kgContext, relatedNotes, relatedDocuments, relatedAttachments] = await Promise.all([
         memoryService.searchMemories(userId, query, 5),
