@@ -5,9 +5,10 @@
  * Validates: Requirements 2.1, 2.5, 2.6, 3.1, 3.3, 4.1, 4.3
  */
 
-const { PrismaClient, AttachmentType } = require('@prisma/client');
+const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
+const ALLOWED_ATTACHMENT_TYPES = ['IMAGE', 'DOCUMENT', 'TABLE'];
 
 function safeParseJson(value, fallback) {
   if (value === null || value === undefined) return fallback;
@@ -55,7 +56,7 @@ async function createAttachment(data) {
   }
 
   // Validate attachment type
-  if (!Object.values(AttachmentType).includes(type)) {
+  if (!ALLOWED_ATTACHMENT_TYPES.includes(type)) {
     throw new Error(`Invalid attachment type: ${type}`);
   }
 

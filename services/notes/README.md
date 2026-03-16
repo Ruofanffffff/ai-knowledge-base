@@ -9,6 +9,16 @@ This module provides:
 - **Attachment DAL**: CRUD operations for attachments and analysis
 - **Tag Extractor**: Utilities for extracting and parsing hashtags from text
 
+## Deployment
+
+Notes uses the same Prisma SQLite database as the Knowledge Graph.
+
+- Ensure Prisma client is generated and migrations are applied:
+  - `npx prisma generate`
+  - `npx prisma migrate deploy`
+- Database file path is controlled by `prisma/schema.prisma` datasource (`file:../data/knowledge_graph.db`).
+- If `/api/attachments/upload` returns `503 Notes storage is not initialized`, it means the runtime database is missing required tables or migrations were not applied.
+
 ## Requirements Validation
 
 This implementation validates the following requirements:

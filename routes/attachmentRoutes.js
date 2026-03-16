@@ -11,6 +11,7 @@ const multer = require('multer');
 const path = require('path');
 const { authMiddleware } = require('../services/authService');
 const attachmentDAL = require('../services/notes/attachmentDAL');
+const noteDAL = require('../services/notes/noteDAL');
 const { uploadFileWithRetry, validateFileSize, validateMimeType, downloadFile } = require('../services/notes/s3Client');
 const { uploadAndAnalyzeImage } = require('../services/notes/imageAnalysisService');
 const { uploadAndProcessDocument } = require('../services/notes/documentProcessingService');
@@ -116,6 +117,14 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
       return res.status(400).json({
         success: false,
         error: 'Note ID is required'
+      });
+    }
+
+    const note = await noteDAL.getNoteById(noteId, userId);
+    if (!note) {
+      return res.status(404).json({
+        success: false,
+        error: 'Note not found'
       });
     }
 
@@ -268,6 +277,20 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
       return res.status(400).json({
         success: false,
         error: error.message
+      });
+    }
+
+    const isDbNotInitialized =
+      error?.code === 'P2021' ||
+      /no such table/i.test(error?.message || '') ||
+      /table .* (notes|attachments|attachment_analysis) .* does not exist/i.test(error?.message || '');
+
+    if (isDbNotInitialized) {
+      return res.status(503).json({
+        success: false,
+        error: 'Notes storage is not initialized. Please run Prisma migrations.',
+        errorCode: error.code || 'NOTES_STORAGE_NOT_INITIALIZED',
+        errorId
       });
     }
 

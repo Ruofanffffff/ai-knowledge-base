@@ -1343,7 +1343,8 @@ export function NoteCreate() {
             console.error('Failed to cleanup draft note after upload failure:', cleanupError);
           }
         }
-        toast.error('文档解析失败，请重试');
+        const msg = (err as any)?.message;
+        toast.error(typeof msg === 'string' && msg.trim() ? msg : '文档解析失败，请重试');
       } finally {
         setUploadParsing(false);
       }

@@ -13,6 +13,10 @@ jest.mock('../services/authService', () => ({
   }
 }));
 
+jest.mock('../services/notes/noteDAL', () => ({
+  getNoteById: jest.fn()
+}));
+
 jest.mock('../services/notes/attachmentDAL');
 jest.mock('../services/notes/s3Client');
 jest.mock('../services/notes/imageAnalysisService', () => ({
@@ -59,6 +63,7 @@ jest.mock('../config/notes.config', () => ({
 const request = require('supertest');
 const express = require('express');
 const attachmentRoutes = require('./attachmentRoutes');
+const noteDAL = require('../services/notes/noteDAL');
 const attachmentDAL = require('../services/notes/attachmentDAL');
 const { uploadFileWithRetry, validateFileSize, validateMimeType, downloadFile } = require('../services/notes/s3Client');
 const { uploadAndAnalyzeImage } = require('../services/notes/imageAnalysisService');
@@ -73,6 +78,12 @@ app.use('/api/attachments', attachmentRoutes);
 describe('Attachment Routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    noteDAL.getNoteById.mockResolvedValue({
+      id: 'note-1',
+      userId: 'test-user-id',
+      content: 'test',
+      tags: []
+    });
   });
 
   describe('POST /api/attachments/upload', () => {
