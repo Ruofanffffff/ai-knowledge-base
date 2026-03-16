@@ -1,5 +1,10 @@
 import { api } from './api';
 
+export type UploadedDocumentResult = {
+  textContent: string;
+  metadata?: any;
+};
+
 export const documentService = {
   /**
    * Upload and parse a document file
@@ -7,7 +12,7 @@ export const documentService = {
    * @param noteId The ID of the note to associate with
    * @returns The parsed text content
    */
-  async uploadDocument(file: File, noteId: string): Promise<string> {
+  async uploadDocument(file: File, noteId: string): Promise<UploadedDocumentResult> {
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -21,10 +26,13 @@ export const documentService = {
       });
 
       if (response.data.success && response.data.data.analysis) {
-        return response.data.data.analysis.textContent || '';
+        return {
+          textContent: response.data.data.analysis.textContent || '',
+          metadata: response.data.data.analysis.metadata,
+        };
       }
 
-      return '';
+      return { textContent: '' };
     } catch (err: any) {
       const data = err?.response?.data;
       const errorId = data?.errorId;

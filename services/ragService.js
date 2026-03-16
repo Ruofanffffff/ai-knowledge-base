@@ -114,6 +114,127 @@ class RAGService {
       .slice(0, 6);
   }
 
+  async searchUserDocuments(userId, query) {
+    const tokens = this.tokenizeQuery(query);
+    const docs = await prisma.document.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      take: 120,
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        updatedAt: true
+      }
+    });
+
+    if (!docs.length) return [];
+
+    const normalizedQuery = String(query || '').toLowerCase();
+    const scored = docs.map(doc => {
+      const title = String(doc.title || '').trim();
+      const plain = this.stripHtmlToText(doc.content);
+      const lowerTitle = title.toLowerCase();
+      const lowerPlain = plain.toLowerCase();
+
+      let score = 0;
+      if (normalizedQuery && (lowerTitle.includes(normalizedQuery) || lowerPlain.includes(normalizedQuery))) score += 8;
+      tokens.forEach(token => {
+        const lowerToken = token.toLowerCase();
+        if (lowerTitle.includes(lowerToken)) score += 5;
+        if (lowerPlain.includes(lowerToken)) score += 3;
+      });
+      if (score <= 0) return null;
+
+      return {
+        id: doc.id,
+        title: title || this.deriveTitle(doc.content),
+        excerpt: plain.slice(0, 260),
+        score,
+        updatedAt: doc.updatedAt
+      };
+    }).filter(Boolean);
+
+    return scored
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      })
+      .slice(0, 4);
+  }
+
+  async searchUserAttachmentAnalyses(userId, query) {
+    const tokens = this.tokenizeQuery(query);
+    const rows = await prisma.attachmentAnalysis.findMany({
+      where: { attachment: { note: { userId } } },
+      orderBy: { createdAt: 'desc' },
+      take: 160,
+      select: {
+        id: true,
+        textContent: true,
+        description: true,
+        attachment: {
+          select: {
+            id: true,
+            type: true,
+            noteId: true,
+            note: {
+              select: {
+                id: true,
+                content: true,
+                tags: true,
+                updatedAt: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!rows.length) return [];
+
+    const normalizedQuery = String(query || '').toLowerCase();
+    const scored = rows.map(row => {
+      const text = String(row.textContent || '').trim();
+      const desc = String(row.description || '').trim();
+      const lowerText = text.toLowerCase();
+      const lowerDesc = desc.toLowerCase();
+      const note = row.attachment?.note;
+      const notePlain = note ? this.stripHtmlToText(note.content) : '';
+      const tags = note ? this.parseTags(note.tags) : [];
+      const lowerTags = tags.map(tag => tag.toLowerCase());
+
+      let score = 0;
+      if (normalizedQuery && (lowerText.includes(normalizedQuery) || lowerDesc.includes(normalizedQuery))) score += 8;
+      tokens.forEach(token => {
+        const lowerToken = token.toLowerCase();
+        if (lowerText.includes(lowerToken)) score += 3;
+        if (lowerDesc.includes(lowerToken)) score += 2;
+        if (notePlain.toLowerCase().includes(lowerToken)) score += 1;
+        if (lowerTags.some(tag => tag.includes(lowerToken))) score += 4;
+      });
+      if (score <= 0) return null;
+
+      return {
+        id: row.id,
+        type: row.attachment?.type || 'DOCUMENT',
+        noteId: row.attachment?.noteId || null,
+        noteTitle: note ? this.deriveTitle(note.content) : '无标题',
+        excerpt: (text || desc || '').slice(0, 260),
+        tags,
+        score,
+        updatedAt: note?.updatedAt || row.attachment?.note?.updatedAt || null
+      };
+    }).filter(Boolean);
+
+    return scored
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+      })
+      .slice(0, 4);
+  }
+
   /**
    * Search Knowledge Graph (Simple text match for now + Vector if available)
    * @param {string} userId 
@@ -165,10 +286,12 @@ class RAGService {
   async generateResponse(userId, query) {
     try {
       // 1. Parallel Retrieval: Memories + Knowledge Graph
-      const [memories, kgContext, relatedNotes] = await Promise.all([
+      const [memories, kgContext, relatedNotes, relatedDocuments, relatedAttachments] = await Promise.all([
         memoryService.searchMemories(userId, query, 5),
         this.searchKnowledgeGraph(userId, query),
-        this.searchUserNotes(userId, query)
+        this.searchUserNotes(userId, query),
+        this.searchUserDocuments(userId, query),
+        this.searchUserAttachmentAnalyses(userId, query)
       ]);
 
       // 2. Format Context
@@ -184,7 +307,21 @@ class RAGService {
           .join('\n') + '\n';
       }
 
-      const fullContext = `${memoryContext}\n${notesContext}\n${kgContext}`;
+      let documentsContext = '';
+      if (relatedDocuments.length > 0) {
+        documentsContext = '【思库文档】:\n' + relatedDocuments
+          .map((doc, idx) => `- [${idx + 1}] ${doc.title}｜内容摘要: ${doc.excerpt}`)
+          .join('\n') + '\n';
+      }
+
+      let attachmentsContext = '';
+      if (relatedAttachments.length > 0) {
+        attachmentsContext = '【思库附件】:\n' + relatedAttachments
+          .map((att, idx) => `- [${idx + 1}] ${att.noteTitle}｜类型: ${att.type}｜标签: ${att.tags.join('、') || '无'}｜内容摘要: ${att.excerpt}`)
+          .join('\n') + '\n';
+      }
+
+      const fullContext = `${memoryContext}\n${notesContext}\n${documentsContext}\n${attachmentsContext}\n${kgContext}`;
 
       // 3. Construct Prompt
       const userPrompt = `用户问题: ${query}\n\n参考信息:\n${fullContext}`;
@@ -209,11 +346,15 @@ class RAGService {
         sources: {
           memories: memories.map(m => m.id),
           notes: relatedNotes.map(note => note.id),
+          documents: relatedDocuments.map(doc => doc.id),
+          attachments: relatedAttachments.map(att => att.id),
           kg_entities: []
         },
         contextStats: {
           memories: memories.length,
           notes: relatedNotes.length,
+          documents: relatedDocuments.length,
+          attachments: relatedAttachments.length,
           kgContextIncluded: Boolean(kgContext && kgContext.trim())
         }
       };

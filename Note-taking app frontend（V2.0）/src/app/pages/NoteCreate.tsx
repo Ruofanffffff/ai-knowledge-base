@@ -1011,6 +1011,7 @@ export function NoteCreate() {
   const editorMountRef = useRef<HTMLDivElement>(null);
   /** Always holds the latest editor instance — avoids stale-closure bugs */
   const editorRef = useRef<Editor | null>(null);
+  const pendingImportHtmlRef = useRef<string | null>(null);
 
   /** Long-press detection refs */
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1089,6 +1090,14 @@ export function NoteCreate() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // mount once — initialContent is captured by closure on first render
+
+  useEffect(() => {
+    if (!editor) return;
+    const pending = pendingImportHtmlRef.current;
+    if (!pending) return;
+    editor.commands.setContent(pending);
+    pendingImportHtmlRef.current = null;
+  }, [editor]);
 
   // ── Deferred init: when user picks "自由写作" the choose→write
   //    transition renders editorMountRef for the first time, but the
@@ -1262,6 +1271,7 @@ export function NoteCreate() {
   /* ── Document upload ──────────────────────────────────────── */
   const processDocumentFile = useCallback(async (file: File) => {
     setUploadParsing(true);
+    setCreateMode('write');
     const ext = file.name.split('.').pop()?.toLowerCase();
 
     if (ext === 'txt' || ext === 'md') {
@@ -1274,10 +1284,14 @@ export function NoteCreate() {
           ? lines.slice(1).join('\n').trim()
           : text;
         if (possibleTitle && possibleTitle.length < 60) setTitle(possibleTitle);
-        editor?.commands.setContent(toHtml(bodyText));
+        const importedHtml = toHtml(bodyText);
+        pendingImportHtmlRef.current = importedHtml;
+        if (editorRef.current) {
+          editorRef.current.commands.setContent(importedHtml);
+          pendingImportHtmlRef.current = null;
+        }
         setUploadParsing(false);
         toast.success(`已导入 ${file.name}`);
-        setCreateMode('write');
       };
       reader.onerror = () => {
         setUploadParsing(false);
@@ -1309,14 +1323,31 @@ export function NoteCreate() {
         }
 
         if (targetNoteId) {
-          const text = await documentService.uploadDocument(file, targetNoteId);
+          const uploadResult = await documentService.uploadDocument(file, targetNoteId);
           const possibleTitle = file.name.replace(/\.\w+$/, '');
-          const parsedText = text?.trim();
-          const importedContent = parsedText || `文档《${file.name}》上传成功，但暂未提取到文本内容，请手动补充。`;
+          const parsedText = uploadResult.textContent?.trim();
+          const pdfParse = uploadResult.metadata?.pdfParse;
+          const importedContent = parsedText || (() => {
+            const reason = String(pdfParse?.reason || '');
+            if (reason === 'NO_TEXT_LAYER') {
+              return `文档《${file.name}》上传成功，但未检测到可复制的文本层（可能是扫描件）。建议上传可复制文本的 PDF，或将扫描件转换为可复制文本后再导入。`;
+            }
+            if (reason === 'OCR_TOOL_NOT_AVAILABLE') {
+              return `文档《${file.name}》上传成功，但当前服务端尚未配置 OCR 组件，暂无法从扫描 PDF 提取文字。`;
+            }
+            if (reason.startsWith('PDF_PARSE_ERROR:')) {
+              return `文档《${file.name}》上传成功，但 PDF 解析失败：${reason.replace('PDF_PARSE_ERROR:', '')}`;
+            }
+            return `文档《${file.name}》上传成功，但暂未提取到文本内容，请手动补充。`;
+          })();
           const importedHtml = toHtml(importedContent);
 
           setTitle(possibleTitle);
-          editor?.commands.setContent(importedHtml);
+          pendingImportHtmlRef.current = importedHtml;
+          if (editorRef.current) {
+            editorRef.current.commands.setContent(importedHtml);
+            pendingImportHtmlRef.current = null;
+          }
           setCreateMode('write');
 
           // 上传场景下为临时草稿自动回填内容，避免出现 Draft 标题和空白内容
@@ -1330,7 +1361,9 @@ export function NoteCreate() {
           if (parsedText) {
             toast.success('文档解析完成，内容已导入');
           } else {
-            toast.warning('文档解析完成，但未提取到文本内容');
+            toast.warning(typeof pdfParse?.reason === 'string' && pdfParse.reason
+              ? `文档上传成功，但未提取到文本（${pdfParse.reason}）`
+              : '文档解析完成，但未提取到文本内容');
           }
         }
       } catch (err) {

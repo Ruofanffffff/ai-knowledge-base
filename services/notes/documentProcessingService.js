@@ -26,6 +26,12 @@ const { notesConfig } = require('../../config/notes.config');
 const path = require('path');
 const fs = require('fs').promises;
 const os = require('os');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const { createMultimodalLLMClient } = require('./llmClient');
+const { createTextRecognitionPrompt } = require('./prompts');
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Document Processing Service class
@@ -134,6 +140,7 @@ class DocumentProcessingService {
         metadata: {
           fileType,
           structuredData: processingResult.structuredData || null,
+          ...(processingResult.pdfParse && { pdfParse: processingResult.pdfParse }),
           ckbCount: processingResult.ckbCount || 0,
           coverageRate: processingResult.coverageRate || null,
           qualityScore: processingResult.qualityScore || null,
@@ -242,8 +249,12 @@ class DocumentProcessingService {
       }
 
       // Fallback parser: keep upload usable for Word/PDF even without KG pipeline.
-      const fallbackText = await this._extractTextByFileType(fileData, fileType);
-      const safeText = (fallbackText || '').trim();
+      const fallbackResult = await this._extractTextByFileType({
+        fileData,
+        fileType,
+        tempFilePath
+      });
+      const safeText = (fallbackResult?.text || '').trim();
 
       return {
         textContent: safeText || null,
@@ -255,6 +266,7 @@ class DocumentProcessingService {
           parser: 'fallback',
           filename: originalFilename
         },
+        pdfParse: fallbackResult?.pdfParse || null,
         ckbCount: safeText ? 1 : 0,
         coverageRate: null,
         qualityScore: null
@@ -271,27 +283,57 @@ class DocumentProcessingService {
     }
   }
 
-  async _extractTextByFileType(fileData, fileType) {
+  async _extractTextByFileType(options) {
+    const { fileData, fileType, tempFilePath } = options || {};
     switch (fileType) {
       case 'pdf':
-        return this._extractPdfText(fileData);
+        return this._extractPdfText(fileData, tempFilePath);
       case 'word':
-        return this._extractWordText(fileData);
+        return { text: await this._extractWordText(fileData) };
       case 'markdown':
       case 'excel':
       default:
-        return fileData.toString('utf8');
+        return { text: fileData.toString('utf8') };
     }
   }
 
-  async _extractPdfText(fileData) {
+  async _extractPdfText(fileData, tempFilePath) {
+    const meta = {
+      method: 'none',
+      pageCount: null,
+      textLength: 0,
+      reason: null
+    };
+
     try {
       const pdfParse = require('pdf-parse');
       const result = await pdfParse(fileData);
-      return result?.text || '';
+      const rawText = (result?.text || '').trim();
+      const pageCount = Number(result?.numpages) || null;
+      meta.pageCount = pageCount;
+
+      if (rawText) {
+        meta.method = 'text';
+        meta.textLength = rawText.length;
+        return { text: rawText, pdfParse: meta };
+      }
+
+      const ocrResult = await this._extractPdfTextByOcr(tempFilePath, pageCount);
+      if (ocrResult?.text) {
+        meta.method = 'ocr';
+        meta.textLength = ocrResult.text.length;
+        meta.reason = ocrResult.reason || null;
+        return { text: ocrResult.text, pdfParse: meta };
+      }
+
+      meta.method = ocrResult?.method || 'none';
+      meta.reason = ocrResult?.reason || 'NO_TEXT_LAYER';
+      return { text: '', pdfParse: meta };
     } catch (error) {
+      meta.method = 'none';
+      meta.reason = `PDF_PARSE_ERROR:${error.message}`;
       console.warn('[DocumentProcessingService] pdf fallback parse failed:', error.message);
-      return '';
+      return { text: '', pdfParse: meta };
     }
   }
 
@@ -304,6 +346,59 @@ class DocumentProcessingService {
       // .doc or damaged .docx may fail in mammoth; keep upload success.
       console.warn('[DocumentProcessingService] word fallback parse failed:', error.message);
       return '';
+    }
+  }
+
+  async _extractPdfTextByOcr(tempFilePath, pageCount) {
+    if (!tempFilePath) {
+      return { text: '', method: 'none', reason: 'TEMP_FILE_MISSING' };
+    }
+
+    const maxPages = Math.max(1, Math.min(2, Number(pageCount) || 2));
+    const outputPrefix = `${tempFilePath}_ocr`;
+
+    let outputFiles = [];
+    try {
+      await execFileAsync('pdftoppm', ['-png', '-f', '1', '-l', String(maxPages), tempFilePath, outputPrefix]);
+      outputFiles = Array.from({ length: maxPages }, (_, idx) => `${outputPrefix}-${idx + 1}.png`);
+      const imageBuffers = await Promise.all(outputFiles.map(fp => fs.readFile(fp)));
+      const llm = createMultimodalLLMClient();
+      const prompt = createTextRecognitionPrompt({ imageType: 'document' });
+
+      const chunks = [];
+      for (const buf of imageBuffers) {
+        const dataUrl = `data:image/png;base64,${buf.toString('base64')}`;
+        const result = await llm.analyzeImage({
+          imageUrl: dataUrl,
+          prompt,
+          config: { temperature: 0.1, maxTokens: 1800 }
+        });
+        const text = String(result?.content || '').trim();
+        if (text) chunks.push(text);
+      }
+
+      return {
+        text: chunks.join('\n\n').trim(),
+        method: 'ocr',
+        reason: chunks.length ? null : 'OCR_EMPTY'
+      };
+    } catch (error) {
+      const code = error?.code;
+      if (code === 'ENOENT') {
+        return { text: '', method: 'none', reason: 'OCR_TOOL_NOT_AVAILABLE' };
+      }
+      if (String(error?.message || '').includes('LLM API key is required')) {
+        return { text: '', method: 'none', reason: 'OCR_LLM_KEY_MISSING' };
+      }
+      return { text: '', method: 'none', reason: `OCR_FAILED:${error.message}` };
+    } finally {
+      await Promise.all(
+        outputFiles.map(async fp => {
+          try {
+            await fs.unlink(fp);
+          } catch (_) {}
+        })
+      );
     }
   }
 
