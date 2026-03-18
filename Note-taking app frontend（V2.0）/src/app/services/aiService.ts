@@ -1,4 +1,53 @@
+import axios from 'axios';
 import { api } from './api';
+
+type ApiErrorDetails = {
+  title: string;
+  subtitle?: string;
+  status?: number;
+  errorId?: string;
+  errorCode?: string;
+};
+
+function toSummaryApiError(err: unknown): ApiErrorDetails {
+  if (!axios.isAxiosError(err)) {
+    const message = err instanceof Error ? err.message : String(err || '');
+    return {
+      title: 'AI 总结失败',
+      subtitle: message ? `未知错误｜${message}` : '未知错误',
+    };
+  }
+
+  const status = err.response?.status;
+  const data: any = err.response?.data;
+  const errorId = data?.errorId;
+  const errorCode = data?.errorCode;
+  const backendMessage = data?.error || data?.message;
+  const infoParts = [
+    typeof status === 'number' ? `HTTP ${status}` : null,
+    errorCode ? String(errorCode) : null,
+    errorId ? `错误ID: ${String(errorId)}` : null,
+  ].filter(Boolean);
+  const info = infoParts.join('｜');
+
+  if (status === 404 || status === 501) {
+    return {
+      title: '后端未升级/接口不存在',
+      subtitle: [info, '请确认后端已升级到支持 AI 总结的版本后重试，或切换到正确环境'].filter(Boolean).join('｜'),
+      status,
+      errorId,
+      errorCode,
+    };
+  }
+
+  return {
+    title: 'AI 总结失败',
+    subtitle: [info, backendMessage ? String(backendMessage) : null].filter(Boolean).join('｜') || info || '请求失败，请稍后重试',
+    status,
+    errorId,
+    errorCode,
+  };
+}
 
 export const aiService = {
   // 智能生成 / 扩写
@@ -48,17 +97,28 @@ export const aiService = {
   },
 
   async summarizeText(text: string): Promise<any> {
-    const response = await api.post('/ai/summary/text', { text });
-    const payload = response.data;
-    if (payload?.structured) return payload.structured;
-    if (payload?.summary) {
-      try {
-        return JSON.parse(payload.summary);
-      } catch {
-        return { overview: String(payload.summary || '') };
+    try {
+      const response = await api.post('/ai/summary/text', { text });
+      const payload = response.data;
+      if (payload?.structured) return payload.structured;
+      if (payload?.summary) {
+        try {
+          return JSON.parse(payload.summary);
+        } catch {
+          return { overview: String(payload.summary || '') };
+        }
       }
+      return { overview: '' };
+    } catch (err) {
+      const details = toSummaryApiError(err);
+      const e = new Error(details.title);
+      (e as any).title = details.title;
+      (e as any).subtitle = details.subtitle;
+      (e as any).status = details.status;
+      (e as any).errorId = details.errorId;
+      (e as any).errorCode = details.errorCode;
+      throw e;
     }
-    return { overview: '' };
   },
 
   // 生成脑图

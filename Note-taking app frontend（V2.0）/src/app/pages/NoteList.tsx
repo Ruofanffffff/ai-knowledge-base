@@ -124,8 +124,8 @@ function NoteCard({ note, onDelete, onClick, onTagClick, index }: NoteCardProps)
   const [editFlash, setEditFlash] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteCountdown, setDeleteCountdown] = useState(3);
-  const [deleteVisible, setDeleteVisible] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
 
   // Auto-cancel delete confirmation after 3 seconds
   useEffect(() => {
@@ -148,8 +148,10 @@ function NoteCard({ note, onDelete, onClick, onTagClick, index }: NoteCardProps)
   const handleLongPressStart = (e: React.PointerEvent) => {
     // Only trigger on primary pointer (finger / left mouse button)
     if (e.button !== undefined && e.button !== 0) return;
+    longPressFiredRef.current = false;
     longPressTimer.current = setTimeout(() => {
-      setDeleteVisible(true);
+      longPressFiredRef.current = true;
+      setShowDeleteConfirm(true);
     }, 500);
   };
 
@@ -167,10 +169,13 @@ function NoteCard({ note, onDelete, onClick, onTagClick, index }: NoteCardProps)
       transition={{ delay: index * 0.045, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="relative group cursor-pointer active:scale-[0.97] transition-transform"
       onClick={() => {
-        if (deleteVisible) {
-          setDeleteVisible(false);
+        if (longPressFiredRef.current) {
+          longPressFiredRef.current = false;
+          return;
+        }
+        if (showDeleteConfirm) {
           setShowDeleteConfirm(false);
-        } else if (!showDeleteConfirm) {
+        } else {
           onClick(note.id);
         }
       }}
@@ -468,7 +473,11 @@ function NoteCard({ note, onDelete, onClick, onTagClick, index }: NoteCardProps)
                 </motion.button>
                 <motion.button
                   whileTap={{ scale: 0.94 }}
-                  onClick={e => { e.stopPropagation(); onDelete(note.id); }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    setShowDeleteConfirm(false);
+                    onDelete(note.id);
+                  }}
                   className="flex-1 py-2 rounded-xl flex items-center justify-center gap-1"
                   style={{
                     background: 'linear-gradient(135deg, #EF4444, #F87171)',
@@ -484,36 +493,26 @@ function NoteCard({ note, onDelete, onClick, onTagClick, index }: NoteCardProps)
         </AnimatePresence>
 
         {/* ── Delete trigger button ── */}
-        <AnimatePresence>
-          {deleteVisible && (
-            <motion.button
-              key="delete-btn"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={showDeleteConfirm
-                ? { opacity: 1, scale: 1.1, rotate: [0, -12, 12, -6, 0] }
-                : { opacity: 1, scale: 1, rotate: 0 }
-              }
-              exit={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 0.4 }}
-              whileTap={{ scale: 0.85 }}
-              className="absolute top-2.5 right-2.5 z-20 w-6 h-6 rounded-full flex items-center justify-center"
-              style={{
-                background: showDeleteConfirm ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)',
-              }}
-              onClick={e => {
-                e.stopPropagation();
-                if (showDeleteConfirm) {
-                  setShowDeleteConfirm(false);
-                  setDeleteVisible(false);
-                } else {
-                  setShowDeleteConfirm(true);
-                }
-              }}
-            >
-              <Trash2 size={11} style={{ color: '#EF4444' }} />
-            </motion.button>
-          )}
-        </AnimatePresence>
+        <motion.button
+          key="delete-btn"
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={showDeleteConfirm
+            ? { opacity: 1, scale: 1.1, rotate: [0, -12, 12, -6, 0] }
+            : { opacity: 1, scale: 1, rotate: 0 }
+          }
+          transition={{ duration: 0.4 }}
+          whileTap={{ scale: 0.85 }}
+          className="absolute top-2.5 right-2.5 z-20 w-6 h-6 rounded-full flex items-center justify-center"
+          style={{
+            background: showDeleteConfirm ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)',
+          }}
+          onClick={e => {
+            e.stopPropagation();
+            setShowDeleteConfirm(v => !v);
+          }}
+        >
+          <Trash2 size={11} style={{ color: '#EF4444' }} />
+        </motion.button>
       </div>
     </motion.div>
   );

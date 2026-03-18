@@ -17,7 +17,7 @@ import {
   ChevronDown, CheckCheck, LayoutGrid, GitFork,
   Plus, Check, FilePlus, CloudUpload,
   Send, Globe, Users, Lock,
-  List, ListOrdered, Minus, Camera, Hash, Edit2,
+  List, ListOrdered, Minus, Camera, Hash, Edit2, Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -1002,6 +1002,30 @@ export function NoteCreate() {
   const [draftId, setDraftId] = useState<string | null>(null);
   const activeNoteId = id || draftId;
   const existingNote = activeNoteId ? notes.find(n => n.id === activeNoteId) : undefined;
+  const [showDeleteSheet, setShowDeleteSheet] = useState(false);
+  const [deletingNote, setDeletingNote] = useState(false);
+
+  const handleDeleteNote = useCallback(async () => {
+    if (!existingNote) return;
+    if (deletingNote) return;
+    setDeletingNote(true);
+    try {
+      await deleteNote(existingNote.id);
+      setDraftId(null);
+      toast.success('已删除');
+      navigate('/siku', { replace: true });
+    } catch (err) {
+      console.error('Failed to delete note:', err);
+      const msg =
+        (err as any)?.response?.data?.error ||
+        (err as Error)?.message ||
+        '删除失败，请重试';
+      toast.error(msg);
+    } finally {
+      setDeletingNote(false);
+      setShowDeleteSheet(false);
+    }
+  }, [deleteNote, deletingNote, existingNote, navigate]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
@@ -1245,9 +1269,18 @@ export function NoteCreate() {
         default:
           setAiPanel('none');
       }
-    } catch {
+    } catch (err) {
       setAiPanel('none');
-      toast.error('AI 服务暂时不可用，请稍后重试');
+      const title =
+        (err as any)?.title ||
+        (err instanceof Error ? err.message : '') ||
+        'AI 服务暂时不可用，请稍后重试';
+      const subtitle = (err as any)?.subtitle;
+      if (subtitle) {
+        toast.error(title, { subtitle });
+      } else {
+        toast.error(title);
+      }
     }
   };
 
@@ -1652,6 +1685,18 @@ export function NoteCreate() {
           {existingNote ? '编辑笔记' : '新建笔记'}
         </span>
         <div className="flex items-center gap-2">
+          {createMode === 'write' && existingNote && (
+            <button
+              onClick={() => setShowDeleteSheet(true)}
+              className="flex items-center justify-center w-9 h-9 rounded-2xl active:scale-95 transition-transform"
+              style={{
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.14)',
+              }}
+            >
+              <Trash2 size={16} style={{ color: '#EF4444' }} />
+            </button>
+          )}
           {createMode === 'write' && (
             <button
               onClick={() => setShowShareSheet(true)}
@@ -2484,6 +2529,87 @@ export function NoteCreate() {
         }}
         onClose={() => setMmEditorOpen(false)}
       />
+
+      <AnimatePresence>
+        {showDeleteSheet && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0"
+              style={{ zIndex: 9998, background: 'rgba(0,0,0,0.38)', backdropFilter: 'blur(4px)' }}
+              onClick={() => { if (!deletingNote) setShowDeleteSheet(false); }}
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="fixed bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden"
+              style={{
+                zIndex: 9999,
+                background: 'rgba(255,255,255,0.98)',
+                boxShadow: '0 -8px 40px rgba(239,68,68,0.18)',
+                backdropFilter: 'blur(20px)',
+                maxHeight: '60vh',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(239,68,68,0.18)' }} />
+              </div>
+              <div className="px-4 pb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-8 h-8 rounded-2xl flex items-center justify-center"
+                      style={{ background: 'rgba(239,68,68,0.12)' }}
+                    >
+                      <Trash2 size={16} style={{ color: '#EF4444' }} />
+                    </div>
+                    <span style={{ fontSize: '16px', fontWeight: 800, color: '#1a1a2e' }}>删除笔记</span>
+                  </div>
+                  <button
+                    onClick={() => setShowDeleteSheet(false)}
+                    disabled={deletingNote}
+                    className="w-7 h-7 flex items-center justify-center rounded-full disabled:opacity-50"
+                    style={{ background: 'rgba(239,68,68,0.08)' }}
+                  >
+                    <X size={14} style={{ color: '#EF4444' }} />
+                  </button>
+                </div>
+                <p style={{ fontSize: '13px', color: '#6B7280', lineHeight: 1.6 }}>
+                  删除后无法恢复，确定要删除这条笔记吗？
+                </p>
+                <div className="flex gap-2 mt-5">
+                  <button
+                    onClick={() => setShowDeleteSheet(false)}
+                    disabled={deletingNote}
+                    className="flex-1 py-2.5 rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50"
+                    style={{ background: 'rgba(107,114,128,0.1)', color: '#6B7280', fontWeight: 700 }}
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleDeleteNote}
+                    disabled={deletingNote}
+                    className="flex-1 py-2.5 rounded-2xl transition-all active:scale-[0.98] disabled:opacity-70"
+                    style={{
+                      background: 'linear-gradient(135deg, #EF4444, #F87171)',
+                      color: 'white',
+                      fontWeight: 800,
+                      boxShadow: '0 4px 14px rgba(239,68,68,0.35)',
+                    }}
+                  >
+                    {deletingNote ? '删除中…' : '确认删除'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ═══ Share to 思圈 sheet ═══ */}
       <AnimatePresence>

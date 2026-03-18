@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, X, Send, Plus, UserPlus, EyeOff, Link2, Flag, Check } from 'lucide-react';

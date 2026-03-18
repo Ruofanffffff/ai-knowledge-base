@@ -21,6 +21,7 @@ import { ChatCard, CardPayload } from '../components/ChatCards';
 import { InlineSearch } from '../components/InlineSearch';
 import { hibrainService } from '../services/hibrainService';
 import { useVisualViewportMetrics } from '../components/ui/use-visual-viewport';
+import { useCapacitorKeyboardMetrics } from '../components/ui/use-capacitor-keyboard';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants & types
@@ -808,11 +809,24 @@ function HiBrainNewDesign() {
   const [recordSecs,  setRecordSecs]    = useState(0);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const vv = useVisualViewportMetrics();
-  const keyboardOpen = inputFocused && vv.insetBottom > 0;
+  const capKeyboard = useCapacitorKeyboardMetrics();
+  const baselineLayoutHeightRef = useRef<number>(vv.layoutHeight);
+  baselineLayoutHeightRef.current = Math.max(baselineLayoutHeightRef.current, vv.layoutHeight);
+  const layoutInset = Math.max(0, baselineLayoutHeightRef.current - vv.layoutHeight);
+  const viewportInsetBottom = Math.max(vv.insetBottom, layoutInset);
+  const overlayInsetFromCap = capKeyboard.height > 0 ? Math.max(0, capKeyboard.height - layoutInset) : 0;
+  const keyboardOpen = inputFocused && (capKeyboard.visible || capKeyboard.height > 0 || viewportInsetBottom > 0);
   const containerHeight = keyboardOpen
-    ? vv.supported
-      ? Math.round(vv.visualHeight + vv.offsetTop)
-      : vv.layoutHeight
+    ? Math.round(
+        Math.max(
+          0,
+          capKeyboard.height > 0
+            ? vv.layoutHeight - overlayInsetFromCap
+            : vv.supported
+              ? vv.visualHeight + vv.offsetTop
+              : vv.layoutHeight - viewportInsetBottom,
+        ),
+      )
     : undefined;
 
   const VOICE_MOCKS = [
@@ -886,7 +900,7 @@ function HiBrainNewDesign() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, 60);
     return () => window.clearTimeout(t);
-  }, [keyboardOpen]);
+  }, [keyboardOpen, capKeyboard.height, viewportInsetBottom, containerHeight]);
 
   const resolveAiAnswer = (result: any) => {
     if (typeof result === 'string' && result.trim()) return result.trim();
