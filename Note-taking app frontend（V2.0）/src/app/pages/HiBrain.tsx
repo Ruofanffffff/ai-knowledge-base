@@ -17,9 +17,10 @@ import { HiBrainClassic } from './HiBrainClassic';
 import { StrategyViewPanel } from '../components/StrategyViewPanel';
 import { ClusterCard } from '../components/ClusterCard';
 import { KnowledgePushNotification } from '../components/KnowledgePushNotification';
-import { ChatCard, CardPayload, GraphNode, GraphEdge } from '../components/ChatCards';
+import { ChatCard, CardPayload } from '../components/ChatCards';
 import { InlineSearch } from '../components/InlineSearch';
 import { hibrainService } from '../services/hibrainService';
+import { useVisualViewportMetrics } from '../components/ui/use-visual-viewport';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants & types
@@ -91,85 +92,6 @@ function GrowthRing({ completion, color, fragCount }: { completion: number; colo
 }
 
 interface Message { id: string; role: 'user' | 'ai'; content: string; timestamp: Date; card?: CardPayload; }
-
-// ─── Mock image library ───────────────────────────────────────────────────────
-const IMG_LIBRARY: Record<string, { url: string; title: string; caption: string }> = {
-  hokkaido: {
-    url: 'https://images.unsplash.com/photo-1598176433730-2aca0907a717?w=600&q=80',
-    title: '北海道雪景', caption: '白雪皑皑的北海道冬日风光',
-  },
-  japan: {
-    url: 'https://images.unsplash.com/photo-1742518461813-4732bd5e9867?w=600&q=80',
-    title: '日本樱花', caption: '春日漫天樱花的旅行意境',
-  },
-  kyoto: {
-    url: 'https://images.unsplash.com/photo-1735807324326-ae7a02d60f24?w=600&q=80',
-    title: '京都红叶', caption: '秋日寺庙间的色彩盛宴',
-  },
-  tokyo: {
-    url: 'https://images.unsplash.com/photo-1597806807841-c5fe4f69e38d?w=600&q=80',
-    title: '东京夜景', caption: '流光溢彩的城市不夜天',
-  },
-  cafe: {
-    url: 'https://images.unsplash.com/photo-1758609054061-5576a5e4e373?w=600&q=80',
-    title: '咖啡阅读', caption: '慵懒午后的知识角落',
-  },
-};
-
-function getImageCard(msg: string): CardPayload | undefined {
-  const m = msg.toLowerCase();
-  let img: { url: string; title: string; caption: string } | undefined;
-  if (m.includes('北海道') || m.includes('hokkaido'))       img = IMG_LIBRARY.hokkaido;
-  else if (m.includes('京都') || m.includes('kyoto'))       img = IMG_LIBRARY.kyoto;
-  else if (m.includes('东京') || m.includes('tokyo'))       img = IMG_LIBRARY.tokyo;
-  else if (m.includes('日本') || m.includes('japan') || m.includes('旅行')) img = IMG_LIBRARY.japan;
-  else if (m.includes('咖啡') || m.includes('阅读') || m.includes('cafe')) img = IMG_LIBRARY.cafe;
-  if (!img) return undefined;
-  return { type: 'image', imageUrl: img.url, imageTitle: img.title, imageCaption: img.caption };
-}
-
-function buildGraphCard(clusters: Cluster[]): CardPayload {
-  const top = clusters.slice(0, 5);
-  const nodes: GraphNode[] = [
-    { id: 'center', label: 'HiBrain', emoji: '🧠', color: '#6366F1', x: 130, y: 74, size: 18 },
-    ...top.map((cl, i) => {
-      const a = (i / Math.max(top.length, 1)) * 2 * Math.PI - Math.PI / 2;
-      return { id: cl.id, label: cl.name, color: cl.color,
-        x: Math.round(130 + Math.cos(a) * 90), y: Math.round(74 + Math.sin(a) * 48),
-        size: 10 + Math.min(cl.fragCount, 5) * 1.8 };
-    }),
-  ];
-  const edges: GraphEdge[] = top.map(cl => ({ from: 'center', to: cl.id, strength: cl.completion / 100 }));
-  // cross-edges for clusters sharing tags
-  top.forEach((a, ai) => top.slice(ai + 1).forEach(b => {
-    if (a.topTags.some(t => b.topTags.includes(t)))
-      edges.push({ from: a.id, to: b.id, strength: 0.4 });
-  }));
-  return { type: 'graph', graphNodes: nodes, graphEdges: edges, graphTitle: '你的知识关联图谱' };
-}
-
-function getCardForMessage(msg: string, clusters: Cluster[], notes: Note[]): CardPayload | undefined {
-  const m = msg.toLowerCase();
-  // Image trigger
-  if (m.includes('图片') || m.includes('照片') || m.includes('看看') || m.includes('长什么样') || m.includes('是什么样')) {
-    return getImageCard(msg);
-  }
-  // Specific place triggers → also return image
-  if (/北海道|京都|东京|日本|hokkaido|kyoto|tokyo|japan/.test(m) && !m.includes('图谱')) {
-    const imgCard = getImageCard(msg);
-    if (imgCard) return imgCard;
-  }
-  // Graph trigger
-  if (m.includes('图谱') || m.includes('关联') || m.includes('关系') || m.includes('网络') || m.includes('结构')) {
-    if (clusters.length > 0) return buildGraphCard(clusters);
-  }
-  // Note reference trigger
-  if ((m.includes('找') || m.includes('查找') || m.includes('上次') || m.includes('之前') || m.includes('那条')) && notes.length > 0) {
-    const latest = [...notes].sort((a, b) => b.createdAt - a.createdAt)[0];
-    return { type: 'note', noteData: latest, noteHighlight: 'AI 引用' };
-  }
-  return undefined;
-}
 
 const QUICK_PROMPTS = ['帮我串联碎片', '生成完整攻略', '发现主题规律', '今日碎片整合', '查看知识图谱', '找找上次的笔记', '日本旅行图片'];
 
@@ -870,6 +792,7 @@ function HiBrainNewDesign() {
   const [messages, setMessages] = useState<Message[]>([{ id:'0', role:'ai', content:initMsg, timestamp:new Date() }]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showScan, setShowScan] = useState(false);
   const [nexusCollapsed, setNexusCollapsed] = useState(false);
@@ -884,6 +807,13 @@ function HiBrainNewDesign() {
   const [isRecording, setIsRecording]   = useState(false);
   const [recordSecs,  setRecordSecs]    = useState(0);
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const vv = useVisualViewportMetrics();
+  const keyboardOpen = inputFocused && vv.insetBottom > 0;
+  const containerHeight = keyboardOpen
+    ? vv.supported
+      ? Math.round(vv.visualHeight + vv.offsetTop)
+      : vv.layoutHeight
+    : undefined;
 
   const VOICE_MOCKS = [
     '今天读了一篇关于知识图谱的论文，感觉可以和之前的笔记串联起来',
@@ -950,6 +880,14 @@ function HiBrainNewDesign() {
     messagesEndRef.current?.scrollIntoView({ behavior:'smooth' });
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    if (!keyboardOpen) return;
+    const t = window.setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 60);
+    return () => window.clearTimeout(t);
+  }, [keyboardOpen]);
+
   const resolveAiAnswer = (result: any) => {
     if (typeof result === 'string' && result.trim()) return result.trim();
 
@@ -973,6 +911,24 @@ function HiBrainNewDesign() {
     return fromCandidates?.trim() || '我收到你的消息了，但暂时无法回答。';
   };
 
+  const hasNonEmptySourceArrays = (value: unknown): boolean => {
+    if (!value || typeof value !== 'object') return false;
+    return Object.values(value as Record<string, unknown>).some(v => Array.isArray(v) && v.length > 0);
+  };
+
+  const buildSourcesCardFromResult = (result: any): CardPayload | undefined => {
+    const hasSourcesField = result?.sources !== undefined && result?.sources !== null;
+    const sourcesHasAny = Array.isArray(result?.sources)
+      ? result.sources.length > 0
+      : hasNonEmptySourceArrays(result?.sources);
+    const sourcesDetailsHasAny = hasNonEmptySourceArrays(result?.sourcesDetails);
+
+    const shouldShow = hasSourcesField ? sourcesHasAny : sourcesDetailsHasAny;
+    if (!shouldShow) return undefined;
+    if (!result?.sourcesDetails || typeof result.sourcesDetails !== 'object') return undefined;
+    return { type: 'sources', sourcesDetails: result.sourcesDetails };
+  };
+
   const sendMessage = async (text?: string) => {
     const msg = (text || input).trim();
     if (!msg) return;
@@ -984,8 +940,12 @@ function HiBrainNewDesign() {
     try {
       // Use real backend service instead of mock
       const result = await hibrainService.query(msg);
-      const card = getCardForMessage(msg, clusters, notes);
-      const notesSourceCount = Array.isArray(result?.sources?.notes) ? result.sources.notes.length : 0;
+      const card = buildSourcesCardFromResult(result);
+      const notesSourceCount = Array.isArray(result?.sources?.notes)
+        ? result.sources.notes.length
+        : Array.isArray(result?.sourcesDetails?.notes)
+          ? result.sourcesDetails.notes.length
+          : 0;
       const answer = resolveAiAnswer(result);
       const answerWithSource = notesSourceCount > 0
         ? `${answer}\n\n（已检索思库笔记 ${notesSourceCount} 条）`
@@ -1031,7 +991,10 @@ function HiBrainNewDesign() {
   const matureClusters = clusters.filter(c => c.stage === 'growing' || c.stage === 'mature');
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden relative" style={{ background:'var(--hi-page-bg)' }}>
+    <div
+      className="h-screen flex flex-col overflow-hidden relative"
+      style={{ background:'var(--hi-page-bg)', ...(containerHeight ? { height: `${containerHeight}px` } : {}) }}
+    >
       <ParticleBackground />
 
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -1301,8 +1264,18 @@ function HiBrainNewDesign() {
       </div>
 
       {/* ── Input bar ── */}
-      <div className="relative z-20 flex-shrink-0 px-4 pb-24 pt-3"
-        style={{ background:'var(--hi-header-bg)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderTop:'1px solid var(--hi-header-border)' }}>
+      <div
+        className="relative z-20 flex-shrink-0 px-4 pt-3"
+        style={{
+          background:'var(--hi-header-bg)',
+          backdropFilter:'blur(20px)',
+          WebkitBackdropFilter:'blur(20px)',
+          borderTop:'1px solid var(--hi-header-border)',
+          paddingBottom: keyboardOpen
+            ? 'max(env(safe-area-inset-bottom), 12px)'
+            : 'calc(env(safe-area-inset-bottom) + 96px)',
+        }}
+      >
         <motion.div
           key={quickPulse}
           initial={{ opacity: 0, y: 8 }}
@@ -1437,6 +1410,8 @@ function HiBrainNewDesign() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMessage(); }}}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
             placeholder={isRecording ? '正在聆听…' : '串联你的碎片灵感…'}
             className="flex-1 bg-transparent outline-none"
             style={{ color:'var(--hi-text-primary)', fontSize:'14px' }}
@@ -1451,7 +1426,7 @@ function HiBrainNewDesign() {
         </div>
       </div>
 
-      <BottomNav />
+      {!keyboardOpen && <BottomNav />}
       <GlobalSearch open={showSearch} onClose={() => setShowSearch(false)} />
       <ScanRecognition open={showScan} onClose={() => setShowScan(false)} />
 

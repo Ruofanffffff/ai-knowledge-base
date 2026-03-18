@@ -27,8 +27,40 @@ export interface GraphNode {
 }
 export interface GraphEdge { from: string; to: string; strength?: number; }
 
+export interface HiBrainSourceNoteDetail {
+  id: string;
+  title: string;
+  excerpt?: string;
+  tags?: string[];
+  updatedAt?: string;
+}
+
+export interface HiBrainSourceDocumentDetail {
+  id: string;
+  title: string;
+  excerpt?: string;
+  updatedAt?: string;
+}
+
+export interface HiBrainSourceAttachmentDetail {
+  id: string;
+  type?: string;
+  noteId?: string;
+  noteTitle?: string;
+  excerpt?: string;
+  tags?: string[];
+  updatedAt?: string;
+}
+
+export interface HiBrainSourcesDetails {
+  notes?: HiBrainSourceNoteDetail[];
+  documents?: HiBrainSourceDocumentDetail[];
+  attachments?: HiBrainSourceAttachmentDetail[];
+  [key: string]: any;
+}
+
 export interface CardPayload {
-  type: 'image' | 'graph' | 'note' | 'growth';
+  type: 'image' | 'graph' | 'note' | 'growth' | 'sources';
   // image
   imageUrl?: string;
   imageTitle?: string;
@@ -43,6 +75,8 @@ export interface CardPayload {
   // growth
   cluster?: Cluster;
   nextColor?: string;
+  // sources
+  sourcesDetails?: HiBrainSourcesDetails;
 }
 
 // ─── Shared card wrapper ──────────────────────────────────────────────────────
@@ -648,6 +682,202 @@ function GrowthCard({ card, onMerge }:
   );
 }
 
+function formatSourceDate(iso?: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+}
+
+function SourcesCard({ card, onNavigate }: { card: CardPayload; onNavigate?: (p: string) => void }) {
+  const details = card.sourcesDetails;
+  const notes = Array.isArray(details?.notes) ? details!.notes : [];
+  const documents = Array.isArray(details?.documents) ? details!.documents : [];
+  const attachments = Array.isArray(details?.attachments) ? details!.attachments : [];
+  const total = notes.length + documents.length + attachments.length;
+  if (total === 0) return null;
+
+  const SectionTitle = ({ text }: { text: string }) => (
+    <p style={{ color: '#9CA3AF', fontSize: '9.5px', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 10 }}>
+      {text}
+    </p>
+  );
+
+  return (
+    <CardShell color="#6366F1">
+      <div className="px-3.5 pt-3 pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-6 h-6 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(99,102,241,0.12)' }}>
+              <Layers size={12} color="#6366F1" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', fontWeight: 900 }}>
+                AI 引用
+              </p>
+              <p style={{ color: 'var(--hi-text-secondary)', fontSize: '9.5px', marginTop: 1 }}>
+                {total} 条来源
+              </p>
+            </div>
+          </div>
+          {onNavigate && (
+            <motion.button
+              whileTap={{ scale: 0.94 }}
+              onClick={() => onNavigate('/siku')}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl flex-shrink-0"
+              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}
+            >
+              <span style={{ color: '#6366F1', fontSize: '10px', fontWeight: 700 }}>去思库</span>
+              <ArrowRight size={9} color="#6366F1" />
+            </motion.button>
+          )}
+        </div>
+
+        {notes.length > 0 && (
+          <div>
+            <SectionTitle text="笔记" />
+            <div className="space-y-2 mt-2">
+              {notes.slice(0, 3).map((n, i) => {
+                const timeStr = formatSourceDate(n.updatedAt);
+                const clickable = Boolean(onNavigate);
+                const row = (
+                  <motion.div
+                    key={n.id}
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.08 + i * 0.04, type: 'spring', stiffness: 340, damping: 24 }}
+                    className="rounded-2xl px-3 py-2 text-left"
+                    style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.14)' }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '12px', fontWeight: 800 }}>
+                        {n.title || '未命名笔记'}
+                      </p>
+                      {timeStr && (
+                        <span style={{ color: '#9CA3AF', fontSize: '9px', flexShrink: 0 }}>{timeStr}</span>
+                      )}
+                    </div>
+                    {n.excerpt && (
+                      <p style={{ color: 'var(--hi-text-secondary)', fontSize: '10.5px', marginTop: 2, lineHeight: 1.5 }}>
+                        {n.excerpt}
+                      </p>
+                    )}
+                    {Array.isArray(n.tags) && n.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {n.tags.slice(0, 4).map(tag => (
+                          <span key={tag}
+                            style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.18)',
+                              color: '#6366F1', fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: 99 }}>
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+                return clickable ? (
+                  <button
+                    key={n.id}
+                    onClick={() => onNavigate?.(`/siku/${n.id}`)}
+                    className="w-full text-left active:scale-[0.99] transition-transform"
+                  >
+                    {row}
+                  </button>
+                ) : row;
+              })}
+            </div>
+          </div>
+        )}
+
+        {documents.length > 0 && (
+          <div>
+            <SectionTitle text="文档" />
+            <div className="space-y-2 mt-2">
+              {documents.slice(0, 2).map((d, i) => {
+                const timeStr = formatSourceDate(d.updatedAt);
+                return (
+                  <motion.div
+                    key={d.id}
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.12 + i * 0.04, type: 'spring', stiffness: 340, damping: 24 }}
+                    className="rounded-2xl px-3 py-2"
+                    style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)' }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '11.5px', fontWeight: 800 }}>
+                        {d.title || '未命名文档'}
+                      </p>
+                      {timeStr && (
+                        <span style={{ color: '#9CA3AF', fontSize: '9px', flexShrink: 0 }}>{timeStr}</span>
+                      )}
+                    </div>
+                    {d.excerpt && (
+                      <p style={{ color: 'var(--hi-text-secondary)', fontSize: '10.5px', marginTop: 2, lineHeight: 1.5 }}>
+                        {d.excerpt}
+                      </p>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {attachments.length > 0 && (
+          <div>
+            <SectionTitle text="附件解析" />
+            <div className="space-y-2 mt-2">
+              {attachments.slice(0, 2).map((a, i) => {
+                const timeStr = formatSourceDate(a.updatedAt);
+                return (
+                  <motion.div
+                    key={a.id}
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.16 + i * 0.04, type: 'spring', stiffness: 340, damping: 24 }}
+                    className="rounded-2xl px-3 py-2"
+                    style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)' }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '11.5px', fontWeight: 800 }}>
+                        {a.noteTitle || a.type || '附件'}
+                      </p>
+                      {timeStr && (
+                        <span style={{ color: '#9CA3AF', fontSize: '9px', flexShrink: 0 }}>{timeStr}</span>
+                      )}
+                    </div>
+                    {a.excerpt && (
+                      <p style={{ color: 'var(--hi-text-secondary)', fontSize: '10.5px', marginTop: 2, lineHeight: 1.5 }}>
+                        {a.excerpt}
+                      </p>
+                    )}
+                    {Array.isArray(a.tags) && a.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {a.tags.slice(0, 4).map(tag => (
+                          <span key={tag}
+                            style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.18)',
+                              color: '#6366F1', fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: 99 }}>
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {total > 7 && (
+          <p className="mt-3" style={{ color: '#9CA3AF', fontSize: '10px' }}>
+            仅展示部分来源
+          </p>
+        )}
+      </div>
+    </CardShell>
+  );
+}
+
 // ─── Main dispatcher ──────────────────────────────────────────────────────────
 
 export function ChatCard({ card, onMerge, onNavigate, onAddToMerge }: {
@@ -661,6 +891,7 @@ export function ChatCard({ card, onMerge, onNavigate, onAddToMerge }: {
     case 'graph':  return <GraphCard card={card} onNavigate={onNavigate} />;
     case 'note':   return <NoteCard card={card} onNavigate={onNavigate} onAddToMerge={onAddToMerge} />;
     case 'growth': return <GrowthCard card={card} onMerge={onMerge} />;
+    case 'sources': return <SourcesCard card={card} onNavigate={onNavigate} />;
     default: return null;
   }
 }

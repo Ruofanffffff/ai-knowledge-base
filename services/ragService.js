@@ -9,7 +9,8 @@ const SYSTEM_PROMPT = `你是一个名为 "Hi Brain" 的 AI 助手，也是用�
 你的使命是协助用户记录灵感、串联知识，并提供有深度的见解。
 
 请基于以下提供的【用户记忆】和【知识库上下文】来回答用户的问题。
-如果上下文中没有相关信息，请诚实地说明，或者基于你的通用知识进行回答，但要标明这是通用知识。
+如果上下文中没有相关信息，请基于你的通用知识进行回答，并明确标明这是通用知识。
+如果上下文中命中了【思库笔记/思库文档/思库附件】任意一类来源，你的回答必须结合来源信息（至少自然提及 1-2 个来源标题或关键点来支撑结论），避免出现“未同步/没有相关内容/没有相关/无相关内容”等否定式话术。
 
 回答风格要求：
 1. 温暖、真诚、富有同理心。
@@ -80,6 +81,72 @@ class RAGService {
       return text.split(/[，,\s|/]+/).map(tag => tag.trim()).filter(Boolean);
     }
     return [];
+  }
+
+  buildSourcesDetails({ notes = [], documents = [], attachments = [] }) {
+    const safeDate = value => (value instanceof Date ? value.toISOString() : value || null);
+
+    return {
+      notes: notes.map(note => ({
+        id: note.id,
+        title: note.title,
+        excerpt: note.excerpt,
+        tags: note.tags || [],
+        updatedAt: safeDate(note.updatedAt)
+      })),
+      documents: documents.map(doc => ({
+        id: doc.id,
+        title: doc.title,
+        excerpt: doc.excerpt,
+        updatedAt: safeDate(doc.updatedAt)
+      })),
+      attachments: attachments.map(att => ({
+        id: att.id,
+        type: att.type,
+        noteId: att.noteId || null,
+        noteTitle: att.noteTitle,
+        excerpt: att.excerpt,
+        tags: att.tags || [],
+        updatedAt: safeDate(att.updatedAt)
+      }))
+    };
+  }
+
+  hasAnySources(sources) {
+    if (!sources || typeof sources !== 'object') return false;
+    const keys = ['notes', 'documents', 'attachments', 'memories', 'kg_entities'];
+    return keys.some(key => Array.isArray(sources[key]) && sources[key].length > 0);
+  }
+
+  containsNegativeNoSourceWording(text) {
+    const value = String(text || '').trim();
+    if (!value) return false;
+    return /(未同步|没有相关内容|无相关内容|没有相关|暂时没有检索到|找不到相关)/.test(value);
+  }
+
+  buildSourceBackedFallbackAnswer({ query, notes = [], documents = [], attachments = [] }) {
+    const picked = [];
+    notes.slice(0, 2).forEach(note => {
+      picked.push(`- 笔记《${note.title}》：${note.excerpt || '（摘要为空）'}`);
+    });
+    if (picked.length < 3) {
+      documents.slice(0, 2).forEach(doc => {
+        if (picked.length >= 3) return;
+        picked.push(`- 文档《${doc.title}》：${doc.excerpt || '（摘要为空）'}`);
+      });
+    }
+    if (picked.length < 3) {
+      attachments.slice(0, 2).forEach(att => {
+        if (picked.length >= 3) return;
+        const label = att.noteTitle ? `关联笔记《${att.noteTitle}》` : '附件';
+        picked.push(`- 附件（${att.type}）${label}：${att.excerpt || '（摘要为空）'}`);
+      });
+    }
+
+    const lead = `我先基于你思库里命中的内容，回答你的问题「${query}」：`;
+    const body = picked.length ? picked.join('\n') : '';
+    const tail = '\n\n你希望我优先展开哪一条来源？也可以告诉我你更关注的角度（结论/步骤/对比/行动建议）。';
+    return `${lead}\n\n${body}${tail}`.trim();
   }
 
   async searchUserNotes(userId, query) {
@@ -315,6 +382,13 @@ class RAGService {
             take,
             select: { id: true, content: true, tags: true, updatedAt: true }
           });
+          const notes = rows.map(r => ({
+            id: r.id,
+            title: this.deriveTitle(r.content),
+            excerpt: this.stripHtmlToText(r.content).slice(0, 220),
+            tags: this.parseTags(r.tags),
+            updatedAt: r.updatedAt
+          }));
           const items = rows.map((note, idx) => {
             const title = this.deriveTitle(note.content);
             const excerpt = this.stripHtmlToText(note.content).slice(0, 120);
@@ -328,6 +402,7 @@ class RAGService {
             answer,
             response: answer,
             sources: { notes: rows.map(r => r.id), documents: [], attachments: [], memories: [], kg_entities: [] },
+            sourcesDetails: this.buildSourcesDetails({ notes, documents: [], attachments: [] }),
             contextStats: { notes: rows.length, documents: 0, attachments: 0, memories: 0, kgContextIncluded: false }
           };
         }
@@ -339,6 +414,12 @@ class RAGService {
             take,
             select: { id: true, title: true, content: true, updatedAt: true }
           });
+          const documents = rows.map(r => ({
+            id: r.id,
+            title: String(r.title || '').trim() || this.deriveTitle(r.content),
+            excerpt: this.stripHtmlToText(r.content).slice(0, 260),
+            updatedAt: r.updatedAt
+          }));
           const items = rows.map((doc, idx) => {
             const title = String(doc.title || '').trim() || this.deriveTitle(doc.content);
             const excerpt = this.stripHtmlToText(doc.content).slice(0, 140);
@@ -351,6 +432,7 @@ class RAGService {
             answer,
             response: answer,
             sources: { notes: [], documents: rows.map(r => r.id), attachments: [], memories: [], kg_entities: [] },
+            sourcesDetails: this.buildSourcesDetails({ notes: [], documents, attachments: [] }),
             contextStats: { notes: 0, documents: rows.length, attachments: 0, memories: 0, kgContextIncluded: false }
           };
         }
@@ -366,9 +448,19 @@ class RAGService {
               url: true,
               createdAt: true,
               noteId: true,
-              analysis: { select: { textContent: true, description: true } }
+              analysis: { select: { textContent: true, description: true } },
+              note: { select: { content: true, tags: true, updatedAt: true } }
             }
           });
+          const attachments = rows.map(r => ({
+            id: r.id,
+            type: r.type,
+            noteId: r.noteId,
+            noteTitle: r.note ? this.deriveTitle(r.note.content) : '无标题',
+            excerpt: String(r.analysis?.textContent || r.analysis?.description || '').trim().slice(0, 260),
+            tags: r.note ? this.parseTags(r.note.tags) : [],
+            updatedAt: (r.note && r.note.updatedAt) ? r.note.updatedAt : r.createdAt
+          }));
           const items = rows.map((att, idx) => {
             const excerpt = String(att.analysis?.textContent || att.analysis?.description || '').trim().slice(0, 120);
             return `${idx + 1}. ${att.type}（noteId: ${att.noteId}）\n   ${excerpt || '（暂无解析内容）'}`;
@@ -380,6 +472,7 @@ class RAGService {
             answer,
             response: answer,
             sources: { notes: [], documents: [], attachments: rows.map(r => r.id), memories: [], kg_entities: [] },
+            sourcesDetails: this.buildSourcesDetails({ notes: [], documents: [], attachments }),
             contextStats: { notes: 0, documents: 0, attachments: rows.length, memories: 0, kgContextIncluded: false }
           };
         }
@@ -424,7 +517,9 @@ class RAGService {
       const fullContext = `${memoryContext}\n${notesContext}\n${documentsContext}\n${attachmentsContext}\n${kgContext}`;
 
       // 3. Construct Prompt
-      const userPrompt = `用户问题: ${query}\n\n参考信息:\n${fullContext}`;
+      const userPrompt =
+        `用户问题: ${query}\n\n参考信息:\n${fullContext}\n\n` +
+        `要求：如果参考信息里包含来源（思库笔记/思库文档/思库附件），请在回答中自然提及并用它们支撑结论；不要输出“未同步/没有相关内容/没有相关/无相关内容”等话术。`;
 
       // 4. Call LLM
       const response = await llmClient.call(userPrompt, {
@@ -432,17 +527,46 @@ class RAGService {
         temperature: 0.7
       });
       const finalResponse = typeof response === 'string' ? response.trim() : '';
-      const fallbackResponse = relatedNotes.length > 0
-        ? `我结合你的思库找到了这些相关笔记：${relatedNotes.slice(0, 3).map(n => `《${n.title}》`).join('、')}。你可以继续追问，我会基于这些内容展开。`
-        : '我暂时没有检索到和你问题直接相关的思库内容。你可以换个关键词，或先新增一些相关笔记。';
+
+      const sourcesDetails = this.buildSourcesDetails({
+        notes: relatedNotes,
+        documents: relatedDocuments,
+        attachments: relatedAttachments
+      });
+      const hasSources = relatedNotes.length > 0 || relatedDocuments.length > 0 || relatedAttachments.length > 0 || memories.length > 0;
+
+      let answer = finalResponse;
+      if (!answer) {
+        answer = hasSources
+          ? this.buildSourceBackedFallbackAnswer({ query, notes: relatedNotes, documents: relatedDocuments, attachments: relatedAttachments })
+          : `我先用通用知识回答你的问题「${query}」。如果你愿意，也可以补充一点背景（例如你要做什么、现状是什么、限制条件是什么），我会更贴近你的语境给建议。`;
+      }
+      if (hasSources && this.containsNegativeNoSourceWording(answer)) {
+        answer = this.buildSourceBackedFallbackAnswer({ query, notes: relatedNotes, documents: relatedDocuments, attachments: relatedAttachments });
+      }
+      if (hasSources) {
+        const titles = [
+          ...relatedNotes.slice(0, 2).map(n => n.title),
+          ...relatedDocuments.slice(0, 1).map(d => d.title),
+          ...relatedAttachments.slice(0, 1).map(a => a.noteTitle)
+        ].filter(Boolean);
+        const mentionsAnyTitle = titles.some(title => title && answer.includes(title));
+        if (!mentionsAnyTitle && (sourcesDetails.notes.length || sourcesDetails.documents.length || sourcesDetails.attachments.length)) {
+          const lines = [];
+          sourcesDetails.notes.slice(0, 2).forEach(n => lines.push(`- 笔记《${n.title}》：${n.excerpt || '（摘要为空）'}`));
+          sourcesDetails.documents.slice(0, 1).forEach(d => lines.push(`- 文档《${d.title}》：${d.excerpt || '（摘要为空）'}`));
+          sourcesDetails.attachments.slice(0, 1).forEach(a => lines.push(`- 附件（${a.type}）关联笔记《${a.noteTitle}》：${a.excerpt || '（摘要为空）'}`));
+          answer = `${answer}\n\n参考来源：\n${lines.join('\n')}`.trim();
+        }
+      }
 
       // 5. Asynchronously save this interaction to Episodic Memory if important
       // (This logic could be refined to only save high-quality interactions)
       // await memoryService.addMemory(userId, `用户问: ${query}\nAI答: ${response}`, 'episodic');
 
       return {
-        answer: finalResponse || fallbackResponse,
-        response: finalResponse || fallbackResponse,
+        answer,
+        response: answer,
         sources: {
           memories: memories.map(m => m.id),
           notes: relatedNotes.map(note => note.id),
@@ -450,6 +574,7 @@ class RAGService {
           attachments: relatedAttachments.map(att => att.id),
           kg_entities: []
         },
+        sourcesDetails,
         contextStats: {
           memories: memories.length,
           notes: relatedNotes.length,

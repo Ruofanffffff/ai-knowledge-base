@@ -1,8 +1,50 @@
 import { api } from './api';
 
+export interface HiBrainSources {
+  memories?: string[];
+  notes?: string[];
+  documents?: string[];
+  attachments?: string[];
+  kg_entities?: string[];
+  [key: string]: any;
+}
+
+export interface HiBrainSourceNoteDetail {
+  id: string;
+  title: string;
+  excerpt?: string;
+  tags?: string[];
+  updatedAt?: string;
+}
+
+export interface HiBrainSourceDocumentDetail {
+  id: string;
+  title: string;
+  excerpt?: string;
+  updatedAt?: string;
+}
+
+export interface HiBrainSourceAttachmentDetail {
+  id: string;
+  type?: string;
+  noteId?: string;
+  noteTitle?: string;
+  excerpt?: string;
+  tags?: string[];
+  updatedAt?: string;
+}
+
+export interface HiBrainSourcesDetails {
+  notes?: HiBrainSourceNoteDetail[];
+  documents?: HiBrainSourceDocumentDetail[];
+  attachments?: HiBrainSourceAttachmentDetail[];
+  [key: string]: any;
+}
+
 export interface HiBrainQueryResponse {
   answer: string;
-  sources?: any[];
+  sources?: HiBrainSources;
+  sourcesDetails?: HiBrainSourcesDetails;
   [key: string]: any;
 }
 
