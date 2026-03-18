@@ -119,4 +119,57 @@ describe('RAGService - sourcesDetails', () => {
     expect(result.answer).toContain('旅行预算清单');
     expect(result.answer).not.toContain('没有相关内容');
   });
+
+  it('should return stable sourcesDetails and generic answer with explicit no-source notice when sources miss and LLM is empty', async () => {
+    const llmClient = require('../llmClient');
+    const memoryService = require('../memoryService');
+    const ragService = require('../ragService');
+
+    llmClient.call.mockResolvedValue('');
+    memoryService.searchMemories.mockResolvedValue([]);
+
+    ragService.searchKnowledgeGraph = jest.fn().mockResolvedValue('');
+    ragService.searchUserNotes = jest.fn().mockResolvedValue([]);
+    ragService.searchUserDocuments = jest.fn().mockResolvedValue([]);
+    ragService.searchUserAttachmentAnalyses = jest.fn().mockResolvedValue([]);
+
+    const result = await ragService.generateResponse('u1', '怎么更高效地学习一门新技能？');
+
+    expect(result.sources).toEqual({
+      memories: [],
+      notes: [],
+      documents: [],
+      attachments: [],
+      kg_entities: []
+    });
+
+    expect(result.sourcesDetails).toEqual({
+      notes: [],
+      documents: [],
+      attachments: []
+    });
+
+    expect(result.answer).toContain('通用知识');
+    expect(result.answer).toContain('未引用思库来源');
+  });
+
+  it('should append explicit no-source notice when sources miss but LLM returns an answer', async () => {
+    const llmClient = require('../llmClient');
+    const memoryService = require('../memoryService');
+    const ragService = require('../ragService');
+
+    llmClient.call.mockResolvedValue('你可以从一个小项目开始，把它拆成可执行的任务。');
+    memoryService.searchMemories.mockResolvedValue([]);
+
+    ragService.searchKnowledgeGraph = jest.fn().mockResolvedValue('');
+    ragService.searchUserNotes = jest.fn().mockResolvedValue([]);
+    ragService.searchUserDocuments = jest.fn().mockResolvedValue([]);
+    ragService.searchUserAttachmentAnalyses = jest.fn().mockResolvedValue([]);
+
+    const result = await ragService.generateResponse('u1', '怎么开始学习编程？');
+
+    expect(result.answer).toContain('小项目');
+    expect(result.answer).toContain('未引用思库来源');
+    expect(result.answer).toContain('仅基于通用知识');
+  });
 });

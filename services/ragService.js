@@ -121,7 +121,19 @@ class RAGService {
   containsNegativeNoSourceWording(text) {
     const value = String(text || '').trim();
     if (!value) return false;
-    return /(未同步|没有相关内容|无相关内容|没有相关|暂时没有检索到|找不到相关)/.test(value);
+    return /(未同步|没有相关内容|无相关内容|没有相关|暂时没有检索到|找不到相关|未找到相关|没有找到相关|没找到相关|未检索到|没有检索到|未命中|没有命中|思库(里|中).{0,12}(没有|找不到|未找到))/i.test(value);
+  }
+
+  ensureNoSourceNotice(answer) {
+    const value = String(answer || '').trim();
+    if (!value) return value;
+
+    if (/(未引用|未使用|仅基于通用知识).{0,18}思库/.test(value) || /未引用思库来源/.test(value)) {
+      return value;
+    }
+
+    const notice = '说明：本次回答未引用思库来源（笔记/文档/附件），仅基于通用知识。';
+    return `${value}\n\n${notice}`.trim();
   }
 
   buildSourceBackedFallbackAnswer({ query, notes = [], documents = [], attachments = [] }) {
@@ -543,6 +555,9 @@ class RAGService {
       }
       if (hasSources && this.containsNegativeNoSourceWording(answer)) {
         answer = this.buildSourceBackedFallbackAnswer({ query, notes: relatedNotes, documents: relatedDocuments, attachments: relatedAttachments });
+      }
+      if (!hasSources) {
+        answer = this.ensureNoSourceNotice(answer);
       }
       if (hasSources) {
         const titles = [
