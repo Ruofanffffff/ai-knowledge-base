@@ -3365,11 +3365,10 @@ function ThemeRow() {
                             <motion.div
                               key="spinning"
                               initial={{ opacity: 0, scale: 0.6 }}
-                              animate={{ opacity: 1, scale: 1 }}
+                              animate={{ opacity: 1, scale: 1, rotate: 360 }}
                               exit={{ opacity: 0, scale: 0.6 }}
                               className="w-6 h-6 rounded-full border-2 flex items-center justify-center"
                               style={{ borderColor: 'rgba(99,102,241,0.2)', borderTopColor: '#6366F1' }}
-                              animate={{ rotate: 360 }}
                               transition={{ duration: 0.75, repeat: Infinity, ease: 'linear' }}
                             />
                           ) : isApplied ? (

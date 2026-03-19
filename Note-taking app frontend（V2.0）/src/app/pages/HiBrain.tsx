@@ -94,8 +94,6 @@ function GrowthRing({ completion, color, fragCount }: { completion: number; colo
 
 interface Message { id: string; role: 'user' | 'ai'; content: string; timestamp: Date; card?: CardPayload; }
 
-const QUICK_PROMPTS = ['帮我串联碎片', '生成完整攻略', '发现主题规律', '今日碎片整合', '查看知识图谱', '找找上次的笔记', '日本旅行图片'];
-
 // ─────────────────────────────────────────────────────────────────────────────
 // StatusBar
 // ──────────────────────────────────────��──────────────────────────────────────
@@ -796,12 +794,11 @@ function HiBrainNewDesign() {
   const [inputFocused, setInputFocused] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showScan, setShowScan] = useState(false);
-  const [nexusCollapsed, setNexusCollapsed] = useState(false);
+  const [nexusCollapsed, setNexusCollapsed] = useState(true);
   const [showSynthesis, setShowSynthesis] = useState<Cluster | null>(null);
   const [proactiveSent, setProactiveSent] = useState(false);
   const [logoTaps, setLogoTaps] = useState(0);
   const [showRollbackBanner, setShowRollbackBanner] = useState(false);
-  const [quickPulse, setQuickPulse] = useState(0);
   const logoTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -947,7 +944,6 @@ function HiBrainNewDesign() {
     const msg = (text || input).trim();
     if (!msg) return;
     setInput('');
-    setQuickPulse(v => v + 1);
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: msg, timestamp: new Date() }]);
     setIsTyping(true);
     
@@ -1290,33 +1286,6 @@ function HiBrainNewDesign() {
             : 'calc(env(safe-area-inset-bottom) + 96px)',
         }}
       >
-        <motion.div
-          key={quickPulse}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-2"
-        >
-          <div className="flex items-center justify-between px-1">
-            <p style={{ color:'#9CA3AF', fontSize:'10px', fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase' }}>
-              快速串联
-            </p>
-          </div>
-          <div className="flex gap-2 mt-2 overflow-x-auto scrollbar-hide">
-            {QUICK_PROMPTS.map(prompt => (
-              <motion.button
-                key={prompt}
-                whileTap={{ scale:0.96 }}
-                onClick={() => sendMessage(prompt)}
-                className="px-3.5 py-1.5 rounded-full flex-shrink-0"
-                style={{ background:'var(--hi-chip-bg)', border:'1px solid rgba(99,102,241,0.2)', color:'#6366F1', fontSize:'12px', fontWeight:600, backdropFilter:'blur(8px)' }}
-              >
-                {prompt}
-              </motion.button>
-            ))}
-          </div>
-        </motion.div>
-
         <div className="flex items-center gap-3 px-4 rounded-3xl"
           style={{ background:'var(--hi-msg-ai-bg)', border:'1px solid rgba(99,102,241,0.18)', boxShadow:'0 2px 16px rgba(99,102,241,0.08)', height:'52px' }}>
           {/* ── Mic button ─────────────────────────────────────── */}

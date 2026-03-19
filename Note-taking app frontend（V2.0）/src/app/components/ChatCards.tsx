@@ -304,13 +304,12 @@ function GraphCard({ card, onNavigate }: { card: CardPayload; onNavigate?: (p: s
             const isCenterNode = n.id === 'center';
             return (
               <motion.g key={n.id}
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', transformOrigin: `${n.x}px ${n.y}px`, transformBox: 'fill-box' }}
                 onClick={() => !isCenterNode && handleNode(n.id)}
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: isDimmed ? 0.3 : 1 }}
                 transition={{ type: 'spring', stiffness: 420, damping: 22,
                   delay: 0.15 + i * 0.06, opacity: { duration: 0.3 } }}
-                style={{ transformOrigin: `${n.x}px ${n.y}px`, transformBox: 'fill-box' }}
               >
                 {/* Glow ring for selected */}
                 {isSelected && (

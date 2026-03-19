@@ -60,36 +60,52 @@ function ScanEffect({ color }: { color: string }) {
       />
 
       {/* Top edge spark */}
-      <motion.div className="absolute inset-x-0 top-0" style={{ height: 2 }}
+      <motion.div
+        className="absolute inset-x-0 top-0"
+        style={{
+          height: 2,
+          background: `linear-gradient(90deg,transparent,${color},transparent)`,
+          boxShadow: `0 0 18px 6px ${color}60`,
+        }}
         initial={{ scaleX: 0, opacity: 0 }}
         animate={{ scaleX: [0, 1, 1, 1], opacity: [0, 1, 1, 0] }}
         transition={{ duration: 0.9, times: [0, 0.25, 0.75, 1] }}
-        style={{ background: `linear-gradient(90deg,transparent,${color},transparent)`,
-          boxShadow: `0 0 18px 6px ${color}60` }}
       />
       {/* Bottom edge spark */}
-      <motion.div className="absolute inset-x-0 bottom-0" style={{ height: 2 }}
+      <motion.div
+        className="absolute inset-x-0 bottom-0"
+        style={{
+          height: 2,
+          background: `linear-gradient(90deg,transparent,${color},transparent)`,
+          boxShadow: `0 0 18px 6px ${color}60`,
+        }}
         initial={{ scaleX: 0, opacity: 0 }}
         animate={{ scaleX: [0, 1, 1, 1], opacity: [0, 1, 1, 0] }}
         transition={{ duration: 0.9, delay: 0.18, times: [0, 0.25, 0.75, 1] }}
-        style={{ background: `linear-gradient(90deg,transparent,${color},transparent)`,
-          boxShadow: `0 0 18px 6px ${color}60` }}
       />
       {/* Left edge */}
-      <motion.div className="absolute inset-y-0 left-0" style={{ width: 2 }}
+      <motion.div
+        className="absolute inset-y-0 left-0"
+        style={{
+          width: 2,
+          background: `linear-gradient(to bottom,transparent,${color},transparent)`,
+          boxShadow: `0 0 12px 4px ${color}50`,
+        }}
         initial={{ scaleY: 0, opacity: 0 }}
         animate={{ scaleY: [0, 1, 1, 1], opacity: [0, 0.8, 0.8, 0] }}
         transition={{ duration: 0.7, delay: 0.12, times: [0, 0.3, 0.7, 1] }}
-        style={{ background: `linear-gradient(to bottom,transparent,${color},transparent)`,
-          boxShadow: `0 0 12px 4px ${color}50` }}
       />
       {/* Right edge */}
-      <motion.div className="absolute inset-y-0 right-0" style={{ width: 2 }}
+      <motion.div
+        className="absolute inset-y-0 right-0"
+        style={{
+          width: 2,
+          background: `linear-gradient(to bottom,transparent,${color},transparent)`,
+          boxShadow: `0 0 12px 4px ${color}50`,
+        }}
         initial={{ scaleY: 0, opacity: 0 }}
         animate={{ scaleY: [0, 1, 1, 1], opacity: [0, 0.8, 0.8, 0] }}
         transition={{ duration: 0.7, delay: 0.12, times: [0, 0.3, 0.7, 1] }}
-        style={{ background: `linear-gradient(to bottom,transparent,${color},transparent)`,
-          boxShadow: `0 0 12px 4px ${color}50` }}
       />
 
       {/* Scan beam — sweeps top → bottom */}
