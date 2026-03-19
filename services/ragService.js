@@ -24,7 +24,6 @@ class RAGService {
     const text = String(query || '').toLowerCase();
     if (!text) return null;
 
-    const hasRecent = text.includes('最近') || text.includes('近期') || text.includes('近来') || text.includes('这段时间');
     const isListAsk =
       text.includes('有哪些') ||
       text.includes('有什么') ||
@@ -33,12 +32,16 @@ class RAGService {
       text.includes('清单') ||
       text.includes('都有哪些');
 
-    if (!hasRecent || !isListAsk) return null;
+    if (!isListAsk) return null;
 
-    if (text.includes('笔记') || text.includes('便签')) return { type: 'recent_notes' };
-    if (text.includes('文档') || text.includes('文件')) return { type: 'recent_documents' };
-    if (text.includes('附件')) return { type: 'recent_attachments' };
-    return { type: 'recent_all' };
+    const hasRecent = text.includes('最近') || text.includes('近期') || text.includes('近来') || text.includes('这段时间');
+
+    if (text.includes('笔记') || text.includes('便签')) return { type: 'recent_notes', explicitRecent: hasRecent };
+    if (text.includes('文档') || text.includes('文件')) return { type: 'recent_documents', explicitRecent: hasRecent };
+    if (text.includes('附件')) return { type: 'recent_attachments', explicitRecent: hasRecent };
+
+    if (text.includes('思库')) return { type: 'recent_all', explicitRecent: hasRecent };
+    return null;
   }
   tokenizeQuery(query) {
     return String(query || '')
@@ -83,6 +86,14 @@ class RAGService {
     return [];
   }
 
+  coerceToDate(value) {
+    if (!value) return new Date(0);
+    if (value instanceof Date) return value;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return new Date(0);
+    return date;
+  }
+
   buildSourcesDetails({ notes = [], documents = [], attachments = [] }) {
     const safeDate = value => (value instanceof Date ? value.toISOString() : value || null);
 
@@ -110,6 +121,34 @@ class RAGService {
         updatedAt: safeDate(att.updatedAt)
       }))
     };
+  }
+
+  async fetchRecentUserDbDocuments(userId, take = 8) {
+    const numericUserId = Number.isFinite(Number(userId)) ? Number(userId) : userId;
+    try {
+      if (!this._userDb) {
+        const { initDatabase } = require('../database/initUserDB');
+        this._userDb = initDatabase();
+      }
+
+      return await new Promise(resolve => {
+        this._userDb.all(
+          'SELECT id, title, content, updated_at, created_at FROM documents WHERE user_id = ? ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ?',
+          [numericUserId, take],
+          (err, rows) => {
+            if (err || !rows) return resolve([]);
+            resolve(rows.map(row => ({
+              id: String(row.id),
+              title: String(row.title || '').trim(),
+              content: row.content || '',
+              updatedAt: row.updated_at || row.created_at || null
+            })));
+          }
+        );
+      });
+    } catch (_) {
+      return [];
+    }
   }
 
   hasAnySources(sources) {
@@ -215,17 +254,35 @@ class RAGService {
 
   async searchUserDocuments(userId, query) {
     const tokens = this.tokenizeQuery(query);
-    const docs = await prisma.document.findMany({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-      take: 120,
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        updatedAt: true
-      }
-    });
+    const [prismaDocs, userDbDocs] = await Promise.all([
+      prisma.document.findMany({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        take: 120,
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          updatedAt: true
+        }
+      }),
+      this.fetchRecentUserDbDocuments(userId, 120)
+    ]);
+
+    const docs = [
+      ...(prismaDocs || []).map(doc => ({
+        id: String(doc.id),
+        title: String(doc.title || '').trim(),
+        content: doc.content || '',
+        updatedAt: doc.updatedAt
+      })),
+      ...(userDbDocs || []).map(doc => ({
+        id: String(doc.id),
+        title: String(doc.title || '').trim(),
+        content: doc.content || '',
+        updatedAt: doc.updatedAt
+      }))
+    ];
 
     if (!docs.length) return [];
 
@@ -420,32 +477,88 @@ class RAGService {
         }
 
         if (overviewIntent.type === 'recent_documents') {
-          const rows = await prisma.document.findMany({
-            where: { userId },
-            orderBy: { updatedAt: 'desc' },
-            take,
-            select: { id: true, title: true, content: true, updatedAt: true }
-          });
-          const documents = rows.map(r => ({
+          const [prismaRows, userDbRows, attachmentRows] = await Promise.all([
+            prisma.document.findMany({
+              where: { userId },
+              orderBy: { updatedAt: 'desc' },
+              take,
+              select: { id: true, title: true, content: true, updatedAt: true }
+            }),
+            this.fetchRecentUserDbDocuments(userId, take),
+            prisma.attachment.findMany({
+              where: { note: { userId } },
+              orderBy: { createdAt: 'desc' },
+              take,
+              select: {
+                id: true,
+                type: true,
+                createdAt: true,
+                noteId: true,
+                analysis: { select: { textContent: true, description: true } },
+                note: { select: { content: true, tags: true, updatedAt: true } }
+              }
+            })
+          ]);
+
+          const mergedDocuments = [
+            ...(prismaRows || []).map(r => ({
+              id: String(r.id),
+              title: String(r.title || '').trim() || this.deriveTitle(r.content),
+              excerpt: this.stripHtmlToText(r.content).slice(0, 260),
+              updatedAt: r.updatedAt
+            })),
+            ...(userDbRows || []).map(r => ({
+              id: String(r.id),
+              title: String(r.title || '').trim() || this.deriveTitle(r.content),
+              excerpt: this.stripHtmlToText(r.content).slice(0, 260),
+              updatedAt: r.updatedAt
+            }))
+          ]
+            .sort((a, b) => this.coerceToDate(b.updatedAt).getTime() - this.coerceToDate(a.updatedAt).getTime())
+            .slice(0, take);
+
+          const attachments = (attachmentRows || []).map(r => ({
             id: r.id,
-            title: String(r.title || '').trim() || this.deriveTitle(r.content),
-            excerpt: this.stripHtmlToText(r.content).slice(0, 260),
-            updatedAt: r.updatedAt
+            type: r.type,
+            noteId: r.noteId,
+            noteTitle: r.note ? this.deriveTitle(r.note.content) : '无标题',
+            excerpt: String(r.analysis?.textContent || r.analysis?.description || '').trim().slice(0, 260),
+            tags: r.note ? this.parseTags(r.note.tags) : [],
+            updatedAt: (r.note && r.note.updatedAt) ? r.note.updatedAt : r.createdAt
           }));
-          const items = rows.map((doc, idx) => {
-            const title = String(doc.title || '').trim() || this.deriveTitle(doc.content);
-            const excerpt = this.stripHtmlToText(doc.content).slice(0, 140);
-            return `${idx + 1}. 《${title}》\n   ${excerpt}`;
+
+          const docItems = mergedDocuments.map((doc, idx) => {
+            const excerpt = String(doc.excerpt || '').trim().slice(0, 140);
+            return `${idx + 1}. 《${doc.title}》\n   ${excerpt}`;
           });
-          const answer = items.length
-            ? `你最近上传/编辑的文档有这些（按更新时间倒序）：\n${items.join('\n')}\n\n你想我总结哪一份？可以直接回复序号或标题。`
-            : '你最近还没有文档。你可以先在思库里上传一份，我再帮你总结与串联。';
+          const attItems = attachments.map((att, idx) => {
+            const excerpt = String(att.excerpt || '').trim().slice(0, 120);
+            const title = att.noteTitle ? `《${att.noteTitle}》` : '（无标题）';
+            return `${idx + 1}. ${att.type}${title}\n   ${excerpt || '（暂无解析内容）'}`;
+          });
+
+          const docCount = mergedDocuments.length;
+          const attCount = attachments.length;
+          const lead = overviewIntent.explicitRecent
+            ? '你最近上传/更新的文件概览如下（按时间倒序）：'
+            : `我先列出你思库里最近更新的文件（各取最近 ${take} 个，按时间倒序，避免列表过长）：`;
+
+          let answer = '';
+          if (!docCount && !attCount) {
+            answer = '你思库里暂时还没有可列出的文件/文档（文档 0 个，附件 0 个）。你可以先上传一份文档或添加一个附件，我再帮你做总结与串联。';
+          } else {
+            const blocks = [];
+            if (docCount) blocks.push(`【文档】\n${docItems.join('\n')}`);
+            if (attCount) blocks.push(`【附件】\n${attItems.join('\n')}`);
+            answer = `${lead}\n\n${blocks.join('\n\n')}\n\n你想我优先总结哪一份？可以直接回复序号或标题。`.trim();
+          }
+
           return {
             answer,
             response: answer,
-            sources: { notes: [], documents: rows.map(r => r.id), attachments: [], memories: [], kg_entities: [] },
-            sourcesDetails: this.buildSourcesDetails({ notes: [], documents, attachments: [] }),
-            contextStats: { notes: 0, documents: rows.length, attachments: 0, memories: 0, kgContextIncluded: false }
+            sources: { notes: [], documents: mergedDocuments.map(r => r.id), attachments: attachments.map(r => r.id), memories: [], kg_entities: [] },
+            sourcesDetails: this.buildSourcesDetails({ notes: [], documents: mergedDocuments, attachments }),
+            contextStats: { notes: 0, documents: mergedDocuments.length, attachments: attachments.length, memories: 0, kgContextIncluded: false }
           };
         }
 
