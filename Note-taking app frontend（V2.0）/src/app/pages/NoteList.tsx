@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useNotes, Note } from '../components/context/NoteContext';
 import {
-  Plus, Search, Trash2, Sparkles, Clock, FileText, X,
+  Plus, Search, Sparkles, Clock, FileText, X,
   BookOpen, LayoutGrid, GitFork, CheckCheck, Pen,
   TrendingUp, Tag, ArrowRight, Calendar, Hash, ChevronRight,
 } from 'lucide-react';
@@ -113,53 +113,19 @@ const AI_FEATURES = [
 
 interface NoteCardProps {
   note: Note;
-  onDelete: (id: string) => void;
   onClick: (id: string) => void;
   onTagClick: (tag: string) => void;
   index: number;
 }
 
-function NoteCard({ note, onDelete, onClick, onTagClick, index }: NoteCardProps) {
+function NoteCard({ note, onClick, onTagClick, index }: NoteCardProps) {
   const accent = getAccent(note.id);
   const [editFlash, setEditFlash] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteCountdown, setDeleteCountdown] = useState(3);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressFiredRef = useRef(false);
-
-  // Auto-cancel delete confirmation after 3 seconds
-  useEffect(() => {
-    if (!showDeleteConfirm) { setDeleteCountdown(3); return; }
-    const interval = setInterval(() => {
-      setDeleteCountdown(prev => {
-        if (prev <= 1) { setShowDeleteConfirm(false); return 3; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [showDeleteConfirm]);
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setEditFlash(true);
     setTimeout(() => { setEditFlash(false); onClick(note.id); }, 360);
-  };
-
-  const handleLongPressStart = (e: React.PointerEvent) => {
-    // Only trigger on primary pointer (finger / left mouse button)
-    if (e.button !== undefined && e.button !== 0) return;
-    longPressFiredRef.current = false;
-    longPressTimer.current = setTimeout(() => {
-      longPressFiredRef.current = true;
-      setShowDeleteConfirm(true);
-    }, 500);
-  };
-
-  const handleLongPressCancel = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
   };
 
   return (
@@ -168,37 +134,19 @@ function NoteCard({ note, onDelete, onClick, onTagClick, index }: NoteCardProps)
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay: index * 0.045, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className="relative group cursor-pointer active:scale-[0.97] transition-transform"
-      onClick={() => {
-        if (longPressFiredRef.current) {
-          longPressFiredRef.current = false;
-          return;
-        }
-        if (showDeleteConfirm) {
-          setShowDeleteConfirm(false);
-        } else {
-          onClick(note.id);
-        }
-      }}
-      onPointerDown={handleLongPressStart}
-      onPointerUp={handleLongPressCancel}
-      onPointerLeave={handleLongPressCancel}
-      onPointerCancel={handleLongPressCancel}
+      onClick={() => onClick(note.id)}
     >
       <div
         className="rounded-[18px] p-4 overflow-hidden relative"
         style={{
-          background: showDeleteConfirm
-            ? 'var(--hi-note-del-bg)'
-            : 'var(--hi-card-bg)',
+          background: 'var(--hi-card-bg)',
           backdropFilter: 'blur(14px)',
           WebkitBackdropFilter: 'blur(14px)',
-          borderTop: showDeleteConfirm ? '1px solid var(--hi-note-del-border)' : '1px solid var(--hi-card-border)',
-          borderRight: showDeleteConfirm ? '1px solid var(--hi-note-del-border)' : '1px solid var(--hi-card-border)',
-          borderBottom: showDeleteConfirm ? '1px solid var(--hi-note-del-border)' : '1px solid var(--hi-card-border)',
-          borderLeft: showDeleteConfirm ? '3px solid rgba(239,68,68,0.6)' : `3px solid ${accent.dot}`,
-          boxShadow: showDeleteConfirm
-            ? '0 2px 20px rgba(239,68,68,0.12), 0 1px 4px rgba(0,0,0,0.04)'
-            : '0 2px 16px rgba(99,102,241,0.07), 0 1px 4px rgba(0,0,0,0.04)',
+          borderTop: '1px solid var(--hi-card-border)',
+          borderRight: '1px solid var(--hi-card-border)',
+          borderBottom: '1px solid var(--hi-card-border)',
+          borderLeft: `3px solid ${accent.dot}`,
+          boxShadow: '0 2px 16px rgba(99,102,241,0.07), 0 1px 4px rgba(0,0,0,0.04)',
           transition: 'background 0.25s, border-color 0.25s, box-shadow 0.25s',
         }}
       >
@@ -413,106 +361,6 @@ function NoteCard({ note, onDelete, onClick, onTagClick, index }: NoteCardProps)
             <Pen size={9} color={editFlash ? 'white' : accent.dot} />
           </motion.button>
         </div>
-
-        {/* ── Delete confirm overlay ── */}
-        <AnimatePresence>
-          {showDeleteConfirm && (
-            <motion.div
-              key="delete-confirm"
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute inset-x-0 bottom-0 px-3 pt-3 pb-3 z-10"
-              style={{
-                background: 'linear-gradient(to bottom, rgba(255,248,248,0) 0%, rgba(255,244,244,0.98) 28%)',
-                borderBottomLeftRadius: 16,
-                borderBottomRightRadius: 16,
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              {/* Warning line */}
-              <div className="flex items-center gap-1.5 mb-2.5">
-                <Trash2 size={11} style={{ color: '#EF4444' }} />
-                <span style={{ color: '#EF4444', fontSize: '11px', fontWeight: 700, flex: 1 }}>
-                  确认删除？
-                </span>
-                {/* Countdown ring */}
-                <div className="relative w-5 h-5 flex-shrink-0">
-                  <svg width="20" height="20" viewBox="0 0 20 20" className="absolute inset-0 -rotate-90">
-                    <circle cx="10" cy="10" r="8" fill="none" stroke="rgba(239,68,68,0.15)" strokeWidth="2" />
-                    <motion.circle
-                      cx="10" cy="10" r="8" fill="none"
-                      stroke="#EF4444" strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeDasharray={`${2 * Math.PI * 8}`}
-                      animate={{ strokeDashoffset: `${2 * Math.PI * 8 * (1 - deleteCountdown / 3)}` }}
-                      transition={{ duration: 0.9, ease: 'linear' }}
-                    />
-                  </svg>
-                  <span
-                    className="absolute inset-0 flex items-center justify-center"
-                    style={{ color: '#EF4444', fontSize: '8px', fontWeight: 800 }}
-                  >
-                    {deleteCountdown}
-                  </span>
-                </div>
-              </div>
-              {/* Action buttons */}
-              <div className="flex gap-2">
-                <motion.button
-                  whileTap={{ scale: 0.94 }}
-                  onClick={e => { e.stopPropagation(); setShowDeleteConfirm(false); }}
-                  className="flex-1 py-2 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: 'rgba(107,114,128,0.1)',
-                    border: '1px solid rgba(107,114,128,0.15)',
-                  }}
-                >
-                  <span style={{ color: '#6B7280', fontSize: '11.5px', fontWeight: 600 }}>取消</span>
-                </motion.button>
-                <motion.button
-                  whileTap={{ scale: 0.94 }}
-                  onClick={e => {
-                    e.stopPropagation();
-                    setShowDeleteConfirm(false);
-                    onDelete(note.id);
-                  }}
-                  className="flex-1 py-2 rounded-xl flex items-center justify-center gap-1"
-                  style={{
-                    background: 'linear-gradient(135deg, #EF4444, #F87171)',
-                    boxShadow: '0 3px 10px rgba(239,68,68,0.3)',
-                  }}
-                >
-                  <Trash2 size={11} color="white" />
-                  <span style={{ color: 'white', fontSize: '11.5px', fontWeight: 700 }}>删除</span>
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* ── Delete trigger button ── */}
-        <motion.button
-          key="delete-btn"
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={showDeleteConfirm
-            ? { opacity: 1, scale: 1.1, rotate: [0, -12, 12, -6, 0] }
-            : { opacity: 1, scale: 1, rotate: 0 }
-          }
-          transition={{ duration: 0.4 }}
-          whileTap={{ scale: 0.85 }}
-          className="absolute top-2.5 right-2.5 z-20 w-6 h-6 rounded-full flex items-center justify-center"
-          style={{
-            background: showDeleteConfirm ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)',
-          }}
-          onClick={e => {
-            e.stopPropagation();
-            setShowDeleteConfirm(v => !v);
-          }}
-        >
-          <Trash2 size={11} style={{ color: '#EF4444' }} />
-        </motion.button>
       </div>
     </motion.div>
   );
@@ -557,10 +405,9 @@ function StatusBar() {
 /* ─── Main Component ─── */
 export function NoteList() {
   const navigate = useNavigate();
-  const { notes, deleteNote } = useNotes();
+  const { notes } = useNotes();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const [showStatsSheet, setShowStatsSheet] = useState(false);
@@ -944,7 +791,6 @@ export function NoteList() {
                     key={note.id}
                     note={note}
                     index={i}
-                    onDelete={id => deleteNote(id)}
                     onClick={(id) => navigate(`/siku/${id}`)}
                     onTagClick={tag => {
                       setTagFilter(tag);

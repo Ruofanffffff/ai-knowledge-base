@@ -524,6 +524,18 @@ const NODE_COLORS = [
 
 function getColor(idx: number) { return NODE_COLORS[idx % NODE_COLORS.length]; }
 
+type GraphBuildView = {
+  expandedTagNames?: string[];
+  expandedNoteIds?: string[];
+  singleShowAllTags?: boolean;
+};
+
+function hashCode(text: string) {
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) - h + text.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
 function normalizeNoteTags(raw: unknown): string[] {
   if (Array.isArray(raw)) {
     return raw
@@ -557,73 +569,198 @@ function buildGraph(
   notes: Note[],
   mode: 'all' | string,
   noteEntityMap: Record<string, string[]>,
-  singleGraph: { entities: BackendKgEntity[]; relations: BackendKgRelation[] } | null
+  singleGraph: { entities: BackendKgEntity[]; relations: BackendKgRelation[] } | null,
+  view?: GraphBuildView
 ) {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
 
+  const expandedTags = new Set(view?.expandedTagNames || []);
+  const expandedNotes = new Set(view?.expandedNoteIds || []);
+
+  const noteById = new Map<string, Note>(notes.map(n => [n.id, n]));
+  const noteTagsMap = new Map<string, string[]>();
+  const tagCount = new Map<string, number>();
+  const tagToNotes = new Map<string, Note[]>();
+
+  notes.forEach(note => {
+    const tags = normalizeNoteTags(note.tags).slice(0, 30);
+    noteTagsMap.set(note.id, tags);
+    tags.forEach(tag => {
+      tagCount.set(tag, (tagCount.get(tag) || 0) + 1);
+      if (!tagToNotes.has(tag)) tagToNotes.set(tag, []);
+      tagToNotes.get(tag)!.push(note);
+    });
+  });
+
+  const labelForNote = (note: Note, maxLen: number) => {
+    const raw = (note.title || note.content || '').trim();
+    if (!raw) return '无标题';
+    return raw.length > maxLen ? raw.slice(0, maxLen) + '…' : raw;
+  };
+
   if (mode === 'all') {
-    const tagSet = new Map<string, number[]>();
-    notes.forEach((note, ni) => {
-      const tags = mergeNoteTags(note, noteEntityMap);
-      tags.forEach(tag => {
-        if (!tagSet.has(tag)) tagSet.set(tag, []);
-        tagSet.get(tag)!.push(ni);
-      });
+    const CORE_TAG_LIMIT = 10;
+    const NOTES_PER_TAG = 8;
+    const MAX_VISIBLE_NOTES = 42;
+    const MAX_NOTE_NOTE_EDGES = 42;
+
+    const sortedTags = Array.from(tagCount.entries())
+      .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0], 'zh-CN'));
+    const coreTags = sortedTags.slice(0, CORE_TAG_LIMIT).map(([tag]) => tag);
+
+    const visibleTags = new Set<string>(coreTags);
+    expandedTags.forEach(t => visibleTags.add(t));
+
+    expandedNotes.forEach(noteId => {
+      const tags = (noteTagsMap.get(noteId) || [])
+        .slice()
+        .sort((a, b) => ((tagCount.get(b) || 0) - (tagCount.get(a) || 0)) || a.localeCompare(b, 'zh-CN'))
+        .slice(0, 10);
+      tags.forEach(t => visibleTags.add(t));
     });
 
-    notes.forEach((note, ni) => {
-      const tags = mergeNoteTags(note, noteEntityMap);
-      nodes.push({
-        id: note.id,
-        label: note.title || note.content.slice(0, 12) + '…',
-        x: 200 + (Math.random() - 0.5) * 300,
-        y: 200 + (Math.random() - 0.5) * 300,
-        vx: 0, vy: 0, fx: 0, fy: 0,
-        color: getColor(ni),
-        r: 20,
-        tags,
-      });
+    const visibleNoteIds = new Set<string>();
+
+    expandedTags.forEach(tag => {
+      const list = (tagToNotes.get(tag) || [])
+        .slice()
+        .sort((a, b) => (b.createdAt - a.createdAt))
+        .slice(0, NOTES_PER_TAG);
+      list.forEach(n => visibleNoteIds.add(n.id));
     });
 
-    Array.from(tagSet.keys()).forEach((tag, ti) => {
-      const tagNodeIdx = nodes.length;
+    expandedNotes.forEach(noteId => {
+      visibleNoteIds.add(noteId);
+      const baseTags = new Set(noteTagsMap.get(noteId) || []);
+      if (baseTags.size === 0) return;
+      const scored: { id: string; score: number; createdAt: number }[] = [];
+      notes.forEach(n => {
+        if (n.id === noteId) return;
+        const tags = noteTagsMap.get(n.id) || [];
+        let s = 0;
+        for (const t of tags) if (baseTags.has(t)) s++;
+        if (s >= 2) scored.push({ id: n.id, score: s, createdAt: n.createdAt });
+      });
+      scored
+        .sort((a, b) => (b.score - a.score) || (b.createdAt - a.createdAt))
+        .slice(0, 6)
+        .forEach(v => visibleNoteIds.add(v.id));
+    });
+
+    let visibleNotes = Array.from(visibleNoteIds)
+      .map(id => noteById.get(id))
+      .filter(Boolean) as Note[];
+    visibleNotes = visibleNotes
+      .sort((a, b) => (b.createdAt - a.createdAt))
+      .slice(0, MAX_VISIBLE_NOTES);
+
+    const visibleTagList = Array.from(visibleTags)
+      .sort((a, b) => ((tagCount.get(b) || 0) - (tagCount.get(a) || 0)) || a.localeCompare(b, 'zh-CN'));
+
+    nodes.push({
+      id: '__hub_all__',
+      label: '思链',
+      x: 200,
+      y: 200,
+      vx: 0, vy: 0, fx: 0, fy: 0,
+      color: '#6366F1',
+      r: 34,
+      tags: [],
+      isTag: true,
+    });
+
+    visibleTagList.forEach((tag, ti) => {
+      const angle = (ti / Math.max(visibleTagList.length, 1)) * Math.PI * 2 - Math.PI / 2;
+      const seed = hashCode(tag) % 1000;
+      const jitter = (seed / 1000 - 0.5) * 24;
+      const radius = 140 + Math.min(90, (tagCount.get(tag) || 1) * 4);
       nodes.push({
         id: `tag_${tag}`,
         label: `#${tag}`,
-        x: 200 + (Math.random() - 0.5) * 300,
-        y: 200 + (Math.random() - 0.5) * 300,
+        x: 200 + Math.cos(angle) * radius + jitter,
+        y: 200 + Math.sin(angle) * (radius * 0.82) - jitter * 0.6,
         vx: 0, vy: 0, fx: 0, fy: 0,
-        color: getColor(ti + notes.length),
+        color: getColor(ti + 1),
         r: 16,
         tags: [],
         isTag: true,
-        noteCount: tagSet.get(tag)!.length,
-      });
-
-      tagSet.get(tag)!.forEach(ni => {
-        edges.push({ sourceIdx: ni, targetIdx: tagNodeIdx, weight: 1, color: getColor(ti + notes.length), label: '属于' });
+        noteCount: tagCount.get(tag) || 0,
       });
     });
 
-    for (let i = 0; i < notes.length; i++) {
-      for (let j = i + 1; j < notes.length; j++) {
-        const leftTags = mergeNoteTags(notes[i], noteEntityMap);
-        const rightTags = mergeNoteTags(notes[j], noteEntityMap);
-        const shared = leftTags.filter(t => rightTags.includes(t));
-        if (shared.length >= 1) {
-          edges.push({ sourceIdx: i, targetIdx: j, weight: shared.length, color: '#6366F1', label: `共${shared.length}标签` });
+    visibleNotes.forEach(note => {
+      const seed = hashCode(note.id) % 1000;
+      const jitter = (seed / 1000 - 0.5) * 140;
+      nodes.push({
+        id: note.id,
+        label: labelForNote(note, 12),
+        x: 200 + jitter,
+        y: 210 + (jitter * 0.5),
+        vx: 0, vy: 0, fx: 0, fy: 0,
+        color: getColor(hashCode(note.id)),
+        r: 20,
+        tags: normalizeNoteTags(note.tags),
+      });
+    });
+
+    const idxById = new Map<string, number>();
+    nodes.forEach((n, i) => idxById.set(n.id, i));
+
+    visibleTagList.forEach(tag => {
+      const ti = idxById.get(`tag_${tag}`);
+      if (ti === undefined) return;
+      edges.push({ sourceIdx: 0, targetIdx: ti, weight: 1, color: nodes[ti].color, label: '标签' });
+    });
+
+    visibleNotes.forEach(note => {
+      const ni = idxById.get(note.id);
+      if (ni === undefined) return;
+      const tags = noteTagsMap.get(note.id) || [];
+      tags.forEach(tag => {
+        const ti = idxById.get(`tag_${tag}`);
+        if (ti === undefined) return;
+        const show = expandedTags.has(tag) || expandedNotes.has(note.id);
+        if (!show) return;
+        edges.push({ sourceIdx: ti, targetIdx: ni, weight: 1, color: nodes[ti].color, label: '属于' });
+      });
+    });
+
+    const visibleNoteNodes = visibleNotes.map(n => n.id);
+    if (visibleNoteNodes.length > 1) {
+      const tagSetByNote = new Map<string, Set<string>>();
+      visibleNotes.forEach(n => tagSetByNote.set(n.id, new Set(noteTagsMap.get(n.id) || [])));
+      const candidate: { a: string; b: string; w: number }[] = [];
+      for (let i = 0; i < visibleNoteNodes.length; i++) {
+        for (let j = i + 1; j < visibleNoteNodes.length; j++) {
+          const a = visibleNoteNodes[i], b = visibleNoteNodes[j];
+          const sa = tagSetByNote.get(a)!;
+          const sb = tagSetByNote.get(b)!;
+          let shared = 0;
+          sa.forEach(t => { if (sb.has(t)) shared++; });
+          if (shared >= 2) candidate.push({ a, b, w: shared });
         }
       }
+      candidate
+        .sort((x, y) => y.w - x.w)
+        .slice(0, MAX_NOTE_NOTE_EDGES)
+        .forEach(({ a, b, w }) => {
+          const ai = idxById.get(a);
+          const bi = idxById.get(b);
+          if (ai === undefined || bi === undefined) return;
+          edges.push({ sourceIdx: ai, targetIdx: bi, weight: w, color: '#6366F1', label: `共${w}标签` });
+        });
     }
   } else {
     const note = notes.find(n => n.id === mode);
     if (!note) return { nodes, edges };
     const noteTags = mergeNoteTags(note, noteEntityMap);
+    const tagLimit = view?.singleShowAllTags ? noteTags.length : 8;
+    const visibleTags = noteTags.slice(0, Math.max(1, tagLimit));
 
     nodes.push({
       id: note.id,
-      label: note.title || note.content.slice(0, 15),
+      label: labelForNote(note, 15),
       x: 200, y: 200,
       vx: 0, vy: 0, fx: 0, fy: 0,
       color: '#6366F1',
@@ -667,8 +804,11 @@ function buildGraph(
       return { nodes, edges };
     }
 
-    noteTags.forEach((tag, ti) => {
-      const angle = (ti / (noteTags.length || 1)) * Math.PI * 2;
+    const idxById = new Map<string, number>();
+    idxById.set(note.id, 0);
+
+    visibleTags.forEach((tag, ti) => {
+      const angle = (ti / (visibleTags.length || 1)) * Math.PI * 2;
       const tagIdx = nodes.length;
       nodes.push({
         id: `tag_${tag}`,
@@ -683,25 +823,34 @@ function buildGraph(
       });
       edges.push({ sourceIdx: 0, targetIdx: tagIdx, weight: 1, color: getColor(ti + 1), label: '含标签' });
 
-      notes.filter(n => n.id !== note.id && mergeNoteTags(n, noteEntityMap).includes(tag)).slice(0, 3).forEach((rel, ri) => {
-        const relAngle = angle + (ri - 1) * 0.5;
-        const relIdx = nodes.findIndex(n => n.id === rel.id);
-        if (relIdx === -1) {
-          const newIdx = nodes.length;
-          nodes.push({
-            id: rel.id,
-            label: rel.title || rel.content.slice(0, 12) + '…',
-            x: 200 + Math.cos(relAngle) * 260,
-            y: 200 + Math.sin(relAngle) * 260,
-            vx: 0, vy: 0, fx: 0, fy: 0,
-            color: getColor(ti + ri + 2),
-            r: 18,
-            tags: normalizeNoteTags(rel.tags),
-          });
-          edges.push({ sourceIdx: tagIdx, targetIdx: newIdx, weight: 1, color: getColor(ti + 1), label: '相关笔记' });
-        } else {
-          edges.push({ sourceIdx: tagIdx, targetIdx: relIdx, weight: 1, color: getColor(ti + 1), label: '相关笔记' });
+      if (!expandedTags.has(tag)) return;
+
+      const related = (tagToNotes.get(tag) || [])
+        .filter(n => n.id !== note.id)
+        .slice()
+        .sort((a, b) => (b.createdAt - a.createdAt))
+        .slice(0, 6);
+
+      related.forEach((rel, ri) => {
+        const relAngle = angle + (ri - Math.floor(related.length / 2)) * 0.42;
+        const existing = idxById.get(rel.id);
+        if (existing !== undefined) {
+          edges.push({ sourceIdx: tagIdx, targetIdx: existing, weight: 1, color: getColor(ti + 1), label: '相关笔记' });
+          return;
         }
+        const newIdx = nodes.length;
+        idxById.set(rel.id, newIdx);
+        nodes.push({
+          id: rel.id,
+          label: labelForNote(rel, 12),
+          x: 200 + Math.cos(relAngle) * 265,
+          y: 200 + Math.sin(relAngle) * 265,
+          vx: 0, vy: 0, fx: 0, fy: 0,
+          color: getColor(hashCode(rel.id)),
+          r: 18,
+          tags: normalizeNoteTags(rel.tags),
+        });
+        edges.push({ sourceIdx: tagIdx, targetIdx: newIdx, weight: 1, color: getColor(ti + 1), label: '相关笔记' });
       });
     });
   }
@@ -817,6 +966,41 @@ function KnowledgeGraphCanvas({
 
   const W = 400, H = 420;
 
+  const [expandedTagNames, setExpandedTagNames] = useState<string[]>([]);
+  const [expandedNoteIds, setExpandedNoteIds] = useState<string[]>([]);
+  const [singleShowAllTags, setSingleShowAllTags] = useState(false);
+
+  useEffect(() => {
+    setExpandedTagNames([]);
+    setExpandedNoteIds([]);
+    setSingleShowAllTags(false);
+  }, [mode, notes.length]);
+
+  const handleNodeAction = useCallback((id: string) => {
+    if (id === '__hub_all__') {
+      setExpandedTagNames([]);
+      setExpandedNoteIds([]);
+      setSingleShowAllTags(false);
+      return;
+    }
+
+    if (id.startsWith('tag_')) {
+      const tag = id.slice(4);
+      setExpandedTagNames(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+      onNodeClick(id);
+      return;
+    }
+
+    if (mode !== 'all' && id === mode) {
+      setSingleShowAllTags(v => !v);
+      onNodeClick(id);
+      return;
+    }
+
+    setExpandedNoteIds(prev => prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]);
+    onNodeClick(id);
+  }, [mode, onNodeClick]);
+
   // Client coords → canvas logical coords (accounts for zoom + DPR)
   const getCanvasPos = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -875,12 +1059,12 @@ function KnowledgeGraphCanvas({
   const handleMouseUp = useCallback((_e: React.MouseEvent<HTMLCanvasElement>) => {
     if (draggingIdxRef.current !== null && !hasDraggedRef.current) {
       const node = nodesRef.current[draggingIdxRef.current];
-      if (node) onNodeClick(node.id);
+      if (node) handleNodeAction(node.id);
     }
     draggingIdxRef.current = null;
     hasDraggedRef.current = false;
     setCursorStyle(hoveredIdxRef.current !== null ? 'grab' : 'default');
-  }, [onNodeClick]);
+  }, [handleNodeAction]);
 
   const handleMouseLeave = useCallback(() => {
     draggingIdxRef.current = null;
@@ -921,11 +1105,11 @@ function KnowledgeGraphCanvas({
   const handleTouchEnd = useCallback((_e: React.TouchEvent<HTMLCanvasElement>) => {
     if (draggingIdxRef.current !== null && !hasDraggedRef.current) {
       const node = nodesRef.current[draggingIdxRef.current];
-      if (node) onNodeClick(node.id);
+      if (node) handleNodeAction(node.id);
     }
     draggingIdxRef.current = null;
     hasDraggedRef.current = false;
-  }, [onNodeClick]);
+  }, [handleNodeAction]);
 
   // ── Draw ──
   const draw = useCallback((ctx: CanvasRenderingContext2D) => {
@@ -1143,7 +1327,11 @@ function KnowledgeGraphCanvas({
   // ── Build graph + animation loop ──
   useEffect(() => {
     if (notes.length === 0) return;
-    const { nodes, edges } = buildGraph(notes, mode, noteEntityMap, singleGraph);
+    const { nodes, edges } = buildGraph(notes, mode, noteEntityMap, singleGraph, {
+      expandedTagNames,
+      expandedNoteIds,
+      singleShowAllTags,
+    });
     nodesRef.current = nodes;
     edgesRef.current = edges;
     setSettled(false);
@@ -1174,7 +1362,7 @@ function KnowledgeGraphCanvas({
     cancelAnimationFrame(animRef.current);
     animRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animRef.current);
-  }, [notes, mode, draw, noteEntityMap, singleGraph]);
+  }, [notes, mode, draw, noteEntityMap, singleGraph, expandedTagNames, expandedNoteIds, singleShowAllTags]);
 
   // Canvas DPR sizing (once)
   useEffect(() => {
