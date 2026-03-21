@@ -194,7 +194,6 @@ export const aiSearchService = {
               throw new Error(msg);
             }
           } catch {
-            // ignore
           }
         }
       }

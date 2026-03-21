@@ -1,14 +1,10 @@
 import axios from 'axios';
 import { api } from './api';
-import type { HiBrainSources, HiBrainSourcesDetails } from './hibrainService';
+import type { PersistedSource } from '../types/sources';
 
 type AnyObject = Record<string, any>;
 
 function unwrapPayload<T>(payload: any): T {
-  // Compatible with multiple backend response shapes:
-  // - direct: T
-  // - { data: T }
-  // - { result: T }
   if (payload && typeof payload === 'object') {
     if ('data' in payload) return (payload as AnyObject).data as T;
     if ('result' in payload) return (payload as AnyObject).result as T;
@@ -30,17 +26,19 @@ function toApiErrorMessage(err: unknown): string {
 
 export type ChatSessionId = string;
 
+export interface WebSource {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
 export interface ChatSessionMessage {
   id?: string | number;
   role: 'user' | 'assistant';
   content: string;
-  /**
-   * Web 端当前存的是 `toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})`
-   * 为兼容性保留 string，必要时前端自行解析显示。
-   */
   timestamp?: string;
-  sources?: HiBrainSources;
-  sourcesDetails?: HiBrainSourcesDetails;
+  sources?: PersistedSource[];
+  webSources?: WebSource[];
   [key: string]: any;
 }
 
@@ -72,7 +70,6 @@ export const chatSessionsService = {
       const data = unwrapPayload<any>(resp.data);
       return Array.isArray(data) ? (data as ChatSessionSummary[]) : [];
     } catch (err) {
-      console.error('listSessions failed:', toApiErrorMessage(err));
       throw err;
     }
   },
@@ -82,7 +79,6 @@ export const chatSessionsService = {
       const resp = await api.post('/chat/sessions', input);
       return unwrapPayload<ChatSessionDetail>(resp.data);
     } catch (err) {
-      console.error('createSession failed:', toApiErrorMessage(err));
       throw err;
     }
   },
@@ -92,7 +88,6 @@ export const chatSessionsService = {
       const resp = await api.get(`/chat/sessions/${sessionId}`);
       return unwrapPayload<ChatSessionDetail>(resp.data);
     } catch (err) {
-      console.error('getSession failed:', toApiErrorMessage(err));
       throw err;
     }
   },
@@ -101,29 +96,30 @@ export const chatSessionsService = {
     try {
       await api.delete(`/chat/sessions/${sessionId}`);
     } catch (err) {
-      console.error('deleteSession failed:', toApiErrorMessage(err));
       throw err;
     }
   },
 
   async renameSession(sessionId: ChatSessionId, title: string): Promise<void> {
     try {
-      // 与 Web 端对齐：PUT /chat/sessions/:id { title }
       await api.put(`/chat/sessions/${sessionId}`, { title });
     } catch (err) {
-      console.error('renameSession failed:', toApiErrorMessage(err));
       throw err;
     }
   },
 
   async addMessage(sessionId: ChatSessionId, message: ChatSessionMessage): Promise<void> {
     try {
-      // 与 Web 端对齐：POST /chat/sessions/:id/messages
-      await api.post(`/chat/sessions/${sessionId}/messages`, message);
+      const payload = {
+        role: message.role,
+        content: message.content,
+        timestamp: message.timestamp,
+        sources: Array.isArray(message.sources) ? message.sources : [],
+        webSources: Array.isArray(message.webSources) ? message.webSources : [],
+      };
+      await api.post(`/chat/sessions/${sessionId}/messages`, payload);
     } catch (err) {
-      console.error('addMessage failed:', toApiErrorMessage(err));
       throw err;
     }
   },
 };
-

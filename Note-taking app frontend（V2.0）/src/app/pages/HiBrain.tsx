@@ -23,7 +23,7 @@ import { hibrainService } from '../services/hibrainService';
 import type { HiBrainSourcesDetails } from '../services/hibrainService';
 import { aiSearchService } from '../services/aiSearchService';
 import { chatSessionsService } from '../services/chatSessionsService';
-import type { ChatSessionMessage, ChatSessionSummary } from '../services/chatSessionsService';
+import type { ChatSessionMessage, ChatSessionSummary, WebSource } from '../services/chatSessionsService';
 import { coercePersistedSources, type PersistedSource } from '../types/sources';
 import { useVisualViewportMetrics } from '../components/ui/use-visual-viewport';
 import { useCapacitorKeyboardMetrics } from '../components/ui/use-capacitor-keyboard';
@@ -868,16 +868,28 @@ function HiBrainNewDesign() {
     const safe = Array.isArray(raw) ? raw : [];
     return safe.map((m, idx) => {
       const role = m.role === 'assistant' ? 'ai' : 'user';
-      const persistedSources = coercePersistedSources((m as any)?.sources?.webSources);
-      const mappedFromDetails = persistedSources.length === 0 ? sourcesFromDetails(m.sourcesDetails as any) : [];
-      const sources = persistedSources.length > 0 ? persistedSources : mappedFromDetails;
+      const persistedSources = coercePersistedSources((m as any)?.sources);
+      const persistedWebSources: WebSource[] = Array.isArray((m as any)?.webSources)
+        ? ((m as any).webSources as WebSource[])
+        : [];
+      const webAsSources: PersistedSource[] = persistedWebSources
+        .filter(w => w && w.title)
+        .map(w => ({
+          id: String(w.url || w.title),
+          title: String(w.title),
+          preview: typeof w.snippet === 'string' ? w.snippet : undefined,
+          url: String(w.url || ''),
+          sourceType: 'web' as const,
+          updatedAt: undefined,
+        }))
+        .filter(s => s.id && s.title);
+      const sources = [...persistedSources, ...webAsSources];
       const base: Message = {
         id: String(m.id ?? `msg-${idx}-${Date.now()}`),
         role,
         content: String(m.content ?? ''),
         timestamp: parseSessionTimestamp(m.timestamp),
         ...(sources.length > 0 ? { sources } : {}),
-        ...(m.sourcesDetails ? { sourcesDetails: m.sourcesDetails as HiBrainSourcesDetails } : {}),
       };
       if (role === 'ai' && sources.length > 0) {
         return {
@@ -1147,32 +1159,25 @@ function HiBrainNewDesign() {
     };
 
     try {
-      // Ensure session exists
       let sessionId = currentSessionId;
       if (!sessionId) {
         sessionId = await createNewSession();
       }
 
-      // 1) Save user message to session first
       try {
         await chatSessionsService.addMessage(sessionId, {
           role: 'user',
           content: msg,
           timestamp: formatStoreTime(now),
         });
-      } catch (err) {
-        console.error('Failed to save user message:', err);
-      }
+      } catch {}
 
-      // 2) Auto-generate title on first user message (align with Web)
       if (existingUserCount === 0) {
         const newTitle = generateTitle(msg);
         try {
           await chatSessionsService.renameSession(sessionId, newTitle);
           setSessions(prev => prev.map(s => String(s.id) === String(sessionId) ? { ...s, title: newTitle } : s));
-        } catch (err) {
-          console.error('Failed to rename session:', err);
-        }
+        } catch {}
       }
 
       const assistantStart = new Date();
@@ -1180,6 +1185,7 @@ function HiBrainNewDesign() {
 
       let streamed = '';
       let streamedSources: PersistedSource[] = [];
+      let streamedWebSources: WebSource[] = [];
 
       try {
         const { content, sources } = await aiSearchService.search(
@@ -1189,8 +1195,17 @@ function HiBrainNewDesign() {
               streamed += delta;
               patchAssistant({ content: streamed });
             },
-            onSources: (src) => {
+            onSources: (src, raw) => {
               streamedSources = src;
+              const rawWeb = Array.isArray((raw as any)?.webSources) ? (raw as any).webSources : [];
+              streamedWebSources = rawWeb
+                .filter((w: any) => w && (w.title || w.url))
+                .map((w: any) => ({
+                  title: String(w.title || w.url || ''),
+                  url: String(w.url || ''),
+                  snippet: typeof w.snippet === 'string' ? w.snippet : undefined,
+                }))
+                .filter((w: WebSource) => w.title);
               patchAssistant({
                 sources: streamedSources,
                 card: streamedSources.length > 0 ? { type: 'sources', sources: streamedSources } : undefined,
@@ -1202,7 +1217,8 @@ function HiBrainNewDesign() {
         streamed = content || streamed;
         streamedSources = sources.length > 0 ? sources : streamedSources;
 
-        const notesCount = streamedSources.filter(s => s.sourceType === 'note').length;
+        const nonWebSources = streamedSources.filter(s => s.sourceType !== 'web');
+        const notesCount = nonWebSources.filter(s => s.sourceType === 'note').length;
         const finalContent = notesCount > 0
           ? `${streamed}\n\n（已检索思库笔记 ${notesCount} 条）`
           : streamed;
@@ -1219,11 +1235,10 @@ function HiBrainNewDesign() {
             role: 'assistant',
             content: finalContent,
             timestamp: formatStoreTime(new Date()),
-            ...(streamedSources.length > 0 ? { sources: { webSources: streamedSources } } : {}),
+            ...(nonWebSources.length > 0 ? { sources: nonWebSources } : {}),
+            ...(streamedWebSources.length > 0 ? { webSources: streamedWebSources } : {}),
           });
-        } catch (err) {
-          console.error('Failed to save assistant message:', err);
-        }
+        } catch {}
 
         return;
       } catch (streamErr) {
@@ -1243,7 +1258,6 @@ function HiBrainNewDesign() {
         sources: mappedSources.length > 0 ? mappedSources : undefined,
         card: mappedSources.length > 0 ? { type: 'sources', sources: mappedSources } : undefined,
         timestamp: new Date(),
-        ...(result?.sourcesDetails ? { sourcesDetails: result.sourcesDetails as HiBrainSourcesDetails } : {}),
       });
 
       try {
@@ -1251,18 +1265,14 @@ function HiBrainNewDesign() {
           role: 'assistant',
           content: answerWithSource,
           timestamp: formatStoreTime(new Date()),
-          ...(mappedSources.length > 0 ? { sources: { webSources: mappedSources } } : {}),
-          ...(result?.sourcesDetails ? { sourcesDetails: result.sourcesDetails } : {}),
+          ...(mappedSources.length > 0 ? { sources: mappedSources } : {}),
         });
-      } catch (err) {
-        console.error('Failed to save assistant message:', err);
-      }
+      } catch {}
     } catch (error) {
       console.error('HiBrain error:', error);
       const assistantNow = new Date();
       const errorText = '抱歉，连接 HiBrain 大脑时出现了一些问题，请检查网络或稍后再试。';
       patchAssistant({ content: errorText, timestamp: assistantNow });
-      // Best-effort persist error message as assistant output
       if (currentSessionId) {
         try {
           await chatSessionsService.addMessage(currentSessionId, {
@@ -1270,9 +1280,7 @@ function HiBrainNewDesign() {
             content: errorText,
             timestamp: formatStoreTime(assistantNow),
           });
-        } catch (err) {
-          console.error('Failed to save error assistant message:', err);
-        }
+        } catch {}
       }
     } finally {
       setIsTyping(false);
