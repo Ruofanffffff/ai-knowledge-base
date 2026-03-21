@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useNotes, Note } from '../components/context/NoteContext';
+import { documentsLibraryService, type LibraryDocument } from '../services/documentsLibraryService';
 import {
   Plus, Search, Sparkles, Clock, FileText, X,
   BookOpen, LayoutGrid, GitFork, CheckCheck, Pen,
@@ -406,6 +407,7 @@ function StatusBar() {
 export function NoteList() {
   const navigate = useNavigate();
   const { notes } = useNotes();
+  const [libraryView, setLibraryView] = useState<'notes' | 'documents'>('notes');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -414,6 +416,35 @@ export function NoteList() {
   const [showTodaySheet, setShowTodaySheet] = useState(false);
   /** active tag filter — set by clicking a tag pill on any note card */
   const [tagFilter, setTagFilter] = useState('');
+  const [documents, setDocuments] = useState<LibraryDocument[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentsLoaded, setDocumentsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (libraryView !== 'documents') return;
+    if (documentsLoaded) return;
+    let cancelled = false;
+    setDocumentsLoading(true);
+    documentsLibraryService
+      .list()
+      .then((rows) => {
+        if (cancelled) return;
+        setDocuments(Array.isArray(rows) ? rows : []);
+        setDocumentsLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDocuments([]);
+        setDocumentsLoaded(true);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setDocumentsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [documentsLoaded, libraryView]);
 
   const filtered = useMemo(() => {
     return notes.filter(n => {
@@ -430,6 +461,19 @@ export function NoteList() {
       return matchesSearch && matchesFilter && matchesTag;
     });
   }, [notes, search, filter, tagFilter]);
+
+  const filteredDocuments = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const tf = tagFilter;
+    return documents.filter((d) => {
+      const title = String(d.title || '').toLowerCase();
+      const content = String(d.content || '').toLowerCase();
+      const tags = Array.isArray(d.tags) ? d.tags : [];
+      const matchesSearch = !q || title.includes(q) || content.includes(q) || tags.some(t => String(t).toLowerCase().includes(q));
+      const matchesTag = !tf || tags.includes(tf);
+      return matchesSearch && matchesTag;
+    });
+  }, [documents, search, tagFilter]);
 
   const now = new Date();
   const hour = now.getHours();
@@ -553,6 +597,43 @@ export function NoteList() {
           </div>
         </div>
 
+        <div className="px-5 pb-3">
+          <div
+            className="flex items-center p-1 rounded-2xl"
+            style={{ background: 'var(--hi-chip-bg)', border: '1px solid var(--hi-card-border)' }}
+          >
+            <button
+              onClick={() => {
+                setLibraryView('notes');
+                setTagFilter('');
+              }}
+              className="flex-1 py-2 rounded-[14px] transition-all active:scale-[0.98]"
+              style={
+                libraryView === 'notes'
+                  ? { background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '12.5px', fontWeight: 800 }
+                  : { background: 'transparent', color: 'var(--hi-text-dim)', fontSize: '12.5px', fontWeight: 800 }
+              }
+            >
+              笔记
+            </button>
+            <button
+              onClick={() => {
+                setLibraryView('documents');
+                setFilter('all');
+                setTagFilter('');
+              }}
+              className="flex-1 py-2 rounded-[14px] transition-all active:scale-[0.98]"
+              style={
+                libraryView === 'documents'
+                  ? { background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '12.5px', fontWeight: 800 }
+                  : { background: 'transparent', color: 'var(--hi-text-dim)', fontSize: '12.5px', fontWeight: 800 }
+              }
+            >
+              文档
+            </button>
+          </div>
+        </div>
+
         {/* Search bar */}
         <AnimatePresence>
           {searchOpen && (
@@ -578,7 +659,7 @@ export function NoteList() {
                     autoFocus
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    placeholder="搜索笔记内容、标签..."
+                    placeholder={libraryView === 'notes' ? '搜索笔记内容、标签...' : '搜索文档标题、内容、标签...'}
                     className="flex-1 bg-transparent outline-none"
                     style={{ color: 'var(--hi-text-primary)', fontSize: '14px' }}
                   />
@@ -598,51 +679,52 @@ export function NoteList() {
         </AnimatePresence>
 
         {/* Filter tabs */}
-        <div className="flex gap-2 px-5 pb-3.5 overflow-x-auto scrollbar-hide">
-          {FILTER_TABS.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setFilter(tab.key)}
-              className="px-4 py-1.5 rounded-full whitespace-nowrap flex-shrink-0 transition-all active:scale-95"
-              style={
-                filter === tab.key
-                  ? {
-                      background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                      color: 'white',
-                      fontSize: '12.5px',
-                      fontWeight: 600,
-                      boxShadow: '0 2px 10px rgba(99,102,241,0.3)',
-                    }
-                  : {
-                      background: 'var(--hi-chip-bg)',
-                      color: 'var(--hi-text-dim)',
-                      fontSize: '12.5px',
-                      border: '1px solid var(--hi-card-border)',
-                    }
-              }
-            >
-              {tab.label}
-            </button>
-          ))}
-          {/* Active tag filter pill */}
-          {tagFilter && (
-            <button
-              onClick={() => setTagFilter('')}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full whitespace-nowrap flex-shrink-0 transition-all active:scale-95"
-              style={{
-                background: 'rgba(99,102,241,0.12)',
-                border: '1.5px solid rgba(99,102,241,0.35)',
-                fontSize: '12.5px',
-                fontWeight: 600,
-                color: '#4F46E5',
-              }}
-            >
-              <Hash size={11} style={{ color: '#6366F1' }} />
-              {tagFilter}
-              <X size={11} style={{ color: '#6366F1', marginLeft: 1 }} />
-            </button>
-          )}
-        </div>
+        {libraryView === 'notes' && (
+          <div className="flex gap-2 px-5 pb-3.5 overflow-x-auto scrollbar-hide">
+            {FILTER_TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setFilter(tab.key)}
+                className="px-4 py-1.5 rounded-full whitespace-nowrap flex-shrink-0 transition-all active:scale-95"
+                style={
+                  filter === tab.key
+                    ? {
+                        background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                        color: 'white',
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        boxShadow: '0 2px 10px rgba(99,102,241,0.3)',
+                      }
+                    : {
+                        background: 'var(--hi-chip-bg)',
+                        color: 'var(--hi-text-dim)',
+                        fontSize: '12.5px',
+                        border: '1px solid var(--hi-card-border)',
+                      }
+                }
+              >
+                {tab.label}
+              </button>
+            ))}
+            {tagFilter && (
+              <button
+                onClick={() => setTagFilter('')}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full whitespace-nowrap flex-shrink-0 transition-all active:scale-95"
+                style={{
+                  background: 'rgba(99,102,241,0.12)',
+                  border: '1.5px solid rgba(99,102,241,0.35)',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#4F46E5',
+                }}
+              >
+                <Hash size={11} style={{ color: '#6366F1' }} />
+                {tagFilter}
+                <X size={11} style={{ color: '#6366F1', marginLeft: 1 }} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── SCROLLABLE CONTENT ── */}
@@ -683,20 +765,32 @@ export function NoteList() {
                 </p>
                 <div className="flex items-center gap-3 mt-3">
                   <div className="flex items-center gap-1.5">
-                    <motion.button
-                      whileTap={{ scale: 0.93 }}
-                      onClick={() => setShowStatsSheet(true)}
-                      className="px-2.5 py-1 rounded-full flex items-center gap-1 active:opacity-80 transition-opacity"
-                      style={{ background: 'rgba(255,255,255,0.2)' }}
-                    >
-                      <BookOpen size={11} color="white" />
-                      <span style={{ color: 'white', fontSize: '11px', fontWeight: 600 }}>
-                        {notes.length} 条笔记
-                      </span>
-                      <ChevronRight size={9} color="rgba(255,255,255,0.7)" />
-                    </motion.button>
+                    {libraryView === 'notes' ? (
+                      <motion.button
+                        whileTap={{ scale: 0.93 }}
+                        onClick={() => setShowStatsSheet(true)}
+                        className="px-2.5 py-1 rounded-full flex items-center gap-1 active:opacity-80 transition-opacity"
+                        style={{ background: 'rgba(255,255,255,0.2)' }}
+                      >
+                        <BookOpen size={11} color="white" />
+                        <span style={{ color: 'white', fontSize: '11px', fontWeight: 600 }}>
+                          {notes.length} 条笔记
+                        </span>
+                        <ChevronRight size={9} color="rgba(255,255,255,0.7)" />
+                      </motion.button>
+                    ) : (
+                      <div
+                        className="px-2.5 py-1 rounded-full flex items-center gap-1"
+                        style={{ background: 'rgba(255,255,255,0.2)' }}
+                      >
+                        <FileText size={11} color="white" />
+                        <span style={{ color: 'white', fontSize: '11px', fontWeight: 600 }}>
+                          {documents.length} 条文档
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  {todayNotes > 0 && (
+                  {libraryView === 'notes' && todayNotes > 0 && (
                     <motion.button
                       whileTap={{ scale: 0.93 }}
                       onClick={() => setShowTodaySheet(true)}
@@ -734,7 +828,7 @@ export function NoteList() {
           <div className="flex items-center gap-1.5">
             <FileText size={12} style={{ color: '#9CA3AF' }} />
             <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
-              {filtered.length} 条笔记
+              {libraryView === 'notes' ? `${filtered.length} 条笔记` : `${filteredDocuments.length} 条文档`}
             </span>
           </div>
           {(search || tagFilter) && (
@@ -746,60 +840,142 @@ export function NoteList() {
 
         {/* Notes grid */}
         <div className="px-3 pb-4">
-          {filtered.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center justify-center py-16 text-center"
-            >
-              <div
-                className="w-20 h-20 rounded-3xl flex items-center justify-center mb-5"
-                style={{ background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)' }}
+          {libraryView === 'notes' ? (
+            filtered.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center justify-center py-16 text-center"
               >
-                {search
-                  ? <Search size={30} style={{ color: '#9CA3AF' }} />
-                  : <Sparkles size={30} style={{ color: '#6366F1' }} />
-                }
-              </div>
-              <p style={{ color: '#1E1B4B', fontSize: '17px', fontWeight: 700 }}>
-                {search ? '未找到相关笔记' : '还没有笔记'}
-              </p>
-              <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '13.5px' }}>
-                {search ? '试试其他关键词' : '点击右上角 + 记录你的第一个灵感'}
-              </p>
-              {!search && (
-                <button
-                  onClick={() => navigate('/siku/create')}
-                  className="mt-6 px-6 py-2.5 rounded-2xl"
-                  style={{
-                    background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                    color: 'white',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
-                  }}
+                <div
+                  className="w-20 h-20 rounded-3xl flex items-center justify-center mb-5"
+                  style={{ background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)' }}
                 >
-                  立即创建
-                </button>
-              )}
-            </motion.div>
-          ) : (
-            <ResponsiveMasonry columnsCountBreakPoints={{ 0: 2, 640: 3, 1024: 4 }}>
-              <Masonry gutter="10px" style={{ width: '100%', minWidth: 0 }}>
-                {filtered.map((note, i) => (
-                  <NoteCard
-                    key={note.id}
-                    note={note}
-                    index={i}
-                    onClick={(id) => navigate(`/siku/${id}`)}
-                    onTagClick={tag => {
-                      setTagFilter(tag);
-                      setFilter('all');
+                  {search
+                    ? <Search size={30} style={{ color: '#9CA3AF' }} />
+                    : <Sparkles size={30} style={{ color: '#6366F1' }} />
+                  }
+                </div>
+                <p style={{ color: '#1E1B4B', fontSize: '17px', fontWeight: 700 }}>
+                  {search ? '未找到相关笔记' : '还没有笔记'}
+                </p>
+                <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '13.5px' }}>
+                  {search ? '试试其他关键词' : '点击右上角 + 记录你的第一个灵感'}
+                </p>
+                {!search && (
+                  <button
+                    onClick={() => navigate('/siku/create')}
+                    className="mt-6 px-6 py-2.5 rounded-2xl"
+                    style={{
+                      background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                      color: 'white',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
                     }}
-                  />
-                ))}
-              </Masonry>
-            </ResponsiveMasonry>
+                  >
+                    立即创建
+                  </button>
+                )}
+              </motion.div>
+            ) : (
+              <ResponsiveMasonry columnsCountBreakPoints={{ 0: 2, 640: 3, 1024: 4 }}>
+                <Masonry gutter="10px" style={{ width: '100%', minWidth: 0 }}>
+                  {filtered.map((note, i) => (
+                    <NoteCard
+                      key={note.id}
+                      note={note}
+                      index={i}
+                      onClick={(id) => navigate(`/siku/${id}`)}
+                      onTagClick={tag => {
+                        setTagFilter(tag);
+                        setFilter('all');
+                      }}
+                    />
+                  ))}
+                </Masonry>
+              </ResponsiveMasonry>
+            )
+          ) : (
+            <>
+              {documentsLoading && (
+                <div className="px-1 py-3" style={{ color: '#9CA3AF', fontSize: '12.5px' }}>
+                  正在加载文档…
+                </div>
+              )}
+              {!documentsLoading && filteredDocuments.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center justify-center py-16 text-center"
+                >
+                  <div
+                    className="w-20 h-20 rounded-3xl flex items-center justify-center mb-5"
+                    style={{ background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)' }}
+                  >
+                    <FileText size={30} style={{ color: '#6366F1' }} />
+                  </div>
+                  <p style={{ color: '#1E1B4B', fontSize: '17px', fontWeight: 700 }}>
+                    {search ? '未找到相关文档' : '还没有文档'}
+                  </p>
+                  <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '13.5px' }}>
+                    {search ? '试试其他关键词' : '请在 Web 端上传文档后查看'}
+                  </p>
+                </motion.div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredDocuments.map((d, i) => (
+                    <motion.button
+                      key={d.id}
+                      type="button"
+                      whileTap={{ scale: 0.99 }}
+                      onClick={() => navigate(`/documents/${d.id}`)}
+                      className="w-full text-left rounded-[18px] p-4"
+                      style={{
+                        background: 'var(--hi-card-bg)',
+                        backdropFilter: 'blur(14px)',
+                        WebkitBackdropFilter: 'blur(14px)',
+                        borderTop: '1px solid var(--hi-card-border)',
+                        borderRight: '1px solid var(--hi-card-border)',
+                        borderBottom: '1px solid var(--hi-card-border)',
+                        borderLeft: '3px solid rgba(99,102,241,0.75)',
+                        boxShadow: '0 2px 16px rgba(99,102,241,0.07), 0 1px 4px rgba(0,0,0,0.04)',
+                      }}
+                      initial={{ opacity: 0, y: 18, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: i * 0.03, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontWeight: 800, fontSize: '13.5px' }}>
+                            {d.title || '未命名文档'}
+                          </p>
+                          <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 4, lineHeight: 1.5 }}>
+                            {String(d.content || '').slice(0, 90)}
+                          </p>
+                        </div>
+                        <span style={{ color: '#9CA3AF', fontSize: '10px', flexShrink: 0 }}>
+                          {d.fileType ? String(d.fileType) : 'DOCUMENT'}
+                        </span>
+                      </div>
+                      {Array.isArray(d.tags) && d.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {d.tags.slice(0, 6).map((t) => (
+                            <span
+                              key={t}
+                              className="px-2.5 py-1 rounded-full"
+                              style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.16)', color: '#4F46E5', fontSize: '11px', fontWeight: 700 }}
+                            >
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

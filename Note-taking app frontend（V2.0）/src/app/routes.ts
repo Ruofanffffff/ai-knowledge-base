@@ -5,6 +5,7 @@ import { Auth } from "./pages/Auth";
 import { HiBrain } from "./pages/HiBrain";
 import { NoteList } from "./pages/NoteList";
 import { NoteCreate } from "./pages/NoteCreate";
+import { DocumentDetail } from "./pages/DocumentDetail";
 import { SiChain } from "./pages/SiChain";
 import { SiCircle } from "./pages/SiCircle";
 import { Profile } from "./pages/Profile";
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
       { path: "siku", Component: NoteList },
       { path: "siku/create", Component: NoteCreate },
       { path: "siku/:id", Component: NoteCreate },
+      { path: "documents/:id", Component: DocumentDetail },
       { path: "sichain", Component: SiChain },
       { path: "sicircle", Component: SiCircle },
       { path: "profile", Component: Profile },
