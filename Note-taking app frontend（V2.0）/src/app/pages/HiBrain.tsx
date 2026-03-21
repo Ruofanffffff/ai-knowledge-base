@@ -11,7 +11,7 @@ import {
   Send, Sparkles, GitBranch, ChevronRight,
   Mic, Plus, FileText,
   PenLine, Search, ScanLine, RotateCcw, X, ArrowRight,
-  Layers, Wand2,
+  Layers, Wand2, MessageSquareText, Trash2, Check,
 } from 'lucide-react';
 import { HiBrainClassic } from './HiBrainClassic';
 import { StrategyViewPanel } from '../components/StrategyViewPanel';
@@ -20,8 +20,24 @@ import { KnowledgePushNotification } from '../components/KnowledgePushNotificati
 import { ChatCard, CardPayload } from '../components/ChatCards';
 import { InlineSearch } from '../components/InlineSearch';
 import { hibrainService } from '../services/hibrainService';
+import type { HiBrainSourcesDetails } from '../services/hibrainService';
+import { chatSessionsService } from '../services/chatSessionsService';
+import type { ChatSessionMessage, ChatSessionSummary } from '../services/chatSessionsService';
 import { useVisualViewportMetrics } from '../components/ui/use-visual-viewport';
 import { useCapacitorKeyboardMetrics } from '../components/ui/use-capacitor-keyboard';
+import { useIsMobile } from '../components/ui/use-mobile';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '../components/ui/drawer';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants & types
@@ -92,7 +108,14 @@ function GrowthRing({ completion, color, fragCount }: { completion: number; colo
   );
 }
 
-interface Message { id: string; role: 'user' | 'ai'; content: string; timestamp: Date; card?: CardPayload; }
+interface Message {
+  id: string;
+  role: 'user' | 'ai';
+  content: string;
+  timestamp: Date;
+  card?: CardPayload;
+  sourcesDetails?: HiBrainSourcesDetails;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // StatusBar
@@ -788,7 +811,69 @@ function HiBrainNewDesign() {
 
   const initMsg = `你好，我是 **Hi Brain** 🧠\n\n我是你的**精神伙伴 (Spiritual Partner)**。不仅仅是记录工具，我更希望成为你思考的延伸。\n\n**我的使命：**\n当你记录碎片时，我负责**看见**；\n当你回顾时，我负责**串联**；\n当你迷茫时，我负责**寻找方向**。\n\n把你的灵感交给我，让我们一起见证知识的生长 🌱`;
 
-  const [messages, setMessages] = useState<Message[]>([{ id:'0', role:'ai', content:initMsg, timestamp:new Date() }]);
+  const isMobile = useIsMobile();
+
+  const formatStoreTime = (d: Date) =>
+    d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  const parseSessionTimestamp = (value: unknown): Date => {
+    if (!value) return new Date();
+    if (value instanceof Date) return value;
+    if (typeof value === 'number') return new Date(value);
+    if (typeof value !== 'string') return new Date();
+    // ISO / RFC
+    const iso = new Date(value);
+    if (!Number.isNaN(iso.getTime())) return iso;
+    // "HH:mm" (web 端常见)
+    const m = value.match(/^(\d{1,2}):(\d{2})$/);
+    if (m) {
+      const d = new Date();
+      d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+      return d;
+    }
+    return new Date();
+  };
+
+  const normalizeSessionMessages = useCallback((raw: ChatSessionMessage[]): Message[] => {
+    const safe = Array.isArray(raw) ? raw : [];
+    const hasNonEmptySourceArraysLocal = (value: unknown): boolean => {
+      if (!value || typeof value !== 'object') return false;
+      return Object.values(value as Record<string, unknown>).some(v => Array.isArray(v) && v.length > 0);
+    };
+    return safe.map((m, idx) => {
+      const role = m.role === 'assistant' ? 'ai' : 'user';
+      const base: Message = {
+        id: String(m.id ?? `msg-${idx}-${Date.now()}`),
+        role,
+        content: String(m.content ?? ''),
+        timestamp: parseSessionTimestamp(m.timestamp),
+        ...(m.sourcesDetails ? { sourcesDetails: m.sourcesDetails as HiBrainSourcesDetails } : {}),
+      };
+      // 仅当有 sourcesDetails 时再生成 sources 卡片
+      if (role === 'ai' && m.sourcesDetails && hasNonEmptySourceArraysLocal(m.sourcesDetails)) {
+        return {
+          ...base,
+          card: { type: 'sources', sourcesDetails: m.sourcesDetails as any },
+        };
+      }
+      return base;
+    });
+  }, []);
+
+  const welcomeMessage: Message = useMemo(
+    () => ({ id: '0', role: 'ai', content: initMsg, timestamp: new Date() }),
+    [initMsg],
+  );
+
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+
+  const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
@@ -869,6 +954,101 @@ function HiBrainNewDesign() {
     if (!localStorage.getItem('hi_brain_authed')) navigate('/auth', { replace: true });
   }, [navigate]);
 
+  const generateTitle = (firstUserMessage: string): string => {
+    const maxLength = 30;
+    const s = (firstUserMessage || '').trim();
+    return s.length > maxLength ? s.slice(0, maxLength) + '...' : (s || '新对话');
+  };
+
+  const createNewSession = useCallback(async () => {
+    const now = new Date();
+    const tempId = Date.now().toString();
+    const sessionPayload = {
+      id: tempId,
+      title: '新对话',
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      messages: [
+        {
+          id: 1,
+          role: 'assistant' as const,
+          content: initMsg,
+          timestamp: formatStoreTime(now),
+        },
+      ],
+    };
+
+    try {
+      const created = await chatSessionsService.createSession(sessionPayload);
+      const sessionId = created?.id ? String(created.id) : tempId;
+      const summary: ChatSessionSummary = {
+        id: sessionId,
+        title: created?.title || sessionPayload.title,
+        createdAt: created?.createdAt || sessionPayload.createdAt,
+        updatedAt: created?.updatedAt || sessionPayload.updatedAt,
+      };
+
+      setSessions(prev => [summary, ...prev.filter(s => String(s.id) !== sessionId)]);
+      setCurrentSessionId(sessionId);
+      setMessages(normalizeSessionMessages(created?.messages || sessionPayload.messages));
+      return sessionId;
+    } catch (err) {
+      console.error('createNewSession failed:', err);
+      const summary: ChatSessionSummary = {
+        id: tempId,
+        title: sessionPayload.title,
+        createdAt: sessionPayload.createdAt,
+        updatedAt: sessionPayload.updatedAt,
+      };
+      setSessions(prev => [summary, ...prev]);
+      setCurrentSessionId(tempId);
+      setMessages(normalizeSessionMessages(sessionPayload.messages));
+      return tempId;
+    }
+  }, [formatStoreTime, initMsg, normalizeSessionMessages]);
+
+  const switchSession = useCallback(async (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    setMessagesLoading(true);
+    try {
+      const detail = await chatSessionsService.getSession(sessionId);
+      setMessages(normalizeSessionMessages(detail?.messages || []));
+      if (detail?.title) {
+        setSessions(prev => prev.map(s => String(s.id) === sessionId ? { ...s, title: detail.title } : s));
+      }
+    } catch (err) {
+      console.error('switchSession failed:', err);
+      setMessages([welcomeMessage]);
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, [normalizeSessionMessages, welcomeMessage]);
+
+  const fetchSessions = useCallback(async () => {
+    setSessionsLoading(true);
+    try {
+      const loaded = await chatSessionsService.listSessions();
+      if (loaded.length > 0) {
+        setSessions(loaded);
+        const firstId = currentSessionId ? String(currentSessionId) : String(loaded[0].id);
+        await switchSession(firstId);
+      } else {
+        await createNewSession();
+      }
+    } catch (err) {
+      console.error('fetchSessions failed:', err);
+      setSessions([]);
+      await createNewSession();
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [createNewSession, currentSessionId, switchSession]);
+
+  useEffect(() => {
+    fetchSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Proactive AI insight — now with GrowthCard
   useEffect(() => {
     const best = clusters.find(c => c.fragCount >= 3);
@@ -944,11 +1124,42 @@ function HiBrainNewDesign() {
     const msg = (text || input).trim();
     if (!msg) return;
     setInput('');
-    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: msg, timestamp: new Date() }]);
+    const now = new Date();
+    const userMsgId = Date.now().toString();
+    const existingUserCount = messages.filter(m => m.role === 'user').length;
+    setMessages(prev => [...prev, { id: userMsgId, role: 'user', content: msg, timestamp: now }]);
     setIsTyping(true);
     
     try {
-      // Use real backend service instead of mock
+      // Ensure session exists
+      let sessionId = currentSessionId;
+      if (!sessionId) {
+        sessionId = await createNewSession();
+      }
+
+      // 1) Save user message to session first
+      try {
+        await chatSessionsService.addMessage(sessionId, {
+          role: 'user',
+          content: msg,
+          timestamp: formatStoreTime(now),
+        });
+      } catch (err) {
+        console.error('Failed to save user message:', err);
+      }
+
+      // 2) Auto-generate title on first user message (align with Web)
+      if (existingUserCount === 0) {
+        const newTitle = generateTitle(msg);
+        try {
+          await chatSessionsService.renameSession(sessionId, newTitle);
+          setSessions(prev => prev.map(s => String(s.id) === String(sessionId) ? { ...s, title: newTitle } : s));
+        } catch (err) {
+          console.error('Failed to rename session:', err);
+        }
+      }
+
+      // 3) Call existing HiBrain query
       const result = await hibrainService.query(msg);
       const card = buildSourcesCardFromResult(result);
       const notesSourceCount = Array.isArray(result?.sources?.notes)
@@ -961,21 +1172,51 @@ function HiBrainNewDesign() {
         ? `${answer}\n\n（已检索思库笔记 ${notesSourceCount} 条）`
         : answer;
       
+      const assistantNow = new Date();
+      const assistantMsgId = (Date.now() + 1).toString();
       setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(), 
+        id: assistantMsgId,
         role: 'ai',
         content: answerWithSource,
-        timestamp: new Date(),
+        timestamp: assistantNow,
         ...(card ? { card } : {}),
+        ...(result?.sourcesDetails ? { sourcesDetails: result.sourcesDetails as HiBrainSourcesDetails } : {}),
       }]);
+
+      // 4) Save assistant message to session (include sourcesDetails)
+      try {
+        await chatSessionsService.addMessage(sessionId, {
+          role: 'assistant',
+          content: answerWithSource,
+          timestamp: formatStoreTime(assistantNow),
+          ...(result?.sources ? { sources: result.sources } : {}),
+          ...(result?.sourcesDetails ? { sourcesDetails: result.sourcesDetails } : {}),
+        });
+      } catch (err) {
+        console.error('Failed to save assistant message:', err);
+      }
     } catch (error) {
       console.error('HiBrain error:', error);
+      const assistantNow = new Date();
+      const errorText = '抱歉，连接 HiBrain 大脑时出现了一些问题，请检查网络或稍后再试。';
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'ai',
-        content: '抱歉，连接 HiBrain 大脑时出现了一些问题，请检查网络或稍后再试。',
-        timestamp: new Date(),
+        content: errorText,
+        timestamp: assistantNow,
       }]);
+      // Best-effort persist error message as assistant output
+      if (currentSessionId) {
+        try {
+          await chatSessionsService.addMessage(currentSessionId, {
+            role: 'assistant',
+            content: errorText,
+            timestamp: formatStoreTime(assistantNow),
+          });
+        } catch (err) {
+          console.error('Failed to save error assistant message:', err);
+        }
+      }
     } finally {
       setIsTyping(false);
     }
@@ -999,6 +1240,190 @@ function HiBrainNewDesign() {
 
   const todayCount = notes.filter(n => Date.now() - n.createdAt < 86400000).length;
   const matureClusters = clusters.filter(c => c.stage === 'growing' || c.stage === 'mature');
+
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    if (!window.confirm('确定删除该会话吗？此操作不可撤销。')) return;
+    try {
+      await chatSessionsService.deleteSession(sessionId);
+      setSessions(prev => prev.filter(s => String(s.id) !== String(sessionId)));
+      if (String(currentSessionId) === String(sessionId)) {
+        const remaining = sessions.filter(s => String(s.id) !== String(sessionId));
+        if (remaining.length > 0) {
+          await switchSession(String(remaining[0].id));
+        } else {
+          await createNewSession();
+        }
+      }
+    } catch (err) {
+      console.error('deleteSession failed:', err);
+    }
+  }, [createNewSession, currentSessionId, sessions, switchSession]);
+
+  const startRenameSession = useCallback((s: ChatSessionSummary) => {
+    setRenamingSessionId(String(s.id));
+    setRenameDraft(String(s.title || ''));
+  }, []);
+
+  const cancelRenameSession = useCallback(() => {
+    setRenamingSessionId(null);
+    setRenameDraft('');
+  }, []);
+
+  const commitRenameSession = useCallback(async () => {
+    if (!renamingSessionId) return;
+    const title = renameDraft.trim();
+    if (!title) return;
+    try {
+      await chatSessionsService.renameSession(renamingSessionId, title);
+      setSessions(prev => prev.map(s => String(s.id) === String(renamingSessionId) ? { ...s, title } : s));
+      cancelRenameSession();
+    } catch (err) {
+      console.error('renameSession failed:', err);
+    }
+  }, [cancelRenameSession, renameDraft, renamingSessionId]);
+
+  const sessionsPanel = (
+    <div className="flex flex-col" style={{ background: 'var(--hi-page-bg)' }}>
+      <div className="px-4 pb-3 flex items-center justify-between gap-3">
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={async () => {
+            await createNewSession();
+            setSessionsOpen(false);
+          }}
+          className="px-3 py-2 rounded-xl flex items-center gap-2"
+          style={{ background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', color: 'white', fontSize: '12px', fontWeight: 700 }}
+        >
+          <Plus size={14} color="white" />
+          新对话
+        </motion.button>
+        <div className="flex items-center gap-2">
+          {sessionsLoading && <span style={{ color: '#9CA3AF', fontSize: '11px' }}>加载中…</span>}
+          <button
+            onClick={() => setSessionsOpen(false)}
+            className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(156,163,175,0.10)' }}
+            aria-label="关闭会话列表"
+          >
+            <X size={14} style={{ color: '#9CA3AF' }} />
+          </button>
+        </div>
+      </div>
+
+      <div className="px-4 pb-4 overflow-y-auto" style={{ maxHeight: isMobile ? '72vh' : '60vh' }}>
+        {sessions.length === 0 ? (
+          <div className="py-10 text-center" style={{ color: '#9CA3AF', fontSize: '12px' }}>
+            暂无会话
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {sessions.map((s) => {
+              const active = String(s.id) === String(currentSessionId);
+              const isRenaming = String(s.id) === String(renamingSessionId);
+              return (
+                <motion.button
+                  key={String(s.id)}
+                  whileTap={{ scale: 0.985 }}
+                  onClick={async () => {
+                    if (isRenaming) return;
+                    await switchSession(String(s.id));
+                    setSessionsOpen(false);
+                  }}
+                  className="w-full text-left rounded-2xl p-3 flex items-center gap-3"
+                  style={{
+                    background: active ? 'rgba(99,102,241,0.10)' : 'rgba(156,163,175,0.06)',
+                    border: active ? '1px solid rgba(99,102,241,0.28)' : '1px solid rgba(156,163,175,0.10)',
+                  }}
+                >
+                  <div className="w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: active ? 'rgba(99,102,241,0.18)' : 'rgba(156,163,175,0.10)' }}>
+                    <MessageSquareText size={16} style={{ color: active ? '#6366F1' : '#9CA3AF' }} />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    {isRenaming ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={renameDraft}
+                          onChange={e => setRenameDraft(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') commitRenameSession();
+                            if (e.key === 'Escape') cancelRenameSession();
+                          }}
+                          className="flex-1 bg-transparent outline-none px-3 py-2 rounded-xl"
+                          style={{
+                            border: '1px solid rgba(99,102,241,0.28)',
+                            color: 'var(--hi-text-primary)',
+                            fontSize: '12.5px',
+                            background: 'rgba(99,102,241,0.06)',
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); commitRenameSession(); }}
+                          className="w-8 h-8 rounded-xl flex items-center justify-center"
+                          style={{ background: 'rgba(16,185,129,0.12)' }}
+                          aria-label="确认重命名"
+                        >
+                          <Check size={14} style={{ color: '#10B981' }} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); cancelRenameSession(); }}
+                          className="w-8 h-8 rounded-xl flex items-center justify-center"
+                          style={{ background: 'rgba(156,163,175,0.10)' }}
+                          aria-label="取消重命名"
+                        >
+                          <X size={14} style={{ color: '#9CA3AF' }} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 800 }}>
+                            {s.title || '未命名会话'}
+                          </p>
+                          {active && (
+                            <span className="px-1.5 py-0.5 rounded-full"
+                              style={{ background: 'rgba(99,102,241,0.16)', color: '#6366F1', fontSize: '9px', fontWeight: 700 }}>
+                              当前
+                            </span>
+                          )}
+                        </div>
+                        <p className="truncate" style={{ color: '#9CA3AF', fontSize: '10.5px', marginTop: 2 }}>
+                          {s.updatedAt ? new Date(s.updatedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  {!isRenaming && (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); startRenameSession(s); }}
+                        className="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style={{ background: 'rgba(99,102,241,0.10)' }}
+                        aria-label="重命名会话"
+                      >
+                        <PenLine size={14} style={{ color: '#6366F1' }} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteSession(String(s.id)); }}
+                        className="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style={{ background: 'rgba(239,68,68,0.10)' }}
+                        aria-label="删除会话"
+                      >
+                        <Trash2 size={14} style={{ color: '#EF4444' }} />
+                      </button>
+                    </div>
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -1047,59 +1472,76 @@ function HiBrainNewDesign() {
               </div>
             </div>
           </div>
-          <motion.button
-            onClick={() => navigate('/siku/create')}
-            className="w-9 h-9 rounded-2xl flex items-center justify-center relative overflow-hidden"
-            whileHover="hov"
-            whileTap="tap"
-            variants={{
-              hov: {
-                scale: 1.12,
-                boxShadow: '0 0 0 3px rgba(99,102,241,0.22), 0 6px 20px rgba(99,102,241,0.38)',
-              },
-              tap: {
-                scale: 0.78,
-                boxShadow: '0 0 0 10px rgba(99,102,241,0)',
-              },
-            }}
-            style={{
-              background: 'var(--hi-icon-bg)',
-              border: '1px solid rgba(99,102,241,0.2)',
-              boxShadow: '0 0 0 0px rgba(99,102,241,0)',
-            }}
-            transition={{ type: 'spring', stiffness: 420, damping: 22 }}
-          >
-            {/* Hover fill overlay */}
-            <motion.div
-              className="absolute inset-0 rounded-2xl pointer-events-none"
-              variants={{ hov: { opacity: 1 }, tap: { opacity: 0.5 } }}
-              initial={{ opacity: 0 }}
-              transition={{ duration: 0.16 }}
-              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(139,92,246,0.10))' }}
-            />
-
-            {/* Tap radial flash burst */}
-            <motion.div
-              className="absolute inset-0 rounded-2xl pointer-events-none"
-              variants={{ tap: { opacity: [0, 0.6, 0] } }}
-              initial={{ opacity: 0 }}
-              transition={{ duration: 0.30, ease: 'easeOut' }}
-              style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.50) 0%, transparent 72%)' }}
-            />
-
-            {/* Plus icon — rotates 90° on hover, 135° on tap */}
-            <motion.div
-              variants={{
-                hov: { rotate: 90,  scale: 1.08 },
-                tap: { rotate: 135, scale: 0.80 },
+          <div className="flex items-center gap-2">
+            <motion.button
+              onClick={() => setSessionsOpen(true)}
+              className="w-9 h-9 rounded-2xl flex items-center justify-center"
+              whileTap={{ scale: 0.90 }}
+              style={{
+                background: 'var(--hi-icon-bg)',
+                border: '1px solid rgba(99,102,241,0.2)',
+                boxShadow: '0 2px 10px rgba(99,102,241,0.10)',
               }}
-              initial={{ rotate: 0, scale: 1 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 18 }}
-              style={{ display: 'flex', originX: '50%', originY: '50%' }}
+              aria-label="会话列表"
             >
-              <Plus size={18} style={{ color: '#6366F1' }} />
-            </motion.div>
-          </motion.button>
+              <MessageSquareText size={17} style={{ color: '#6366F1' }} />
+            </motion.button>
+
+            <motion.button
+              onClick={() => navigate('/siku/create')}
+              className="w-9 h-9 rounded-2xl flex items-center justify-center relative overflow-hidden"
+              whileHover="hov"
+              whileTap="tap"
+              variants={{
+                hov: {
+                  scale: 1.12,
+                  boxShadow: '0 0 0 3px rgba(99,102,241,0.22), 0 6px 20px rgba(99,102,241,0.38)',
+                },
+                tap: {
+                  scale: 0.78,
+                  boxShadow: '0 0 0 10px rgba(99,102,241,0)',
+                },
+              }}
+              style={{
+                background: 'var(--hi-icon-bg)',
+                border: '1px solid rgba(99,102,241,0.2)',
+                boxShadow: '0 0 0 0px rgba(99,102,241,0)',
+              }}
+              transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+              aria-label="新建灵感"
+            >
+              {/* Hover fill overlay */}
+              <motion.div
+                className="absolute inset-0 rounded-2xl pointer-events-none"
+                variants={{ hov: { opacity: 1 }, tap: { opacity: 0.5 } }}
+                initial={{ opacity: 0 }}
+                transition={{ duration: 0.16 }}
+                style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(139,92,246,0.10))' }}
+              />
+
+              {/* Tap radial flash burst */}
+              <motion.div
+                className="absolute inset-0 rounded-2xl pointer-events-none"
+                variants={{ tap: { opacity: [0, 0.6, 0] } }}
+                initial={{ opacity: 0 }}
+                transition={{ duration: 0.30, ease: 'easeOut' }}
+                style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.50) 0%, transparent 72%)' }}
+              />
+
+              {/* Plus icon — rotates 90° on hover, 135° on tap */}
+              <motion.div
+                variants={{
+                  hov: { rotate: 90,  scale: 1.08 },
+                  tap: { rotate: 135, scale: 0.80 },
+                }}
+                initial={{ rotate: 0, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 18 }}
+                style={{ display: 'flex', originX: '50%', originY: '50%' }}
+              >
+                <Plus size={18} style={{ color: '#6366F1' }} />
+              </motion.div>
+            </motion.button>
+          </div>
         </div>
 
         {/* Quick actions — always visible */}
@@ -1209,11 +1651,19 @@ function HiBrainNewDesign() {
 
         <div className="space-y-0 pb-2">
           <div className="space-y-4">
-            {messages.map(msg => (
-              <motion.div key={msg.id}
-                initial={{ opacity:0, y:12, scale:0.96 }} animate={{ opacity:1, y:0, scale:1 }}
-                transition={{ duration:0.35, ease:[0.16,1,0.3,1] }}
-                className={`flex ${msg.role==='user' ? 'justify-end' : 'justify-start'} gap-2.5`}>
+            {messagesLoading ? (
+              <div className="py-10 flex items-center justify-center">
+                <div className="px-4 py-3 rounded-2xl"
+                  style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)', color: '#6366F1', fontSize: '12px', fontWeight: 700 }}>
+                  正在加载会话…
+                </div>
+              </div>
+            ) : (
+              messages.map(msg => (
+                <motion.div key={msg.id}
+                  initial={{ opacity:0, y:12, scale:0.96 }} animate={{ opacity:1, y:0, scale:1 }}
+                  transition={{ duration:0.35, ease:[0.16,1,0.3,1] }}
+                  className={`flex ${msg.role==='user' ? 'justify-end' : 'justify-start'} gap-2.5`}>
 
                 {msg.role === 'ai' && (
                   <div className="w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0 mt-1"
@@ -1246,8 +1696,9 @@ function HiBrainNewDesign() {
                     />
                   )}
                 </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))
+            )}
 
             <AnimatePresence>
               {isTyping && (
@@ -1412,6 +1863,27 @@ function HiBrainNewDesign() {
       {!keyboardOpen && <BottomNav />}
       <GlobalSearch open={showSearch} onClose={() => setShowSearch(false)} />
       <ScanRecognition open={showScan} onClose={() => setShowScan(false)} />
+
+      {/* Sessions panel (Dialog on desktop / Drawer on mobile) */}
+      {isMobile ? (
+        <Drawer open={sessionsOpen} onOpenChange={setSessionsOpen}>
+          <DrawerContent className="p-0" style={{ background: 'var(--hi-page-bg)', borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+            <DrawerHeader className="pb-1">
+              <DrawerTitle style={{ color: 'var(--hi-text-primary)', fontWeight: 900 }}>会话列表</DrawerTitle>
+            </DrawerHeader>
+            {sessionsPanel}
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={sessionsOpen} onOpenChange={setSessionsOpen}>
+          <DialogContent className="p-0 max-w-[560px]" style={{ background: 'var(--hi-page-bg)' }}>
+            <DialogHeader className="px-4 pt-4 pb-2">
+              <DialogTitle style={{ color: 'var(--hi-text-primary)', fontWeight: 900 }}>会话列表</DialogTitle>
+            </DialogHeader>
+            {sessionsPanel}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Cluster synthesis overlay */}
       <AnimatePresence>
