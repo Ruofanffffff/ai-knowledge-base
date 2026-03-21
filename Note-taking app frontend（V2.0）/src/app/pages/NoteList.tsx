@@ -1,16 +1,18 @@
-import { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { useNotes, Note } from '../components/context/NoteContext';
 import { documentsLibraryService, type LibraryDocument } from '../services/documentsLibraryService';
 import {
   Plus, Search, Sparkles, Clock, FileText, X,
   BookOpen, LayoutGrid, GitFork, CheckCheck, Pen,
   TrendingUp, Tag, ArrowRight, Calendar, Hash, ChevronRight,
+  Upload, Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Masonry, { ResponsiveMasonry } from 'react-responsive-masonry';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
+import { toast } from '../components/ui/Toast';
 
 /* ── Mindmap mini-thumbnail (pure JSX SVG, no DOM manipulation) ── */
 const MM_COLORS = ['#8B5CF6','#3B82F6','#10B981','#F59E0B','#EF4444','#EC4899','#14B8A6','#F97316'];
@@ -406,6 +408,7 @@ function StatusBar() {
 /* ─── Main Component ─── */
 export function NoteList() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { notes } = useNotes();
   const [libraryView, setLibraryView] = useState<'notes' | 'documents'>('notes');
   const [search, setSearch] = useState('');
@@ -419,6 +422,17 @@ export function NoteList() {
   const [documents, setDocuments] = useState<LibraryDocument[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [documentsLoaded, setDocumentsLoaded] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const state = location.state as any;
+    if (!state || typeof state !== 'object') return;
+
+    const wantsDocuments = state.libraryView === 'documents' || state.refreshDocuments === true;
+    if (wantsDocuments) setLibraryView('documents');
+    if (state.refreshDocuments === true) setDocumentsLoaded(false);
+  }, [location.key]);
 
   useEffect(() => {
     if (libraryView !== 'documents') return;
@@ -445,6 +459,34 @@ export function NoteList() {
       cancelled = true;
     };
   }, [documentsLoaded, libraryView]);
+
+  const openUploadDocument = () => {
+    if (uploadingDocument) return;
+    uploadInputRef.current?.click();
+  };
+
+  const handleUploadDocumentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    e.target.value = '';
+    if (!file) return;
+
+    const toastId = toast.loading('正在上传文档…');
+    setUploadingDocument(true);
+    try {
+      const doc = await documentsLibraryService.upload(file);
+      setDocumentsLoaded(false);
+      toast.dismiss(toastId);
+      toast.upload();
+      navigate(`/documents/${doc.id}`);
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error('上传失败', {
+        subtitle: err instanceof Error ? err.message : String(err || '上传失败'),
+      });
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     return notes.filter(n => {
@@ -528,6 +570,13 @@ export function NoteList() {
     >
       {/* Background layers */}
       <ParticleBackground />
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.txt,.md"
+        onChange={handleUploadDocumentChange}
+        style={{ display: 'none' }}
+      />
 
       {/* Ambient light blobs */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -583,16 +632,34 @@ export function NoteList() {
               <Search size={18} style={{ color: searchOpen ? '#6366F1' : 'var(--hi-text-dim)' }} />
             </button>
 
-            {/* Create button */}
             <button
               onClick={() => navigate('/siku/create')}
-              className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-90"
+              className="h-10 px-3 rounded-2xl flex items-center gap-1.5 transition-all active:scale-90"
               style={{
                 background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                boxShadow: '0 4px 16px rgba(99,102,241,0.4)',
+                boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
               }}
             >
-              <Plus size={20} color="white" strokeWidth={2.5} />
+              <Plus size={18} color="white" strokeWidth={2.5} />
+              <span style={{ color: 'white', fontSize: '12.5px', fontWeight: 800 }}>新建</span>
+            </button>
+
+            <button
+              onClick={openUploadDocument}
+              disabled={uploadingDocument}
+              className="h-10 px-3 rounded-2xl flex items-center gap-1.5 transition-all active:scale-90 disabled:opacity-60 disabled:active:scale-100"
+              style={{
+                background: 'var(--hi-chip-bg)',
+                border: '1px solid var(--hi-card-border)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              }}
+            >
+              {uploadingDocument ? (
+                <Loader2 size={16} className="animate-spin" style={{ color: '#10B981' }} />
+              ) : (
+                <Upload size={16} style={{ color: '#10B981' }} />
+              )}
+              <span style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', fontWeight: 800 }}>上传</span>
             </button>
           </div>
         </div>
@@ -860,7 +927,7 @@ export function NoteList() {
                   {search ? '未找到相关笔记' : '还没有笔记'}
                 </p>
                 <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '13.5px' }}>
-                  {search ? '试试其他关键词' : '点击右上角 + 记录你的第一个灵感'}
+                  {search ? '试试其他关键词' : '点击右上角「新建」记录你的第一个灵感'}
                 </p>
                 {!search && (
                   <button
@@ -919,8 +986,29 @@ export function NoteList() {
                     {search ? '未找到相关文档' : '还没有文档'}
                   </p>
                   <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '13.5px' }}>
-                    {search ? '试试其他关键词' : '请在 Web 端上传文档后查看'}
+                    {search ? '试试其他关键词' : '上传文档到思库，自动解析后可在这里查看'}
                   </p>
+                  {!search && (
+                    <button
+                      onClick={openUploadDocument}
+                      disabled={uploadingDocument}
+                      className="mt-6 px-6 py-2.5 rounded-2xl flex items-center gap-2 disabled:opacity-60 disabled:active:scale-100 active:scale-[0.98] transition-all"
+                      style={{
+                        background: 'linear-gradient(135deg, #10B981, #34D399)',
+                        color: 'white',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        boxShadow: '0 4px 16px rgba(16,185,129,0.28)',
+                      }}
+                    >
+                      {uploadingDocument ? (
+                        <Loader2 size={16} className="animate-spin" color="white" />
+                      ) : (
+                        <Upload size={16} color="white" />
+                      )}
+                      上传文档
+                    </button>
+                  )}
                 </motion.div>
               ) : (
                 <div className="space-y-3">
