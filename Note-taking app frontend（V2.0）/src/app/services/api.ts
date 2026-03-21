@@ -13,6 +13,8 @@ if (isNative) {
   BASE_URL = envBaseUrl || DEFAULT_SERVER_BASE_URL;
 }
 
+export const API_BASE_URL = BASE_URL;
+
 export const api = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,

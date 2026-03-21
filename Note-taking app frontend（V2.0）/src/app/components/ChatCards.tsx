@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Note } from './context/NoteContext';
 import { Cluster } from './ClusterCard';
+import type { PersistedSource } from '../types/sources';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ export interface CardPayload {
   cluster?: Cluster;
   nextColor?: string;
   // sources
+  sources?: PersistedSource[];
   sourcesDetails?: HiBrainSourcesDetails;
 }
 
@@ -688,12 +690,44 @@ function formatSourceDate(iso?: string): string | null {
   return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
 }
 
-function SourcesCard({ card, onNavigate }: { card: CardPayload; onNavigate?: (p: string) => void }) {
-  const details = card.sourcesDetails;
+function sourcesFromDetails(details?: HiBrainSourcesDetails): PersistedSource[] {
+  const out: PersistedSource[] = [];
   const notes = Array.isArray(details?.notes) ? details!.notes : [];
   const documents = Array.isArray(details?.documents) ? details!.documents : [];
   const attachments = Array.isArray(details?.attachments) ? details!.attachments : [];
-  const total = notes.length + documents.length + attachments.length;
+
+  for (const n of notes) {
+    const id = String(n.id ?? '');
+    const title = String(n.title ?? '');
+    if (!id || !title) continue;
+    out.push({ id, title, preview: n.excerpt, sourceType: 'note', updatedAt: n.updatedAt });
+  }
+  for (const d of documents) {
+    const id = String(d.id ?? '');
+    const title = String(d.title ?? '');
+    if (!id || !title) continue;
+    out.push({ id, title, preview: d.excerpt, sourceType: 'document', updatedAt: d.updatedAt });
+  }
+  for (const a of attachments) {
+    const id = String(a.id ?? '');
+    const title = String(a.noteTitle ?? a.type ?? '附件');
+    if (!id || !title) continue;
+    out.push({ id, title, preview: a.excerpt, sourceType: 'attachment', updatedAt: a.updatedAt });
+  }
+
+  return out;
+}
+
+function SourcesCard({ card, onNavigate }: { card: CardPayload; onNavigate?: (p: string) => void }) {
+  const sources = (Array.isArray(card.sources) ? card.sources : []).filter(s => s && s.id && s.title);
+  const fallback = sources.length === 0 ? sourcesFromDetails(card.sourcesDetails) : [];
+  const all = sources.length > 0 ? sources : fallback;
+
+  const notes = all.filter(s => s.sourceType === 'note');
+  const documents = all.filter(s => s.sourceType === 'document');
+  const attachments = all.filter(s => s.sourceType === 'attachment');
+  const web = all.filter(s => s.sourceType === 'web');
+  const total = notes.length + documents.length + attachments.length + web.length;
   if (total === 0) return null;
 
   const SectionTitle = ({ text }: { text: string }) => (
@@ -740,6 +774,8 @@ function SourcesCard({ card, onNavigate }: { card: CardPayload; onNavigate?: (p:
               {notes.slice(0, 3).map((n, i) => {
                 const timeStr = formatSourceDate(n.updatedAt);
                 const clickable = Boolean(onNavigate);
+                const rawId = String(n.id || '');
+                const noteId = rawId.startsWith('note:') ? rawId.slice('note:'.length) : rawId;
                 const row = (
                   <motion.div
                     key={n.id}
@@ -756,34 +792,57 @@ function SourcesCard({ card, onNavigate }: { card: CardPayload; onNavigate?: (p:
                         <span style={{ color: '#9CA3AF', fontSize: '9px', flexShrink: 0 }}>{timeStr}</span>
                       )}
                     </div>
-                    {n.excerpt && (
+                    {n.preview && (
                       <p style={{ color: 'var(--hi-text-secondary)', fontSize: '10.5px', marginTop: 2, lineHeight: 1.5 }}>
-                        {n.excerpt}
+                        {n.preview}
                       </p>
-                    )}
-                    {Array.isArray(n.tags) && n.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {n.tags.slice(0, 4).map(tag => (
-                          <span key={tag}
-                            style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.18)',
-                              color: '#6366F1', fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: 99 }}>
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
                     )}
                   </motion.div>
                 );
                 return clickable ? (
                   <button
                     key={n.id}
-                    onClick={() => onNavigate?.(`/siku/${n.id}`)}
+                    onClick={() => onNavigate?.(`/siku/${noteId}`)}
                     className="w-full text-left active:scale-[0.99] transition-transform"
                   >
                     {row}
                   </button>
                 ) : row;
               })}
+            </div>
+          </div>
+        )}
+
+        {web.length > 0 && (
+          <div>
+            <SectionTitle text="联网" />
+            <div className="space-y-2 mt-2">
+              {web.slice(0, 3).map((w, i) => (
+                <motion.button
+                  key={`${w.id}-${i}`}
+                  type="button"
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => w.url && window.open(w.url, '_blank')}
+                  className="w-full text-left rounded-2xl px-3 py-2"
+                  style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)' }}
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.10 + i * 0.04, type: 'spring', stiffness: 340, damping: 24 }}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '11.5px', fontWeight: 800 }}>
+                      {w.title}
+                    </p>
+                    {w.url && (
+                      <span style={{ color: '#9CA3AF', fontSize: '9px', flexShrink: 0 }}>打开</span>
+                    )}
+                  </div>
+                  {w.preview && (
+                    <p style={{ color: 'var(--hi-text-secondary)', fontSize: '10.5px', marginTop: 2, lineHeight: 1.5 }}>
+                      {w.preview}
+                    </p>
+                  )}
+                </motion.button>
+              ))}
             </div>
           </div>
         )}
@@ -810,9 +869,9 @@ function SourcesCard({ card, onNavigate }: { card: CardPayload; onNavigate?: (p:
                         <span style={{ color: '#9CA3AF', fontSize: '9px', flexShrink: 0 }}>{timeStr}</span>
                       )}
                     </div>
-                    {d.excerpt && (
+                    {d.preview && (
                       <p style={{ color: 'var(--hi-text-secondary)', fontSize: '10.5px', marginTop: 2, lineHeight: 1.5 }}>
-                        {d.excerpt}
+                        {d.preview}
                       </p>
                     )}
                   </motion.div>
@@ -838,27 +897,16 @@ function SourcesCard({ card, onNavigate }: { card: CardPayload; onNavigate?: (p:
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '11.5px', fontWeight: 800 }}>
-                        {a.noteTitle || a.type || '附件'}
+                        {a.title || '附件'}
                       </p>
                       {timeStr && (
                         <span style={{ color: '#9CA3AF', fontSize: '9px', flexShrink: 0 }}>{timeStr}</span>
                       )}
                     </div>
-                    {a.excerpt && (
+                    {a.preview && (
                       <p style={{ color: 'var(--hi-text-secondary)', fontSize: '10.5px', marginTop: 2, lineHeight: 1.5 }}>
-                        {a.excerpt}
+                        {a.preview}
                       </p>
-                    )}
-                    {Array.isArray(a.tags) && a.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {a.tags.slice(0, 4).map(tag => (
-                          <span key={tag}
-                            style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.18)',
-                              color: '#6366F1', fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: 99 }}>
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
                     )}
                   </motion.div>
                 );

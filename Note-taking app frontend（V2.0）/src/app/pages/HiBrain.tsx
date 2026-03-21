@@ -21,8 +21,10 @@ import { ChatCard, CardPayload } from '../components/ChatCards';
 import { InlineSearch } from '../components/InlineSearch';
 import { hibrainService } from '../services/hibrainService';
 import type { HiBrainSourcesDetails } from '../services/hibrainService';
+import { aiSearchService } from '../services/aiSearchService';
 import { chatSessionsService } from '../services/chatSessionsService';
 import type { ChatSessionMessage, ChatSessionSummary } from '../services/chatSessionsService';
+import { coercePersistedSources, type PersistedSource } from '../types/sources';
 import { useVisualViewportMetrics } from '../components/ui/use-visual-viewport';
 import { useCapacitorKeyboardMetrics } from '../components/ui/use-capacitor-keyboard';
 import { useIsMobile } from '../components/ui/use-mobile';
@@ -114,6 +116,7 @@ interface Message {
   content: string;
   timestamp: Date;
   card?: CardPayload;
+  sources?: PersistedSource[];
   sourcesDetails?: HiBrainSourcesDetails;
 }
 
@@ -834,26 +837,52 @@ function HiBrainNewDesign() {
     return new Date();
   };
 
+  const sourcesFromDetails = (details?: HiBrainSourcesDetails): PersistedSource[] => {
+    const out: PersistedSource[] = [];
+    const notes = Array.isArray(details?.notes) ? details!.notes : [];
+    const documents = Array.isArray(details?.documents) ? details!.documents : [];
+    const attachments = Array.isArray(details?.attachments) ? details!.attachments : [];
+
+    for (const n of notes) {
+      const id = String(n.id ?? '');
+      const title = String(n.title ?? '');
+      if (!id || !title) continue;
+      out.push({ id, title, preview: n.excerpt, sourceType: 'note', updatedAt: n.updatedAt });
+    }
+    for (const d of documents) {
+      const id = String(d.id ?? '');
+      const title = String(d.title ?? '');
+      if (!id || !title) continue;
+      out.push({ id, title, preview: d.excerpt, sourceType: 'document', updatedAt: d.updatedAt });
+    }
+    for (const a of attachments) {
+      const id = String(a.id ?? '');
+      const title = String(a.noteTitle ?? a.type ?? '附件');
+      if (!id || !title) continue;
+      out.push({ id, title, preview: a.excerpt, sourceType: 'attachment', updatedAt: a.updatedAt });
+    }
+    return out;
+  };
+
   const normalizeSessionMessages = useCallback((raw: ChatSessionMessage[]): Message[] => {
     const safe = Array.isArray(raw) ? raw : [];
-    const hasNonEmptySourceArraysLocal = (value: unknown): boolean => {
-      if (!value || typeof value !== 'object') return false;
-      return Object.values(value as Record<string, unknown>).some(v => Array.isArray(v) && v.length > 0);
-    };
     return safe.map((m, idx) => {
       const role = m.role === 'assistant' ? 'ai' : 'user';
+      const persistedSources = coercePersistedSources((m as any)?.sources?.webSources);
+      const mappedFromDetails = persistedSources.length === 0 ? sourcesFromDetails(m.sourcesDetails as any) : [];
+      const sources = persistedSources.length > 0 ? persistedSources : mappedFromDetails;
       const base: Message = {
         id: String(m.id ?? `msg-${idx}-${Date.now()}`),
         role,
         content: String(m.content ?? ''),
         timestamp: parseSessionTimestamp(m.timestamp),
+        ...(sources.length > 0 ? { sources } : {}),
         ...(m.sourcesDetails ? { sourcesDetails: m.sourcesDetails as HiBrainSourcesDetails } : {}),
       };
-      // 仅当有 sourcesDetails 时再生成 sources 卡片
-      if (role === 'ai' && m.sourcesDetails && hasNonEmptySourceArraysLocal(m.sourcesDetails)) {
+      if (role === 'ai' && sources.length > 0) {
         return {
           ...base,
-          card: { type: 'sources', sourcesDetails: m.sourcesDetails as any },
+          card: { type: 'sources', sources },
         };
       }
       return base;
@@ -1102,24 +1131,6 @@ function HiBrainNewDesign() {
     return fromCandidates?.trim() || '我收到你的消息了，但暂时无法回答。';
   };
 
-  const hasNonEmptySourceArrays = (value: unknown): boolean => {
-    if (!value || typeof value !== 'object') return false;
-    return Object.values(value as Record<string, unknown>).some(v => Array.isArray(v) && v.length > 0);
-  };
-
-  const buildSourcesCardFromResult = (result: any): CardPayload | undefined => {
-    const hasSourcesField = result?.sources !== undefined && result?.sources !== null;
-    const sourcesHasAny = Array.isArray(result?.sources)
-      ? result.sources.length > 0
-      : hasNonEmptySourceArrays(result?.sources);
-    const sourcesDetailsHasAny = hasNonEmptySourceArrays(result?.sourcesDetails);
-
-    const shouldShow = hasSourcesField ? sourcesHasAny : sourcesDetailsHasAny;
-    if (!shouldShow) return undefined;
-    if (!result?.sourcesDetails || typeof result.sourcesDetails !== 'object') return undefined;
-    return { type: 'sources', sourcesDetails: result.sourcesDetails };
-  };
-
   const sendMessage = async (text?: string) => {
     const msg = (text || input).trim();
     if (!msg) return;
@@ -1129,7 +1140,12 @@ function HiBrainNewDesign() {
     const existingUserCount = messages.filter(m => m.role === 'user').length;
     setMessages(prev => [...prev, { id: userMsgId, role: 'user', content: msg, timestamp: now }]);
     setIsTyping(true);
-    
+
+    const assistantMsgId = (Date.now() + 1).toString();
+    const patchAssistant = (patch: Partial<Message>) => {
+      setMessages(prev => prev.map(m => (m.id === assistantMsgId ? { ...m, ...patch } : m)));
+    };
+
     try {
       // Ensure session exists
       let sessionId = currentSessionId;
@@ -1159,37 +1175,83 @@ function HiBrainNewDesign() {
         }
       }
 
-      // 3) Call existing HiBrain query
-      const result = await hibrainService.query(msg);
-      const card = buildSourcesCardFromResult(result);
-      const notesSourceCount = Array.isArray(result?.sources?.notes)
-        ? result.sources.notes.length
-        : Array.isArray(result?.sourcesDetails?.notes)
-          ? result.sourcesDetails.notes.length
-          : 0;
-      const answer = resolveAiAnswer(result);
-      const answerWithSource = notesSourceCount > 0
-        ? `${answer}\n\n（已检索思库笔记 ${notesSourceCount} 条）`
-        : answer;
-      
-      const assistantNow = new Date();
-      const assistantMsgId = (Date.now() + 1).toString();
-      setMessages(prev => [...prev, {
-        id: assistantMsgId,
-        role: 'ai',
-        content: answerWithSource,
-        timestamp: assistantNow,
-        ...(card ? { card } : {}),
-        ...(result?.sourcesDetails ? { sourcesDetails: result.sourcesDetails as HiBrainSourcesDetails } : {}),
-      }]);
+      const assistantStart = new Date();
+      setMessages(prev => [...prev, { id: assistantMsgId, role: 'ai', content: '', timestamp: assistantStart }]);
 
-      // 4) Save assistant message to session (include sourcesDetails)
+      let streamed = '';
+      let streamedSources: PersistedSource[] = [];
+
+      try {
+        const { content, sources } = await aiSearchService.search(
+          { query: msg, model: 'deepseek-chat', limit: 10 },
+          {
+            onContent: (delta) => {
+              streamed += delta;
+              patchAssistant({ content: streamed });
+            },
+            onSources: (src) => {
+              streamedSources = src;
+              patchAssistant({
+                sources: streamedSources,
+                card: streamedSources.length > 0 ? { type: 'sources', sources: streamedSources } : undefined,
+              });
+            },
+          },
+        );
+
+        streamed = content || streamed;
+        streamedSources = sources.length > 0 ? sources : streamedSources;
+
+        const notesCount = streamedSources.filter(s => s.sourceType === 'note').length;
+        const finalContent = notesCount > 0
+          ? `${streamed}\n\n（已检索思库笔记 ${notesCount} 条）`
+          : streamed;
+
+        patchAssistant({
+          content: finalContent,
+          sources: streamedSources,
+          card: streamedSources.length > 0 ? { type: 'sources', sources: streamedSources } : undefined,
+          timestamp: new Date(),
+        });
+
+        try {
+          await chatSessionsService.addMessage(sessionId, {
+            role: 'assistant',
+            content: finalContent,
+            timestamp: formatStoreTime(new Date()),
+            ...(streamedSources.length > 0 ? { sources: { webSources: streamedSources } } : {}),
+          });
+        } catch (err) {
+          console.error('Failed to save assistant message:', err);
+        }
+
+        return;
+      } catch (streamErr) {
+        console.warn('aiSearchService failed, fallback to /hibrain/query:', streamErr);
+      }
+
+      const result = await hibrainService.query(msg);
+      const answer = resolveAiAnswer(result);
+      const mappedSources = sourcesFromDetails(result?.sourcesDetails as any);
+      const notesCount = mappedSources.filter(s => s.sourceType === 'note').length;
+      const answerWithSource = notesCount > 0
+        ? `${answer}\n\n（已检索思库笔记 ${notesCount} 条）`
+        : answer;
+
+      patchAssistant({
+        content: answerWithSource,
+        sources: mappedSources.length > 0 ? mappedSources : undefined,
+        card: mappedSources.length > 0 ? { type: 'sources', sources: mappedSources } : undefined,
+        timestamp: new Date(),
+        ...(result?.sourcesDetails ? { sourcesDetails: result.sourcesDetails as HiBrainSourcesDetails } : {}),
+      });
+
       try {
         await chatSessionsService.addMessage(sessionId, {
           role: 'assistant',
           content: answerWithSource,
-          timestamp: formatStoreTime(assistantNow),
-          ...(result?.sources ? { sources: result.sources } : {}),
+          timestamp: formatStoreTime(new Date()),
+          ...(mappedSources.length > 0 ? { sources: { webSources: mappedSources } } : {}),
           ...(result?.sourcesDetails ? { sourcesDetails: result.sourcesDetails } : {}),
         });
       } catch (err) {
@@ -1199,12 +1261,7 @@ function HiBrainNewDesign() {
       console.error('HiBrain error:', error);
       const assistantNow = new Date();
       const errorText = '抱歉，连接 HiBrain 大脑时出现了一些问题，请检查网络或稍后再试。';
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        content: errorText,
-        timestamp: assistantNow,
-      }]);
+      patchAssistant({ content: errorText, timestamp: assistantNow });
       // Best-effort persist error message as assistant output
       if (currentSessionId) {
         try {
