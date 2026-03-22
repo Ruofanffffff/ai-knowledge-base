@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { ArrowLeft, CheckCheck, FileText, PencilLine, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CheckCheck, FileText, LayoutGrid, PencilLine, Sparkles, Trash2, X } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { documentsLibraryService, type LibraryDocument } from '../services/documentsLibraryService';
@@ -160,6 +160,7 @@ export function DocumentDetail() {
   const [aiLoadingText, setAiLoadingText] = useState('');
   const [aiOriginalText, setAiOriginalText] = useState('');
   const [aiPreviewText, setAiPreviewText] = useState('');
+  const [aiToolsOpen, setAiToolsOpen] = useState(false);
 
   useEffect(() => {
     const docId = String(id || '');
@@ -181,6 +182,7 @@ export function DocumentDetail() {
     setAiLoadingText('');
     setAiOriginalText('');
     setAiPreviewText('');
+    setAiToolsOpen(false);
     documentsLibraryService
       .get(docId)
       .then((d) => {
@@ -317,6 +319,7 @@ export function DocumentDetail() {
       return;
     }
 
+    setAiToolsOpen(false);
     setAiAction(action);
     setAiOriginalText(text);
     setAiPreviewText('');
@@ -435,7 +438,7 @@ export function DocumentDetail() {
   };
 
   return (
-    <div className="relative flex flex-col min-h-[100dvh]" style={{ background: 'var(--hi-page-bg)', maxWidth: '100vw' }}>
+    <div className="relative flex flex-col h-[100dvh] overflow-hidden" style={{ background: 'var(--hi-page-bg)', maxWidth: '100vw' }}>
       <ParticleBackground />
 
       <div
@@ -481,7 +484,7 @@ export function DocumentDetail() {
 
       <div
         className="relative z-10 flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
-        style={{ paddingBottom: 'calc(160px + env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'calc(240px + env(safe-area-inset-bottom))' }}
       >
         <div className="px-4 pt-4">
           {loading && (
@@ -512,69 +515,6 @@ export function DocumentDetail() {
                   ))}
                 </div>
               )}
-
-              <div className="flex flex-wrap gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={handleSummarize}
-                  disabled={summaryLoading || deleting}
-                  className="px-3 py-2 rounded-2xl flex items-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
-                  style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.16)' }}
-                >
-                  <Sparkles size={14} style={{ color: '#6366F1' }} />
-                  <span style={{ color: '#4F46E5', fontSize: '12.5px', fontWeight: 800 }}>
-                    {summaryLoading ? '总结中…' : 'AI 总结'}
-                  </span>
-                </button>
-
-                {!isEditing ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleStartEdit}
-                      disabled={saving || deleting}
-                      className="px-3 py-2 rounded-2xl flex items-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
-                      style={{ background: 'var(--hi-chip-bg)', border: '1px solid var(--hi-card-border)' }}
-                    >
-                      <PencilLine size={14} style={{ color: 'var(--hi-text-dim)' }} />
-                      <span style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', fontWeight: 800 }}>编辑</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleConfirmDelete}
-                      disabled={saving || deleting}
-                      className="px-3 py-2 rounded-2xl flex items-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
-                      style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)' }}
-                    >
-                      <Trash2 size={14} style={{ color: '#EF4444' }} />
-                      <span style={{ color: '#EF4444', fontSize: '12.5px', fontWeight: 800 }}>删除</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleSave}
-                      disabled={saving || deleting}
-                      className="px-3 py-2 rounded-2xl flex items-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
-                      style={{ background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', boxShadow: '0 6px 18px rgba(99,102,241,0.26)' }}
-                    >
-                      <span style={{ color: 'white', fontSize: '12.5px', fontWeight: 900 }}>
-                        {saving ? '保存中…' : '保存'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCancelEdit}
-                      disabled={saving || deleting}
-                      className="px-3 py-2 rounded-2xl flex items-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
-                      style={{ background: 'var(--hi-chip-bg)', border: '1px solid var(--hi-card-border)' }}
-                    >
-                      <span style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', fontWeight: 800 }}>取消</span>
-                    </button>
-                  </>
-                )}
-              </div>
 
               {isEditing ? (
                 <div className="rounded-[18px] p-4 space-y-3" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
@@ -720,57 +660,172 @@ export function DocumentDetail() {
       <BottomNav />
 
       {doc && aiPanel === 'none' && (
-        <div
-          className="fixed left-0 right-0 px-4"
-          style={{
-            zIndex: 60,
-            bottom: 'calc(74px + env(safe-area-inset-bottom))',
-          }}
-        >
+        <div className="fixed inset-0" style={{ zIndex: 70, pointerEvents: 'none' }}>
           <div
-            className="mx-auto max-w-[520px] rounded-[22px] px-3 py-2 flex items-center justify-between gap-2"
+            className="absolute left-0 right-0 px-4"
             style={{
-              background: 'rgba(253,253,255,0.92)',
-              boxShadow: '0 10px 30px rgba(99,102,241,0.12)',
-              border: '1px solid rgba(99,102,241,0.12)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              bottom: 'calc(74px + env(safe-area-inset-bottom))',
+              pointerEvents: 'auto',
             }}
           >
-            <div className="flex items-center gap-2">
-              <div
-                className="w-8 h-8 rounded-2xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.14))' }}
-              >
-                <Sparkles size={14} style={{ color: '#6366F1' }} />
+            <div
+              className="mx-auto max-w-[520px] rounded-[22px] p-3 flex flex-col gap-2"
+              style={{
+                background: 'rgba(253,253,255,0.92)',
+                boxShadow: '0 10px 30px rgba(99,102,241,0.12)',
+                border: '1px solid rgba(99,102,241,0.12)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+              }}
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleSummarize}
+                  disabled={summaryLoading || deleting}
+                  className="w-full px-3 py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
+                  style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.16)' }}
+                >
+                  <LayoutGrid size={15} style={{ color: '#6366F1' }} />
+                  <span style={{ color: '#4F46E5', fontSize: '13px', fontWeight: 900 }}>
+                    {summaryLoading ? '总结中…' : 'AI 总结'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiToolsOpen(true)}
+                  disabled={saving || deleting}
+                  className="w-full px-3 py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))',
+                    border: '1px solid rgba(99,102,241,0.18)',
+                  }}
+                >
+                  <Sparkles size={15} style={{ color: '#6366F1' }} />
+                  <span style={{ color: '#4F46E5', fontSize: '13px', fontWeight: 900 }}>AI 工具</span>
+                </button>
               </div>
-              <div className="min-w-0">
-                <p style={{ color: '#1a1a2e', fontSize: '12.5px', fontWeight: 900, lineHeight: 1.15 }}>AI 工具</p>
-                <p style={{ color: '#8B8BA7', fontSize: '10.5px', marginTop: 3, lineHeight: 1.15 }}>扩写 / 校对（可预览后应用）</p>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleAiAction('expand')}
-                disabled={saving || deleting}
-                className="px-3 py-2 rounded-2xl flex items-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
-                style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.16)' }}
-              >
-                <Sparkles size={14} style={{ color: '#6366F1' }} />
-                <span style={{ color: '#4F46E5', fontSize: '12px', fontWeight: 900 }}>扩写</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAiAction('proofread')}
-                disabled={saving || deleting}
-                className="px-3 py-2 rounded-2xl flex items-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
-                style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.18)' }}
-              >
-                <CheckCheck size={14} style={{ color: '#10B981' }} />
-                <span style={{ color: '#059669', fontSize: '12px', fontWeight: 900 }}>校对</span>
-              </button>
+              {!isEditing ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleStartEdit}
+                    disabled={saving || deleting}
+                    className="w-full px-3 py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
+                    style={{ background: 'var(--hi-chip-bg)', border: '1px solid var(--hi-card-border)' }}
+                  >
+                    <PencilLine size={15} style={{ color: 'var(--hi-text-dim)' }} />
+                    <span style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 900 }}>编辑</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmDelete}
+                    disabled={saving || deleting}
+                    className="w-full px-3 py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)' }}
+                  >
+                    <Trash2 size={15} style={{ color: '#EF4444' }} />
+                    <span style={{ color: '#EF4444', fontSize: '13px', fontWeight: 900 }}>删除</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving || deleting}
+                    className="w-full px-3 py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
+                    style={{
+                      background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+                      boxShadow: '0 6px 18px rgba(99,102,241,0.26)',
+                    }}
+                  >
+                    <span style={{ color: 'white', fontSize: '13px', fontWeight: 900 }}>{saving ? '保存中…' : '保存'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={saving || deleting}
+                    className="w-full px-3 py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
+                    style={{ background: 'var(--hi-chip-bg)', border: '1px solid var(--hi-card-border)' }}
+                  >
+                    <span style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 900 }}>取消</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {doc && aiPanel === 'none' && aiToolsOpen && (
+        <div
+          className="fixed inset-0"
+          style={{ zIndex: 180, background: 'rgba(15,10,40,0.45)', backdropFilter: 'blur(10px)' }}
+          onClick={() => { if (!saving && !deleting) setAiToolsOpen(false); }}
+        >
+          <div
+            className="fixed left-0 right-0 bottom-0"
+            style={{ borderRadius: '24px 24px 0 0', overflow: 'hidden' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                background: 'rgba(253,253,255,0.99)',
+                boxShadow: '0 -12px 40px rgba(99,102,241,0.15), 0 -1px 0 rgba(99,102,241,0.10)',
+                backdropFilter: 'blur(28px)',
+                WebkitBackdropFilter: 'blur(28px)',
+                borderRadius: '24px 24px 0 0',
+                paddingBottom: 'env(safe-area-inset-bottom)',
+              }}
+            >
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(99,102,241,0.18)' }} />
+              </div>
+              <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid rgba(99,102,241,0.08)' }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}>
+                    <Sparkles size={13} style={{ color: 'white' }} />
+                  </div>
+                  <div>
+                    <p style={{ color: '#1a1a2e', fontSize: '14px', fontWeight: 900, lineHeight: 1.15 }}>AI 工具</p>
+                    <p style={{ color: '#8B8BA7', fontSize: '11px', marginTop: 3, lineHeight: 1.15 }}>扩写 / 校对（可预览后应用）</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiToolsOpen(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full transition-all active:scale-90"
+                  style={{ background: 'rgba(99,102,241,0.08)' }}
+                  aria-label="关闭"
+                >
+                  <X size={16} style={{ color: '#6366F1' }} />
+                </button>
+              </div>
+
+              <div className="p-4 pb-7 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleAiAction('expand')}
+                  disabled={saving || deleting}
+                  className="w-full py-3 rounded-2xl transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+                  style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.16)' }}
+                >
+                  <Sparkles size={16} style={{ color: '#6366F1' }} />
+                  <span style={{ color: '#4F46E5', fontSize: '14px', fontWeight: 900 }}>扩写</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAiAction('proofread')}
+                  disabled={saving || deleting}
+                  className="w-full py-3 rounded-2xl transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+                  style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.18)' }}
+                >
+                  <CheckCheck size={16} style={{ color: '#10B981' }} />
+                  <span style={{ color: '#059669', fontSize: '14px', fontWeight: 900 }}>校对</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
