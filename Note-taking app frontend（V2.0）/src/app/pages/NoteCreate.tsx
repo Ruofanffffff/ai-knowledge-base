@@ -167,7 +167,7 @@ function FormatToolbar({ editor, onImage }: FTProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: 32, height: 32, borderRadius: 8, border: 'none',
           background: active ? 'rgba(99,102,241,0.12)' : 'transparent',
-          color: disabled ? 'rgba(150,150,160,0.35)' : active ? '#4F46E5' : '#555',
+          color: disabled ? 'rgba(150,150,160,0.35)' : active ? '#4F46E5' : 'var(--hi-text-muted)',
           flexShrink: 0, cursor: disabled ? 'default' : 'pointer',
           transition: 'all 0.15s',
         }}
@@ -186,9 +186,9 @@ function FormatToolbar({ editor, onImage }: FTProps) {
       style={{
         display: 'flex', alignItems: 'center', gap: 2,
         padding: '6px 8px', overflowX: 'auto',
-        borderTop: '1px solid rgba(99,102,241,0.08)',
-        borderBottom: '1px solid rgba(99,102,241,0.08)',
-        background: 'rgba(255,255,255,0.95)',
+        borderTop: '1px solid var(--hi-divider)',
+        borderBottom: '1px solid var(--hi-divider)',
+        background: 'var(--hi-chip-bg)',
         minHeight: 46,
       }}
     >
@@ -1665,23 +1665,23 @@ export function NoteCreate() {
   return (
     <div
       className="flex flex-col h-screen overflow-hidden"
-      style={{ background: 'linear-gradient(160deg, #FDFDFF 0%, #F8F5FF 50%, #F3F8FF 100%)' }}
+      style={{ background: 'var(--hi-page-bg)' }}
     >
       <ParticleBackground />
 
       {/* Nav bar */}
       <div
         className="flex items-center justify-between px-4 pt-12 pb-3 relative z-10"
-        style={{ background: 'rgba(253,253,255,0.88)', backdropFilter: 'blur(14px)', borderBottom: '1px solid rgba(99,102,241,0.08)' }}
+        style={{ background: 'var(--hi-header-bg)', backdropFilter: 'blur(14px)', borderBottom: '1px solid var(--hi-header-border)' }}
       >
         <button
           onClick={() => navigate(-1)}
           className="flex items-center justify-center w-9 h-9 rounded-2xl active:scale-95 transition-transform"
-          style={{ background: 'rgba(99,102,241,0.08)' }}
+          style={{ background: 'var(--hi-icon-bg)' }}
         >
-          <ArrowLeft size={18} style={{ color: '#4F46E5' }} />
+          <ArrowLeft size={18} style={{ color: 'var(--hi-text-primary)' }} />
         </button>
-        <span style={{ fontSize: '15px', fontWeight: 600, color: '#1a1a2e' }}>
+        <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--hi-text-primary)' }}>
           {existingNote ? '编辑笔记' : '新建笔记'}
         </span>
         <div className="flex items-center gap-2">
@@ -1690,8 +1690,8 @@ export function NoteCreate() {
               onClick={() => setShowDeleteSheet(true)}
               className="flex items-center justify-center w-9 h-9 rounded-2xl active:scale-95 transition-transform"
               style={{
-                background: 'rgba(239,68,68,0.08)',
-                border: '1px solid rgba(239,68,68,0.14)',
+                background: 'var(--hi-icon-bg-danger)',
+                border: '1px solid var(--hi-note-del-border)',
               }}
             >
               <Trash2 size={16} style={{ color: '#EF4444' }} />
@@ -1701,7 +1701,7 @@ export function NoteCreate() {
             <button
               onClick={() => setShowShareSheet(true)}
               className="flex items-center justify-center w-9 h-9 rounded-2xl active:scale-95 transition-transform"
-              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.12))' }}
+              style={{ background: 'var(--hi-icon-bg)' }}
             >
               <Users size={16} style={{ color: '#6366F1' }} />
             </button>
@@ -1711,9 +1711,9 @@ export function NoteCreate() {
               onClick={handleSave}
               className="px-5 py-2 rounded-2xl transition-all active:scale-95"
               style={{
-                background: content.trim() ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'rgba(255,255,255,0.6)',
-                color: content.trim() ? 'white' : '#999',
-                border: content.trim() ? 'none' : '1px solid rgba(99,102,241,0.15)',
+                background: content.trim() ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'var(--hi-chip-bg)',
+                color: content.trim() ? 'white' : 'var(--hi-text-secondary)',
+                border: content.trim() ? 'none' : '1px solid var(--hi-card-border)',
                 fontSize: '14px', fontWeight: 600,
                 boxShadow: content.trim() ? '0 3px 12px rgba(99,102,241,0.35)' : 'none',
               }}
@@ -1730,8 +1730,8 @@ export function NoteCreate() {
           /* ── Mode selection ── */
           <div className="flex-1 flex flex-col items-center justify-center px-6 gap-4">
             <div className="text-center mb-2">
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e' }}>选择创作方式</h2>
-              <p style={{ fontSize: '13px', color: '#888', marginTop: 4 }}>选择你想要的笔记创建方式</p>
+                <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--hi-text-primary)' }}>选择创作方式</h2>
+                <p style={{ fontSize: '13px', color: 'var(--hi-text-secondary)', marginTop: 4 }}>选择你想要的笔记创建方式</p>
             </div>
             {[
               {
@@ -1987,11 +1987,11 @@ export function NoteCreate() {
                 <Tag size={16} style={{ color: '#6366F1' }} />
               </button>
               <div className="flex-1" />
-              <span style={{ fontSize: '12px', color: '#aaa' }}>{wordCount} 字</span>
+              <span style={{ fontSize: '12px', color: 'var(--hi-text-secondary)' }}>{wordCount} 字</span>
               <button
                 onClick={() => navigate(-1)}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-xl transition-all active:scale-95"
-                style={{ background: 'rgba(99,102,241,0.06)', color: '#888', fontSize: '12px' }}
+                style={{ background: 'rgba(99,102,241,0.06)', color: 'var(--hi-text-secondary)', fontSize: '12px' }}
               >
                 <ChevronDown size={13} />
                 收起
@@ -2038,7 +2038,7 @@ export function NoteCreate() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0"
-                style={{ zIndex: 9998, background: 'rgba(0,0,0,0.28)', backdropFilter: 'blur(3px)' }}
+                style={{ zIndex: 9998, background: 'var(--hi-overlay)', backdropFilter: 'blur(3px)' }}
                 onPointerDown={() => setShowTagPanel(false)}
               />
               {/* Sheet */}
@@ -2050,7 +2050,7 @@ export function NoteCreate() {
                 className="fixed bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden"
                 style={{
                   zIndex: 9999,
-                  background: 'rgba(255,255,255,0.98)',
+                  background: 'var(--hi-sheet-bg)',
                   boxShadow: '0 -8px 40px rgba(99,102,241,0.2)',
                   backdropFilter: 'blur(20px)',
                 }}
@@ -2075,7 +2075,7 @@ export function NoteCreate() {
                 {/* Already added */}
                 {tags.length > 0 && (
                   <div className="px-4 mb-3">
-                    <p style={{ fontSize: '11px', color: '#aaa', marginBottom: 8, fontWeight: 600, letterSpacing: '0.06em' }}>已添加</p>
+                    <p style={{ fontSize: '11px', color: 'var(--hi-text-secondary)', marginBottom: 8, fontWeight: 600, letterSpacing: '0.06em' }}>已添加</p>
                     <div className="flex flex-wrap gap-2">
                       {tags.map(tag => (
                         <span
@@ -2133,7 +2133,7 @@ export function NoteCreate() {
 
                 {/* Frequency suggestions */}
                 <div className="px-4 pb-10">
-                  <p style={{ fontSize: '11px', color: '#aaa', marginBottom: 8, fontWeight: 600, letterSpacing: '0.06em' }}>常用标签</p>
+                  <p style={{ fontSize: '11px', color: 'var(--hi-text-secondary)', marginBottom: 8, fontWeight: 600, letterSpacing: '0.06em' }}>常用标签</p>
                   <div className="flex flex-wrap gap-2">
                     {freqTags.filter(t => !tags.includes(t)).map((tag, i) => (
                       <motion.button
@@ -2538,7 +2538,7 @@ export function NoteCreate() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0"
-              style={{ zIndex: 9998, background: 'rgba(0,0,0,0.38)', backdropFilter: 'blur(4px)' }}
+              style={{ zIndex: 9998, background: 'var(--hi-overlay)', backdropFilter: 'blur(4px)' }}
               onClick={() => { if (!deletingNote) setShowDeleteSheet(false); }}
             />
             <motion.div
@@ -2549,7 +2549,7 @@ export function NoteCreate() {
               className="fixed bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden"
               style={{
                 zIndex: 9999,
-                background: 'rgba(255,255,255,0.98)',
+                background: 'var(--hi-sheet-bg)',
                 boxShadow: '0 -8px 40px rgba(239,68,68,0.18)',
                 backdropFilter: 'blur(20px)',
                 maxHeight: '60vh',
@@ -2568,7 +2568,7 @@ export function NoteCreate() {
                     >
                       <Trash2 size={16} style={{ color: '#EF4444' }} />
                     </div>
-                    <span style={{ fontSize: '16px', fontWeight: 800, color: '#1a1a2e' }}>删除笔记</span>
+                    <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--hi-text-primary)' }}>删除笔记</span>
                   </div>
                   <button
                     onClick={() => setShowDeleteSheet(false)}
@@ -2579,7 +2579,7 @@ export function NoteCreate() {
                     <X size={14} style={{ color: '#EF4444' }} />
                   </button>
                 </div>
-                <p style={{ fontSize: '13px', color: '#6B7280', lineHeight: 1.6 }}>
+                <p style={{ fontSize: '13px', color: 'var(--hi-text-secondary)', lineHeight: 1.6 }}>
                   删除后无法恢复，确定要删除这条笔记吗？
                 </p>
                 <div className="flex gap-2 mt-5">
@@ -2587,7 +2587,7 @@ export function NoteCreate() {
                     onClick={() => setShowDeleteSheet(false)}
                     disabled={deletingNote}
                     className="flex-1 py-2.5 rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50"
-                    style={{ background: 'rgba(107,114,128,0.1)', color: '#6B7280', fontWeight: 700 }}
+                    style={{ background: 'var(--hi-chip-bg)', color: 'var(--hi-text-secondary)', fontWeight: 700, border: '1px solid var(--hi-card-border)' }}
                   >
                     取消
                   </button>
@@ -2620,7 +2620,7 @@ export function NoteCreate() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0"
-              style={{ zIndex: 9998, background: 'rgba(0,0,0,0.38)', backdropFilter: 'blur(4px)' }}
+              style={{ zIndex: 9998, background: 'var(--hi-overlay)', backdropFilter: 'blur(4px)' }}
               onClick={() => { if (shareStep !== 'publishing') { setShowShareSheet(false); setShareStep('compose'); } }}
             />
             <motion.div
@@ -2631,7 +2631,7 @@ export function NoteCreate() {
               className="fixed bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden"
               style={{
                 zIndex: 9999,
-                background: 'rgba(255,255,255,0.98)',
+                background: 'var(--hi-sheet-bg)',
                 boxShadow: '0 -8px 40px rgba(99,102,241,0.2)',
                 backdropFilter: 'blur(20px)',
                 maxHeight: '80vh',
@@ -2645,7 +2645,7 @@ export function NoteCreate() {
               {shareStep === 'compose' && (
                 <div className="px-4 pb-10">
                   <div className="flex items-center justify-between mb-4">
-                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#1a1a2e' }}>分享到思圈</span>
+                    <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--hi-text-primary)' }}>分享到思圈</span>
                     <button
                       onClick={() => setShowShareSheet(false)}
                       className="w-7 h-7 flex items-center justify-center rounded-full"

@@ -1,37 +1,33 @@
 import { useEffect } from 'react';
 import { Outlet } from 'react-router';
 import { Toaster } from 'sonner';
+import { useTheme } from './context/ThemeContext';
 
 /**
  * Root layout — injects mobile-viewport meta tags on mount, then
  * renders the route outlet. Keeps Outlet inside RouterProvider context.
  */
 export function RootLayout() {
+  const { isDark } = useTheme();
+
   useEffect(() => {
-    // ── 1. viewport-fit=cover ── lets the app extend behind the
-    //    Android status bar and iOS notch instead of leaving a gap.
     const vp = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     if (vp && !vp.content.includes('viewport-fit')) {
       vp.content = vp.content.trimEnd().replace(/,?\s*$/, '') +
         ', viewport-fit=cover, maximum-scale=1.0, user-scalable=no';
     }
 
-    // ── 2. theme-color ── sets the Android status-bar background so it
-    //    blends with the page instead of showing an opaque black strip.
     let tc = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     if (!tc) {
       tc = document.createElement('meta');
       tc.name = 'theme-color';
       document.head.appendChild(tc);
     }
-    // Light purple-white to match the app's overall gradient feel
-    tc.content = '#F8F5FF';
+    tc.content = isDark ? '#0F0E1A' : '#F8F5FF';
 
-    // ── 3. body background ── prevents a flash of white/black during
-    //    route transitions or before React hydrates.
-    document.documentElement.style.background = '#0e0520';
-    document.body.style.background = '#FDFDFF';
-  }, []);
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--hi-page-bg').trim();
+    document.body.style.background = bg || (isDark ? '#0F0E1A' : '#FDFDFF');
+  }, [isDark]);
 
   return (
     <>
