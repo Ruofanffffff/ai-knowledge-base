@@ -10,7 +10,10 @@ const express = require('express');
 const kgRoutes = require('../kgRoutes');
 
 // Mock dependencies
-jest.mock('../../services/authService');
+jest.mock('../../services/authService', () => ({
+  authMiddleware: jest.fn(),
+  requirePermission: jest.fn(() => (req, res, next) => next()),
+}));
 jest.mock('../../services/kgPipelineService', () => {
   const pipelineStatus = new Map();
   const service = {
@@ -23,8 +26,10 @@ jest.mock('../../services/kgPipelineService', () => {
     cleanedRelation: { findMany: jest.fn() },
     unifiedEntity: { findMany: jest.fn() },
     unifiedRelation: { findMany: jest.fn() },
+    unifiedPrinciple: { findMany: jest.fn() },
     docEntity: { findMany: jest.fn() },
     docRelation: { findMany: jest.fn() },
+    docPrinciple: { findMany: jest.fn() },
   };
   module.exports = service;
   module.exports.pipelineStatus = pipelineStatus;
@@ -62,33 +67,37 @@ describe('KG Routes - Dual Layer', () => {
   describe('GET /api/kg/unified/graph', () => {
     it('should return unified entities and relations', async () => {
       prisma.unifiedEntity.findMany.mockResolvedValue([
-        { id: 'ue1', cleanedName: '拍摄手法', description: '涵盖垂直拍摄等技巧' },
-        { id: 'ue2', cleanedName: '摄影器材', description: '相机和镜头等设备' },
+        { id: 'ue1', cleanedName: '拍摄手法', description: '涵盖垂直拍摄等技巧', entityType: 'concept', source: 'fact' },
+        { id: 'ue2', cleanedName: '摄影器材', description: '相机和镜头等设备', entityType: 'object', source: 'fact' },
       ]);
       prisma.unifiedRelation.findMany.mockResolvedValue([
-        { id: 'ur1', sourceEntityId: 'ue1', targetEntityId: 'ue2', cleanedName: '使用', description: '手法使用器材' },
+        { id: 'ur1', sourceEntityId: 'ue1', targetEntityId: 'ue2', cleanedName: '使用', description: '手法使用器材', layer: 'how', source: 'fact' },
       ]);
+      prisma.unifiedPrinciple.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/kg/unified/graph');
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      expect(res.body.data.scope).toBe('unified');
       expect(res.body.data.entities).toEqual([
-        { id: 'ue1', name: '拍摄手法', description: '涵盖垂直拍摄等技巧' },
-        { id: 'ue2', name: '摄影器材', description: '相机和镜头等设备' },
+        { id: 'ue1', name: '拍摄手法', description: '涵盖垂直拍摄等技巧', entityType: 'concept', source: 'fact' },
+        { id: 'ue2', name: '摄影器材', description: '相机和镜头等设备', entityType: 'object', source: 'fact' },
       ]);
       expect(res.body.data.relations).toEqual([
-        { id: 'ur1', source: 'ue1', target: 'ue2', name: '使用', description: '手法使用器材' },
+        { id: 'ur1', source: 'ue1', target: 'ue2', name: '使用', description: '手法使用器材', layer: 'how', source_tag: 'fact', linkSource: 'fact' },
       ]);
     });
 
     it('should return empty arrays when no unified data exists', async () => {
       prisma.unifiedEntity.findMany.mockResolvedValue([]);
       prisma.unifiedRelation.findMany.mockResolvedValue([]);
+      prisma.unifiedPrinciple.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/kg/unified/graph');
 
       expect(res.status).toBe(200);
+      expect(res.body.data.scope).toBe('unified');
       expect(res.body.data.entities).toEqual([]);
       expect(res.body.data.relations).toEqual([]);
     });
@@ -108,24 +117,26 @@ describe('KG Routes - Dual Layer', () => {
   describe('GET /api/kg/doc/:docId/graph', () => {
     it('should return doc-specific entities and relations', async () => {
       prisma.docEntity.findMany.mockResolvedValue([
-        { id: 'de1', cleanedName: '垂直拍摄', description: '从上方垂直角度拍摄' },
-        { id: 'de2', cleanedName: '光圈控制', description: '调整光圈大小' },
+        { id: 'de1', cleanedName: '垂直拍摄', description: '从上方垂直角度拍摄', entityType: 'process', source: 'fact' },
+        { id: 'de2', cleanedName: '光圈控制', description: '调整光圈大小', entityType: 'process', source: 'fact' },
       ]);
       prisma.docRelation.findMany.mockResolvedValue([
-        { id: 'dr1', sourceEntityId: 'de1', targetEntityId: 'de2', cleanedName: '需要', description: '拍摄需要控制' },
+        { id: 'dr1', sourceEntityId: 'de1', targetEntityId: 'de2', cleanedName: '需要', description: '拍摄需要控制', layer: 'how', source: 'fact' },
       ]);
+      prisma.docPrinciple.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/kg/doc/doc-123/graph');
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      expect(res.body.data.scope).toBe('doc');
       expect(res.body.data.docId).toBe('doc-123');
       expect(res.body.data.entities).toEqual([
-        { id: 'de1', name: '垂直拍摄', description: '从上方垂直角度拍摄' },
-        { id: 'de2', name: '光圈控制', description: '调整光圈大小' },
+        { id: 'de1', name: '垂直拍摄', description: '从上方垂直角度拍摄', entityType: 'process', source: 'fact' },
+        { id: 'de2', name: '光圈控制', description: '调整光圈大小', entityType: 'process', source: 'fact' },
       ]);
       expect(res.body.data.relations).toEqual([
-        { id: 'dr1', source: 'de1', target: 'de2', name: '需要', description: '拍摄需要控制' },
+        { id: 'dr1', source: 'de1', target: 'de2', name: '需要', description: '拍摄需要控制', layer: 'how', source_tag: 'fact', linkSource: 'fact' },
       ]);
       expect(prisma.docEntity.findMany).toHaveBeenCalledWith({ where: { docId: 'doc-123' } });
       expect(prisma.docRelation.findMany).toHaveBeenCalledWith({ where: { docId: 'doc-123' } });
@@ -134,10 +145,12 @@ describe('KG Routes - Dual Layer', () => {
     it('should return empty arrays when no doc data exists', async () => {
       prisma.docEntity.findMany.mockResolvedValue([]);
       prisma.docRelation.findMany.mockResolvedValue([]);
+      prisma.docPrinciple.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/kg/doc/unknown-doc/graph');
 
       expect(res.status).toBe(200);
+      expect(res.body.data.scope).toBe('doc');
       expect(res.body.data.entities).toEqual([]);
       expect(res.body.data.relations).toEqual([]);
     });
@@ -178,6 +191,7 @@ describe('KG Routes - Dual Layer', () => {
 
       expect(res.status).toBe(409);
       expect(res.body.success).toBe(false);
+      expect(res.body.code).toBe('UNIFICATION_ALREADY_RUNNING');
       expect(res.body.error).toContain('正在执行中');
       expect(unificationService.runUnification).not.toHaveBeenCalled();
     });
@@ -279,16 +293,18 @@ describe('KG Routes - Dual Layer', () => {
   describe('GET /api/kg/graph (compatibility)', () => {
     it('should return unified graph data for backward compatibility', async () => {
       prisma.unifiedEntity.findMany.mockResolvedValue([
-        { id: 'ue1', cleanedName: '实体A', description: '描述A' },
+        { id: 'ue1', cleanedName: '实体A', description: '描述A', entityType: 'concept', source: 'fact' },
       ]);
       prisma.unifiedRelation.findMany.mockResolvedValue([
-        { id: 'ur1', sourceEntityId: 'ue1', targetEntityId: 'ue1', cleanedName: '关系', description: '关系描述' },
+        { id: 'ur1', sourceEntityId: 'ue1', targetEntityId: 'ue1', cleanedName: '关系', description: '关系描述', layer: 'how', source: 'fact' },
       ]);
+      prisma.unifiedPrinciple.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/kg/graph');
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      expect(res.body.data.scope).toBe('unified');
       expect(res.body.data.entities).toHaveLength(1);
       expect(res.body.data.relations).toHaveLength(1);
     });

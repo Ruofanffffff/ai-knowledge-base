@@ -10,7 +10,10 @@ const express = require('express');
 const kgRoutes = require('./kgRoutes');
 
 // Mock dependencies
-jest.mock('../services/authService');
+jest.mock('../services/authService', () => ({
+  authMiddleware: jest.fn(),
+  requirePermission: jest.fn(() => (req, res, next) => next()),
+}));
 jest.mock('../services/kgPipelineService', () => {
   const pipelineStatus = new Map();
   const service = {
@@ -19,8 +22,9 @@ jest.mock('../services/kgPipelineService', () => {
   };
   service.pipelineStatus = pipelineStatus;
   service.prisma = {
-    cleanedEntity: { findMany: jest.fn() },
-    cleanedRelation: { findMany: jest.fn() },
+    unifiedEntity: { findMany: jest.fn() },
+    unifiedRelation: { findMany: jest.fn() },
+    unifiedPrinciple: { findMany: jest.fn() },
   };
   // Default export is the service instance; named exports attached
   module.exports = service;
@@ -80,7 +84,7 @@ describe('KG Routes', () => {
     });
 
     it('should return 409 when pipeline is already active for docId', async () => {
-      pipelineStatus.set('doc-1', { docId: 'doc-1', status: 'extracting_entities' });
+      pipelineStatus.set('doc-1', { docId: 'doc-1', status: 'indexing' });
 
       const res = await request(app)
         .post('/api/kg/build')
@@ -88,7 +92,7 @@ describe('KG Routes', () => {
 
       expect(res.status).toBe(409);
       expect(res.body.success).toBe(false);
-      expect(res.body.data.status).toBe('extracting_entities');
+      expect(res.body.data.status).toBe('indexing');
     });
 
     it('should allow rebuild after pipeline completed', async () => {
@@ -120,40 +124,44 @@ describe('KG Routes', () => {
 
   describe('GET /api/kg/graph', () => {
     it('should return mapped entities and relations', async () => {
-      prisma.cleanedEntity.findMany.mockResolvedValue([
-        { id: 'e1', cleanedName: '实体A', description: '描述A' },
-        { id: 'e2', cleanedName: '实体B', description: '描述B' },
+      prisma.unifiedEntity.findMany.mockResolvedValue([
+        { id: 'e1', cleanedName: '实体A', description: '描述A', entityType: 'concept', source: 'fact' },
+        { id: 'e2', cleanedName: '实体B', description: '描述B', entityType: 'concept', source: 'fact' },
       ]);
-      prisma.cleanedRelation.findMany.mockResolvedValue([
-        { id: 'r1', sourceEntityId: 'e1', targetEntityId: 'e2', cleanedName: '关系', description: '关系描述' },
+      prisma.unifiedRelation.findMany.mockResolvedValue([
+        { id: 'r1', sourceEntityId: 'e1', targetEntityId: 'e2', cleanedName: '关系', description: '关系描述', layer: 'how', source: 'fact' },
       ]);
+      prisma.unifiedPrinciple.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/kg/graph');
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      expect(res.body.data.scope).toBe('unified');
       expect(res.body.data.entities).toEqual([
-        { id: 'e1', name: '实体A', description: '描述A' },
-        { id: 'e2', name: '实体B', description: '描述B' },
+        { id: 'e1', name: '实体A', description: '描述A', entityType: 'concept', source: 'fact' },
+        { id: 'e2', name: '实体B', description: '描述B', entityType: 'concept', source: 'fact' },
       ]);
       expect(res.body.data.relations).toEqual([
-        { id: 'r1', source: 'e1', target: 'e2', name: '关系', description: '关系描述' },
+        { id: 'r1', source: 'e1', target: 'e2', name: '关系', description: '关系描述', layer: 'how', source_tag: 'fact', linkSource: 'fact' },
       ]);
     });
 
     it('should return empty arrays when no data exists', async () => {
-      prisma.cleanedEntity.findMany.mockResolvedValue([]);
-      prisma.cleanedRelation.findMany.mockResolvedValue([]);
+      prisma.unifiedEntity.findMany.mockResolvedValue([]);
+      prisma.unifiedRelation.findMany.mockResolvedValue([]);
+      prisma.unifiedPrinciple.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/kg/graph');
 
       expect(res.status).toBe(200);
+      expect(res.body.data.scope).toBe('unified');
       expect(res.body.data.entities).toEqual([]);
       expect(res.body.data.relations).toEqual([]);
     });
 
     it('should return 500 on database error', async () => {
-      prisma.cleanedEntity.findMany.mockRejectedValue(new Error('DB error'));
+      prisma.unifiedEntity.findMany.mockRejectedValue(new Error('DB error'));
 
       const res = await request(app).get('/api/kg/graph');
 
@@ -168,7 +176,7 @@ describe('KG Routes', () => {
     it('should return pipeline status for a known docId', async () => {
       pipelineStatus.set('doc-1', {
         docId: 'doc-1',
-        status: 'extracting_entities',
+        status: 'extracting_four_layers',
         entityCount: 5,
         relationCount: 0,
       });
@@ -179,17 +187,19 @@ describe('KG Routes', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data).toEqual({
         docId: 'doc-1',
-        status: 'extracting_entities',
+        status: 'extracting_four_layers',
         entityCount: 5,
         relationCount: 0,
+        principleCount: 0,
       });
     });
 
-    it('should return 404 when no status exists for docId', async () => {
+    it('should return idle status when no status exists for docId', async () => {
       const res = await request(app).get('/api/kg/status/unknown-doc');
 
-      expect(res.status).toBe(404);
-      expect(res.body.success).toBe(false);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('idle');
     });
   });
 });

@@ -1,6 +1,17 @@
 module.exports = {
   testEnvironment: 'node',
   coveragePathIgnorePatterns: ['/node_modules/'],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist-electron/',
+    '/Note-taking app frontend \\(V1\\.1\\)/',
+    '/Note-taking app frontend（V2\\.0）/',
+  ],
+  modulePathIgnorePatterns: [
+    '<rootDir>/dist-electron/',
+    '<rootDir>/Note-taking app frontend (V1.1)/',
+    '<rootDir>/Note-taking app frontend（V2.0）/',
+  ],
   transformIgnorePatterns: [
     'node_modules/(?!(uuid|@aws-sdk)/)'
   ],
@@ -22,4 +33,3 @@ module.exports = {
   },
   coverageReporters: ['text', 'lcov', 'json', 'html']
 };
-

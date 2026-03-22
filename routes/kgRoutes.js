@@ -10,6 +10,7 @@ const { authMiddleware, requirePermission } = require('../services/authService')
 const kgPipelineService = require('../services/kgPipelineService');
 const { pipelineStatus, prisma } = require('../services/kgPipelineService');
 const unificationService = require('../services/unificationService');
+const graphDtoService = require('../services/graphDtoService');
 
 // 正在执行中的Pipeline状态（收到重复请求时应拒绝）
 const ACTIVE_STATUSES = ['pending', 'indexing', 'extracting_four_layers', 'merging', 'saving'];
@@ -195,32 +196,10 @@ router.get('/graph', authMiddleware, requirePermission('kg:read'), async (req, r
     const relations = await prisma.unifiedRelation.findMany();
     const principles = await prisma.unifiedPrinciple.findMany();
 
+    const graph = graphDtoService.fromUnifiedPrisma({ entities, relations, principles });
     res.json({
       success: true,
-      data: {
-        entities: entities.map(e => ({
-          id: e.id,
-          name: e.cleanedName,
-          description: e.description,
-          entityType: e.entityType,
-          source: e.source
-        })),
-        relations: relations.map(r => ({
-          id: r.id,
-          source: r.sourceEntityId,
-          target: r.targetEntityId,
-          name: r.cleanedName,
-          description: r.description,
-          layer: r.layer,
-          source_tag: r.source
-        })),
-        principles: principles.map(p => ({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          source: p.source
-        }))
-      }
+      data: graph
     });
   } catch (error) {
     console.error('[KG Routes] Error fetching graph data:', error);
@@ -283,32 +262,10 @@ router.get('/unified/graph', authMiddleware, requirePermission('kg:read'), async
     const relations = await prisma.unifiedRelation.findMany();
     const principles = await prisma.unifiedPrinciple.findMany();
 
+    const graph = graphDtoService.fromUnifiedPrisma({ entities, relations, principles });
     res.json({
       success: true,
-      data: {
-        entities: entities.map(e => ({
-          id: e.id,
-          name: e.cleanedName,
-          description: e.description,
-          entityType: e.entityType,
-          source: e.source
-        })),
-        relations: relations.map(r => ({
-          id: r.id,
-          source: r.sourceEntityId,
-          target: r.targetEntityId,
-          name: r.cleanedName,
-          description: r.description,
-          layer: r.layer,
-          source_tag: r.source
-        })),
-        principles: principles.map(p => ({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          source: p.source
-        }))
-      }
+      data: graph
     });
   } catch (error) {
     console.error('[KG Routes] Error fetching unified graph data:', error);
@@ -339,34 +296,10 @@ router.get('/doc/:docId/graph', authMiddleware, requirePermission('kg:read'), as
       where: { docId }
     });
 
+    const graph = graphDtoService.fromDocPrisma({ docId, entities, relations, principles });
     res.json({
       success: true,
-      data: {
-        docId,
-        entities: entities.map(e => ({
-          id: e.id,
-          name: e.cleanedName,
-          description: e.description,
-          entityType: e.entityType,
-          source: e.source
-        })),
-        relations: relations.map(r => ({
-          id: r.id,
-          source: r.sourceEntityId,
-          target: r.targetEntityId,
-          name: r.cleanedName,
-          description: r.description,
-          layer: r.layer,
-          source_tag: r.source
-        })),
-        principles: principles.map(p => ({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          relatedEntityIds: p.relatedEntityIds,
-          source: p.source
-        }))
-      }
+      data: graph
     });
   } catch (error) {
     console.error('[KG Routes] Error fetching doc graph data:', error);
@@ -388,6 +321,7 @@ router.post('/unified/trigger', authMiddleware, requirePermission('kg:run'), asy
     if (latestLog && latestLog.status === 'running') {
       return res.status(409).json({
         success: false,
+        code: 'UNIFICATION_ALREADY_RUNNING',
         error: '统一归纳正在执行中，请勿重复触发',
         data: {
           status: latestLog.status,
@@ -407,6 +341,7 @@ router.post('/unified/trigger', authMiddleware, requirePermission('kg:run'), asy
       success: true,
       data: {
         status: 'running',
+        triggeredBy: 'manual',
         message: '统一归纳已启动'
       }
     });
@@ -414,6 +349,7 @@ router.post('/unified/trigger', authMiddleware, requirePermission('kg:run'), asy
     console.error('[KG Routes] Error triggering unification:', error);
     res.status(500).json({
       success: false,
+      code: 'UNIFICATION_TRIGGER_FAILED',
       error: error.message || 'Internal server error'
     });
   }
@@ -432,6 +368,7 @@ router.get('/unified/status', authMiddleware, async (req, res) => {
         success: true,
         data: {
           status: 'idle',
+          code: 'UNIFICATION_IDLE',
           message: '尚未执行过统一归纳'
         }
       });
@@ -441,6 +378,7 @@ router.get('/unified/status', authMiddleware, async (req, res) => {
       success: true,
       data: {
         status: latestLog.status,
+        code: latestLog.status === 'failed' ? 'UNIFICATION_FAILED' : 'UNIFICATION_OK',
         entityCount: latestLog.entityCount,
         relationCount: latestLog.relationCount,
         principleCount: latestLog.principleCount || 0,
@@ -474,13 +412,15 @@ router.get('/note/:noteId/graph', authMiddleware, requirePermission('kg:read'), 
       });
     }
     const graph = await buildNoteGraph(note);
+    const graphDto = graphDtoService.fromNoteGraph({ noteId, entities: graph.entities, relations: graph.relations });
     return res.json({
       success: true,
       data: {
         noteId,
         entities: graph.entities,
         relations: graph.relations,
-        updatedAt: note.updatedAt
+        updatedAt: note.updatedAt,
+        graph: graphDto
       }
     });
   } catch (error) {
@@ -511,12 +451,14 @@ router.get('/notes/graph', authMiddleware, requirePermission('kg:read'), async (
       entities.push(...graph.entities);
       relations.push(...graph.relations);
     });
+    const graphDto = graphDtoService.fromNotesAggregate({ entities, relations });
     return res.json({
       success: true,
       data: {
         entities,
         relations,
-        noteEntityMap
+        noteEntityMap,
+        graph: graphDto
       }
     });
   } catch (error) {
