@@ -1,33 +1,15 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Search, ZoomIn, ZoomOut, RefreshCw, Loader2, Globe, FileText, BookOpen } from 'lucide-react';
+import { Search, ZoomIn, ZoomOut, RefreshCw, Loader2, Globe, FileText, BookOpen, Zap, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useGraph } from '../hooks/useGraph';
-import apiClient from '../api/client';
+import apiService from '../services/api';
 import DocumentIndexDrawer from '../components/DocumentIndexDrawer';
+import { getEntityTypeSemantic } from 'graph-core';
 
 interface Document {
   id: string;
   title: string;
 }
-
-// 实体类型颜色方案（匹配后端 Entity_Type 枚举 + 旧类型兼容）
-const ENTITY_COLORS: Record<string, { fill: string; stroke: string; bg: string; label: string }> = {
-  // 后端 Entity_Type 枚举（优先）
-  concept:    { fill: '#8b5cf6', stroke: '#7c3aed', bg: 'rgba(139, 92, 246, 0.1)', label: '概念/理论' },
-  object:     { fill: '#6366f1', stroke: '#4f46e5', bg: 'rgba(99, 102, 241, 0.1)', label: '对象/产品' },
-  process:    { fill: '#10b981', stroke: '#059669', bg: 'rgba(16, 185, 129, 0.1)', label: '流程/方法' },
-  role:       { fill: '#f59e0b', stroke: '#d97706', bg: 'rgba(245, 158, 11, 0.1)', label: '人物/角色' },
-  rule:       { fill: '#ef4444', stroke: '#dc2626', bg: 'rgba(239, 68, 68, 0.1)',  label: '规则/规范' },
-  tool:       { fill: '#3b82f6', stroke: '#2563eb', bg: 'rgba(59, 130, 246, 0.1)', label: '工具/技术' },
-  target:     { fill: '#f97316', stroke: '#ea580c', bg: 'rgba(249, 115, 22, 0.1)', label: '目标/成果' },
-  data:       { fill: '#14b8a6', stroke: '#0d9488', bg: 'rgba(20, 184, 166, 0.1)', label: '数据/资源' },
-  // 旧 inferEntityType 兼容映射
-  technology: { fill: '#6366f1', stroke: '#4f46e5', bg: 'rgba(99, 102, 241, 0.12)', label: '技术/工具' },
-  person:     { fill: '#f59e0b', stroke: '#d97706', bg: 'rgba(245, 158, 11, 0.12)', label: '人物/组织' },
-  action:     { fill: '#10b981', stroke: '#059669', bg: 'rgba(16, 185, 129, 0.12)', label: '方法/行为' },
-  domain:     { fill: '#3b82f6', stroke: '#2563eb', bg: 'rgba(59, 130, 246, 0.12)', label: '领域/场景' },
-  default:    { fill: '#64748b', stroke: '#475569', bg: 'rgba(100, 116, 139, 0.1)', label: '其他' },
-};
 
 // 根据实体描述推断类型
 function inferEntityType(label: string, description: string): string {
@@ -74,9 +56,9 @@ function forceLayout(
     // 斥力
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
-        let dx = nodes[i].x - nodes[j].x;
-        let dy = nodes[i].y - nodes[j].y;
-        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const dx = nodes[i].x - nodes[j].x;
+        const dy = nodes[i].y - nodes[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
         const minDist = nodes[i].r + nodes[j].r + 60;
         const force = repulsion / (dist * dist);
         const fx = (dx / dist) * force;
@@ -101,9 +83,9 @@ function forceLayout(
       const si = idMap.get(link.source);
       const ti = idMap.get(link.target);
       if (si === undefined || ti === undefined) continue;
-      let dx = nodes[ti].x - nodes[si].x;
-      let dy = nodes[ti].y - nodes[si].y;
-      let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const dx = nodes[ti].x - nodes[si].x;
+      const dy = nodes[ti].y - nodes[si].y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
       const idealDist = 180;
       const force = (dist - idealDist) * attraction;
       const fx = (dx / dist) * force;
@@ -130,23 +112,33 @@ function forceLayout(
 
 export function Graph() {
   const { 
-    graphData, isLoading, error, viewMode, selectedDocId,
-    setViewMode, setSelectedDocId, fetchUnifiedGraph, fetchDocGraph
+    graphData, graphMeta, isLoading, error, viewMode, selectedDocId,
+    setViewMode, setSelectedDocId, fetchUnifiedGraph, fetchDocGraph,
+    unifiedStatus, unifiedStatusLoading, unifiedStatusError, fetchUnifiedStatus, triggerUnified
   } = useGraph();
   
+  const loading = isLoading;
   const [graphNodes, setGraphNodes] = useState(graphData.nodes);
   const [graphLinks, setGraphLinks] = useState(graphData.links);
   const [viewState, setViewState] = useState({ x: 0, y: 0, zoom: 1 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
+  const [isNodeDragging, setIsNodeDragging] = useState(false);
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const nodeDragStartRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const panStartRef = useRef<{ clientX: number; clientY: number; startX: number; startY: number; startZoom: number } | null>(null);
+  const interactionRef = useRef<{ type: 'none' | 'node' | 'pan'; moved: boolean } | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [indexDrawerDocId, setIndexDrawerDocId] = useState<string | null>(null);
   const [indexDrawerDocTitle, setIndexDrawerDocTitle] = useState<string | undefined>(undefined);
+  const [unifiedActionMessage, setUnifiedActionMessage] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgSize, setSvgSize] = useState({ width: 1200, height: 800 });
+  const prevUnifiedStatusRef = useRef<string | null>(null);
   
   // 监听容器尺寸变化
   useEffect(() => {
@@ -167,19 +159,49 @@ export function Graph() {
     fetchUnifiedGraph();
     fetchDocuments();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    fetchUnifiedStatus();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (unifiedStatus?.status !== 'running') return;
+    const id = window.setInterval(() => {
+      fetchUnifiedStatus();
+    }, 2500);
+    return () => window.clearInterval(id);
+  }, [unifiedStatus?.status, fetchUnifiedStatus]);
+
+  useEffect(() => {
+    const prev = prevUnifiedStatusRef.current;
+    const next = unifiedStatus?.status || null;
+    if (prev === 'running' && next === 'completed' && viewMode === 'unified') {
+      fetchUnifiedGraph();
+    }
+    prevUnifiedStatusRef.current = next;
+  }, [unifiedStatus?.status, viewMode, fetchUnifiedGraph]);
   
   const fetchDocuments = async () => {
     try {
-      const response = await apiClient.get('/documents');
-      const docs = Array.isArray(response.data) ? response.data : (response.data.documents || []);
+      const response = await apiService.getDocuments();
+      const docs = response.success ? (response.data || []) : [];
       setDocuments(docs.map((doc: any) => ({
         id: doc.id,
-        title: doc.title || doc.filename || 'Untitled'
+        title: doc.title || doc.name || 'Untitled'
       })));
     } catch (err) {
       console.error('Failed to fetch documents:', err);
     }
   };
+
+  useEffect(() => {
+    if (viewMode !== 'per-document') return;
+    if (selectedDocId) return;
+    const firstDocId = documents[0]?.id;
+    if (!firstDocId) return;
+    setSelectedDocId(firstDocId);
+    fetchDocGraph(firstDocId);
+  }, [viewMode, selectedDocId, documents, setSelectedDocId, fetchDocGraph]);
 
   
   // 当 graphData 更新时，运行力导向布局
@@ -187,7 +209,7 @@ export function Graph() {
     if (graphData.nodes.length === 0) {
       // 只有在非加载状态下才清空节点，避免加载时的闪烁
       // 或者如果是首次加载（当前没有任何节点），也允许清空（保持空状态）
-      if (!isLoading || graphNodes.length === 0) {
+      if (!loading || graphNodes.length === 0) {
         setGraphNodes([]);
         setGraphLinks([]);
       }
@@ -216,13 +238,13 @@ export function Graph() {
     const newNodes = graphData.nodes.map(node => {
       const pos = posMap.get(node.id)!;
       const entityType = node.entityType || inferEntityType(node.label, node.description);
-      const colorScheme = ENTITY_COLORS[entityType] || ENTITY_COLORS.default;
+      const colorScheme = getEntityTypeSemantic(entityType);
       return { ...node, x: pos.x, y: pos.y, color: colorScheme.fill };
     });
 
     setGraphNodes(newNodes);
     setGraphLinks(graphData.links);
-  }, [graphData, svgSize]);
+  }, [graphData, svgSize, loading, graphNodes.length]);
 
   // 计算节点增强数据
   const nodes = useMemo(() => {
@@ -236,7 +258,7 @@ export function Graph() {
       const count = degree[node.id] || 0;
       const r = 20 + count * 6;
       const entityType = node.entityType || inferEntityType(node.label, node.description);
-      const colorScheme = ENTITY_COLORS[entityType] || ENTITY_COLORS.default;
+      const colorScheme = getEntityTypeSemantic(entityType);
       const label = node.label.length > 8 ? node.label.substring(0, 8) + '…' : node.label;
       return { ...node, r, degree: count, entityType, colorScheme, displayLabel: label, fullLabel: node.label };
     });
@@ -252,28 +274,142 @@ export function Graph() {
   // 获取当前使用的颜色类型（用于图例）
   const usedTypes = useMemo(() => {
     const types = new Set(nodes.map(n => n.entityType));
-    return Array.from(types).map(t => ({ type: t, ...ENTITY_COLORS[t] }));
+    return Array.from(types).map(t => ({ type: t, ...getEntityTypeSemantic(t) }));
   }, [nodes]);
+
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+  const clientToWorld = useCallback((clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const rect = svg.getBoundingClientRect();
+    const px = (clientX - rect.left) / rect.width;
+    const py = (clientY - rect.top) / rect.height;
+    const viewW = svgSize.width / viewState.zoom;
+    const viewH = svgSize.height / viewState.zoom;
+    return {
+      x: viewState.x + px * viewW,
+      y: viewState.y + py * viewH,
+    };
+  }, [svgSize, viewState]);
 
   const handleNodeMouseDown = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    interactionRef.current = { type: 'node', moved: false };
+    nodeDragStartRef.current = { clientX: e.clientX, clientY: e.clientY };
     setDraggedNode(nodeId);
-    setIsDragging(true);
+    setIsNodeDragging(true);
   };
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (!isDragging || !draggedNode || !svgRef.current) return;
+    if (interactionRef.current && !interactionRef.current.moved) {
+      const start =
+        interactionRef.current.type === 'pan'
+          ? panStartRef.current
+          : interactionRef.current.type === 'node'
+            ? nodeDragStartRef.current
+            : null;
+      if (start) {
+        const dx = e.clientX - start.clientX;
+        const dy = e.clientY - start.clientY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+          interactionRef.current = { ...interactionRef.current, moved: true };
+        }
+      }
+    }
+
+    if (isNodeDragging && draggedNode) {
+      const p = clientToWorld(e.clientX, e.clientY);
+      setGraphNodes(prev => prev.map(n => n.id === draggedNode ? { ...n, x: p.x, y: p.y } : n));
+      return;
+    }
+
+    if (isPanning && panStartRef.current) {
+      const start = panStartRef.current;
+      const dx = e.clientX - start.clientX;
+      const dy = e.clientY - start.clientY;
+      setViewState(prev => ({
+        ...prev,
+        x: start.startX - dx / start.startZoom,
+        y: start.startY - dy / start.startZoom,
+      }));
+    }
+  }, [clientToWorld, draggedNode, isNodeDragging, isPanning]);
+
+  const stopInteractions = useCallback(() => {
+    setIsNodeDragging(false);
+    setDraggedNode(null);
+    setIsPanning(false);
+    panStartRef.current = null;
+    nodeDragStartRef.current = null;
+    interactionRef.current = null;
+  }, []);
+
+  const handleMouseDownBackground = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button !== 0) return;
+    if (isNodeDragging) return;
+    interactionRef.current = { type: 'pan', moved: false };
+    panStartRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      startX: viewState.x,
+      startY: viewState.y,
+      startZoom: viewState.zoom,
+    };
+    setIsPanning(true);
+  }, [isNodeDragging, viewState.x, viewState.y, viewState.zoom]);
+
+  const zoomAt = useCallback((clientX: number, clientY: number, factor: number) => {
     const svg = svgRef.current;
+    if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * svgSize.width;
-    const y = ((e.clientY - rect.top) / rect.height) * svgSize.height;
-    setGraphNodes(prev => prev.map(n => n.id === draggedNode ? { ...n, x, y } : n));
-  }, [isDragging, draggedNode, svgSize]);
+    const px = (clientX - rect.left) / rect.width;
+    const py = (clientY - rect.top) / rect.height;
 
-  const handleMouseUp = () => { setIsDragging(false); setDraggedNode(null); };
+    setViewState(prev => {
+      const nextZoom = clamp(prev.zoom * factor, 0.3, 3);
+      const prevViewW = svgSize.width / prev.zoom;
+      const prevViewH = svgSize.height / prev.zoom;
+      const worldX = prev.x + px * prevViewW;
+      const worldY = prev.y + py * prevViewH;
 
-  const handleZoomIn = () => setViewState(prev => ({ ...prev, zoom: Math.min(prev.zoom * 1.2, 3) }));
-  const handleZoomOut = () => setViewState(prev => ({ ...prev, zoom: Math.max(prev.zoom / 1.2, 0.3) }));
+      const nextViewW = svgSize.width / nextZoom;
+      const nextViewH = svgSize.height / nextZoom;
+      const nextX = worldX - px * nextViewW;
+      const nextY = worldY - py * nextViewH;
+
+      return { x: nextX, y: nextY, zoom: nextZoom };
+    });
+  }, [svgSize.width, svgSize.height]);
+
+  const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      const factor = Math.exp(-e.deltaY * 0.002);
+      zoomAt(e.clientX, e.clientY, factor);
+      return;
+    }
+    setViewState(prev => ({
+      ...prev,
+      x: prev.x + e.deltaX / prev.zoom,
+      y: prev.y + e.deltaY / prev.zoom,
+    }));
+  }, [zoomAt]);
+
+  const handleZoomIn = () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.2);
+  };
+
+  const handleZoomOut = () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1 / 1.2);
+  };
+
   const handleReset = () => {
     setViewState({ x: 0, y: 0, zoom: 1 });
     if (viewMode === 'unified') fetchUnifiedGraph();
@@ -282,6 +418,11 @@ export function Graph() {
 
   const handleViewModeChange = (mode: 'unified' | 'per-document') => {
     setViewMode(mode);
+    setSelectedNodeId(null);
+    setSelectedLinkId(null);
+    setHoveredNode(null);
+    setIndexDrawerDocId(null);
+    setIndexDrawerDocTitle(undefined);
     if (mode === 'unified') { setSelectedDocId(null); fetchUnifiedGraph(); }
     else if (documents.length > 0) {
       const firstDocId = documents[0]?.id;
@@ -289,7 +430,18 @@ export function Graph() {
     }
   };
 
-  const handleDocumentSelect = (docId: string) => { setSelectedDocId(docId); fetchDocGraph(docId); };
+  const handleDocumentSelect = (docId: string) => {
+    setSelectedDocId(docId);
+    setSelectedNodeId(null);
+    setSelectedLinkId(null);
+    setHoveredNode(null);
+    fetchDocGraph(docId);
+    const doc = documents.find(d => d.id === docId);
+    setIndexDrawerDocTitle(doc?.title);
+  };
+
+  const focusNodeId = selectedNodeId ?? hoveredNode;
+  const focusLink = selectedLinkId ? (graphLinks.find(l => l.id === selectedLinkId) || null) : null;
 
   return (
     <>
@@ -344,6 +496,71 @@ export function Graph() {
                )}
              </div>
            )}
+
+           <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl px-3 py-2 pointer-events-auto flex items-center gap-3 min-w-[220px]">
+             <div className="min-w-0">
+               <div className="flex items-center gap-2">
+                 <span
+                   className="text-xs font-semibold"
+                   style={{
+                     color:
+                       unifiedStatus?.status === 'running'
+                         ? '#2563eb'
+                         : unifiedStatus?.status === 'completed'
+                           ? '#059669'
+                           : unifiedStatus?.status === 'failed'
+                             ? '#dc2626'
+                             : '#64748b',
+                   }}
+                   title={unifiedStatus?.error || unifiedStatusError || undefined}
+                 >
+                   {unifiedStatus?.status === 'running'
+                     ? '统一归纳中…'
+                     : unifiedStatus?.status === 'completed'
+                       ? '统一归纳已完成'
+                       : unifiedStatus?.status === 'failed'
+                         ? '统一归纳失败'
+                         : '统一归纳未运行'}
+                 </span>
+                 {unifiedStatus?.status === 'completed' && (
+                   <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                     {unifiedStatus.entityCount || 0} 实体 · {unifiedStatus.relationCount || 0} 关系
+                   </span>
+                 )}
+               </div>
+               {(unifiedStatusError || unifiedActionMessage) && (
+                 <div
+                   className="text-[10px] mt-0.5 truncate"
+                   style={{ color: unifiedStatusError ? '#dc2626' : '#64748b' }}
+                   title={unifiedStatusError || unifiedActionMessage || undefined}
+                 >
+                   {unifiedStatusError || unifiedActionMessage}
+                 </div>
+               )}
+             </div>
+
+             <button
+               onClick={async () => {
+                 setUnifiedActionMessage(null);
+                 const res = await triggerUnified();
+                 if (!res.ok) {
+                   setUnifiedActionMessage(res.message || (res.conflict ? '统一归纳正在执行中' : '触发失败'));
+                   return;
+                 }
+                 setUnifiedActionMessage(res.message || '已触发统一归纳');
+               }}
+               disabled={unifiedStatusLoading || unifiedStatus?.status === 'running'}
+               className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+                 unifiedStatusLoading || unifiedStatus?.status === 'running'
+                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                   : 'bg-purple-600 text-white hover:bg-purple-700'
+               }`}
+               title={unifiedStatus?.status === 'running' ? '统一归纳正在执行中' : '触发统一归纳'}
+             >
+               {unifiedStatusLoading ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+               <span>触发</span>
+             </button>
+           </div>
 
            <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl p-2 flex gap-2 pointer-events-auto">
               <button onClick={handleZoomIn} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="放大"><ZoomIn size={16} /></button>
@@ -409,29 +626,46 @@ export function Graph() {
       {/* SVG Graph */}
       <div ref={containerRef} className="w-full h-full">
          <svg 
-           ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${svgSize.width} ${svgSize.height}`} className="w-full h-full"
-           onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
-           style={{ cursor: isDragging ? 'grabbing' : 'default' }}
+           ref={svgRef}
+           width="100%"
+           height="100%"
+           viewBox={`${viewState.x} ${viewState.y} ${svgSize.width / viewState.zoom} ${svgSize.height / viewState.zoom}`}
+           className="w-full h-full"
+           onMouseDown={handleMouseDownBackground}
+           onMouseMove={handleMouseMove}
+           onMouseUp={stopInteractions}
+           onMouseLeave={stopInteractions}
+           onWheel={handleWheel}
+           onClick={() => {
+             const moved = interactionRef.current?.moved;
+             const type = interactionRef.current?.type;
+             if (type === 'pan' && moved) {
+               interactionRef.current = null;
+               return;
+             }
+             setSelectedNodeId(null);
+             setSelectedLinkId(null);
+             setHoveredNode(null);
+           }}
+           style={{ cursor: isPanning ? 'grabbing' : isNodeDragging ? 'grabbing' : 'default', touchAction: 'none' }}
          >
             <defs>
                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
                   <circle cx="2" cy="2" r="0.8" fill="#e2e8f0" opacity="0.6"/>
                </pattern>
                {/* 为每种类型创建呼吸动画 */}
-               {Object.entries(ENTITY_COLORS).map(([type, colors]) => (
-                 <radialGradient key={type} id={`grad-${type}`} cx="50%" cy="50%" r="50%">
-                   <stop offset="0%" stopColor={colors.fill} stopOpacity="0.3" />
-                   <stop offset="100%" stopColor={colors.fill} stopOpacity="0.05" />
-                 </radialGradient>
-               ))}
+               {Array.from(new Set([...nodes.map(n => n.entityType), 'default'])).map((type) => {
+                 const colors = getEntityTypeSemantic(type);
+                 return (
+                   <radialGradient key={type} id={`grad-${type}`} cx="50%" cy="50%" r="50%">
+                     <stop offset="0%" stopColor={colors.fill} stopOpacity="0.3" />
+                     <stop offset="100%" stopColor={colors.fill} stopOpacity="0.05" />
+                   </radialGradient>
+                 );
+               })}
             </defs>
             <rect width="100%" height="100%" fill="url(#grid)" />
-
-            <motion.g
-              animate={{ scale: viewState.zoom }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              style={{ transformOrigin: `${svgSize.width / 2}px ${svgSize.height / 2}px` }}
-            >
+            <g>
               {/* Links */}
               {graphLinks.map((link, i) => {
                  const source = nodes.find(n => n.id === link.source);
@@ -442,8 +676,11 @@ export function Graph() {
                  const tx = target.x ?? 0, ty = target.y ?? 0;
                  const midX = (sx + tx) / 2, midY = (sy + ty) / 2;
                  
-                 const isHighlighted = hoveredNode && (hoveredNode === source.id || hoveredNode === target.id);
-                 const isDimmed = hoveredNode && !isHighlighted;
+                const isHighlighted = Boolean(
+                  (focusLink && focusLink.id === link.id) ||
+                  (!focusLink && focusNodeId && (focusNodeId === source.id || focusNodeId === target.id))
+                );
+                const isDimmed = Boolean((focusLink || focusNodeId) && !isHighlighted);
                  const isSearchDimmed = matchedNodeIds && !matchedNodeIds.has(source.id) && !matchedNodeIds.has(target.id);
 
                  // Task 10.2 & 10.5: layer-based line style (why=dashed, how/missing=solid)
@@ -453,11 +690,22 @@ export function Graph() {
                  const linkSourceTag = link.linkSource || 'fact';
                  
                  return (
-                    <g key={i} opacity={isDimmed || isSearchDimmed ? 0.1 : 1} style={{ transition: 'opacity 0.3s' }}>
+                    <g
+                      key={i}
+                      opacity={isDimmed || isSearchDimmed ? 0.1 : 1}
+                      style={{ transition: 'opacity 0.3s', cursor: 'pointer' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (interactionRef.current?.type === 'pan' && interactionRef.current.moved) return;
+                        setSelectedLinkId(link.id);
+                        setSelectedNodeId(null);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
                       <line 
                         x1={sx} y1={sy} x2={tx} y2={ty}
                         stroke={isHighlighted ? '#94a3b8' : '#e2e8f0'}
-                        strokeWidth={isHighlighted ? 2 : 1.2}
+                        strokeWidth={isHighlighted ? 2.2 : 1.2}
                         strokeDasharray={layerDash}
                       />
                       <rect x={midX - 18} y={midY - 9} width="36" height="18" rx="9" fill="white" stroke="#e2e8f0" strokeWidth="0.5" />
@@ -481,10 +729,18 @@ export function Graph() {
               {/* Nodes */}
               {nodes.map((node) => {
                  const isHovered = hoveredNode === node.id;
-                 const isConnected = hoveredNode && graphLinks.some(l => 
-                   (l.source === node.id && l.target === hoveredNode) || (l.target === node.id && l.source === hoveredNode)
+                 const isSelected = selectedNodeId === node.id;
+                 const isConnected = focusNodeId && graphLinks.some(l => 
+                   (l.source === node.id && l.target === focusNodeId) || (l.target === node.id && l.source === focusNodeId)
                  );
-                 const isDimmed = hoveredNode && !isHovered && !isConnected;
+                 const isLinkEndpoint = focusLink ? (node.id === focusLink.source || node.id === focusLink.target) : false;
+                 const isDimmed = Boolean(
+                   focusLink
+                     ? !isLinkEndpoint
+                     : focusNodeId
+                       ? !isSelected && node.id !== focusNodeId && !isConnected
+                       : false
+                 );
                  const isSearchMatch = matchedNodeIds ? matchedNodeIds.has(node.id) : true;
                  const isSearchDimmed = matchedNodeIds && !isSearchMatch;
                  const nx = node.x ?? 0, ny = node.y ?? 0;
@@ -497,7 +753,13 @@ export function Graph() {
                       onMouseEnter={() => setHoveredNode(node.id)}
                       onMouseLeave={() => setHoveredNode(null)}
                       onMouseDown={(e) => handleNodeMouseDown(node.id, e)}
-                      style={{ cursor: isDragging && draggedNode === node.id ? 'grabbing' : 'grab', transition: 'opacity 0.3s' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (interactionRef.current?.type === 'node' && interactionRef.current.moved) return;
+                        setSelectedNodeId(node.id);
+                        setSelectedLinkId(null);
+                      }}
+                      style={{ cursor: isNodeDragging && draggedNode === node.id ? 'grabbing' : 'grab', transition: 'opacity 0.3s' }}
                       opacity={isDimmed || isSearchDimmed ? 0.12 : 1}
                     >
                        {/* 呼吸光晕 - 所有节点都有 */}
@@ -546,7 +808,7 @@ export function Graph() {
                  );
               })}
 
-            </motion.g>
+            </g>
          </svg>
       </div>
 
@@ -611,70 +873,225 @@ export function Graph() {
         </div>
       )}
 
-      {/* Hover Info Panel - 右下角浅色紧凑浮窗 */}
-      {hoveredNode && (() => {
-        const node = nodes.find(n => n.id === hoveredNode);
-        if (!node) return null;
-        const accent = node.colorScheme.fill;
+      {(selectedNodeId || selectedLinkId) && (() => {
+        const sourceDocId =
+          (graphMeta?.scope === 'doc' && graphMeta.docId) ||
+          (viewMode === 'per-document' ? selectedDocId : null) ||
+          null;
+
+        if (selectedNodeId) {
+          const node = nodes.find(n => n.id === selectedNodeId);
+          if (!node) return null;
+          const accent = node.colorScheme.fill;
+          return (
+            <motion.div
+              key={`node:${node.id}`}
+              className="pointer-events-auto"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.15 }}
+              style={{
+                position: 'fixed',
+                bottom: '16px',
+                right: '16px',
+                zIndex: 40,
+                width: 'min(360px, calc(100vw - 32px))',
+              }}
+            >
+              <div
+                className="rounded-2xl overflow-hidden"
+                style={{
+                  background: 'rgba(255,255,255,0.94)',
+                  backdropFilter: 'blur(14px)',
+                  border: '1px solid rgba(226,232,240,0.9)',
+                  boxShadow: `0 10px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)`,
+                }}
+              >
+                <div className="flex items-start gap-3 px-4 py-3 border-b border-slate-100">
+                  <div className="w-[4px] h-10 rounded-full shrink-0" style={{ background: accent }} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-800 break-words">{node.fullLabel}</div>
+                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: node.colorScheme.bg, color: accent }}>
+                            {node.entityType}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{
+                            background: (node.source || 'fact') === 'fact' ? 'rgba(16,185,129,0.1)' : (node.source || 'fact') === 'inferred' ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)',
+                            color: (node.source || 'fact') === 'fact' ? '#059669' : (node.source || 'fact') === 'inferred' ? '#d97706' : '#7c3aed',
+                          }}>
+                            {(node.source || 'fact') === 'fact' ? 'fact' : (node.source || 'fact') === 'inferred' ? 'inferred' : 'pattern'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 whitespace-nowrap">{node.degree} 连接</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setSelectedNodeId(null)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                        title="关闭"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-4 py-3">
+                  {node.description ? (
+                    <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{node.description}</div>
+                  ) : (
+                    <div className="text-sm text-slate-400">暂无描述</div>
+                  )}
+
+                  <div className="mt-3 flex items-center gap-2">
+                    {sourceDocId && (
+                      <button
+                        onClick={() => {
+                          const url = `/documents/${sourceDocId}`;
+                          window.open(url, '_blank');
+                        }}
+                        className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 flex items-center gap-2"
+                        title="打开来源文档"
+                      >
+                        <FileText size={14} />
+                        <span>打开来源文档</span>
+                      </button>
+                    )}
+                    {sourceDocId && (
+                      <button
+                        onClick={() => {
+                          const doc = documents.find(d => d.id === sourceDocId);
+                          setIndexDrawerDocId(sourceDocId);
+                          setIndexDrawerDocTitle(doc?.title);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 flex items-center gap-2"
+                        title="查看索引"
+                      >
+                        <BookOpen size={14} />
+                        <span>索引</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSearchQuery(node.fullLabel);
+                      }}
+                      className="ml-auto px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50"
+                      title="按该节点搜索"
+                    >
+                      搜索
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          );
+        }
+
+        const link = graphLinks.find(l => l.id === selectedLinkId);
+        if (!link) return null;
+        const layer = link.layer || 'how';
+        const sourceTag = link.linkSource || 'fact';
+        const sourceNode = nodes.find(n => n.id === link.source);
+        const targetNode = nodes.find(n => n.id === link.target);
+
         return (
           <motion.div
-            key={node.id}
-            className="pointer-events-none"
-            initial={{ opacity: 0, y: 6 }}
+            key={`link:${link.id}`}
+            className="pointer-events-auto"
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.15 }}
             style={{
-              position: 'fixed', bottom: '20px', right: '16px', zIndex: 31,
-              maxWidth: '196px',
+              position: 'fixed',
+              bottom: '16px',
+              right: '16px',
+              zIndex: 40,
+              width: 'min(360px, calc(100vw - 32px))',
             }}
           >
             <div
-              className="rounded-xl overflow-hidden"
+              className="rounded-2xl overflow-hidden"
               style={{
-                background: 'rgba(255,255,255,0.92)',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(226,232,240,0.8)',
-                boxShadow: `0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)`,
+                background: 'rgba(255,255,255,0.94)',
+                backdropFilter: 'blur(14px)',
+                border: '1px solid rgba(226,232,240,0.9)',
+                boxShadow: `0 10px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)`,
               }}
             >
-              {/* 左侧色条 */}
-              <div className="flex">
-                <div className="w-[3px] shrink-0 rounded-l-xl" style={{ background: accent }} />
-                <div className="px-3 py-2.5 min-w-0">
-                  {/* 类型 + 连接数 */}
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-semibold" style={{ color: accent }}>
-                      {node.colorScheme.label}
+              <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-slate-100">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-800 break-words">{link.name || '关系'}</div>
+                  <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                      layer: {layer}
                     </span>
-                    <span className="text-[9px] text-slate-400">
-                      {node.degree} 连接
-                    </span>
-                  </div>
-
-                  {/* entityType 标签 */}
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: node.colorScheme.bg, color: accent }}>
-                      {node.entityType}
-                    </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{
-                      background: (node.source || 'fact') === 'fact' ? 'rgba(16,185,129,0.1)' : (node.source || 'fact') === 'inferred' ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)',
-                      color: (node.source || 'fact') === 'fact' ? '#059669' : (node.source || 'fact') === 'inferred' ? '#d97706' : '#7c3aed',
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{
+                      background: sourceTag === 'fact' ? 'rgba(16,185,129,0.1)' : sourceTag === 'inferred' ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)',
+                      color: sourceTag === 'fact' ? '#059669' : sourceTag === 'inferred' ? '#d97706' : '#7c3aed',
                     }}>
-                      {(node.source || 'fact') === 'fact' ? '📄 事实' : (node.source || 'fact') === 'inferred' ? '💡 推断' : '🔗 模式'}
+                      source_tag: {sourceTag}
                     </span>
                   </div>
-
-                  {/* 名称 */}
-                  <div className="font-semibold text-slate-700 text-[11px] leading-tight break-words">
-                    {node.fullLabel}
+                  <div className="mt-1 text-[11px] text-slate-500 break-words">
+                    {sourceNode?.fullLabel || link.source} → {targetNode?.fullLabel || link.target}
                   </div>
+                </div>
+                <button
+                  onClick={() => setSelectedLinkId(null)}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                  title="关闭"
+                >
+                  <X size={14} />
+                </button>
+              </div>
 
-                  {/* 描述 */}
-                  {node.description && (
-                    <p className="text-[10px] text-slate-500 mt-1 leading-snug line-clamp-2">
-                      {node.description}
-                    </p>
+              <div className="px-4 py-3">
+                {link.description ? (
+                  <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{link.description}</div>
+                ) : (
+                  <div className="text-sm text-slate-400">暂无描述</div>
+                )}
+
+                <div className="mt-3 flex items-center gap-2">
+                  {sourceDocId && (
+                    <button
+                      onClick={() => {
+                        window.open(`/documents/${sourceDocId}`, '_blank');
+                      }}
+                      className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 flex items-center gap-2"
+                      title="打开来源文档"
+                    >
+                      <FileText size={14} />
+                      <span>打开来源文档</span>
+                    </button>
                   )}
+                  {sourceDocId && (
+                    <button
+                      onClick={() => {
+                        const doc = documents.find(d => d.id === sourceDocId);
+                        setIndexDrawerDocId(sourceDocId);
+                        setIndexDrawerDocTitle(doc?.title);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 flex items-center gap-2"
+                      title="查看索引"
+                    >
+                      <BookOpen size={14} />
+                      <span>索引</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (sourceNode?.fullLabel) setSearchQuery(sourceNode.fullLabel);
+                    }}
+                    disabled={!sourceNode}
+                    className={`ml-auto px-3 py-2 rounded-xl text-xs font-medium ${
+                      sourceNode ? 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
+                    title="按源节点搜索"
+                  >
+                    搜索源
+                  </button>
                 </div>
               </div>
             </div>

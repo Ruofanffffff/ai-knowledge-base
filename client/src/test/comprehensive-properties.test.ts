@@ -7,8 +7,7 @@
  * This file contains comprehensive property tests for the API migration.
  */
 
-import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, test, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -74,8 +73,6 @@ describe('Property 3: Component Data Fetching', () => {
    */
   test('data-displaying components should fetch data on mount', () => {
     const componentsDir = path.join(__dirname, '../pages');
-    const componentFiles = fs.readdirSync(componentsDir)
-      .filter(f => f.endsWith('.tsx') && !f.includes('.test.'));
 
     const dataComponents = ['Graph.tsx', 'DocumentsList.tsx', 'Chat.tsx', 'Dashboard.tsx'];
     const violations: string[] = [];

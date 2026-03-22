@@ -197,7 +197,7 @@ describe('Property 7: No Demo Data Functions', () => {
 
           // Find function declarations with demo/mock in name
           // But exclude common event handler patterns like "MouseDown"
-          const functionPattern = /(?:function|const)\s+(\w*(?:demo|mock)\w*)\s*[=\(]/gi;
+          const functionPattern = /(?:function|const)\s+(\w*(?:demo|mock)\w*)\s*[=(]/gi;
           let match;
 
           while ((match = functionPattern.exec(content)) !== null) {

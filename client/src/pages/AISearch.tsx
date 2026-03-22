@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Mic, Bot, User, FileText, Sparkles, Clock, Link, Database, Plus, Trash2, MessageSquare, ChevronDown, ChevronRight, ChevronUp, BarChart3 } from 'lucide-react';
+import { Send, Mic, Bot, User, FileText, Sparkles, Clock, Link, Database, Plus, Trash2, MessageSquare, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import apiClient from '../api/client';
 import { getAccessToken } from '../utils/storage';
@@ -58,8 +58,6 @@ interface AISearchProps {
 
 const StatsCard = ({ documentCount, knowledgeNodeCount, isLoading }: { documentCount: number; knowledgeNodeCount: number; isLoading: boolean }) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const maxNodes = 100;
-  const nodePercentage = Math.min((knowledgeNodeCount / maxNodes) * 100, 100);
   
   const generateBars = () => {
     const bars = [];
@@ -162,7 +160,7 @@ const StatsCard = ({ documentCount, knowledgeNodeCount, isLoading }: { documentC
 
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 
-export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingStats = false, recentDocs = [] }: AISearchProps) {
+export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingStats = false, recentDocs: _recentDocs = [] }: AISearchProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -444,7 +442,7 @@ export function AISearch({ documentCount = 0, knowledgeNodeCount = 0, isLoadingS
       let finalSources: any[] = [];
       let finalWebSources: any[] = [];
       
-      while (true) {
+      for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         

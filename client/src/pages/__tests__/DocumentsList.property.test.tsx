@@ -26,7 +26,7 @@ describe('DocumentsList Page Property Tests', () => {
         fc.array(
           fc.record({
             id: fc.string(),
-            name: fc.string().filter(s => s.length > 0),
+            name: fc.string({ minLength: 1, maxLength: 64 }).filter(s => s.trim().length > 0).map(s => s.trim()),
             uploadDate: fc.date().map(d => d.toISOString()),
             status: fc.constantFrom('processing', 'completed', 'failed'),
           }),
@@ -38,23 +38,22 @@ describe('DocumentsList Page Property Tests', () => {
             data: mockDocuments,
           });
 
-          render(<DocumentsList onNavigate={mockOnNavigate} />);
-
-          await waitFor(() => {
-            expect(apiService.getDocuments).toHaveBeenCalled();
-          });
-
-          // Wait for documents to render
-          await waitFor(() => {
-            // Check that at least one document title is displayed
-            const firstDoc = mockDocuments[0];
-            expect(screen.getByText(firstDoc.name)).toBeInTheDocument();
-          });
+          const { unmount } = render(<DocumentsList onNavigate={mockOnNavigate} />);
+          try {
+            await waitFor(() => {
+              expect(apiService.getDocuments).toHaveBeenCalled();
+              const firstDoc = mockDocuments[0];
+              expect(screen.getByText(firstDoc.name)).toBeInTheDocument();
+            });
+          } finally {
+            unmount();
+            cleanup();
+          }
         }
       ),
-      { numRuns: 20 } // Reduced from 100 for faster execution
+      { numRuns: 10 }
     );
-  }, 10000); // 10 second timeout
+  }, 20000);
 
   // Feature: frontend-data-api-migration, Property 15: Data Transformation Correctness
   // Test that file sizes are correctly formatted

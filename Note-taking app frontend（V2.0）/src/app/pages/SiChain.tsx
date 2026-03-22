@@ -2,11 +2,23 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { GitBranch, X, ZoomIn, ZoomOut, RotateCcw, ChevronRight, FileText, Tag, Check, Sparkles } from 'lucide-react';
+import { GitBranch, X, ZoomIn, ZoomOut, RotateCcw, ChevronRight, FileText, Tag, Check, Sparkles, Search, MapPin, Layers } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { useNotes, Note } from '../components/context/NoteContext';
 import { api } from '../services/api';
+import { documentsLibraryService, type LibraryDocument } from '../services/documentsLibraryService';
+import { reportTelemetryEvent } from '../services/telemetryService';
+import {
+  normalizeGraphDTOv1,
+  type GraphDTOv1Normalized,
+  computeMatchedNodeIds,
+  computeDimmedNodeIds,
+  getEntityTypeSemantic,
+  getLayerSemantic,
+  getSourceTagSemantic,
+  getFeatureFlag,
+} from 'graph-core';
 
 // ── Graph-gen signal (written by NoteCreate after save) ─────────────
 const GG_KEY = 'hi_graph_gen';
@@ -491,6 +503,9 @@ interface GraphNode {
   tags: string[];
   isTag?: boolean;
   noteCount?: number;
+  description?: string;
+  entityType?: string;
+  source?: string;
 }
 
 interface GraphEdge {
@@ -499,6 +514,10 @@ interface GraphEdge {
   weight: number;
   color: string;
   label: string;   // relationship name shown on edge
+  id?: string;
+  description?: string;
+  layer?: string;
+  source_tag?: string;
 }
 
 interface BackendKgEntity {
@@ -1504,7 +1523,878 @@ function StatusBar() {
   );
 }
 
-export function SiChain() {
+function readFeatureFlag(key: string, defaultValue: boolean) {
+  try {
+    return getFeatureFlag(
+      { getItem: (k) => localStorage.getItem(k) },
+      key as any
+    );
+  } catch {
+    return defaultValue;
+  }
+}
+
+function extractGraphPayload(respData: any) {
+  if (!respData) return null;
+  if (respData.data && typeof respData.data === 'object') {
+    if (respData.data.entities || respData.data.relations) return respData.data;
+    if (respData.data.data && typeof respData.data.data === 'object') return respData.data.data;
+  }
+  return respData;
+}
+
+type V1Selection =
+  | { kind: 'entity'; id: string }
+  | { kind: 'relation'; id: string };
+
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
+}
+
+function distancePointToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number) {
+  const vx = bx - ax;
+  const vy = by - ay;
+  const wx = px - ax;
+  const wy = py - ay;
+  const c1 = vx * wx + vy * wy;
+  if (c1 <= 0) return Math.hypot(px - ax, py - ay);
+  const c2 = vx * vx + vy * vy;
+  if (c2 <= c1) return Math.hypot(px - bx, py - by);
+  const t = c1 / c2;
+  const ix = ax + t * vx;
+  const iy = ay + t * vy;
+  return Math.hypot(px - ix, py - iy);
+}
+
+function buildGraphDTOv1(
+  graph: GraphDTOv1Normalized,
+  W: number,
+  H: number
+) {
+  const nodes: GraphNode[] = [];
+  const edges: GraphEdge[] = [];
+
+  const byId = new Map<string, number>();
+  const cx = W / 2;
+  const cy = H / 2;
+  const radius = Math.min(W, H) * 0.32;
+
+  const entities = Array.isArray(graph.entities) ? graph.entities : [];
+  const relations = Array.isArray(graph.relations) ? graph.relations : [];
+
+  entities.forEach((e, i) => {
+    const sem = getEntityTypeSemantic(e.entityType);
+    const a = (i / Math.max(1, entities.length)) * Math.PI * 2 - Math.PI / 2;
+    const x = cx + Math.cos(a) * radius;
+    const y = cy + Math.sin(a) * radius;
+    byId.set(e.id, nodes.length);
+    nodes.push({
+      id: e.id,
+      label: e.name || e.id,
+      description: e.description,
+      entityType: e.entityType,
+      source: e.source,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      fx: 0,
+      fy: 0,
+      color: sem.fill,
+      r: 18,
+      tags: [],
+    });
+  });
+
+  relations.forEach((r) => {
+    const si = byId.get(r.source);
+    const ti = byId.get(r.target);
+    if (si === undefined || ti === undefined) return;
+    const sem = getSourceTagSemantic(r.source_tag);
+    edges.push({
+      id: r.id,
+      sourceIdx: si,
+      targetIdx: ti,
+      weight: 1,
+      color: sem.color,
+      label: r.name,
+      description: r.description,
+      layer: r.layer,
+      source_tag: r.source_tag,
+    });
+  });
+
+  const degree = new Array(nodes.length).fill(0);
+  edges.forEach((e) => {
+    degree[e.sourceIdx]++;
+    degree[e.targetIdx]++;
+  });
+  nodes.forEach((n, i) => {
+    n.r = clamp(16 + degree[i] * 2.2, 14, 34);
+  });
+
+  return { nodes, edges };
+}
+
+function GraphDTOv1Canvas({
+  graph,
+  query,
+  selected,
+  onSelect,
+  centerRequestId,
+  onCentered,
+}: {
+  graph: GraphDTOv1Normalized | null;
+  query: string;
+  selected: V1Selection | null;
+  onSelect: (sel: V1Selection | null) => void;
+  centerRequestId: string | null;
+  onCentered: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const nodesRef = useRef<GraphNode[]>([]);
+  const edgesRef = useRef<GraphEdge[]>([]);
+  const animRef = useRef<number>(0);
+  const frameRef = useRef(0);
+  const [size, setSize] = useState({ w: 380, h: 520 });
+  const [zoom, setZoom] = useState(1);
+  const transformRef = useRef({ scale: 1, tx: 0, ty: 0 });
+
+  const gestureRef = useRef<{
+    mode: 'idle' | 'pan' | 'pinch' | 'dragNode';
+    startX: number;
+    startY: number;
+    startTx: number;
+    startTy: number;
+    startScale: number;
+    moved: boolean;
+    downTs: number;
+    longPressTimer: ReturnType<typeof setTimeout> | null;
+    dragIdx: number | null;
+    pinchStartDist: number;
+    pinchWorldX: number;
+    pinchWorldY: number;
+    pinchCenterX: number;
+    pinchCenterY: number;
+  }>({
+    mode: 'idle',
+    startX: 0,
+    startY: 0,
+    startTx: 0,
+    startTy: 0,
+    startScale: 1,
+    moved: false,
+    downTs: 0,
+    longPressTimer: null,
+    dragIdx: null,
+    pinchStartDist: 0,
+    pinchWorldX: 0,
+    pinchWorldY: 0,
+    pinchCenterX: 0,
+    pinchCenterY: 0,
+  });
+
+  const allNodeIds = useMemo(() => (graph?.entities ?? []).map((e) => e.id), [graph]);
+
+  const matchedNodeIds = useMemo(() => {
+    if (!graph) return null;
+    return computeMatchedNodeIds(
+      graph.entities.map((e) => ({ id: e.id, name: e.name, description: e.description })),
+      query
+    );
+  }, [graph, query]);
+
+  const dimmedNodeIds = useMemo(() => {
+    if (!graph) return null;
+    return computeDimmedNodeIds(allNodeIds, matchedNodeIds, null);
+  }, [allNodeIds, matchedNodeIds, graph]);
+
+  const toWorld = useCallback((sx: number, sy: number) => {
+    const t = transformRef.current;
+    return { x: (sx - t.tx) / t.scale, y: (sy - t.ty) / t.scale };
+  }, []);
+
+  const findNodeAtWorld = useCallback((wx: number, wy: number) => {
+    const nodes = nodesRef.current;
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const n = nodes[i];
+      if (Math.hypot(n.x - wx, n.y - wy) <= n.r + 6) return i;
+    }
+    return -1;
+  }, []);
+
+  const findEdgeAtWorld = useCallback((wx: number, wy: number) => {
+    const nodes = nodesRef.current;
+    const edges = edgesRef.current;
+    const threshold = 10 / Math.max(0.35, transformRef.current.scale);
+    for (let i = edges.length - 1; i >= 0; i--) {
+      const e = edges[i];
+      const a = nodes[e.sourceIdx];
+      const b = nodes[e.targetIdx];
+      if (!a || !b) continue;
+      if (distancePointToSegment(wx, wy, a.x, a.y, b.x, b.y) <= threshold) return i;
+    }
+    return -1;
+  }, []);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = size.w;
+    const H = size.h;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    const isDarkCanvas = document.documentElement.getAttribute('data-theme') === 'dark';
+    ctx.fillStyle = isDarkCanvas ? 'rgba(20,18,40,0.75)' : 'rgba(255,255,255,0.75)';
+    ctx.fillRect(0, 0, W, H);
+
+    const t = transformRef.current;
+    ctx.setTransform(dpr * t.scale, 0, 0, dpr * t.scale, dpr * t.tx, dpr * t.ty);
+
+    const nodes = nodesRef.current;
+    const edges = edgesRef.current;
+
+    edges.forEach((e) => {
+      const a = nodes[e.sourceIdx];
+      const b = nodes[e.targetIdx];
+      if (!a || !b) return;
+      const edgeSelected = selected?.kind === 'relation' && selected.id === e.id;
+      const dimA = dimmedNodeIds?.has(a.id) ?? false;
+      const dimB = dimmedNodeIds?.has(b.id) ?? false;
+      const dim = dimA || dimB;
+      ctx.save();
+      if (dim) ctx.globalAlpha = 0.12;
+      const layerSem = getLayerSemantic(e.layer);
+      if (layerSem.dash) ctx.setLineDash(layerSem.dash.split(' ').map((n) => Number(n) || 0));
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = `${e.color}${edgeSelected ? 'CC' : '55'}`;
+      ctx.lineWidth = edgeSelected ? 3.2 : 2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    });
+
+    edges.forEach((e) => {
+      const a = nodes[e.sourceIdx];
+      const b = nodes[e.targetIdx];
+      if (!a || !b || !e.label) return;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const edgeLen = Math.hypot(dx, dy);
+      if (edgeLen < 70) return;
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      ctx.save();
+      const dimA = dimmedNodeIds?.has(a.id) ?? false;
+      const dimB = dimmedNodeIds?.has(b.id) ?? false;
+      if (dimA || dimB) ctx.globalAlpha = 0.12;
+      ctx.font = '600 9px -apple-system, sans-serif';
+      const tw = ctx.measureText(e.label).width;
+      const pw = tw + 10;
+      const ph = 14;
+      drawRoundRect(ctx, mx - pw / 2, my - ph / 2, pw, ph, 7);
+      ctx.fillStyle = isDarkCanvas ? 'rgba(15,14,26,0.72)' : 'rgba(255,255,255,0.78)';
+      ctx.fill();
+      ctx.strokeStyle = `${e.color}55`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = e.color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(e.label, mx, my);
+      ctx.restore();
+    });
+
+    nodes.forEach((n) => {
+      const selectedNode = selected?.kind === 'entity' && selected.id === n.id;
+      const dim = dimmedNodeIds?.has(n.id) ?? false;
+      const match = matchedNodeIds?.has(n.id) ?? false;
+      ctx.save();
+      if (dim) ctx.globalAlpha = 0.15;
+
+      const glowR = n.r * (selectedNode ? 2.9 : match ? 2.6 : 2.2);
+      const glow = ctx.createRadialGradient(n.x, n.y, n.r * 0.3, n.x, n.y, glowR);
+      glow.addColorStop(0, `${n.color}${selectedNode ? '55' : match ? '3A' : '22'}`);
+      glow.addColorStop(1, `${n.color}00`);
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, glowR, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(n.x - n.r * 0.28, n.y - n.r * 0.28, 0, n.x, n.y, n.r);
+      grad.addColorStop(0, `${n.color}FF`);
+      grad.addColorStop(1, `${n.color}B0`);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.strokeStyle = selectedNode ? 'rgba(255,255,255,0.95)' : `${n.color}FF`;
+      ctx.lineWidth = selectedNode ? 3 : 1.6;
+      ctx.stroke();
+
+      const fontSize = clamp(n.r * 0.55, 8, 13);
+      ctx.font = `800 ${fontSize}px -apple-system, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const maxW = n.r * 1.7;
+      let lbl = n.label;
+      if (ctx.measureText(lbl).width > maxW) {
+        while (ctx.measureText(lbl + '…').width > maxW && lbl.length > 2) lbl = lbl.slice(0, -1);
+        lbl += '…';
+      }
+      ctx.shadowColor = 'rgba(0,0,0,0.35)';
+      ctx.shadowBlur = 3;
+      ctx.fillStyle = 'white';
+      ctx.fillText(lbl, n.x, n.y);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    });
+  }, [dimmedNodeIds, matchedNodeIds, query, selected, size.h, size.w]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (!rect) return;
+      const w = clamp(Math.floor(rect.width), 300, 720);
+      const h = clamp(Math.floor(rect.height), 420, 720);
+      setSize({ w, h });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size.w * dpr;
+    canvas.height = size.h * dpr;
+    draw();
+  }, [draw, size.h, size.w]);
+
+  useEffect(() => {
+    if (!graph) {
+      nodesRef.current = [];
+      edgesRef.current = [];
+      frameRef.current = 0;
+      draw();
+      return;
+    }
+
+    const W = size.w;
+    const H = size.h;
+    const { nodes, edges } = buildGraphDTOv1(graph, W, H);
+    nodesRef.current = nodes;
+    edgesRef.current = edges;
+    frameRef.current = 0;
+
+    transformRef.current = { scale: 1, tx: 0, ty: 0 };
+    setZoom(1);
+
+    const animate = () => {
+      if (frameRef.current < 70) {
+        runSimulation(nodesRef.current, edgesRef.current, W, H, 2);
+        frameRef.current++;
+      }
+      draw();
+      animRef.current = requestAnimationFrame(animate);
+    };
+
+    cancelAnimationFrame(animRef.current);
+    animRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [draw, graph, size.h, size.w]);
+
+  useEffect(() => {
+    if (!centerRequestId) return;
+    const idx = nodesRef.current.findIndex((n) => n.id === centerRequestId);
+    if (idx < 0) return;
+    const n = nodesRef.current[idx];
+    const t = transformRef.current;
+    const tx = size.w / 2 - n.x * t.scale;
+    const ty = size.h / 2 - n.y * t.scale;
+    transformRef.current = { ...t, tx, ty };
+    draw();
+    onCentered();
+  }, [centerRequestId, draw, onCentered, size.h, size.w]);
+
+  const handleTapAt = useCallback((sx: number, sy: number) => {
+    const w = toWorld(sx, sy);
+    const nodeIdx = findNodeAtWorld(w.x, w.y);
+    if (nodeIdx >= 0) {
+      const node = nodesRef.current[nodeIdx];
+      if (node) onSelect({ kind: 'entity', id: node.id });
+      return;
+    }
+    const edgeIdx = findEdgeAtWorld(w.x, w.y);
+    if (edgeIdx >= 0) {
+      const edge = edgesRef.current[edgeIdx];
+      if (edge?.id) onSelect({ kind: 'relation', id: edge.id });
+      return;
+    }
+    onSelect(null);
+  }, [findEdgeAtWorld, findNodeAtWorld, onSelect, toWorld]);
+
+  const onTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const g = gestureRef.current;
+    if (g.longPressTimer) {
+      clearTimeout(g.longPressTimer);
+      g.longPressTimer = null;
+    }
+
+    if (e.touches.length === 2) {
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      const x0 = t0.clientX - rect.left;
+      const y0 = t0.clientY - rect.top;
+      const x1 = t1.clientX - rect.left;
+      const y1 = t1.clientY - rect.top;
+      const cx = (x0 + x1) / 2;
+      const cy = (y0 + y1) / 2;
+      const dist = Math.hypot(x1 - x0, y1 - y0);
+      const t = transformRef.current;
+      const world = toWorld(cx, cy);
+      g.mode = 'pinch';
+      g.startScale = t.scale;
+      g.startTx = t.tx;
+      g.startTy = t.ty;
+      g.pinchStartDist = dist;
+      g.pinchWorldX = world.x;
+      g.pinchWorldY = world.y;
+      g.pinchCenterX = cx;
+      g.pinchCenterY = cy;
+      g.moved = false;
+      e.preventDefault();
+      return;
+    }
+
+    if (e.touches.length !== 1) return;
+    const t0 = e.touches[0];
+    const sx = t0.clientX - rect.left;
+    const sy = t0.clientY - rect.top;
+    const tr = transformRef.current;
+    g.mode = 'pan';
+    g.startX = sx;
+    g.startY = sy;
+    g.startTx = tr.tx;
+    g.startTy = tr.ty;
+    g.startScale = tr.scale;
+    g.moved = false;
+    g.downTs = Date.now();
+    g.dragIdx = null;
+
+    const w = toWorld(sx, sy);
+    const hitIdx = findNodeAtWorld(w.x, w.y);
+    if (hitIdx >= 0) {
+      g.longPressTimer = setTimeout(() => {
+        const gg = gestureRef.current;
+        if (gg.moved) return;
+        gg.mode = 'dragNode';
+        gg.dragIdx = hitIdx;
+      }, 380);
+    }
+    e.preventDefault();
+  }, [findNodeAtWorld, toWorld]);
+
+  const onTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const g = gestureRef.current;
+
+    if (g.mode === 'pinch' && e.touches.length === 2) {
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      const x0 = t0.clientX - rect.left;
+      const y0 = t0.clientY - rect.top;
+      const x1 = t1.clientX - rect.left;
+      const y1 = t1.clientY - rect.top;
+      const cx = (x0 + x1) / 2;
+      const cy = (y0 + y1) / 2;
+      const dist = Math.hypot(x1 - x0, y1 - y0);
+      const nextScale = clamp(g.startScale * (dist / Math.max(1, g.pinchStartDist)), 0.35, 2.6);
+      const tx = cx - g.pinchWorldX * nextScale;
+      const ty = cy - g.pinchWorldY * nextScale;
+      transformRef.current = { scale: nextScale, tx, ty };
+      setZoom(nextScale);
+      g.moved = true;
+      draw();
+      e.preventDefault();
+      return;
+    }
+
+    if (e.touches.length !== 1) return;
+    const t0 = e.touches[0];
+    const sx = t0.clientX - rect.left;
+    const sy = t0.clientY - rect.top;
+
+    if (g.longPressTimer) {
+      const dx0 = sx - g.startX;
+      const dy0 = sy - g.startY;
+      if (Math.hypot(dx0, dy0) > 8) {
+        clearTimeout(g.longPressTimer);
+        g.longPressTimer = null;
+      }
+    }
+
+    if (g.mode === 'dragNode' && g.dragIdx !== null) {
+      const w = toWorld(sx, sy);
+      const node = nodesRef.current[g.dragIdx];
+      if (node) {
+        node.x = clamp(w.x, node.r + 5, size.w - node.r - 5);
+        node.y = clamp(w.y, node.r + 5, size.h - node.r - 5);
+        node.vx = 0;
+        node.vy = 0;
+      }
+      g.moved = true;
+      draw();
+      e.preventDefault();
+      return;
+    }
+
+    if (g.mode === 'pan') {
+      const dx = sx - g.startX;
+      const dy = sy - g.startY;
+      if (Math.hypot(dx, dy) > 6) g.moved = true;
+      transformRef.current = { ...transformRef.current, tx: g.startTx + dx, ty: g.startTy + dy };
+      draw();
+      e.preventDefault();
+    }
+  }, [draw, size.h, size.w, toWorld]);
+
+  const onTouchEnd = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const g = gestureRef.current;
+    if (g.longPressTimer) {
+      clearTimeout(g.longPressTimer);
+      g.longPressTimer = null;
+    }
+    if ((g.mode === 'pan' || g.mode === 'dragNode') && !g.moved) {
+      const t0 = (e.changedTouches && e.changedTouches[0]) || null;
+      if (t0) {
+        const sx = t0.clientX - rect.left;
+        const sy = t0.clientY - rect.top;
+        handleTapAt(sx, sy);
+      }
+    }
+    g.mode = 'idle';
+    g.dragIdx = null;
+  }, [handleTapAt]);
+
+  const onMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const w = toWorld(sx, sy);
+    const hitIdx = findNodeAtWorld(w.x, w.y);
+    const g = gestureRef.current;
+    g.mode = hitIdx >= 0 ? 'dragNode' : 'pan';
+    g.dragIdx = hitIdx >= 0 ? hitIdx : null;
+    g.startX = sx;
+    g.startY = sy;
+    g.startTx = transformRef.current.tx;
+    g.startTy = transformRef.current.ty;
+    g.startScale = transformRef.current.scale;
+    g.moved = false;
+    e.preventDefault();
+  }, [findNodeAtWorld, toWorld]);
+
+  const onMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const g = gestureRef.current;
+    if (g.mode === 'idle') return;
+    if (g.mode === 'pan') {
+      const dx = sx - g.startX;
+      const dy = sy - g.startY;
+      if (Math.hypot(dx, dy) > 3) g.moved = true;
+      transformRef.current = { ...transformRef.current, tx: g.startTx + dx, ty: g.startTy + dy };
+      draw();
+      return;
+    }
+    if (g.mode === 'dragNode' && g.dragIdx !== null) {
+      const w = toWorld(sx, sy);
+      const node = nodesRef.current[g.dragIdx];
+      if (node) {
+        node.x = clamp(w.x, node.r + 5, size.w - node.r - 5);
+        node.y = clamp(w.y, node.r + 5, size.h - node.r - 5);
+        node.vx = 0;
+        node.vy = 0;
+      }
+      g.moved = true;
+      draw();
+    }
+  }, [draw, size.h, size.w, toWorld]);
+
+  const onMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const g = gestureRef.current;
+    if (!g.moved) handleTapAt(sx, sy);
+    g.mode = 'idle';
+    g.dragIdx = null;
+  }, [handleTapAt]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full overflow-hidden rounded-3xl"
+      style={{
+        height: 520,
+        background: 'var(--hi-card-bg)',
+        border: '1px solid var(--hi-card-border)',
+        boxShadow: 'var(--hi-card-shadow)',
+      }}
+    >
+      <canvas
+        ref={canvasRef}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        style={{
+          width: '100%',
+          height: '100%',
+          touchAction: 'none',
+          display: 'block',
+        }}
+      />
+      <div className="absolute bottom-3 right-3 flex flex-col gap-1.5">
+        <button
+          onClick={() => {
+            const t = transformRef.current;
+            const nextScale = clamp(t.scale + 0.2, 0.35, 2.6);
+            transformRef.current = { ...t, scale: nextScale, tx: size.w / 2 - (size.w / 2 - t.tx) * (nextScale / t.scale), ty: size.h / 2 - (size.h / 2 - t.ty) * (nextScale / t.scale) };
+            setZoom(nextScale);
+            draw();
+          }}
+          className="w-8 h-8 rounded-xl flex items-center justify-center"
+          style={{ background: 'var(--hi-chip-bg)', border: '1px solid rgba(99,102,241,0.2)' }}
+        >
+          <ZoomIn size={14} style={{ color: '#6366F1' }} />
+        </button>
+        <button
+          onClick={() => {
+            const t = transformRef.current;
+            const nextScale = clamp(t.scale - 0.2, 0.35, 2.6);
+            transformRef.current = { ...t, scale: nextScale, tx: size.w / 2 - (size.w / 2 - t.tx) * (nextScale / t.scale), ty: size.h / 2 - (size.h / 2 - t.ty) * (nextScale / t.scale) };
+            setZoom(nextScale);
+            draw();
+          }}
+          className="w-8 h-8 rounded-xl flex items-center justify-center"
+          style={{ background: 'var(--hi-chip-bg)', border: '1px solid rgba(99,102,241,0.2)' }}
+        >
+          <ZoomOut size={14} style={{ color: '#6366F1' }} />
+        </button>
+        <motion.button
+          onClick={() => {
+            transformRef.current = { scale: 1, tx: 0, ty: 0 };
+            setZoom(1);
+            draw();
+          }}
+          whileTap={{ scale: 0.88 }}
+          className="w-8 h-8 rounded-xl flex items-center justify-center"
+          style={{ background: zoom !== 1 ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'var(--hi-chip-bg)', border: '1px solid rgba(99,102,241,0.2)' }}
+        >
+          <RotateCcw size={13} style={{ color: zoom !== 1 ? 'white' : '#6366F1' }} />
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+
+function GraphDTOv1DetailSheet({
+  graph,
+  selection,
+  onClose,
+}: {
+  graph: GraphDTOv1Normalized | null;
+  selection: V1Selection | null;
+  onClose: () => void;
+}) {
+  const entity = useMemo(() => {
+    if (!graph || selection?.kind !== 'entity') return null;
+    return graph.entities.find((e) => e.id === selection.id) ?? null;
+  }, [graph, selection]);
+
+  const relation = useMemo(() => {
+    if (!graph || selection?.kind !== 'relation') return null;
+    return graph.relations.find((r) => r.id === selection.id) ?? null;
+  }, [graph, selection]);
+
+  if (!selection || (!entity && !relation)) return null;
+
+  const title = entity ? entity.name : relation ? relation.name : '';
+  const subtitle = entity ? '实体节点' : '关系边';
+  const chips: Array<{ label: string; value: string; color: string; bg: string }> = [];
+  if (entity) {
+    const es = getEntityTypeSemantic(entity.entityType);
+    const ss = getSourceTagSemantic(entity.source);
+    chips.push({ label: 'entityType', value: es.label, color: es.fill, bg: es.bg });
+    chips.push({ label: 'source', value: ss.label, color: ss.color, bg: ss.bg });
+  }
+  if (relation) {
+    const ls = getLayerSemantic(relation.layer);
+    const ss = getSourceTagSemantic(relation.source_tag);
+    chips.push({ label: 'layer', value: ls.label, color: '#6366F1', bg: 'rgba(99,102,241,0.10)' });
+    chips.push({ label: 'source_tag', value: ss.label, color: ss.color, bg: ss.bg });
+  }
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-40 flex items-end justify-center"
+        style={{ background: 'rgba(30,27,75,0.35)', backdropFilter: 'blur(6px)' }}
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ y: 60, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 60, opacity: 0 }}
+          transition={{ type: 'spring', damping: 26 }}
+          className="w-full max-w-lg mx-3 mb-24 rounded-3xl overflow-hidden"
+          style={{ background: 'var(--hi-sheet-bg)', backdropFilter: 'blur(20px)' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-5">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <p style={{ color: '#9CA3AF', fontSize: '11px', fontWeight: 700 }}>{subtitle}</p>
+                <p style={{ color: 'var(--hi-text-primary)', fontSize: '17px', fontWeight: 900, marginTop: 2 }}>
+                  {title}
+                </p>
+              </div>
+              <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.08)' }}>
+                <X size={14} style={{ color: '#6366F1' }} />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {chips.map((c) => (
+                <div key={c.label} className="px-2 py-1 rounded-full" style={{ background: c.bg, border: `1px solid ${c.color}33` }}>
+                  <span style={{ color: c.color, fontSize: '10px', fontWeight: 800 }}>{c.label}</span>
+                  <span style={{ color: c.color, fontSize: '10px', fontWeight: 700, marginLeft: 6 }}>{c.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <p style={{ color: '#4B5563', fontSize: '13.5px', lineHeight: 1.7 }} className="whitespace-pre-wrap">
+              {(entity?.description || relation?.description || '').trim() || '暂无描述'}
+            </p>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function GraphDTOv1Legend({
+  open,
+  onToggle,
+}: {
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const layers = (['how', 'why'] as const).map((k) => ({ k, ...getLayerSemantic(k) }));
+  const sources = (['fact', 'inferred', 'pattern'] as const).map((k) => ({ k, ...getSourceTagSemantic(k) }));
+
+  return (
+    <div className="mx-3 mt-3 rounded-2xl overflow-hidden" style={{ background: 'var(--hi-card-bg)', backdropFilter: 'blur(12px)', border: '1px solid var(--hi-card-border)' }}>
+      <motion.button
+        className="w-full px-4 pt-4 pb-3 flex items-center justify-between"
+        style={{ borderBottom: open ? '1px solid rgba(99,102,241,0.07)' : 'none' }}
+        onClick={onToggle}
+        whileTap={{ scale: 0.98 }}
+      >
+        <div className="text-left">
+          <p style={{ color: '#9CA3AF', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>图例</p>
+          <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 800, marginTop: '1px' }}>layer / source_tag 语义</p>
+        </div>
+        <div className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(99,102,241,0.08)' }}>
+          <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 4L6 8L10 4" stroke="#6366F1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </motion.div>
+        </div>
+      </motion.button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="v1-legend"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="px-4 pt-3 pb-3.5" style={{ borderBottom: '1px solid rgba(99,102,241,0.06)' }}>
+              <p style={{ color: '#9CA3AF', fontSize: '9.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>layer</p>
+              <div className="grid grid-cols-2 gap-2">
+                {layers.map((l) => (
+                  <div key={l.k} className="p-3 rounded-xl" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-2 rounded-full" style={{ background: '#6366F1' }} />
+                      <span style={{ color: 'var(--hi-text-primary)', fontSize: '11.5px', fontWeight: 800 }}>{l.label}</span>
+                    </div>
+                    <p style={{ color: '#9CA3AF', fontSize: '10px', marginTop: 6 }}>{l.k}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="px-4 pt-3 pb-4">
+              <p style={{ color: '#9CA3AF', fontSize: '9.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>source_tag</p>
+              <div className="grid grid-cols-3 gap-2">
+                {sources.map((s) => (
+                  <div key={s.k} className="p-3 rounded-xl" style={{ background: s.bg, border: `1px solid ${s.color}22` }}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
+                      <span style={{ color: s.color, fontSize: '11.5px', fontWeight: 900 }}>{s.label}</span>
+                    </div>
+                    <p style={{ color: s.color, fontSize: '10px', marginTop: 6, opacity: 0.8 }}>{s.k}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function LegacySiChain() {
   const navigate = useNavigate();
   const { notes } = useNotes();
   const [noteEntityMap, setNoteEntityMap] = useState<Record<string, string[]>>({});
@@ -2151,6 +3041,849 @@ export function SiChain() {
           info={graphGenInfo}
           onDone={() => setGraphGenInfo(null)}
         />
+      )}
+    </div>
+  );
+}
+
+export function SiChain() {
+  const navigate = useNavigate();
+  const { notes } = useNotes();
+
+  const noteTabEnabled = readFeatureFlag('ff_sichain_note_tab_enabled', true);
+  const unifiedDefault = readFeatureFlag('ff_sichain_unified_doc_default', true);
+
+  const [mainTab, setMainTab] = useState<'unified' | 'doc' | 'note'>(() => {
+    if (unifiedDefault) return 'unified';
+    return noteTabEnabled ? 'note' : 'unified';
+  });
+
+  useEffect(() => {
+    if (!noteTabEnabled && mainTab === 'note') setMainTab('unified');
+  }, [mainTab, noteTabEnabled]);
+
+  const [graphGenInfo, setGraphGenInfo] = useState<GraphGenInfo | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(GG_KEY);
+      if (!raw) return;
+      const info: GraphGenInfo = JSON.parse(raw);
+      if (Date.now() - info.ts < 15000) setGraphGenInfo(info);
+      localStorage.removeItem(GG_KEY);
+    } catch {}
+  }, []);
+
+  const [unifiedGraph, setUnifiedGraph] = useState<GraphDTOv1Normalized | null>(null);
+  const [unifiedLoading, setUnifiedLoading] = useState(false);
+  const [unifiedError, setUnifiedError] = useState<string | null>(null);
+  const [unifiedQuery, setUnifiedQuery] = useState('');
+  const [unifiedSelection, setUnifiedSelection] = useState<V1Selection | null>(null);
+  const [unifiedLegendOpen, setUnifiedLegendOpen] = useState(false);
+  const [unifiedCenterReq, setUnifiedCenterReq] = useState<string | null>(null);
+
+  const loadUnified = useCallback(async (force?: boolean) => {
+    if (unifiedLoading) return;
+    if (unifiedGraph && !force) return;
+    setUnifiedLoading(true);
+    setUnifiedError(null);
+    const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    try {
+      const resp = await api.get('/kg/unified/graph');
+      const payload = extractGraphPayload(resp.data);
+      setUnifiedGraph(normalizeGraphDTOv1(payload ?? {}));
+    } catch (e) {
+      setUnifiedGraph(null);
+      setUnifiedError(e instanceof Error ? e.message : '加载失败');
+      await reportTelemetryEvent({
+        name: 'sichain_mobile_graph_fetch_failed',
+        data: { endpoint: '/kg/unified/graph', message: e instanceof Error ? e.message : String(e) },
+      });
+    } finally {
+      const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt;
+      if (elapsed > 4000) {
+        await reportTelemetryEvent({
+          name: 'sichain_mobile_graph_fetch_slow',
+          data: { endpoint: '/kg/unified/graph', elapsedMs: Math.round(elapsed) },
+        });
+      }
+      setUnifiedLoading(false);
+    }
+  }, [unifiedGraph, unifiedLoading]);
+
+  useEffect(() => {
+    if (mainTab !== 'unified') return;
+    loadUnified(false);
+  }, [loadUnified, mainTab]);
+
+  const unifiedMatches = useMemo(() => {
+    if (!unifiedGraph) return [];
+    const set = computeMatchedNodeIds(
+      unifiedGraph.entities.map((e) => ({ id: e.id, name: e.name, description: e.description })),
+      unifiedQuery
+    );
+    if (!set || set.size === 0) return [];
+    return unifiedGraph.entities.filter((e) => set.has(e.id)).slice(0, 8);
+  }, [unifiedGraph, unifiedQuery]);
+
+  const [documents, setDocuments] = useState<LibraryDocument[]>([]);
+  const [documentsLoaded, setDocumentsLoaded] = useState(false);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [docPickerOpen, setDocPickerOpen] = useState(false);
+  const [docPickerQuery, setDocPickerQuery] = useState('');
+  const [selectedDocId, setSelectedDocId] = useState('');
+
+  const [docGraphMap, setDocGraphMap] = useState<Record<string, GraphDTOv1Normalized>>({});
+  const [docErrorMap, setDocErrorMap] = useState<Record<string, string>>({});
+  const [docLoadingId, setDocLoadingId] = useState<string | null>(null);
+  const [docQuery, setDocQuery] = useState('');
+  const [docSelection, setDocSelection] = useState<V1Selection | null>(null);
+  const [docLegendOpen, setDocLegendOpen] = useState(false);
+  const [docCenterReq, setDocCenterReq] = useState<string | null>(null);
+
+  const selectedDoc = useMemo(() => {
+    if (!selectedDocId) return null;
+    return documents.find((d) => String(d.id) === String(selectedDocId)) ?? null;
+  }, [documents, selectedDocId]);
+
+  const docGraph = selectedDocId ? (docGraphMap[selectedDocId] ?? null) : null;
+  const docError = selectedDocId ? (docErrorMap[selectedDocId] ?? null) : null;
+  const docLoading = Boolean(selectedDocId && docLoadingId === selectedDocId);
+
+  const loadDocuments = useCallback(async () => {
+    if (documentsLoading || documentsLoaded) return;
+    setDocumentsLoading(true);
+    try {
+      const rows = await documentsLibraryService.list();
+      setDocuments(Array.isArray(rows) ? rows : []);
+      setDocumentsLoaded(true);
+    } catch {
+      setDocuments([]);
+      setDocumentsLoaded(true);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  }, [documentsLoaded, documentsLoading]);
+
+  useEffect(() => {
+    if (mainTab !== 'doc') return;
+    loadDocuments();
+  }, [loadDocuments, mainTab]);
+
+  const loadDocGraph = useCallback(async (docId: string, force?: boolean) => {
+    const id = String(docId || '').trim();
+    if (!id) return;
+    if (!force && docGraphMap[id]) return;
+    if (docLoadingId === id) return;
+    setDocLoadingId(id);
+    setDocErrorMap((prev) => ({ ...prev, [id]: '' }));
+    const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    try {
+      const resp = await api.get(`/kg/doc/${id}/graph`);
+      const payload = extractGraphPayload(resp.data);
+      setDocGraphMap((prev) => ({ ...prev, [id]: normalizeGraphDTOv1(payload ?? { scope: 'doc', docId: id }) }));
+    } catch (e) {
+      setDocGraphMap((prev) => ({ ...prev, [id]: normalizeGraphDTOv1({ scope: 'doc', docId: id }) }));
+      setDocErrorMap((prev) => ({ ...prev, [id]: e instanceof Error ? e.message : '加载失败' }));
+      await reportTelemetryEvent({
+        name: 'sichain_mobile_graph_fetch_failed',
+        data: { endpoint: '/kg/doc/:docId/graph', docId: id, message: e instanceof Error ? e.message : String(e) },
+      });
+    } finally {
+      const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt;
+      if (elapsed > 4000) {
+        await reportTelemetryEvent({
+          name: 'sichain_mobile_graph_fetch_slow',
+          data: { endpoint: '/kg/doc/:docId/graph', docId: id, elapsedMs: Math.round(elapsed) },
+        });
+      }
+      setDocLoadingId(null);
+    }
+  }, [docGraphMap, docLoadingId]);
+
+  useEffect(() => {
+    if (mainTab !== 'doc') return;
+    if (!selectedDocId) return;
+    loadDocGraph(selectedDocId, false);
+  }, [loadDocGraph, mainTab, selectedDocId]);
+
+  const docMatches = useMemo(() => {
+    if (!docGraph) return [];
+    const set = computeMatchedNodeIds(
+      docGraph.entities.map((e) => ({ id: e.id, name: e.name, description: e.description })),
+      docQuery
+    );
+    if (!set || set.size === 0) return [];
+    return docGraph.entities.filter((e) => set.has(e.id)).slice(0, 8);
+  }, [docGraph, docQuery]);
+
+  const [noteInnerTab, setNoteInnerTab] = useState<'combined' | 'single'>('combined');
+  const [noteEntityMap, setNoteEntityMap] = useState<Record<string, string[]>>({});
+  const [singleGraphMap, setSingleGraphMap] = useState<Record<string, { entities: BackendKgEntity[]; relations: BackendKgRelation[] }>>({});
+  const [noteMode, setNoteMode] = useState<'all' | string>('all');
+  const [noteSelectedNode, setNoteSelectedNode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mainTab !== 'note') return;
+    let cancelled = false;
+    const loadCombinedGraph = async () => {
+      if (!notes.length) {
+        if (!cancelled) setNoteEntityMap({});
+        return;
+      }
+      const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      try {
+        const response = await api.get('/kg/notes/graph');
+        const serverMap = response.data?.data?.noteEntityMap;
+        if (!cancelled && serverMap && typeof serverMap === 'object') setNoteEntityMap(serverMap);
+      } catch {
+        const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt;
+        await reportTelemetryEvent({
+          name: 'sichain_mobile_graph_fetch_failed',
+          data: { endpoint: '/kg/notes/graph' },
+        });
+        if (!cancelled) setNoteEntityMap({});
+        if (elapsed > 4000) {
+          await reportTelemetryEvent({
+            name: 'sichain_mobile_graph_fetch_slow',
+            data: { endpoint: '/kg/notes/graph', elapsedMs: Math.round(elapsed) },
+          });
+        }
+      }
+    };
+    loadCombinedGraph();
+    return () => {
+      cancelled = true;
+    };
+  }, [mainTab, notes]);
+
+  useEffect(() => {
+    if (mainTab !== 'note') return;
+    let cancelled = false;
+    const loadSingleGraph = async () => {
+      if (noteMode === 'all' || singleGraphMap[noteMode]) return;
+      const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      try {
+        const response = await api.get(`/kg/note/${noteMode}/graph`);
+        const entities = Array.isArray(response.data?.data?.entities) ? response.data.data.entities : [];
+        const relations = Array.isArray(response.data?.data?.relations) ? response.data.data.relations : [];
+        if (!cancelled) {
+          setSingleGraphMap((prev) => ({ ...prev, [noteMode]: { entities, relations } }));
+          if (entities.length > 0) {
+            setNoteEntityMap((prev) => ({
+              ...prev,
+              [noteMode]: Array.from(new Set(entities.map((entity: BackendKgEntity) => String(entity.name || '').trim()).filter(Boolean)))
+            }));
+          }
+        }
+      } catch (error) {
+        const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt;
+        await reportTelemetryEvent({
+          name: 'sichain_mobile_graph_fetch_failed',
+          data: { endpoint: '/kg/note/:noteId/graph', noteId: noteMode, message: error instanceof Error ? error.message : String(error) },
+        });
+        if (elapsed > 4000) {
+          await reportTelemetryEvent({
+            name: 'sichain_mobile_graph_fetch_slow',
+            data: { endpoint: '/kg/note/:noteId/graph', noteId: noteMode, elapsedMs: Math.round(elapsed) },
+          });
+        }
+      }
+    };
+    loadSingleGraph();
+    return () => {
+      cancelled = true;
+    };
+  }, [mainTab, noteMode, singleGraphMap]);
+
+  const graphNotes = useMemo(() => {
+    return notes.map(note => ({
+      ...note,
+      tags: mergeNoteTags(note, noteEntityMap)
+    }));
+  }, [notes, noteEntityMap]);
+
+  const allTags = useMemo(() => Array.from(new Set(graphNotes.flatMap(n => normalizeNoteTags(n.tags)))), [graphNotes]);
+
+  const selectedNote = noteSelectedNode && !noteSelectedNode.startsWith('tag_')
+    ? graphNotes.find(n => n.id === noteSelectedNode)
+    : null;
+
+  const headerPill = useMemo(() => {
+    if (mainTab === 'unified') return unifiedGraph ? `${unifiedGraph.entities.length} 实体 · ${unifiedGraph.relations.length} 关系` : 'Unified';
+    if (mainTab === 'doc') return docGraph ? `${docGraph.entities.length} 实体 · ${docGraph.relations.length} 关系` : 'Doc';
+    return `${notes.length} 篇 · ${allTags.length} 标签`;
+  }, [allTags.length, docGraph, mainTab, notes.length, unifiedGraph]);
+
+  return (
+    <div className="h-screen flex flex-col overflow-hidden relative" style={{ background: 'var(--hi-page-bg)' }}>
+      <ParticleBackground count={80} />
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-5%] right-[-5%] w-[280px] h-[280px] rounded-full"
+          style={{ background: 'radial-gradient(circle, var(--hi-glow-top) 0%, transparent 65%)' }} />
+      </div>
+
+      <div className="relative z-20 flex-shrink-0"
+        style={{ background: 'var(--hi-header-bg)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: '1px solid var(--hi-header-border)' }}>
+        <StatusBar />
+        <div className="px-5 pb-3 pt-1">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p style={{ color: '#8B5CF6', fontSize: '12px', fontWeight: 500 }}>知识关联可视化</p>
+              <h1 style={{ color: 'var(--hi-text-primary)', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>思链</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="px-3 py-1.5 rounded-xl" style={{ background: 'rgba(99,102,241,0.08)' }}>
+                <span style={{ color: '#6366F1', fontSize: '12px', fontWeight: 700 }}>{headerPill}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            {[
+              { key: 'unified', label: 'Unified' },
+              { key: 'doc', label: 'Doc' },
+              ...(noteTabEnabled ? [{ key: 'note', label: 'Note' }] : []),
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => {
+                  setMainTab(t.key as any);
+                  setUnifiedSelection(null);
+                  setDocSelection(null);
+                  setNoteSelectedNode(null);
+                }}
+                className="px-4 py-1.5 rounded-full transition-all"
+                style={mainTab === t.key
+                  ? { background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '12.5px', fontWeight: 700, boxShadow: '0 2px 10px rgba(99,102,241,0.3)' }
+                  : { background: 'var(--hi-chip-bg)', color: 'var(--hi-text-dim)', fontSize: '12.5px', border: '1px solid var(--hi-card-border)' }
+                }
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="relative z-10 flex-1 overflow-y-auto pb-20">
+        {mainTab === 'unified' && (
+          <div>
+            <div className="mx-3 mt-3 p-4 rounded-3xl" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)', boxShadow: 'var(--hi-card-shadow)' }}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.10)' }}>
+                    <Search size={16} style={{ color: '#6366F1' }} />
+                  </div>
+                  <div>
+                    <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 900 }}>搜索节点</p>
+                    <p style={{ color: '#9CA3AF', fontSize: '11px' }}>匹配名称/描述并可定位</p>
+                  </div>
+                </div>
+                <button
+                  className="px-3 py-1.5 rounded-xl"
+                  style={{ background: 'rgba(99,102,241,0.08)', color: '#6366F1', fontSize: '12px', fontWeight: 800 }}
+                  onClick={() => loadUnified(true)}
+                >
+                  刷新
+                </button>
+              </div>
+              <div className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-2xl" style={{ background: 'var(--hi-input-bg)', border: '1px solid var(--hi-card-border)' }}>
+                <Search size={14} style={{ color: '#9CA3AF' }} />
+                <input
+                  value={unifiedQuery}
+                  onChange={(e) => setUnifiedQuery(e.target.value)}
+                  placeholder="输入关键词，如：概念、流程、因果…"
+                  className="flex-1 bg-transparent outline-none"
+                  style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 600 }}
+                />
+                {unifiedQuery.trim() && (
+                  <button onClick={() => setUnifiedQuery('')} className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.08)' }}>
+                    <X size={13} style={{ color: '#6366F1' }} />
+                  </button>
+                )}
+              </div>
+
+              {unifiedQuery.trim() && (
+                <div className="mt-3 space-y-2">
+                  {unifiedMatches.length === 0 ? (
+                    <p style={{ color: '#9CA3AF', fontSize: '12px' }}>无匹配节点</p>
+                  ) : (
+                    unifiedMatches.map((e) => (
+                      <div key={e.id} className="flex items-center justify-between gap-2 p-3 rounded-2xl" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.10)' }}>
+                        <div className="min-w-0">
+                          <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 800 }}>{e.name}</p>
+                          <p className="truncate" style={{ color: '#9CA3AF', fontSize: '11px', marginTop: 2 }}>{e.description || '暂无描述'}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setUnifiedSelection({ kind: 'entity', id: e.id });
+                            setUnifiedCenterReq(e.id);
+                          }}
+                          className="px-3 py-2 rounded-xl flex items-center gap-1.5"
+                          style={{ background: 'rgba(99,102,241,0.10)', color: '#6366F1', fontSize: '12px', fontWeight: 800, flexShrink: 0 }}
+                        >
+                          <MapPin size={14} />
+                          定位
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="mx-3 mt-3">
+              {unifiedLoading ? (
+                <div className="rounded-3xl p-6" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
+                  <p style={{ color: '#9CA3AF', fontSize: '12px' }}>正在加载 Unified 图谱…</p>
+                </div>
+              ) : unifiedError ? (
+                <div className="rounded-3xl p-6" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
+                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>加载失败</p>
+                  <p style={{ color: '#9CA3AF', fontSize: '12px', marginTop: 6 }}>{unifiedError}</p>
+                </div>
+              ) : (
+                <GraphDTOv1Canvas
+                  graph={unifiedGraph}
+                  query={unifiedQuery}
+                  selected={unifiedSelection}
+                  onSelect={setUnifiedSelection}
+                  centerRequestId={unifiedCenterReq}
+                  onCentered={() => setUnifiedCenterReq(null)}
+                />
+              )}
+            </div>
+
+            <GraphDTOv1Legend open={unifiedLegendOpen} onToggle={() => setUnifiedLegendOpen((v) => !v)} />
+            <GraphDTOv1DetailSheet graph={unifiedGraph} selection={unifiedSelection} onClose={() => setUnifiedSelection(null)} />
+          </div>
+        )}
+
+        {mainTab === 'doc' && (
+          <div>
+            <div className="mx-3 mt-3 p-4 rounded-3xl" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)', boxShadow: 'var(--hi-card-shadow)' }}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.10)' }}>
+                    <FileText size={16} style={{ color: '#3B82F6' }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 900 }}>选择文档</p>
+                    <p className="truncate" style={{ color: '#9CA3AF', fontSize: '11px' }}>{selectedDoc ? (selectedDoc.title || selectedDoc.id) : documentsLoading ? '加载中…' : '未选择'}</p>
+                  </div>
+                </div>
+                <button
+                  className="px-3 py-1.5 rounded-xl flex items-center gap-1.5"
+                  style={{ background: 'rgba(59,130,246,0.10)', color: '#3B82F6', fontSize: '12px', fontWeight: 800 }}
+                  onClick={() => setDocPickerOpen(true)}
+                >
+                  <ChevronRight size={14} />
+                  选择
+                </button>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-2xl" style={{ background: 'var(--hi-input-bg)', border: '1px solid var(--hi-card-border)' }}>
+                <Search size={14} style={{ color: '#9CA3AF' }} />
+                <input
+                  value={docQuery}
+                  onChange={(e) => setDocQuery(e.target.value)}
+                  placeholder="搜索节点（名称/描述）"
+                  className="flex-1 bg-transparent outline-none"
+                  style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 600 }}
+                />
+                {docQuery.trim() && (
+                  <button onClick={() => setDocQuery('')} className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.10)' }}>
+                    <X size={13} style={{ color: '#3B82F6' }} />
+                  </button>
+                )}
+              </div>
+
+              {docQuery.trim() && selectedDocId && (
+                <div className="mt-3 space-y-2">
+                  {docMatches.length === 0 ? (
+                    <p style={{ color: '#9CA3AF', fontSize: '12px' }}>无匹配节点</p>
+                  ) : (
+                    docMatches.map((e) => (
+                      <div key={e.id} className="flex items-center justify-between gap-2 p-3 rounded-2xl" style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.10)' }}>
+                        <div className="min-w-0">
+                          <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 800 }}>{e.name}</p>
+                          <p className="truncate" style={{ color: '#9CA3AF', fontSize: '11px', marginTop: 2 }}>{e.description || '暂无描述'}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setDocSelection({ kind: 'entity', id: e.id });
+                            setDocCenterReq(e.id);
+                          }}
+                          className="px-3 py-2 rounded-xl flex items-center gap-1.5"
+                          style={{ background: 'rgba(59,130,246,0.10)', color: '#3B82F6', fontSize: '12px', fontWeight: 800, flexShrink: 0 }}
+                        >
+                          <MapPin size={14} />
+                          定位
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="mx-3 mt-3">
+              {!selectedDocId ? (
+                <div className="rounded-3xl p-6" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
+                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>先选择一个文档</p>
+                  <p style={{ color: '#9CA3AF', fontSize: '12px', marginTop: 6 }}>选择后会加载 Doc 图谱</p>
+                </div>
+              ) : docLoading ? (
+                <div className="rounded-3xl p-6" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
+                  <p style={{ color: '#9CA3AF', fontSize: '12px' }}>正在加载 Doc 图谱…</p>
+                </div>
+              ) : docError ? (
+                <div className="rounded-3xl p-6" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
+                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>加载失败</p>
+                  <p style={{ color: '#9CA3AF', fontSize: '12px', marginTop: 6 }}>{docError}</p>
+                  <button
+                    className="mt-4 px-4 py-2 rounded-2xl"
+                    style={{ background: 'linear-gradient(135deg,#3B82F6,#06B6D4)', color: 'white', fontSize: '13px', fontWeight: 900 }}
+                    onClick={() => loadDocGraph(selectedDocId, true)}
+                  >
+                    重试
+                  </button>
+                </div>
+              ) : (
+                <GraphDTOv1Canvas
+                  graph={docGraph}
+                  query={docQuery}
+                  selected={docSelection}
+                  onSelect={setDocSelection}
+                  centerRequestId={docCenterReq}
+                  onCentered={() => setDocCenterReq(null)}
+                />
+              )}
+            </div>
+
+            <GraphDTOv1Legend open={docLegendOpen} onToggle={() => setDocLegendOpen((v) => !v)} />
+            <GraphDTOv1DetailSheet graph={docGraph} selection={docSelection} onClose={() => setDocSelection(null)} />
+          </div>
+        )}
+
+        {mainTab === 'note' && (
+          <div>
+            <div className="px-3 pt-3">
+              <div className="flex gap-2">
+                {[
+                  { key: 'combined', label: '综合图谱' },
+                  { key: 'single', label: '单篇图谱' },
+                ].map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => { setNoteInnerTab(t.key as any); if (t.key === 'combined') setNoteMode('all'); }}
+                    className="px-4 py-1.5 rounded-full transition-all"
+                    style={noteInnerTab === t.key
+                      ? { background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '12.5px', fontWeight: 700, boxShadow: '0 2px 10px rgba(99,102,241,0.3)' }
+                      : { background: 'var(--hi-chip-bg)', color: 'var(--hi-text-dim)', fontSize: '12.5px', border: '1px solid var(--hi-card-border)' }
+                    }
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {noteInnerTab === 'combined' ? (
+              <div className="mx-3 mt-3 rounded-3xl overflow-hidden"
+                style={{ background: 'var(--hi-card-bg)', backdropFilter: 'blur(14px)', border: '1px solid var(--hi-card-border)', boxShadow: 'var(--hi-card-shadow)' }}>
+                {graphNotes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <GitBranch size={40} style={{ color: '#C4B5FD' }} />
+                    <p className="mt-3" style={{ color: 'var(--hi-text-primary)', fontSize: '16px', fontWeight: 800 }}>暂无知识图谱</p>
+                    <p className="mt-1" style={{ color: '#9CA3AF', fontSize: '13px' }}>先去思库记录一些笔记吧</p>
+                    <button onClick={() => navigate('/siku/create')} className="mt-4 px-5 py-2 rounded-2xl"
+                      style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '13px', fontWeight: 700 }}>
+                      立即创建
+                    </button>
+                  </div>
+                ) : (
+                  <KnowledgeGraphCanvas
+                    notes={graphNotes}
+                    mode={noteMode}
+                    onNodeClick={(id) => setNoteSelectedNode(id)}
+                    highlightType={null}
+                    noteEntityMap={noteEntityMap}
+                    singleGraph={null}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="px-3 pt-3 space-y-2.5">
+                <p style={{ color: '#6B7280', fontSize: '11.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>选择笔记查看单篇图谱</p>
+                {graphNotes.map((note, i) => (
+                  <motion.button
+                    key={note.id}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    onClick={() => setNoteMode(note.id)}
+                    className="w-full text-left p-4 rounded-2xl transition-all active:scale-[0.98]"
+                    style={{
+                      background: noteMode === note.id ? 'rgba(99,102,241,0.08)' : 'var(--hi-card-bg)',
+                      backdropFilter: 'blur(12px)',
+                      border: noteMode === note.id ? '1.5px solid rgba(99,102,241,0.3)' : '1px solid var(--hi-card-border)',
+                      boxShadow: noteMode === note.id ? '0 4px 16px rgba(99,102,241,0.12)' : '0 2px 10px rgba(99,102,241,0.05)',
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: `${getColor(i)}20` }}>
+                        <FileText size={18} style={{ color: getColor(i) }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 800 }} className="truncate">
+                          {note.title || note.content.slice(0, 20) + '…'}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          {normalizeNoteTags(note.tags).slice(0, 3).map(tag => (
+                            <span key={tag} className="px-1.5 py-0.5 rounded-full"
+                              style={{ background: `${getColor(i)}15`, color: getColor(i), fontSize: '10px', fontWeight: 600 }}>
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <ChevronRight size={16} style={{ color: noteMode === note.id ? '#6366F1' : '#D1D5DB' }} />
+                    </div>
+                  </motion.button>
+                ))}
+
+                <AnimatePresence>
+                  {noteMode !== 'all' && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="rounded-3xl overflow-hidden mt-2"
+                        style={{ background: 'var(--hi-card-bg)', backdropFilter: 'blur(14px)', border: '1px solid var(--hi-card-border)', boxShadow: 'var(--hi-card-shadow)' }}>
+                        <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+                          <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 800 }}>
+                            {notes.find(n => n.id === noteMode)?.title || '笔记图谱'}
+                          </p>
+                          <button onClick={() => setNoteMode('all')} className="w-7 h-7 rounded-xl flex items-center justify-center"
+                            style={{ background: 'rgba(99,102,241,0.08)' }}>
+                            <X size={13} style={{ color: '#6366F1' }} />
+                          </button>
+                        </div>
+                        <KnowledgeGraphCanvas
+                          notes={graphNotes}
+                          mode={noteMode}
+                          onNodeClick={(id) => setNoteSelectedNode(id)}
+                          highlightType={null}
+                          noteEntityMap={noteEntityMap}
+                          singleGraph={noteMode === 'all' ? null : (singleGraphMap[noteMode] || null)}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
+            <AnimatePresence>
+              {noteSelectedNode && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-40 flex items-end justify-center"
+                  style={{ background: 'rgba(30,27,75,0.35)', backdropFilter: 'blur(6px)' }}
+                  onClick={() => setNoteSelectedNode(null)}
+                >
+                  <motion.div
+                    initial={{ y: 60, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 60, opacity: 0 }}
+                    transition={{ type: 'spring', damping: 26 }}
+                    className="w-full max-w-lg mx-3 mb-24 rounded-3xl overflow-hidden"
+                    style={{ background: 'var(--hi-sheet-bg)', backdropFilter: 'blur(20px)' }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div className="p-5">
+                      {noteSelectedNode.startsWith('tag_') ? (
+                        <>
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                              style={{ background: 'rgba(139,92,246,0.1)' }}>
+                              <Tag size={20} style={{ color: '#8B5CF6' }} />
+                            </div>
+                            <div>
+                              <p style={{ color: 'var(--hi-text-primary)', fontSize: '17px', fontWeight: 900 }}>
+                                #{noteSelectedNode.replace('tag_', '')}
+                              </p>
+                              <p style={{ color: '#9CA3AF', fontSize: '12px' }}>
+                                {graphNotes.filter(n => normalizeNoteTags(n.tags).includes(noteSelectedNode.replace('tag_', ''))).length} 篇笔记使用此标签
+                              </p>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            {graphNotes.filter(n => normalizeNoteTags(n.tags).includes(noteSelectedNode.replace('tag_', ''))).map(n => (
+                              <button key={n.id} onClick={() => { navigate(`/siku/${n.id}`); setNoteSelectedNode(null); }}
+                                className="w-full text-left p-3 rounded-2xl"
+                                style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)' }}>
+                                <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 700 }}>{n.title || n.content.slice(0, 30) + '…'}</p>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      ) : selectedNote ? (
+                        <>
+                          <div className="flex items-center justify-between mb-3">
+                            <p style={{ color: 'var(--hi-text-primary)', fontSize: '17px', fontWeight: 900 }}>
+                              {selectedNote.title || '无标题'}
+                            </p>
+                            <button onClick={() => setNoteSelectedNode(null)}>
+                              <X size={16} style={{ color: '#9CA3AF' }} />
+                            </button>
+                          </div>
+                          <p style={{ color: '#4B5563', fontSize: '13.5px', lineHeight: 1.7 }} className="line-clamp-3">
+                            {selectedNote.content}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 mt-3">
+                            {normalizeNoteTags(selectedNote.tags).map(tag => (
+                              <span key={tag} className="px-2 py-0.5 rounded-full"
+                                style={{ background: 'rgba(99,102,241,0.08)', color: '#6366F1', fontSize: '11px', fontWeight: 700 }}>
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => { navigate(`/siku/${selectedNote.id}`); setNoteSelectedNode(null); }}
+                            className="mt-4 w-full py-3 rounded-2xl text-center"
+                            style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '14px', fontWeight: 800 }}>
+                            打开笔记
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
+
+      <BottomNav />
+
+      {graphGenInfo && (
+        <GraphGenOverlay
+          info={graphGenInfo}
+          onDone={() => setGraphGenInfo(null)}
+        />
+      )}
+
+      {docPickerOpen && createPortal(
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex items-end"
+            style={{ background: 'var(--hi-overlay)', backdropFilter: 'blur(10px)' }}
+            onClick={() => setDocPickerOpen(false)}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+              className="w-full max-w-lg rounded-t-3xl flex flex-col"
+              style={{ background: 'var(--hi-sheet-bg)', maxHeight: '86vh', paddingBottom: 'env(safe-area-inset-bottom)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+                <div className="w-10 h-1 rounded-full" style={{ background: 'var(--hi-sheet-handle)' }} />
+              </div>
+              <div className="flex items-center justify-between px-5 pt-3 pb-4 flex-shrink-0">
+                <div>
+                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '20px', fontWeight: 900, letterSpacing: '-0.02em' }}>选择文档</p>
+                  <p style={{ color: '#9CA3AF', fontSize: '12px', marginTop: 2 }}>共 {documents.length} 个</p>
+                </div>
+                <button onClick={() => setDocPickerOpen(false)} className="w-9 h-9 rounded-2xl flex items-center justify-center"
+                  style={{ background: 'rgba(59,130,246,0.10)' }}>
+                  <X size={16} style={{ color: '#3B82F6' }} />
+                </button>
+              </div>
+              <div className="px-5 pb-3 flex-shrink-0">
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-2xl" style={{ background: 'var(--hi-input-bg)', border: '1px solid var(--hi-card-border)' }}>
+                  <Search size={14} style={{ color: '#9CA3AF' }} />
+                  <input
+                    value={docPickerQuery}
+                    onChange={(e) => setDocPickerQuery(e.target.value)}
+                    placeholder="搜索文档标题"
+                    className="flex-1 bg-transparent outline-none"
+                    style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 600 }}
+                  />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 pb-6">
+                {documentsLoading ? (
+                  <p style={{ color: '#9CA3AF', fontSize: '12px' }}>加载中…</p>
+                ) : documents.length === 0 ? (
+                  <p style={{ color: '#9CA3AF', fontSize: '12px' }}>暂无文档</p>
+                ) : (
+                  <div className="space-y-2">
+                    {documents
+                      .filter((d) => {
+                        const q = docPickerQuery.trim().toLowerCase();
+                        if (!q) return true;
+                        return String(d.title || '').toLowerCase().includes(q) || String(d.id || '').toLowerCase().includes(q);
+                      })
+                      .map((d) => {
+                        const active = String(d.id) === String(selectedDocId);
+                        return (
+                          <button
+                            key={d.id}
+                            onClick={() => {
+                              const id = String(d.id);
+                              setSelectedDocId(id);
+                              setDocSelection(null);
+                              setDocCenterReq(null);
+                              setDocPickerOpen(false);
+                              loadDocGraph(id, false);
+                            }}
+                            className="w-full text-left p-4 rounded-2xl transition-all active:scale-[0.98]"
+                            style={{
+                              background: active ? 'rgba(59,130,246,0.10)' : 'rgba(59,130,246,0.04)',
+                              border: active ? '1.5px solid rgba(59,130,246,0.30)' : '1px solid rgba(59,130,246,0.10)',
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                                style={{ background: 'rgba(59,130,246,0.10)' }}>
+                                <FileText size={18} style={{ color: '#3B82F6' }} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>{d.title || d.id}</p>
+                                <p className="truncate" style={{ color: '#9CA3AF', fontSize: '11px', marginTop: 2 }}>{String(d.id)}</p>
+                              </div>
+                              {active && (
+                                <div className="px-2 py-1 rounded-full flex items-center gap-1"
+                                  style={{ background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.25)' }}>
+                                  <Check size={12} style={{ color: '#3B82F6' }} />
+                                  <span style={{ color: '#3B82F6', fontSize: '10px', fontWeight: 900 }}>已选</span>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
       )}
     </div>
   );

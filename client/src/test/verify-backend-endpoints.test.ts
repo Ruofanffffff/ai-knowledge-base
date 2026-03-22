@@ -97,9 +97,8 @@ describe('Task 13.1: Backend API Endpoint Verification', () => {
     const serverFilePath = path.join(__dirname, '../../../server.js');
     const serverContent = fs.readFileSync(serverFilePath, 'utf-8');
 
-    // Check for knowledge graph routes import
-    const hasKGRoutesImport = /require\(['"]\.\/routes\/knowledgeGraphRoutes['"]\)/.test(serverContent);
-    const hasKGRoutesMount = /app\.use\(['"]\/api\/knowledge-graph['"]/.test(serverContent);
+    const hasKGRoutesImport = /require\(['"]\.\/routes\/kgRoutes['"]\)/.test(serverContent);
+    const hasKGRoutesMount = /app\.use\(['"]\/api\/kg['"]\s*,\s*kgRoutes\s*\)/.test(serverContent);
 
     expect(hasKGRoutesImport).toBe(true);
     expect(hasKGRoutesMount).toBe(true);
@@ -109,7 +108,7 @@ describe('Task 13.1: Backend API Endpoint Verification', () => {
    * Verify that the knowledge graph routes file exists
    */
   test('knowledge graph routes file should exist', () => {
-    const kgRoutesPath = path.join(__dirname, '../../../routes/knowledgeGraphRoutes.js');
+    const kgRoutesPath = path.join(__dirname, '../../../routes/kgRoutes.js');
     
     expect(fs.existsSync(kgRoutesPath)).toBe(true);
   });
@@ -118,7 +117,7 @@ describe('Task 13.1: Backend API Endpoint Verification', () => {
    * Check if knowledge graph routes define the required endpoints
    */
   test('knowledge graph routes should define nodes and links endpoints', () => {
-    const kgRoutesPath = path.join(__dirname, '../../../routes/knowledgeGraphRoutes.js');
+    const kgRoutesPath = path.join(__dirname, '../../../routes/kgRoutes.js');
     
     if (!fs.existsSync(kgRoutesPath)) {
       console.warn('Knowledge graph routes file not found, skipping endpoint check');
@@ -127,18 +126,12 @@ describe('Task 13.1: Backend API Endpoint Verification', () => {
 
     const kgRoutesContent = fs.readFileSync(kgRoutesPath, 'utf-8');
 
-    // Check for nodes and links endpoints
-    const hasNodesEndpoint = /router\.(get|all)\s*\(\s*['"]\/nodes['"]/.test(kgRoutesContent) ||
-                             /router\.(get|all)\s*\(\s*['"]\/['"]/.test(kgRoutesContent);
-    const hasLinksEndpoint = /router\.(get|all)\s*\(\s*['"]\/links['"]/.test(kgRoutesContent) ||
-                             /router\.(get|all)\s*\(\s*['"]\/relations['"]/.test(kgRoutesContent);
+    const hasGraphEndpoint =
+      /router\.(get|post)\s*\(\s*['"]\/unified\/graph['"]/.test(kgRoutesContent) ||
+      /router\.(get|post)\s*\(\s*['"]\/doc\/:docId\/graph['"]/.test(kgRoutesContent);
 
-    if (!hasNodesEndpoint) {
-      console.warn('Warning: Could not find /nodes endpoint in knowledge graph routes');
-    }
-
-    if (!hasLinksEndpoint) {
-      console.warn('Warning: Could not find /links or /relations endpoint in knowledge graph routes');
+    if (!hasGraphEndpoint) {
+      console.warn('Warning: Could not find graph endpoints in kg routes');
     }
 
     // This is a soft check - we log warnings but don't fail

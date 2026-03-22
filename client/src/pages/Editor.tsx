@@ -705,7 +705,8 @@ export function Editor({ onNavigate }: EditorProps) {
                     childrenMap[link.source].push(link.target);
                   }
                   const depthMap: Record<string, number> = {};
-                  const bfsQ = [{ id: mmRootId(), depth: 0 }];
+                  const bfsQ: Array<{ id: string; depth: number }> = [];
+                  bfsQ.push({ id: mmRootId(), depth: 0 });
                   while (bfsQ.length > 0) {
                     const { id, depth } = bfsQ.shift()!;
                     depthMap[id] = depth;

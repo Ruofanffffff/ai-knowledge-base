@@ -10,6 +10,15 @@
 
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { apiService } from '../services/api';
+import apiClient from '../api/client';
+
+vi.mock('../api/client', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
 
 describe('Property 12: Type Mismatch Handling', () => {
   let consoleWarnSpy: any;
@@ -18,6 +27,7 @@ describe('Property 12: Type Mismatch Handling', () => {
   beforeEach(() => {
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -30,23 +40,12 @@ describe('Property 12: Type Mismatch Handling', () => {
    * Property: API service should handle type mismatches gracefully
    */
   test('API service should handle malformed responses without crashing', async () => {
-    // Mock fetch to return malformed data
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        // Missing required fields
-        invalidData: 'test'
-      })
-    });
-
-    // Call API method - should not throw
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { invalidData: 'test' } } as any);
     const result = await apiService.getGraphNodes();
 
-    // Should return data (even if empty) and not crash
     expect(result).toBeDefined();
     expect(result.data).toBeDefined();
-    
-    // Application should continue running
+    expect(Array.isArray(result.data)).toBe(true);
     expect(true).toBe(true);
   });
 
@@ -54,11 +53,7 @@ describe('Property 12: Type Mismatch Handling', () => {
    * Property: API service should handle null responses gracefully
    */
   test('API service should handle null responses without crashing', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => null
-    });
-
+    vi.mocked(apiClient.get).mockResolvedValue({ data: null } as any);
     const result = await apiService.getDocuments();
 
     expect(result).toBeDefined();
@@ -70,34 +65,23 @@ describe('Property 12: Type Mismatch Handling', () => {
    * Property: API service should handle undefined responses gracefully
    */
   test('API service should handle undefined responses without crashing', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => undefined
-    });
-
+    vi.mocked(apiClient.get).mockResolvedValue({ data: undefined } as any);
     const result = await apiService.getChatSessions();
 
     expect(result).toBeDefined();
     expect(result.data).toBeDefined();
+    expect(Array.isArray(result.data)).toBe(true);
   });
 
   /**
    * Property: API service should handle responses with wrong types gracefully
    */
   test('API service should handle responses with wrong types without crashing', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        // Return string instead of array
-        data: 'not an array'
-      })
-    });
-
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { links: 'not an array' } } as any);
     const result = await apiService.getGraphLinks();
 
     expect(result).toBeDefined();
     expect(result.data).toBeDefined();
-    // Should convert to array or return empty array
     expect(Array.isArray(result.data)).toBe(true);
   });
 
@@ -105,22 +89,11 @@ describe('Property 12: Type Mismatch Handling', () => {
    * Property: API service should handle responses with missing required fields
    */
   test('API service should handle responses with missing required fields', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ([
-        {
-          // Missing 'id' field
-          label: 'Test Node',
-          type: 'concept'
-        }
-      ])
-    });
-
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { nodes: [{ label: 'Test Node', type: 'concept' }] } } as any);
     const result = await apiService.getGraphNodes();
 
     expect(result).toBeDefined();
     expect(result.data).toBeDefined();
-    // Should handle gracefully, possibly filtering out invalid items
     expect(Array.isArray(result.data)).toBe(true);
   });
 
@@ -128,28 +101,25 @@ describe('Property 12: Type Mismatch Handling', () => {
    * Property: API service should handle responses with extra fields
    */
   test('API service should handle responses with extra unexpected fields', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ([
-        {
-          id: '1',
-          label: 'Test Node',
-          type: 'concept',
-          // Extra fields that aren't in the interface
-          extraField1: 'value1',
-          extraField2: 'value2',
-          nestedExtra: { foo: 'bar' }
-        }
-      ])
-    });
-
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        nodes: [
+          {
+            id: '1',
+            label: 'Test Node',
+            type: 'concept',
+            extraField1: 'value1',
+            extraField2: 'value2',
+            nestedExtra: { foo: 'bar' }
+          }
+        ],
+      },
+    } as any);
     const result = await apiService.getGraphNodes();
 
     expect(result).toBeDefined();
     expect(result.data).toBeDefined();
     expect(Array.isArray(result.data)).toBe(true);
-    // Should not crash even with extra fields - the key is it doesn't throw
-    // The data may be filtered or returned as-is depending on implementation
     expect(result.data.length).toBeGreaterThanOrEqual(0);
   });
 
@@ -157,17 +127,10 @@ describe('Property 12: Type Mismatch Handling', () => {
    * Property: API service should handle JSON parse errors gracefully
    */
   test('API service should handle JSON parse errors without crashing', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => {
-        throw new Error('Invalid JSON');
-      }
-    });
-
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Invalid JSON'));
     const result = await apiService.getDocuments();
 
     expect(result).toBeDefined();
-    // Should return error response instead of crashing
     expect(result.error || result.data).toBeDefined();
   });
 
@@ -175,8 +138,7 @@ describe('Property 12: Type Mismatch Handling', () => {
    * Property: API service should handle network errors gracefully
    */
   test('API service should handle network errors without crashing', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Network error'));
     const result = await apiService.getChatHistory();
 
     expect(result).toBeDefined();
@@ -188,26 +150,21 @@ describe('Property 12: Type Mismatch Handling', () => {
    * Property: Type guards should validate data structure
    */
   test('API responses should be validated before use', async () => {
-    // Mock response with partially valid data
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ([
-        { id: '1', label: 'Valid', type: 'concept' },
-        { id: '2', label: 'Valid', type: 'technology' },
-        { label: 'Invalid - missing id', type: 'method' }, // Invalid
-        { id: '4', type: 'tool' } // Invalid - missing label
-      ])
-    });
-
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        nodes: [
+          { id: '1', label: 'Valid', type: 'concept' },
+          { id: '2', label: 'Valid', type: 'technology' },
+          { label: 'Invalid - missing id', type: 'method' },
+          { id: '4', type: 'tool' }
+        ]
+      }
+    } as any);
     const result = await apiService.getGraphNodes();
 
     expect(result).toBeDefined();
     expect(result.data).toBeDefined();
     expect(Array.isArray(result.data)).toBe(true);
-    
-    // Should filter out or handle invalid items
-    // Valid implementation might return all items or only valid ones
-    // The key is it shouldn't crash
     expect(result.data.length).toBeGreaterThanOrEqual(0);
   });
 
@@ -215,27 +172,14 @@ describe('Property 12: Type Mismatch Handling', () => {
    * Property: Application should continue functioning after type mismatch
    */
   test('application should remain functional after encountering type mismatches', async () => {
-    // First call with bad data
-    global.fetch = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ invalid: 'data' })
-    });
-
+    vi.mocked(apiClient.get).mockResolvedValueOnce({ data: { invalid: 'data' } } as any);
     await apiService.getGraphNodes();
 
-    // Second call with good data - should still work
-    global.fetch = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ([
-        { id: '1', label: 'Test', type: 'concept' }
-      ])
-    });
-
+    vi.mocked(apiClient.get).mockResolvedValueOnce({ data: { nodes: [{ id: '1', label: 'Test', type: 'concept' }] } } as any);
     const result = await apiService.getGraphNodes();
 
     expect(result).toBeDefined();
     expect(result.data).toBeDefined();
-    // Application should recover and work normally
     expect(Array.isArray(result.data)).toBe(true);
   });
 });

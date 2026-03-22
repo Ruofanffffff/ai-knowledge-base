@@ -585,19 +585,36 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
              <>
                <button
                  onClick={() => setIsSelectMode(true)}
-                 className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all"
+                 disabled={loading}
+                 className={`px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium transition-all ${
+                   loading ? 'text-slate-400 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                 }`}
                >
                  选择
                </button>
                <button 
                  onClick={() => setViewMode('list')}
-                 className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-purple-50 text-purple-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                 disabled={loading}
+                 className={`p-2 rounded-lg transition-colors ${
+                   loading
+                     ? 'text-slate-300 cursor-not-allowed'
+                     : viewMode === 'list'
+                       ? 'bg-purple-50 text-purple-600'
+                       : 'text-slate-400 hover:bg-slate-50'
+                 }`}
                >
                  <ListIcon size={20} />
                </button>
                <button 
                  onClick={() => setViewMode('grid')}
-                 className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-purple-50 text-purple-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                 disabled={loading}
+                 className={`p-2 rounded-lg transition-colors ${
+                   loading
+                     ? 'text-slate-300 cursor-not-allowed'
+                     : viewMode === 'grid'
+                       ? 'bg-purple-50 text-purple-600'
+                       : 'text-slate-400 hover:bg-slate-50'
+                 }`}
                >
                  <Grid size={20} />
                </button>
@@ -612,13 +629,23 @@ export function DocumentsList({ onNavigate }: DocumentsListProps) {
                />
                <button 
                  onClick={() => fileInputRef.current?.click()} 
-                 className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-2 active:scale-95 transition-transform"
+                 disabled={loading}
+                 className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-transform ${
+                   loading
+                     ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                     : 'bg-purple-600 text-white hover:bg-purple-700 active:scale-95'
+                 }`}
                >
                   <Upload size={16} /> 上传文件
                </button>
                <button 
                  onClick={() => onNavigate('editor')} 
-                 className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 flex items-center gap-2 active:scale-95 transition-transform"
+                 disabled={loading}
+                 className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-transform ${
+                   loading
+                     ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                     : 'bg-slate-900 text-white hover:bg-slate-800 active:scale-95'
+                 }`}
                >
                   <Plus size={16} /> 创建便签
                </button>

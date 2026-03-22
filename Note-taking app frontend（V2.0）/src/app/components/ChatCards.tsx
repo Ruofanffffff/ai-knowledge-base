@@ -8,7 +8,7 @@
  *  · GrowthCard — 知识生长状态，内联展示主题进度和串联 CTA
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -19,6 +19,7 @@ import {
 import { Note } from './context/NoteContext';
 import { Cluster } from './ClusterCard';
 import type { PersistedSource } from '../types/sources';
+import { getConnectedNodeIds } from 'graph-core';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -244,10 +245,10 @@ function GraphCard({ card, onNavigate }: { card: CardPayload; onNavigate?: (p: s
   const nodes = card.graphNodes ?? [];
   const edges = card.graphEdges ?? [];
 
-  const connectedIds = selectedId
-    ? new Set(edges.filter(e => e.from === selectedId || e.to === selectedId)
-        .flatMap(e => [e.from, e.to]))
-    : null;
+  const connectedIds = useMemo(() => {
+    if (!selectedId) return null;
+    return getConnectedNodeIds(edges.map((e) => ({ source: e.from, target: e.to })), selectedId);
+  }, [edges, selectedId]);
 
   const handleNode = useCallback((id: string) => {
     setSelectedId(p => p === id ? null : id);

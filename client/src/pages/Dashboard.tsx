@@ -6,20 +6,11 @@ import { AISearch } from './AISearch';
 import { useAuth } from '../contexts/AuthContext';
 import { useDocuments } from '../hooks/useDocuments';
 import { formatTimeAgo, getAvatarUrl } from '../utils/transformers';
-import { getAccessToken } from '../utils/storage';
 import DocumentIndexDrawer from '../components/DocumentIndexDrawer';
+import apiService from '../services/api';
 
 interface DashboardProps {
   onNavigate?: (page: string) => void;
-}
-
-interface Document {
-  id: string;
-  title: string;
-  type: string;
-  updated: string;
-  tags?: string[];
-  items?: number;
 }
 
 const Typewriter = ({ text, delay = 50 }: { text: string; delay?: number }) => {
@@ -39,10 +30,14 @@ const Typewriter = ({ text, delay = 50 }: { text: string; delay?: number }) => {
   return <span>{currentText}</span>;
 };
 
+const Loading = () => (
+  <span className="text-2xl font-bold text-slate-800">...</span>
+);
+
 export function Dashboard({ onNavigate }: DashboardProps) {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
-  const { documents, isLoading: isLoadingDocs } = useDocuments({ autoRefresh: false });
+  const { documents } = useDocuments({ autoRefresh: false });
   const [userName, setUserName] = useState('Dr. Sarah Connor');
   const [knowledgeNodeCount, setKnowledgeNodeCount] = useState<number>(0);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
@@ -50,6 +45,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [indexDrawerDocId, setIndexDrawerDocId] = useState<string | null>(null);
   const [indexDrawerDocTitle, setIndexDrawerDocTitle] = useState<string | undefined>(undefined);
   const [isMobile, setIsMobile] = useState(false);
+  const loading = isLoadingStats;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -68,9 +64,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         console.error('Failed to refresh user:', error);
       }
     };
-    
     loadUserInfo();
-  }, []);
+  }, [refreshUser]);
   
   useEffect(() => {
     if (user && (user.username || user.name)) {
@@ -83,16 +78,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       try {
         setIsLoadingStats(true);
         setStatsError(null);
-        
-        const response = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || '/api'}/kg/graph`, {
-          headers: {
-            'Authorization': `Bearer ${getAccessToken() || ''}`,
-          },
-        });
-        const data = await response.json();
-        
-        if (data.success && data.data) {
-          setKnowledgeNodeCount(data.data.entities?.length || 0);
+
+        const result = await apiService.getKGGraph();
+        if (result.success && result.data) {
+          setKnowledgeNodeCount(result.data.entities?.length || 0);
+        } else {
+          setStatsError(result.error || '获取统计数据失败');
         }
       } catch (err: any) {
         console.error('获取统计数据失败:', err);
@@ -137,7 +128,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <AISearch 
               documentCount={documents.length} 
               knowledgeNodeCount={knowledgeNodeCount}
-              isLoadingStats={isLoadingStats}
+              isLoadingStats={loading}
               recentDocs={recentDocs}
             />
           </div>
@@ -186,8 +177,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg w-fit mb-3">
                   <FileText size={20} />
                 </div>
-                {isLoadingStats ? (
-                  <span className="text-2xl font-bold text-slate-800">...</span>
+                {loading ? (
+                  <Loading />
                 ) : (
                   <span className="text-2xl font-bold text-slate-800">{documents.length}</span>
                 )}
@@ -201,8 +192,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <div className="p-2 bg-purple-50 text-purple-600 rounded-lg w-fit mb-3">
                   <Network size={20} />
                 </div>
-                {isLoadingStats ? (
-                  <span className="text-2xl font-bold text-slate-800">...</span>
+                {loading ? (
+                  <Loading />
                 ) : (
                   <span className="text-2xl font-bold text-slate-800">{knowledgeNodeCount}</span>
                 )}
@@ -214,10 +205,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-1 min-h-[200px] flex flex-col">
               <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
                 <h2 className="font-bold text-slate-800">最近活动</h2>
-                <button onClick={() => onNavigate ? onNavigate('documents') : navigate('/documents')} className="text-xs text-purple-600 font-medium hover:underline">查看全部</button>
+                <button
+                  disabled={loading}
+                  onClick={() => onNavigate ? onNavigate('documents') : navigate('/documents')}
+                  className={`text-xs font-medium ${
+                    loading ? 'text-slate-300 cursor-not-allowed' : 'text-purple-600 hover:underline'
+                  }`}
+                >
+                  查看全部
+                </button>
               </div>
               <div className="divide-y divide-slate-100 overflow-y-auto flex-1">
-                {isLoadingStats ? (
+                {loading ? (
                   <div className="p-8 text-center text-slate-400">
                     <div className="animate-pulse">加载中...</div>
                   </div>

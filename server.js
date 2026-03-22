@@ -690,6 +690,9 @@ app.use('/api/admin', adminRouter);
 const kgRoutes = require('./routes/kgRoutes');
 app.use('/api/kg', kgRoutes);
 
+const telemetryRoutes = require('./routes/telemetryRoutes');
+app.use('/api/telemetry', telemetryRoutes);
+
 // 便签路由
 const notesRoutes = require('./routes/notesRoutes');
 app.use('/api/notes', notesRoutes);

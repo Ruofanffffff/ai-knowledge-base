@@ -2,33 +2,13 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/600cc0a2e59f846c93e6529bc524d2ae023eb689.png';
-import { ArrowRight, Lock, Mail, Check, Loader2, AlertTriangle } from 'lucide-react';
+import { Lock, Mail, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 // ---------------------------------------------------------------------------
 // OAuth env check
 // ---------------------------------------------------------------------------
 const OAUTH_ENABLED = import.meta.env.VITE_ENABLE_OAUTH === 'true';
-
-// ---------------------------------------------------------------------------
-// Typewriter Component
-// ---------------------------------------------------------------------------
-const Typewriter = ({ text, delay = 100 }: { text: string; delay?: number }) => {
-  const [currentText, setCurrentText] = useState('');
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(() => {
-    if (currentIndex < text.length) {
-      const timeout = setTimeout(() => {
-        setCurrentText(prev => prev + text[currentIndex]);
-        setCurrentIndex(prev => prev + 1);
-      }, delay);
-      return () => clearTimeout(timeout);
-    }
-  }, [currentIndex, delay, text]);
-
-  return <span>{currentText}</span>;
-};
 
 // ---------------------------------------------------------------------------
 // WeChat SVG icon (brand)

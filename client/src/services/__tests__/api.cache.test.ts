@@ -99,59 +99,52 @@ describe('API Service Caching', () => {
 
   describe('getBatchKGStatus caching', () => {
     it('should cache batch status responses', async () => {
-      const mockResponse = {
-        data: {
-          success: true,
-          data: [
-            {
-              docId: 'doc-1',
+      vi.mocked(apiClient.get).mockImplementation(async (url: any) => {
+        const match = String(url).match(/\/kg\/status\/([^?]+)/);
+        const docId = match?.[1] || '';
+        return {
+          data: {
+            success: true,
+            data: {
+              docId,
               status: 'completed',
               createdAt: '2024-01-01T00:00:00Z',
               updatedAt: '2024-01-01T00:01:00Z'
-            },
-            {
-              docId: 'doc-2',
-              status: 'building',
-              createdAt: '2024-01-01T00:00:00Z',
-              updatedAt: '2024-01-01T00:01:00Z'
             }
-          ]
-        }
-      };
-
-      vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
+          }
+        } as any;
+      });
 
       // First call
       const result1 = await apiService.getBatchKGStatus(['doc-1', 'doc-2']);
-      expect(apiClient.post).toHaveBeenCalledTimes(1);
+      expect(apiClient.get).toHaveBeenCalledTimes(2);
       expect(result1.success).toBe(true);
 
       // Second call with same IDs - should use cache
       const result2 = await apiService.getBatchKGStatus(['doc-1', 'doc-2']);
-      expect(apiClient.post).toHaveBeenCalledTimes(1); // Still 1
+      expect(apiClient.get).toHaveBeenCalledTimes(2); // Still 2
       expect(result2.data).toEqual(result1.data);
     });
 
     it('should use same cache for different order of docIds', async () => {
-      const mockResponse = {
-        data: {
-          success: true,
-          data: [
-            { docId: 'doc-a', status: 'completed', createdAt: '2024-01-01', updatedAt: '2024-01-01' },
-            { docId: 'doc-b', status: 'building', createdAt: '2024-01-01', updatedAt: '2024-01-01' }
-          ]
-        }
-      };
-
-      vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
+      vi.mocked(apiClient.get).mockImplementation(async (url: any) => {
+        const match = String(url).match(/\/kg\/status\/([^?]+)/);
+        const docId = match?.[1] || '';
+        return {
+          data: {
+            success: true,
+            data: { docId, status: 'completed', createdAt: '2024-01-01', updatedAt: '2024-01-01' }
+          }
+        } as any;
+      });
 
       // First call with order: doc-a, doc-b
       await apiService.getBatchKGStatus(['doc-a', 'doc-b']);
-      expect(apiClient.post).toHaveBeenCalledTimes(1);
+      expect(apiClient.get).toHaveBeenCalledTimes(2);
 
       // Second call with order: doc-b, doc-a - should use same cache
       await apiService.getBatchKGStatus(['doc-b', 'doc-a']);
-      expect(apiClient.post).toHaveBeenCalledTimes(1); // Still 1
+      expect(apiClient.get).toHaveBeenCalledTimes(2); // Still 2
     });
   });
 

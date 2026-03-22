@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Search, Heart, Share2, SlidersHorizontal,
+  Search, Heart, Share2,
   Layers, Wand2, X,
   Maximize2, BookOpen, Sparkles, GitFork, Network, Zap,
   ChevronLeft, ChevronRight, Loader2, FileText, MessageCircle, Bookmark,
-  MoreHorizontal, Edit2, Trash2, CheckSquare, Square, Upload, MoreVertical
+  Edit2, Trash2, CheckSquare, Square, Upload, MoreVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -378,12 +378,6 @@ export function Community() {
       alert(result.error || '删除失败');
     }
     setDeleteLoading(false);
-  };
-
-  // ─── Batch delete handlers ───
-  const openBatchDeleteConfirm = () => {
-    if (selectedIds.size === 0) return;
-    setShowBatchDeleteConfirm(true);
   };
 
   const closeBatchDeleteConfirm = () => {

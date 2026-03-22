@@ -9,15 +9,31 @@
  * there exists a corresponding backend API endpoint that can provide that data.
  */
 
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
 import { apiService } from '../services/api';
-import type { 
-  GraphNode, 
-  GraphLink, 
-  Document, 
-  ChatMessage, 
-  ChatSession 
-} from '../services/api';
+
+vi.mock('../api/client', () => ({
+  default: {
+    get: vi.fn(async (url: any) => {
+      const u = String(url);
+      if (u.includes('/knowledge-graph')) {
+        return { data: { nodes: [], links: [] } };
+      }
+      if (u.includes('/documents')) {
+        return { data: [] };
+      }
+      if (u.includes('/chat/history')) {
+        return { data: { messages: [] } };
+      }
+      if (u.includes('/chat/sessions')) {
+        return { data: { sessions: [] } };
+      }
+      return { data: {} };
+    }),
+    post: vi.fn(async () => ({ data: {} })),
+    delete: vi.fn(async () => ({ data: {} })),
+  },
+}));
 
 describe('Property 1: API Endpoint Coverage', () => {
   /**

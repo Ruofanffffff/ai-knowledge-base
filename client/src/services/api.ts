@@ -316,6 +316,18 @@ class ApiService {
     }
   }
 
+  async getKGGraph(): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.get('/kg/graph');
+      if (response.data?.success) {
+        return { success: true, data: response.data.data };
+      }
+      return { success: false, data: null, error: response.data?.error || 'Failed to fetch KG graph' };
+    } catch (error) {
+      return { success: false, data: null, error: this.handleError(error) };
+    }
+  }
+
   // ==========================================================================
   // Document API Methods
   // ==========================================================================
