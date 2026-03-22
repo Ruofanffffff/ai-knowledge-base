@@ -1755,14 +1755,19 @@ export function NoteCreate() {
                 onClick={item.action}
                 className="w-full flex items-center gap-4 p-4 rounded-3xl transition-all active:scale-[0.98]"
                 style={{
-                  background: 'rgba(255,255,255,0.8)',
-                  border: `1px solid ${item.color}28`,
-                  boxShadow: '0 2px 12px rgba(99,102,241,0.06)',
+                  backgroundColor: 'var(--hi-card-bg)',
+                  backgroundImage: `linear-gradient(135deg, ${item.color}26 0%, transparent 62%)`,
+                  border: '1px solid var(--hi-card-border)',
+                  boxShadow: 'var(--hi-card-shadow)',
                 }}
               >
                 <div
                   className="flex items-center justify-center w-12 h-12 rounded-2xl flex-shrink-0"
-                  style={{ background: item.bg }}
+                  style={{
+                    background: `linear-gradient(135deg, ${item.color}40 0%, ${item.color}18 100%)`,
+                    border: `1px solid ${item.color}24`,
+                    boxShadow: `0 6px 18px ${item.color}18`,
+                  }}
                 >
                   <item.icon size={22} style={{ color: item.color }} />
                 </div>
