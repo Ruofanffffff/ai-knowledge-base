@@ -1242,7 +1242,7 @@ export function NoteCreate() {
         }
         case 'summary': {
           setAiLoadingText('AI 正在生成结构化总结…');
-          const summary = await aiService.summarizeText(text);
+          const summary = await aiService.summarizeText(text, title);
           const overview = String(summary?.overview || '').trim();
           const keyPoints = Array.isArray(summary?.keyPoints) ? summary.keyPoints : [];
           const keywords = Array.isArray(summary?.keywords) ? summary.keywords : [];
@@ -1767,8 +1767,8 @@ export function NoteCreate() {
                   <item.icon size={22} style={{ color: item.color }} />
                 </div>
                 <div className="text-left">
-                  <div style={{ fontSize: '15px', fontWeight: 600, color: '#1a1a2e' }}>{item.label}</div>
-                  <div style={{ fontSize: '12px', color: '#888', marginTop: 2 }}>{item.desc}</div>
+                  <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--hi-text-primary)' }}>{item.label}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--hi-text-secondary)', marginTop: 2 }}>{item.desc}</div>
                 </div>
               </button>
             ))}
@@ -1792,8 +1792,8 @@ export function NoteCreate() {
               placeholder="标题（选填）"
               className="w-full px-4 py-3 bg-transparent outline-none"
               style={{
-                fontSize: '18px', fontWeight: 600, color: '#1a1a2e',
-                borderBottom: '1px solid rgba(99,102,241,0.08)',
+                fontSize: '18px', fontWeight: 600, color: 'var(--hi-text-primary)',
+                borderBottom: '1px solid var(--hi-divider)',
               }}
             />
 
@@ -1805,14 +1805,16 @@ export function NoteCreate() {
                 ref={dropZoneRef}
                 className="absolute inset-0 overflow-y-auto px-4 py-3 scrollbar-hide"
                 style={{
-                  background: 'rgba(255,255,255,0.02)',
-                  backdropFilter: 'blur(32px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(32px) saturate(180%)',
+                  background: 'var(--hi-card-bg)',
+                  backdropFilter: 'blur(24px) saturate(160%)',
+                  WebkitBackdropFilter: 'blur(24px) saturate(160%)',
                   borderRadius: 24,
-                  border: '1px solid rgba(255,255,255,0.6)',
-                  boxShadow: '0 4px 24px rgba(99,102,241,0.07), inset 0 1px 0 rgba(255,255,255,0.8)',
+                  border: '1px solid var(--hi-card-border)',
+                  boxShadow: 'var(--hi-card-shadow)',
                   margin: '6px 12px',
                   width: 'calc(100% - 24px)',
+                  color: 'var(--hi-text-primary)',
+                  caretColor: 'var(--hi-text-primary)',
                   scrollbarWidth: 'none',
                   msOverflowStyle: 'none',
                   WebkitOverflowScrolling: 'touch',

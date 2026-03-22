@@ -96,9 +96,13 @@ export const aiService = {
     };
   },
 
-  async summarizeText(text: string): Promise<any> {
+  async summarizeText(text: string, title?: string): Promise<any> {
     try {
-      const response = await api.post('/ai/summary/text', { text });
+      const response = await api.post(
+        '/ai/summary/text',
+        { text, ...(title ? { title } : {}) },
+        { timeout: 60000 },
+      );
       const payload = response.data;
       if (payload?.structured) return payload.structured;
       if (payload?.summary) {

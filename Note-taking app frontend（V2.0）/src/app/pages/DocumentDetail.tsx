@@ -390,7 +390,7 @@ export function DocumentDetail() {
     setSummaryError(null);
     const toastId = toast.loading('AI 总结中…');
     try {
-      const result = await aiService.summarizeText(text);
+      const result = await aiService.summarizeText(text, doc?.title);
       toast.dismiss(toastId);
       setSummary(result);
       setSummaryError(null);
