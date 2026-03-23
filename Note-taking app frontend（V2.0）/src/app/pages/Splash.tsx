@@ -156,7 +156,7 @@ export function Splash() {
               lineHeight: 1.1,
             }}
           >
-            灵感笔记
+            拾思
           </h1>
           <div className="flex items-center gap-3">
             <motion.div

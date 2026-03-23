@@ -1499,30 +1499,6 @@ function KnowledgeGraphCanvas({
   );
 }
 
-function StatusBar() {
-  const now = new Date();
-  const time = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-  return (
-    <div className="flex items-center justify-between px-5 pt-3 pb-1">
-      <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--hi-status-color)' }}>{time}</span>
-      <div className="flex items-center gap-1.5">
-        <svg width="15" height="11" viewBox="0 0 15 11" fill="none">
-          <rect x="0" y="6.5" width="3" height="4.5" rx="1" fill="var(--hi-status-color)" opacity="0.5" />
-          <rect x="4" y="4" width="3" height="7" rx="1" fill="var(--hi-status-color)" opacity="0.7" />
-          <rect x="8" y="2" width="3" height="9" rx="1" fill="var(--hi-status-color)" opacity="0.85" />
-          <rect x="12" y="0" width="3" height="11" rx="1" fill="var(--hi-status-color)" />
-        </svg>
-        <div className="flex items-center gap-0.5">
-          <div className="w-6 h-3 rounded-sm flex items-center px-0.5" style={{ border: '1.5px solid var(--hi-status-color)', opacity: 0.6 }}>
-            <div className="h-1.5 rounded-sm w-4/5" style={{ background: 'var(--hi-status-color)' }} />
-          </div>
-          <div className="w-0.5 h-1.5 rounded-r-sm" style={{ background: 'var(--hi-status-color)', opacity: 0.4 }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function readFeatureFlag(key: string, defaultValue: boolean) {
   try {
     return getFeatureFlag(
@@ -1537,8 +1513,12 @@ function readFeatureFlag(key: string, defaultValue: boolean) {
 function extractGraphPayload(respData: any) {
   if (!respData) return null;
   if (respData.data && typeof respData.data === 'object') {
+    if (respData.data.graph && typeof respData.data.graph === 'object') return respData.data.graph;
     if (respData.data.entities || respData.data.relations) return respData.data;
-    if (respData.data.data && typeof respData.data.data === 'object') return respData.data.data;
+    if (respData.data.data && typeof respData.data.data === 'object') {
+      if (respData.data.data.graph && typeof respData.data.data.graph === 'object') return respData.data.data.graph;
+      return respData.data.data;
+    }
   }
   return respData;
 }
@@ -2513,7 +2493,6 @@ function LegacySiChain() {
       {/* Header */}
       <div className="relative z-20 flex-shrink-0"
         style={{ background: 'var(--hi-header-bg)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: '1px solid var(--hi-header-border)' }}>
-        <StatusBar />
         <div className="px-5 pb-3 pt-1">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -3048,6 +3027,7 @@ function LegacySiChain() {
 
 export function SiChain() {
   const navigate = useNavigate();
+  const { notes } = useNotes();
 
   const [mainTab, setMainTab] = useState<'unified' | 'doc'>('unified');
 
@@ -3114,12 +3094,17 @@ export function SiChain() {
     return unifiedGraph.entities.filter((e) => set.has(e.id)).slice(0, 8);
   }, [unifiedGraph, unifiedQuery]);
 
+  type SingleSourceType = 'doc' | 'note';
+
   const [documents, setDocuments] = useState<LibraryDocument[]>([]);
   const [documentsLoaded, setDocumentsLoaded] = useState(false);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [docPickerOpen, setDocPickerOpen] = useState(false);
+  const [docPickerType, setDocPickerType] = useState<SingleSourceType>('doc');
   const [docPickerQuery, setDocPickerQuery] = useState('');
-  const [selectedDocId, setSelectedDocId] = useState('');
+  const [selectedSourceType, setSelectedSourceType] = useState<SingleSourceType>('doc');
+  const [selectedSourceId, setSelectedSourceId] = useState('');
+  const selectedSourceKey = selectedSourceId ? `${selectedSourceType}:${selectedSourceId}` : '';
 
   const [docGraphMap, setDocGraphMap] = useState<Record<string, GraphDTOv1Normalized>>({});
   const [docErrorMap, setDocErrorMap] = useState<Record<string, string>>({});
@@ -3130,13 +3115,20 @@ export function SiChain() {
   const [docCenterReq, setDocCenterReq] = useState<string | null>(null);
 
   const selectedDoc = useMemo(() => {
-    if (!selectedDocId) return null;
-    return documents.find((d) => String(d.id) === String(selectedDocId)) ?? null;
-  }, [documents, selectedDocId]);
+    if (selectedSourceType !== 'doc') return null;
+    if (!selectedSourceId) return null;
+    return documents.find((d) => String(d.id) === String(selectedSourceId)) ?? null;
+  }, [documents, selectedSourceId, selectedSourceType]);
 
-  const docGraph = selectedDocId ? (docGraphMap[selectedDocId] ?? null) : null;
-  const docError = selectedDocId ? (docErrorMap[selectedDocId] ?? null) : null;
-  const docLoading = Boolean(selectedDocId && docLoadingId === selectedDocId);
+  const selectedNote = useMemo(() => {
+    if (selectedSourceType !== 'note') return null;
+    if (!selectedSourceId) return null;
+    return notes.find((n) => String(n.id) === String(selectedSourceId)) ?? null;
+  }, [notes, selectedSourceId, selectedSourceType]);
+
+  const singleGraph = selectedSourceKey ? (docGraphMap[selectedSourceKey] ?? null) : null;
+  const singleError = selectedSourceKey ? (docErrorMap[selectedSourceKey] ?? null) : null;
+  const singleLoading = Boolean(selectedSourceKey && docLoadingId === selectedSourceKey);
 
   const loadDocuments = useCallback(async () => {
     if (documentsLoading || documentsLoaded) return;
@@ -3158,31 +3150,43 @@ export function SiChain() {
     loadDocuments();
   }, [loadDocuments, mainTab]);
 
-  const loadDocGraph = useCallback(async (docId: string, force?: boolean) => {
-    const id = String(docId || '').trim();
+  const loadSingleGraph = useCallback(async (sourceType: SingleSourceType, sourceId: string, force?: boolean) => {
+    const id = String(sourceId || '').trim();
     if (!id) return;
-    if (!force && docGraphMap[id]) return;
-    if (docLoadingId === id) return;
-    setDocLoadingId(id);
-    setDocErrorMap((prev) => ({ ...prev, [id]: '' }));
+    const key = `${sourceType}:${id}`;
+    if (!force && docGraphMap[key]) return;
+    if (docLoadingId === key) return;
+    setDocLoadingId(key);
+    setDocErrorMap((prev) => ({ ...prev, [key]: '' }));
     const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
     try {
-      const resp = await api.get(`/kg/doc/${id}/graph`);
+      const endpoint = sourceType === 'doc' ? `/kg/doc/${id}/graph` : `/kg/note/${id}/graph`;
+      const resp = await api.get(endpoint);
       const payload = extractGraphPayload(resp.data);
-      setDocGraphMap((prev) => ({ ...prev, [id]: normalizeGraphDTOv1(payload ?? { scope: 'doc', docId: id }) }));
+      setDocGraphMap((prev) => ({ ...prev, [key]: normalizeGraphDTOv1(payload ?? { scope: sourceType, entities: [], relations: [] }) }));
     } catch (e) {
-      setDocGraphMap((prev) => ({ ...prev, [id]: normalizeGraphDTOv1({ scope: 'doc', docId: id }) }));
-      setDocErrorMap((prev) => ({ ...prev, [id]: e instanceof Error ? e.message : '加载失败' }));
+      setDocGraphMap((prev) => ({ ...prev, [key]: normalizeGraphDTOv1({ scope: sourceType, entities: [], relations: [] }) }));
+      setDocErrorMap((prev) => ({ ...prev, [key]: e instanceof Error ? e.message : '加载失败' }));
       await reportTelemetryEvent({
         name: 'sichain_mobile_graph_fetch_failed',
-        data: { endpoint: '/kg/doc/:docId/graph', docId: id, message: e instanceof Error ? e.message : String(e) },
+        data: {
+          endpoint: sourceType === 'doc' ? '/kg/doc/:docId/graph' : '/kg/note/:noteId/graph',
+          sourceType,
+          sourceId: id,
+          message: e instanceof Error ? e.message : String(e)
+        },
       });
     } finally {
       const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt;
       if (elapsed > 4000) {
         await reportTelemetryEvent({
           name: 'sichain_mobile_graph_fetch_slow',
-          data: { endpoint: '/kg/doc/:docId/graph', docId: id, elapsedMs: Math.round(elapsed) },
+          data: {
+            endpoint: sourceType === 'doc' ? '/kg/doc/:docId/graph' : '/kg/note/:noteId/graph',
+            sourceType,
+            sourceId: id,
+            elapsedMs: Math.round(elapsed)
+          },
         });
       }
       setDocLoadingId(null);
@@ -3191,25 +3195,25 @@ export function SiChain() {
 
   useEffect(() => {
     if (mainTab !== 'doc') return;
-    if (!selectedDocId) return;
-    loadDocGraph(selectedDocId, false);
-  }, [loadDocGraph, mainTab, selectedDocId]);
+    if (!selectedSourceId) return;
+    loadSingleGraph(selectedSourceType, selectedSourceId, false);
+  }, [loadSingleGraph, mainTab, selectedSourceId, selectedSourceType]);
 
   const docMatches = useMemo(() => {
-    if (!docGraph) return [];
+    if (!singleGraph) return [];
     const set = computeMatchedNodeIds(
-      docGraph.entities.map((e) => ({ id: e.id, name: e.name, description: e.description })),
+      singleGraph.entities.map((e) => ({ id: e.id, name: e.name, description: e.description })),
       docQuery
     );
     if (!set || set.size === 0) return [];
-    return docGraph.entities.filter((e) => set.has(e.id)).slice(0, 8);
-  }, [docGraph, docQuery]);
+    return singleGraph.entities.filter((e) => set.has(e.id)).slice(0, 8);
+  }, [docQuery, singleGraph]);
 
   const headerPill = useMemo(() => {
     if (mainTab === 'unified') return unifiedGraph ? `${unifiedGraph.entities.length} 实体 · ${unifiedGraph.relations.length} 关系` : '全局图谱';
-    if (mainTab === 'doc') return docGraph ? `${docGraph.entities.length} 实体 · ${docGraph.relations.length} 关系` : '单篇视角';
+    if (mainTab === 'doc') return singleGraph ? `${singleGraph.entities.length} 实体 · ${singleGraph.relations.length} 关系` : '单篇视角';
     return '';
-  }, [docGraph, mainTab, unifiedGraph]);
+  }, [mainTab, singleGraph, unifiedGraph]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden relative" style={{ background: 'var(--hi-page-bg)' }}>
@@ -3221,7 +3225,6 @@ export function SiChain() {
 
       <div className="relative z-20 flex-shrink-0"
         style={{ background: 'var(--hi-header-bg)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: '1px solid var(--hi-header-border)' }}>
-        <StatusBar />
         <div className="px-5 pb-3 pt-1">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -3359,18 +3362,26 @@ export function SiChain() {
             <div className="mx-3 mt-3 p-4 rounded-3xl" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)', boxShadow: 'var(--hi-card-shadow)' }}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.10)' }}>
-                    <FileText size={16} style={{ color: '#3B82F6' }} />
+                  <div className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ background: selectedSourceType === 'doc' ? 'rgba(59,130,246,0.10)' : 'rgba(99,102,241,0.10)' }}>
+                    {selectedSourceType === 'doc' ? (
+                      <FileText size={16} style={{ color: '#3B82F6' }} />
+                    ) : (
+                      <Layers size={16} style={{ color: '#6366F1' }} />
+                    )}
                   </div>
                   <div className="min-w-0">
-                    <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 900 }}>选择文档</p>
-                    <p className="truncate" style={{ color: '#9CA3AF', fontSize: '11px' }}>{selectedDoc ? (selectedDoc.title || selectedDoc.id) : documentsLoading ? '加载中…' : '未选择'}</p>
+                    <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 900 }}>选择内容</p>
+                    <p className="truncate" style={{ color: '#9CA3AF', fontSize: '11px' }}>
+                      {selectedSourceType === 'doc'
+                        ? (selectedDoc ? (selectedDoc.title || selectedDoc.id) : documentsLoading ? '加载中…' : '未选择')
+                        : (selectedNote ? (selectedNote.title || selectedNote.content?.slice?.(0, 18) || selectedNote.id) : notes.length ? '未选择' : '暂无笔记')}
+                    </p>
                   </div>
                 </div>
                 <button
                   className="px-3 py-1.5 rounded-xl flex items-center gap-1.5"
                   style={{ background: 'rgba(59,130,246,0.10)', color: '#3B82F6', fontSize: '12px', fontWeight: 800 }}
-                  onClick={() => setDocPickerOpen(true)}
+                  onClick={() => { setDocPickerType(selectedSourceType); setDocPickerOpen(true); }}
                 >
                   <ChevronRight size={14} />
                   选择
@@ -3393,7 +3404,7 @@ export function SiChain() {
                 )}
               </div>
 
-              {docQuery.trim() && selectedDocId && (
+              {docQuery.trim() && selectedSourceId && (
                 <div className="mt-3 space-y-2">
                   {docMatches.length === 0 ? (
                     <p style={{ color: '#9CA3AF', fontSize: '12px' }}>无匹配节点</p>
@@ -3423,30 +3434,30 @@ export function SiChain() {
             </div>
 
             <div className="mx-3 mt-3">
-              {!selectedDocId ? (
+              {!selectedSourceId ? (
                 <div className="rounded-3xl p-6" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
-                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>先选择一个文档</p>
-                  <p style={{ color: '#9CA3AF', fontSize: '12px', marginTop: 6 }}>选择后会加载 Doc 图谱</p>
+                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>先选择一条内容</p>
+                  <p style={{ color: '#9CA3AF', fontSize: '12px', marginTop: 6 }}>可选择文档或笔记，选择后会加载图谱</p>
                 </div>
-              ) : docLoading ? (
+              ) : singleLoading ? (
                 <div className="rounded-3xl p-6" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
-                  <p style={{ color: '#9CA3AF', fontSize: '12px' }}>正在加载 Doc 图谱…</p>
+                  <p style={{ color: '#9CA3AF', fontSize: '12px' }}>正在加载图谱…</p>
                 </div>
-              ) : docError ? (
+              ) : singleError ? (
                 <div className="rounded-3xl p-6" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
                   <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>加载失败</p>
-                  <p style={{ color: '#9CA3AF', fontSize: '12px', marginTop: 6 }}>{docError}</p>
+                  <p style={{ color: '#9CA3AF', fontSize: '12px', marginTop: 6 }}>{singleError}</p>
                   <button
                     className="mt-4 px-4 py-2 rounded-2xl"
                     style={{ background: 'linear-gradient(135deg,#3B82F6,#06B6D4)', color: 'white', fontSize: '13px', fontWeight: 900 }}
-                    onClick={() => loadDocGraph(selectedDocId, true)}
+                    onClick={() => loadSingleGraph(selectedSourceType, selectedSourceId, true)}
                   >
                     重试
                   </button>
                 </div>
               ) : (
                 <GraphDTOv1Canvas
-                  graph={docGraph}
+                  graph={singleGraph}
                   query={docQuery}
                   selected={docSelection}
                   onSelect={setDocSelection}
@@ -3457,7 +3468,7 @@ export function SiChain() {
             </div>
 
             <GraphDTOv1Legend open={docLegendOpen} onToggle={() => setDocLegendOpen((v) => !v)} />
-            <GraphDTOv1DetailSheet graph={docGraph} selection={docSelection} onClose={() => setDocSelection(null)} />
+            <GraphDTOv1DetailSheet graph={singleGraph} selection={docSelection} onClose={() => setDocSelection(null)} />
           </div>
         )}
 
@@ -3496,8 +3507,8 @@ export function SiChain() {
               </div>
               <div className="flex items-center justify-between px-5 pt-3 pb-4 flex-shrink-0">
                 <div>
-                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '20px', fontWeight: 900, letterSpacing: '-0.02em' }}>选择文档</p>
-                  <p style={{ color: '#9CA3AF', fontSize: '12px', marginTop: 2 }}>共 {documents.length} 个</p>
+                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '20px', fontWeight: 900, letterSpacing: '-0.02em' }}>选择内容</p>
+                  <p style={{ color: '#9CA3AF', fontSize: '12px', marginTop: 2 }}>共 {docPickerType === 'doc' ? documents.length : notes.length} 个</p>
                 </div>
                 <button onClick={() => setDocPickerOpen(false)} className="w-9 h-9 rounded-2xl flex items-center justify-center"
                   style={{ background: 'rgba(59,130,246,0.10)' }}>
@@ -3505,69 +3516,148 @@ export function SiChain() {
                 </button>
               </div>
               <div className="px-5 pb-3 flex-shrink-0">
+                <div className="flex gap-2">
+                  {([
+                    { key: 'doc', label: '文档' },
+                    { key: 'note', label: '笔记' },
+                  ] as { key: SingleSourceType; label: string }[]).map((t) => (
+                    <button
+                      key={t.key}
+                      onClick={() => setDocPickerType(t.key)}
+                      className="px-4 py-1.5 rounded-full transition-all"
+                      style={docPickerType === t.key
+                        ? { background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '12.5px', fontWeight: 700, boxShadow: '0 2px 10px rgba(99,102,241,0.3)' }
+                        : { background: 'var(--hi-chip-bg)', color: 'var(--hi-text-dim)', fontSize: '12.5px', border: '1px solid var(--hi-card-border)' }
+                      }
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="px-5 pb-3 flex-shrink-0">
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-2xl" style={{ background: 'var(--hi-input-bg)', border: '1px solid var(--hi-card-border)' }}>
                   <Search size={14} style={{ color: '#9CA3AF' }} />
                   <input
                     value={docPickerQuery}
                     onChange={(e) => setDocPickerQuery(e.target.value)}
-                    placeholder="搜索文档标题"
+                    placeholder={docPickerType === 'doc' ? '搜索文档标题' : '搜索笔记标题/内容'}
                     className="flex-1 bg-transparent outline-none"
                     style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 600 }}
                   />
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto px-5 pb-6">
-                {documentsLoading ? (
+                {docPickerType === 'doc' && documentsLoading ? (
                   <p style={{ color: '#9CA3AF', fontSize: '12px' }}>加载中…</p>
-                ) : documents.length === 0 ? (
+                ) : docPickerType === 'doc' && documents.length === 0 ? (
                   <p style={{ color: '#9CA3AF', fontSize: '12px' }}>暂无文档</p>
+                ) : docPickerType === 'note' && notes.length === 0 ? (
+                  <p style={{ color: '#9CA3AF', fontSize: '12px' }}>暂无笔记</p>
                 ) : (
                   <div className="space-y-2">
-                    {documents
-                      .filter((d) => {
-                        const q = docPickerQuery.trim().toLowerCase();
-                        if (!q) return true;
-                        return String(d.title || '').toLowerCase().includes(q) || String(d.id || '').toLowerCase().includes(q);
-                      })
-                      .map((d) => {
-                        const active = String(d.id) === String(selectedDocId);
-                        return (
-                          <button
-                            key={d.id}
-                            onClick={() => {
-                              const id = String(d.id);
-                              setSelectedDocId(id);
-                              setDocSelection(null);
-                              setDocCenterReq(null);
-                              setDocPickerOpen(false);
-                              loadDocGraph(id, false);
-                            }}
-                            className="w-full text-left p-4 rounded-2xl transition-all active:scale-[0.98]"
-                            style={{
-                              background: active ? 'rgba(59,130,246,0.10)' : 'rgba(59,130,246,0.04)',
-                              border: active ? '1.5px solid rgba(59,130,246,0.30)' : '1px solid rgba(59,130,246,0.10)',
-                            }}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                                style={{ background: 'rgba(59,130,246,0.10)' }}>
-                                <FileText size={18} style={{ color: '#3B82F6' }} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>{d.title || d.id}</p>
-                                <p className="truncate" style={{ color: '#9CA3AF', fontSize: '11px', marginTop: 2 }}>{String(d.id)}</p>
-                              </div>
-                              {active && (
-                                <div className="px-2 py-1 rounded-full flex items-center gap-1"
-                                  style={{ background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.25)' }}>
-                                  <Check size={12} style={{ color: '#3B82F6' }} />
-                                  <span style={{ color: '#3B82F6', fontSize: '10px', fontWeight: 900 }}>已选</span>
+                    {docPickerType === 'doc' ? (
+                      documents
+                        .filter((d) => {
+                          const q = docPickerQuery.trim().toLowerCase();
+                          if (!q) return true;
+                          return String(d.title || '').toLowerCase().includes(q) || String(d.id || '').toLowerCase().includes(q);
+                        })
+                        .map((d) => {
+                          const active = selectedSourceType === 'doc' && String(d.id) === String(selectedSourceId);
+                          return (
+                            <button
+                              key={d.id}
+                              onClick={() => {
+                                const id = String(d.id);
+                                setSelectedSourceType('doc');
+                                setSelectedSourceId(id);
+                                setDocSelection(null);
+                                setDocCenterReq(null);
+                                setDocPickerOpen(false);
+                                loadSingleGraph('doc', id, false);
+                              }}
+                              className="w-full text-left p-4 rounded-2xl transition-all active:scale-[0.98]"
+                              style={{
+                                background: active ? 'rgba(59,130,246,0.10)' : 'rgba(59,130,246,0.04)',
+                                border: active ? '1.5px solid rgba(59,130,246,0.30)' : '1px solid rgba(59,130,246,0.10)',
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                                  style={{ background: 'rgba(59,130,246,0.10)' }}>
+                                  <FileText size={18} style={{ color: '#3B82F6' }} />
                                 </div>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
+                                <div className="flex-1 min-w-0">
+                                  <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>{d.title || d.id}</p>
+                                  <p className="truncate" style={{ color: '#9CA3AF', fontSize: '11px', marginTop: 2 }}>{String(d.id)}</p>
+                                </div>
+                                {active && (
+                                  <div className="px-2 py-1 rounded-full flex items-center gap-1"
+                                    style={{ background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.25)' }}>
+                                    <Check size={12} style={{ color: '#3B82F6' }} />
+                                    <span style={{ color: '#3B82F6', fontSize: '10px', fontWeight: 900 }}>已选</span>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })
+                    ) : (
+                      notes
+                        .filter((n) => {
+                          const q = docPickerQuery.trim().toLowerCase();
+                          if (!q) return true;
+                          return String(n.title || '').toLowerCase().includes(q)
+                            || String(n.content || '').toLowerCase().includes(q)
+                            || String(n.id || '').toLowerCase().includes(q);
+                        })
+                        .map((n) => {
+                          const active = selectedSourceType === 'note' && String(n.id) === String(selectedSourceId);
+                          const subtitle = String(n.content || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                          return (
+                            <button
+                              key={n.id}
+                              onClick={() => {
+                                const id = String(n.id);
+                                setSelectedSourceType('note');
+                                setSelectedSourceId(id);
+                                setDocSelection(null);
+                                setDocCenterReq(null);
+                                setDocPickerOpen(false);
+                                loadSingleGraph('note', id, false);
+                              }}
+                              className="w-full text-left p-4 rounded-2xl transition-all active:scale-[0.98]"
+                              style={{
+                                background: active ? 'rgba(99,102,241,0.10)' : 'rgba(99,102,241,0.04)',
+                                border: active ? '1.5px solid rgba(99,102,241,0.30)' : '1px solid rgba(99,102,241,0.10)',
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                                  style={{ background: 'rgba(99,102,241,0.10)' }}>
+                                  <Layers size={18} style={{ color: '#6366F1' }} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>
+                                    {n.title || (subtitle ? `${subtitle.slice(0, 18)}…` : n.id)}
+                                  </p>
+                                  <p className="truncate" style={{ color: '#9CA3AF', fontSize: '11px', marginTop: 2 }}>
+                                    {subtitle ? subtitle.slice(0, 40) : String(n.id)}
+                                  </p>
+                                </div>
+                                {active && (
+                                  <div className="px-2 py-1 rounded-full flex items-center gap-1"
+                                    style={{ background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.25)' }}>
+                                    <Check size={12} style={{ color: '#6366F1' }} />
+                                    <span style={{ color: '#6366F1', fontSize: '10px', fontWeight: 900 }}>已选</span>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })
+                    )}
                   </div>
                 )}
               </div>

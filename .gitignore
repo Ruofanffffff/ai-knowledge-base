@@ -72,3 +72,6 @@ ios/
 
 # APK files (upload separately)
 downloads/*.apk
+
+# Local toolchains
+.tools/
