@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { ArrowLeft, CheckCheck, FileText, LayoutGrid, PencilLine, Sparkles, Trash2, X } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { documentsLibraryService, type LibraryDocument } from '../services/documentsLibraryService';
 import { aiService } from '../services/aiService';
+import { api } from '../services/api';
 import { toast } from '../components/ui/Toast';
+import { Drawer, DrawerContent } from '../components/ui/drawer';
 
 function formatDateTime(value?: string): string | null {
   if (!value) return null;
@@ -137,6 +139,34 @@ function extractReadableTextFromJson(parsed: unknown): string | null {
 
 type AIToolAction = 'expand' | 'proofread';
 type AIPanel = 'none' | 'loading' | 'result';
+type StoredSummary = NonNullable<LibraryDocument['summaries']>[number];
+
+type StructuredSummary = {
+  documentType?: string;
+  typeTags?: string[];
+  overview?: string;
+  keyPoints?: string[];
+  keywords?: string[];
+  applications?: string[];
+  comment?: string;
+  quality?: {
+    completeness?: number;
+    clarity?: number;
+    comment?: string;
+  };
+};
+
+function parseStoredSummaryContent(content: string): StructuredSummary {
+  const raw = String(content || '').trim();
+  if (!raw) return { overview: '' };
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (isRecord(parsed)) return parsed as StructuredSummary;
+    return { overview: raw };
+  } catch {
+    return { overview: raw };
+  }
+}
 
 export function DocumentDetail() {
   const navigate = useNavigate();
@@ -151,9 +181,9 @@ export function DocumentDetail() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summary, setSummary] = useState<any | null>(null);
+  const [summary, setSummary] = useState<StructuredSummary | null>(null);
   const [summaryError, setSummaryError] = useState<{ title: string; subtitle?: string } | null>(null);
-  const summaryRef = useRef<HTMLDivElement | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [aiPanel, setAiPanel] = useState<AIPanel>('none');
   const [aiAction, setAiAction] = useState<AIToolAction | null>(null);
   const [aiLoadingText, setAiLoadingText] = useState('');
@@ -175,6 +205,7 @@ export function DocumentDetail() {
     setSummaryLoading(false);
     setSummary(null);
     setSummaryError(null);
+    setSummaryOpen(false);
     setAiPanel('none');
     setAiAction(null);
     setAiLoadingText('');
@@ -226,9 +257,19 @@ export function DocumentDetail() {
     return text.length;
   }, [contentView.main, editContent, isEditing]);
 
-  const scrollToSummary = () => {
-    summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const latestStoredSummary = useMemo<StoredSummary | null>(() => {
+    const list = Array.isArray(doc?.summaries) ? doc?.summaries : [];
+    if (!list || list.length === 0) return null;
+    return list[list.length - 1] || null;
+  }, [doc?.summaries]);
+
+  const storedSummary = useMemo<StructuredSummary | null>(() => {
+    if (!latestStoredSummary?.content) return null;
+    return parseStoredSummaryContent(latestStoredSummary.content);
+  }, [latestStoredSummary?.content]);
+
+  const displaySummary = storedSummary || summary;
+  const storedSummaryTime = useMemo(() => formatDateTime(latestStoredSummary?.createdAt), [latestStoredSummary?.createdAt]);
 
   const handleStartEdit = () => {
     if (!doc || saving || deleting) return;
@@ -378,33 +419,60 @@ export function DocumentDetail() {
     }
   };
 
-  const handleSummarize = async () => {
-    if (summaryLoading || deleting) return;
-    const text = getSummarizeText();
-    if (!text) {
-      toast.warning('没有可总结的内容');
-      return;
-    }
+  const handleSummarize = () => {
+    if (deleting) return;
+    setSummaryOpen(true);
+  };
 
+  const handleGenerateSummary = async () => {
+    const docId = String(id || '');
+    if (!docId || !doc || deleting) return;
+
+    setSummaryOpen(true);
     setSummaryLoading(true);
     setSummaryError(null);
     const toastId = toast.loading('AI 总结中…');
     try {
-      const result = await aiService.summarizeText(text, doc?.title);
+      await aiService.summarizeDocument(docId);
+      const refreshed = await documentsLibraryService.get(docId);
+      setDoc(refreshed);
+      setSummary(null);
       toast.dismiss(toastId);
-      setSummary(result);
-      setSummaryError(null);
-      toast.success('已生成 AI 总结', { action: { label: '定位', onClick: scrollToSummary } });
-      setTimeout(scrollToSummary, 30);
+      toast.success('已生成 AI 总结');
     } catch (e) {
-      toast.dismiss(toastId);
+      const status = (e as any)?.status;
+      if (status === 404 || status === 501) {
+        try {
+          const text = getSummarizeText();
+          if (!text) {
+            toast.dismiss(toastId);
+            toast.warning('没有可总结的内容');
+            return;
+          }
+          const result = await aiService.summarizeText(text, doc?.title);
+          setSummary(result);
+          toast.dismiss(toastId);
+          toast.success('已生成 AI 总结（未保存）');
+          return;
+        } catch (inner) {
+          const title = (inner as any)?.title ? String((inner as any).title) : 'AI 总结失败';
+          const subtitle =
+            (inner as any)?.subtitle ? String((inner as any).subtitle) : (inner instanceof Error ? inner.message : String(inner || '请求失败'));
+          setSummary(null);
+          setSummaryError({ title, subtitle });
+          toast.dismiss(toastId);
+          toast.error(title, { subtitle });
+          return;
+        }
+      }
+
       const title = (e as any)?.title ? String((e as any).title) : 'AI 总结失败';
       const subtitle =
         (e as any)?.subtitle ? String((e as any).subtitle) : (e instanceof Error ? e.message : String(e || '请求失败'));
       setSummary(null);
       setSummaryError({ title, subtitle });
-      toast.error(title, { subtitle, action: { label: '定位', onClick: scrollToSummary } });
-      setTimeout(scrollToSummary, 30);
+      toast.dismiss(toastId);
+      toast.error(title, { subtitle });
     } finally {
       setSummaryLoading(false);
     }
@@ -489,16 +557,41 @@ export function DocumentDetail() {
           )}
 
           {!isEditing ? (
-            <button
-              type="button"
-              onClick={handleStartEdit}
-              disabled={saving || deleting || loading}
-              className="flex items-center justify-center w-9 h-9 rounded-2xl active:scale-95 transition-transform disabled:opacity-60"
-              style={{ background: 'var(--hi-icon-bg)' }}
-              aria-label="编辑"
-            >
-              <PencilLine size={16} style={{ color: '#6366F1' }} />
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    // @ts-ignore
+                    const res = await api.post('/community/publish', {
+                      items: [{ id: doc.id, type: 'document' }],
+                      isPublic: true
+                    });
+                    if (res.data.success) {
+                      toast.success('已成功发布到思圈');
+                      navigate('/sicircle');
+                    }
+                  } catch (e: any) {
+                    toast.error(e.response?.data?.error || '发布失败');
+                  }
+                }}
+                className="flex items-center justify-center w-9 h-9 rounded-2xl active:scale-95 transition-transform disabled:opacity-60"
+                style={{ background: 'var(--hi-icon-bg)' }}
+                aria-label="发布到思圈"
+              >
+                <Sparkles size={16} style={{ color: '#8B5CF6' }} />
+              </button>
+              <button
+                type="button"
+                onClick={handleStartEdit}
+                disabled={saving || deleting || loading}
+                className="flex items-center justify-center w-9 h-9 rounded-2xl active:scale-95 transition-transform disabled:opacity-60"
+                style={{ background: 'var(--hi-icon-bg)' }}
+                aria-label="编辑"
+              >
+                <PencilLine size={16} style={{ color: '#6366F1' }} />
+              </button>
+            </>
           ) : (
             <button
               type="button"
@@ -599,65 +692,6 @@ export function DocumentDetail() {
                   </pre>
                 </div>
               )}
-
-              <div ref={summaryRef} className="mt-3">
-                <div className="rounded-[18px] p-4" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.14)' }}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p style={{ color: '#4F46E5', fontSize: '13px', fontWeight: 900 }}>AI 总结</p>
-                      <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11.5px', marginTop: 6, lineHeight: 1.45 }}>
-                        {summaryLoading ? '正在生成总结…' : summary ? '已生成，可随时重试刷新结果' : summaryError ? '生成失败，可重试' : '点击上方「AI 总结」生成'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleSummarize}
-                      disabled={summaryLoading || deleting}
-                      className="px-3 py-2 rounded-2xl active:scale-[0.98] transition-all disabled:opacity-60"
-                      style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.20)' }}
-                    >
-                      <span style={{ color: '#4F46E5', fontSize: '12px', fontWeight: 900 }}>
-                        {summaryLoading ? '生成中…' : summary ? '重试' : '生成'}
-                      </span>
-                    </button>
-                  </div>
-
-                  {summaryError && (
-                    <div className="mt-3 rounded-2xl p-3" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
-                      <p style={{ color: '#EF4444', fontSize: '12.5px', fontWeight: 900 }}>{summaryError.title}</p>
-                      {summaryError.subtitle && (
-                        <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11.5px', marginTop: 6, lineHeight: 1.45 }}>
-                          {summaryError.subtitle}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {summary && typeof summary === 'object' && (
-                    <div className="mt-4 space-y-4">
-                      {renderSummaryField('类型', (summary as any).documentType)}
-                      {renderSummaryField('概览', (summary as any).overview)}
-                      {renderSummaryList('要点', (summary as any).keyPoints)}
-                      {renderSummaryList('关键词', (summary as any).keywords)}
-                      {renderSummaryList('应用场景', (summary as any).applications)}
-                      {renderSummaryList('类型标签', (summary as any).typeTags)}
-                      {renderSummaryField('补充说明', (summary as any).comment)}
-                      {(summary as any).quality && typeof (summary as any).quality === 'object' && (
-                        <div>
-                          <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', fontWeight: 800 }}>质量</p>
-                          <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', lineHeight: 1.65, marginTop: 6 }}>
-                            {typeof (summary as any).quality.completeness === 'number' ? `完整度 ${(summary as any).quality.completeness}` : ''}
-                            {typeof (summary as any).quality.clarity === 'number' ? ` · 清晰度 ${(summary as any).quality.clarity}` : ''}
-                            {typeof (summary as any).quality.comment === 'string' && (summary as any).quality.comment.trim()
-                              ? ` · ${(summary as any).quality.comment.trim()}`
-                              : ''}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
 
               {contentView.kind === 'json' && contentView.rawJson && (
                 <details
@@ -858,6 +892,124 @@ export function DocumentDetail() {
           </div>
         </div>
       )}
+
+      <Drawer open={summaryOpen} onOpenChange={(open) => { if (!summaryLoading) setSummaryOpen(open); }}>
+        <DrawerContent
+          className="mx-auto w-full max-w-lg"
+          style={{
+            background: 'rgba(253,253,255,0.99)',
+            boxShadow: '0 -12px 40px rgba(99,102,241,0.15), 0 -1px 0 rgba(99,102,241,0.10)',
+            backdropFilter: 'blur(28px)',
+            WebkitBackdropFilter: 'blur(28px)',
+            borderRadius: '24px 24px 0 0',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+          }}
+        >
+          <div className="overflow-y-auto" style={{ maxHeight: '80vh' }}>
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(99,102,241,0.18)' }} />
+            </div>
+
+            <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid rgba(99,102,241,0.08)' }}>
+              <div className="min-w-0">
+                <p className="truncate" style={{ fontSize: '14px', fontWeight: 900, color: '#1a1a2e' }}>AI 总结</p>
+                <p style={{ color: 'rgba(107,114,128,0.95)', fontSize: '11.5px', marginTop: 4 }}>
+                  {storedSummary
+                    ? `${storedSummaryTime ? `${storedSummaryTime} · ` : ''}已生成，可随时重新生成`
+                    : summary
+                      ? '本次为临时总结（未保存）'
+                      : '查看或生成当前文档的总结'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { if (!summaryLoading) setSummaryOpen(false); }}
+                className="w-8 h-8 flex items-center justify-center rounded-2xl transition-all active:scale-90"
+                style={{ background: 'rgba(99,102,241,0.08)' }}
+                aria-label="关闭"
+              >
+                <X size={15} style={{ color: '#6366F1' }} />
+              </button>
+            </div>
+
+            <div className="p-5">
+              {summaryError && (
+                <div className="rounded-2xl p-3" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
+                  <p style={{ color: '#EF4444', fontSize: '12.5px', fontWeight: 900 }}>{summaryError.title}</p>
+                  {summaryError.subtitle && (
+                    <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11.5px', marginTop: 6, lineHeight: 1.45 }}>
+                      {summaryError.subtitle}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {summaryLoading && (
+                <div className="flex flex-col items-center justify-center gap-3 py-10">
+                  <div className="w-10 h-10 rounded-full animate-spin" style={{ border: '3px solid rgba(99,102,241,0.15)', borderTopColor: '#6366F1' }} />
+                  <p style={{ color: '#6366F1', fontSize: '13px', fontWeight: 700 }}>正在生成总结…</p>
+                </div>
+              )}
+
+              {!summaryLoading && displaySummary && (
+                <div className="rounded-[18px] p-4" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.14)' }}>
+                  <div className="space-y-4">
+                    {renderSummaryField('类型', displaySummary.documentType)}
+                    {renderSummaryField('概览', displaySummary.overview)}
+                    {renderSummaryList('要点', displaySummary.keyPoints)}
+                    {renderSummaryList('关键词', displaySummary.keywords)}
+                    {renderSummaryList('应用场景', displaySummary.applications)}
+                    {renderSummaryList('类型标签', displaySummary.typeTags)}
+                    {renderSummaryField('补充说明', displaySummary.comment)}
+                    {displaySummary.quality && (
+                      <div>
+                        <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', fontWeight: 800 }}>质量</p>
+                        <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', lineHeight: 1.65, marginTop: 6 }}>
+                          {typeof displaySummary.quality.completeness === 'number' ? `完整度 ${displaySummary.quality.completeness}` : ''}
+                          {typeof displaySummary.quality.clarity === 'number' ? ` · 清晰度 ${displaySummary.quality.clarity}` : ''}
+                          {typeof displaySummary.quality.comment === 'string' && displaySummary.quality.comment.trim()
+                            ? ` · ${displaySummary.quality.comment.trim()}`
+                            : ''}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!summaryLoading && !displaySummary && !summaryError && (
+                <div className="rounded-[18px] p-4" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
+                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '13.5px', fontWeight: 900 }}>还没有 AI 总结</p>
+                  <p style={{ color: 'var(--hi-text-secondary)', fontSize: '12px', marginTop: 8, lineHeight: 1.55 }}>
+                    生成后会保存到思库，后续在 Web/移动端都可直接查看。
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-4">
+                <button
+                  type="button"
+                  onClick={handleGenerateSummary}
+                  disabled={summaryLoading || deleting}
+                  className="flex-1 py-3 rounded-2xl transition-all active:scale-95 disabled:opacity-60"
+                  style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '14px', fontWeight: 900 }}
+                >
+                  {storedSummary || summary ? '重新生成' : '生成总结'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { if (!summaryLoading) setSummaryOpen(false); }}
+                  disabled={summaryLoading}
+                  className="px-4 py-3 rounded-2xl transition-all active:scale-95 disabled:opacity-60"
+                  style={{ background: 'rgba(99,102,241,0.08)', color: '#6366F1', fontSize: '14px', fontWeight: 800 }}
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       {confirmDeleteOpen && (
         <div

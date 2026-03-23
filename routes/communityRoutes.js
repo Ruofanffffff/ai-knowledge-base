@@ -110,23 +110,28 @@ function initCommunityRoutes(externalDb, prismaClient) {
 
 /**
  * POST /api/community/publish
- * 发布文档到社区
+ * 发布内容到社区
  * 
- * Body: { documentIds: number[], isPublic: boolean }
+ * Body: { items: { id: number, type: 'document'|'note' }[], isPublic: boolean }
+ * 兼容旧版: { documentIds: number[], isPublic: boolean }
  * Response: { success: true, data: { published: [...], skipped: [...] } }
- * 
- * Validates: Requirements 1.2, 1.3, 1.4, 1.6
  */
 router.post('/publish', authMiddleware, requirePermission('community:publish'), (req, res) => {
   try {
-    const { documentIds, isPublic = false } = req.body;
+    const { documentIds, items, isPublic = false } = req.body;
     const userId = req.userId;
 
-    // 校验 documentIds 非空
-    if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
+    let publishItems = [];
+    if (items && Array.isArray(items)) {
+      publishItems = items;
+    } else if (documentIds && Array.isArray(documentIds)) {
+      publishItems = documentIds.map(id => ({ id, type: 'document' }));
+    }
+
+    if (!publishItems || publishItems.length === 0) {
       return res.status(400).json({
         success: false,
-        error: '请提供要发布的文档ID'
+        error: '请提供要发布的内容ID'
       });
     }
 
@@ -134,92 +139,88 @@ router.post('/publish', authMiddleware, requirePermission('community:publish'), 
     const skipped = [];
     let processed = 0;
 
-    documentIds.forEach((documentId) => {
-      // 将字符串ID转换为整数（前端传递的是字符串，数据库存储的是整数）
-      const numericDocId = parseInt(documentId, 10);
-      if (isNaN(numericDocId)) {
-        skipped.push({ documentId, reason: '无效的文档ID' });
+    publishItems.forEach((item) => {
+      const numericId = parseInt(item.id, 10);
+      const sourceType = item.type === 'note' ? 'note' : 'document';
+      
+      if (isNaN(numericId)) {
+        skipped.push({ id: item.id, reason: '无效的内容ID' });
         processed++;
-        if (processed === documentIds.length) {
+        if (processed === publishItems.length) {
           return res.json({ success: true, data: { published, skipped } });
         }
         return;
       }
 
-      // 查询文档信息
+      const table = sourceType === 'note' ? 'notes' : 'documents';
+      
       db.get(
-        'SELECT id, title, content, tags FROM documents WHERE id = ?',
-        [numericDocId],
+        `SELECT id, title, content, tags FROM ${table} WHERE id = ?`,
+        [numericId],
         (err, doc) => {
           if (err) {
-            console.error('查询文档失败:', err);
-            return res.status(500).json({
-              success: false,
-              error: '服务器内部错误'
-            });
-          }
-
-          if (!doc) {
-            skipped.push({ documentId, reason: '文档不存在' });
+            console.error('查询内容失败:', err);
+            skipped.push({ id: item.id, reason: '查询失败' });
             processed++;
-            if (processed === documentIds.length) {
-              return res.json({ success: true, data: { published, skipped } });
-            }
+            if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
             return;
           }
 
-          // 检查是否已发布
+          if (!doc) {
+            skipped.push({ id: item.id, reason: '内容不存在' });
+            processed++;
+            if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
+            return;
+          }
+
           db.get(
-            'SELECT id FROM community_posts WHERE document_id = ?',
-            [numericDocId],
+            'SELECT id FROM community_posts WHERE source_type = ? AND source_id = ?',
+            [sourceType, numericId],
             (err, existing) => {
               if (err) {
                 console.error('查询社区帖子失败:', err);
-                return res.status(500).json({
-                  success: false,
-                  error: '服务器内部错误'
-                });
-              }
-
-              if (existing) {
-                skipped.push({ documentId, reason: '已发布' });
+                skipped.push({ id: item.id, reason: '查询帖子失败' });
                 processed++;
-                if (processed === documentIds.length) {
-                  return res.json({ success: true, data: { published, skipped } });
-                }
+                if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
                 return;
               }
 
-              // 插入社区帖子
-              // 逻辑：如果文档内容有图片，随机选一张作为封面；否则触发 AI 异步生成
+              if (existing) {
+                skipped.push({ id: item.id, reason: '已发布' });
+                processed++;
+                if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
+                return;
+              }
+
               const summary = extractTextFromContent(doc.content);
               const contentImages = extractImagesFromContent(doc.content);
               const coverImage = contentImages.length > 0
                 ? contentImages[Math.floor(Math.random() * contentImages.length)]
                 : null;
 
+              // legacy document_id support
+              const documentIdVal = sourceType === 'document' ? numericId : null;
+
               db.run(
-                `INSERT INTO community_posts (user_id, document_id, title, summary, cover_image, tags, likes, view_count, status, is_public)
-                 VALUES (?, ?, ?, ?, ?, ?, 0, 0, 'published', ?)`,
-                [userId, numericDocId, doc.title, summary, coverImage, doc.tags, isPublic ? 1 : 0],
+                `INSERT INTO community_posts (user_id, document_id, source_type, source_id, title, summary, cover_image, tags, likes, view_count, status, is_public)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 'published', ?)`,
+                [userId, documentIdVal, sourceType, numericId, doc.title, summary, coverImage, doc.tags, isPublic ? 1 : 0],
                 function (err) {
                   if (err) {
                     console.error('插入社区帖子失败:', err);
-                    return res.status(500).json({
-                      success: false,
-                      error: '服务器内部错误'
-                    });
+                    skipped.push({ id: item.id, reason: '插入失败' });
+                    processed++;
+                    if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
+                    return;
                   }
 
                   const postId = this.lastID;
 
-                  // 仅当文档无图片时，异步触发 AI 封面生成（fire-and-forget）
-                  if (!coverImage && coverGenerationService) {
-                    coverGenerationService.generateCover(postId, numericDocId)
+                  if (!coverImage && coverGenerationService && sourceType === 'document') {
+                    coverGenerationService.generateCover(postId, numericId)
                       .catch(err => console.error('[CoverGen] 封面生成失败:', err.message));
                   }
 
-                  // 异步采集 community_publish 碎片（不阻塞主请求）
                   setImmediate(() => {
                     const fragmentContent = [doc.title, summary].filter(Boolean).join(' ');
                     fragmentCollector.collect({
@@ -227,17 +228,18 @@ router.post('/publish', authMiddleware, requirePermission('community:publish'), 
                       fragmentType: 'community_publish',
                       content: fragmentContent,
                       sourceId: String(postId),
-                      sourceMeta: { title: doc.title, summary, documentId: numericDocId }
+                      sourceMeta: { title: doc.title, summary, sourceId: numericId, sourceType }
                     }).catch(err => console.error('[FragmentCollector] community_publish collection error:', err));
                   });
 
                   published.push({
                     id: postId,
-                    documentId: numericDocId,
+                    sourceId: numericId,
+                    sourceType,
                     title: doc.title
                   });
                   processed++;
-                  if (processed === documentIds.length) {
+                  if (processed === publishItems.length) {
                     return res.json({ success: true, data: { published, skipped } });
                   }
                 }
@@ -248,7 +250,7 @@ router.post('/publish', authMiddleware, requirePermission('community:publish'), 
       );
     });
   } catch (error) {
-    console.error('发布文档到社区失败:', error);
+    console.error('发布内容到社区失败:', error);
     res.status(500).json({
       success: false,
       error: '服务器内部错误'
@@ -281,6 +283,9 @@ router.get('/posts', authMiddleware, (req, res) => {
 
     if (filter === 'mine') {
       conditions.push('cp.user_id = ?');
+      params.push(userId);
+    } else if (filter === 'following') {
+      conditions.push('cp.user_id IN (SELECT following_id FROM user_follows WHERE follower_id = ?)');
       params.push(userId);
     }
 
@@ -354,7 +359,9 @@ router.get('/posts', authMiddleware, (req, res) => {
         const posts = (rows || []).map(row => ({
           id: row.id,
           userId: row.user_id,
-          documentId: row.document_id,
+          documentId: row.document_id, // legacy
+          sourceType: row.source_type,
+          sourceId: row.source_id,
           title: row.title,
           summary: row.summary,
           coverImage: row.cover_image,
@@ -942,7 +949,9 @@ router.get('/posts/:id', authMiddleware, async (req, res) => {
         const post = {
           id: row.id,
           userId: row.user_id,
-          documentId: row.document_id,
+          documentId: row.document_id, // legacy
+          sourceType: row.source_type,
+          sourceId: row.source_id,
           title: row.title,
           summary: row.summary,
           tags: row.tags,
@@ -959,17 +968,17 @@ router.get('/posts/:id', authMiddleware, async (req, res) => {
           commentCount: row.commentCount || 0,
         };
 
-        // 查询关联文档的 content 字段，提取内容图片
+        // 查询关联内容的 content 字段，提取内容图片
         let contentImages = [];
-        // 只有当文档ID存在，且（是当前用户自己的文档 OR 文档已设为公开）才返回文档内容
-        const canViewContent = row.document_id && (row.user_id === userId || row.is_public === 1);
+        const canViewContent = row.source_id && (row.user_id === userId || row.is_public === 1);
         
         if (canViewContent) {
+          const table = row.source_type === 'note' ? 'notes' : 'documents';
           try {
             const doc = await new Promise((resolve, reject) => {
               db.get(
-                'SELECT content FROM documents WHERE id = ?',
-                [row.document_id],
+                `SELECT content FROM ${table} WHERE id = ?`,
+                [row.source_id],
                 (err, doc) => {
                   if (err) reject(err);
                   else resolve(doc);
@@ -980,16 +989,16 @@ router.get('/posts/:id', authMiddleware, async (req, res) => {
               contentImages = extractImagesFromContent(doc.content);
             }
           } catch (e) {
-            console.error('查询文档内容失败:', e);
+            console.error('查询内容失败:', e);
           }
         }
 
         // 查询文档索引（从 Prisma/KG 数据库）
         let indexData = null;
-        if (kgPrisma && row.document_id) {
+        if (kgPrisma && row.source_type === 'document' && row.source_id) {
           try {
             const docIndex = await kgPrisma.documentIndex.findFirst({
-              where: { docId: String(row.document_id) },
+              where: { docId: String(row.source_id) },
               orderBy: { version: 'desc' },
             });
             if (docIndex) {

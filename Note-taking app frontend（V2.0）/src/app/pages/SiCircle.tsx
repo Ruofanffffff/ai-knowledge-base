@@ -559,17 +559,49 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                   </motion.div>
 
                   {/* Follow button */}
-                  <motion.button
-                    whileTap={{ scale: 0.92 }}
-                    onClick={() => { setFollowed(v => !v); showToast(followed ? '已取消关注' : `已关注 @${post.user.username} ✓`); }}
-                    className="px-5 py-2 rounded-2xl transition-all"
-                    style={followed
-                      ? { background: 'rgba(99,102,241,0.08)', color: '#6366F1', fontSize: '13px', fontWeight: 700, border: '1.5px solid rgba(99,102,241,0.3)' }
-                      : { background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '13px', fontWeight: 700, boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }
-                    }
-                  >
-                    {followed ? '已关注 ✓' : '+ 关注'}
-                  </motion.button>
+                  <div className="flex gap-2">
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
+                      onClick={async () => { 
+                        try {
+                          if (followed) {
+                            await api.delete('/social/follow', { data: { followingId: post.userId } });
+                            setFollowed(false);
+                            showToast('已取消关注');
+                          } else {
+                            await api.post('/social/follow', { followingId: post.userId });
+                            setFollowed(true);
+                            showToast(`已关注 @${post.user.username} ✓`);
+                          }
+                        } catch (e) {
+                          showToast('操作失败');
+                        }
+                      }}
+                      className="px-4 py-2 rounded-2xl transition-all flex items-center justify-center"
+                      style={followed
+                        ? { background: 'rgba(99,102,241,0.08)', color: '#6366F1', fontSize: '13px', fontWeight: 700, border: '1.5px solid rgba(99,102,241,0.3)' }
+                        : { background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '13px', fontWeight: 700, boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }
+                      }
+                    >
+                      {followed ? '已关注 ✓' : '+ 关注'}
+                    </motion.button>
+
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
+                      onClick={async () => {
+                        try {
+                          await api.post('/social/friends/request', { receiverId: post.userId });
+                          showToast('已发送好友请求');
+                        } catch (e: any) {
+                          showToast(e.response?.data?.error || '请求失败');
+                        }
+                      }}
+                      className="px-3 py-2 rounded-2xl transition-all flex items-center justify-center"
+                      style={{ background: 'rgba(255,255,255,0.9)', color: '#1E1B4B', fontSize: '13px', fontWeight: 700, border: '1.5px solid rgba(30,27,75,0.1)' }}
+                    >
+                      加好友
+                    </motion.button>
+                  </div>
                 </div>
 
                 {/* Name + username */}
@@ -638,6 +670,24 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                     style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '14px', fontWeight: 700, boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
                   >
                     查看主页
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={async () => {
+                      try {
+                        const res = await api.post('/chat/conversations', { otherUserId: post.userId });
+                        if (res.data.success) {
+                          setProfileOpen(false);
+                          navigate(`/messages/${res.data.data.conversationId}`);
+                        }
+                      } catch (e: any) {
+                        showToast(e.response?.data?.error || '无法发起聊天');
+                      }
+                    }}
+                    className="flex-1 py-3 rounded-2xl"
+                    style={{ background: 'rgba(99,102,241,0.08)', color: '#6366F1', fontSize: '14px', fontWeight: 700, border: '1.5px solid rgba(99,102,241,0.2)' }}
+                  >
+                    发消息
                   </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.96 }}
@@ -719,12 +769,11 @@ export function SiCircle() {
 
   const fetchPosts = async () => {
     try {
-      // Fetch posts based on activeTab ('discover' -> latest/hottest, 'follow' -> mine or similar?)
-      // For now, mapping 'discover' to general list.
       const response = await api.get('/community/posts', {
         params: {
           limit: 20,
-          sort: activeTab === 'discover' ? 'latest' : 'hottest', // Just an example logic
+          sort: activeTab === 'discover' ? 'latest' : 'latest',
+          filter: activeTab === 'follow' ? 'following' : undefined,
         }
       });
 

@@ -23,6 +23,22 @@ router.post('/conversations', async (req, res) => {
     const { otherUserId } = req.body;
     if (!otherUserId) return res.status(400).json({ success: false, error: 'Other User ID required' });
     
+    // Check if they are friends
+    const { initDatabase } = require('../database/initUserDB');
+    const db = initDatabase();
+    
+    const isFriend = await new Promise((resolve) => {
+      db.get(
+        'SELECT id FROM friendships WHERE (user_id1 = ? AND user_id2 = ?) OR (user_id1 = ? AND user_id2 = ?)',
+        [req.userId, otherUserId, otherUserId, req.userId],
+        (err, row) => resolve(!!row)
+      );
+    });
+
+    if (!isFriend) {
+      return res.status(403).json({ success: false, error: '只能与好友发起私聊' });
+    }
+
     const conversationId = await chatService.getOrCreateDirectConversation(req.userId, otherUserId);
     res.json({ success: true, data: { conversationId } });
   } catch (err) {

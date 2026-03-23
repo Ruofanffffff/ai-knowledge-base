@@ -101,6 +101,7 @@ const userCenterRoutes = require('./routes/userCenterRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const { router: communityRouter, initCommunityRoutes } = require('./routes/communityRoutes');
+const { router: socialRouter, initSocialRoutes } = require('./routes/socialRoutes');
 const { initDatabase } = require('./database/initUserDB');
 const { PrismaClient } = require('@prisma/client');
 const kgPrisma = new PrismaClient();
@@ -113,6 +114,7 @@ const userCenterRouter = userCenterRoutes.initUserCenterRoutes();
 const adminRouter = adminRoutes.initAdminRoutes();
 // app.use('/api', chatRoutes); // Moved to later with other routes
 initCommunityRoutes(userDb, kgPrisma);
+initSocialRoutes(userDb);
 
 // Initialize storage and deduplication services
 const documentStorageService = new DocumentStorageService(userDb);
@@ -699,6 +701,7 @@ app.use('/api/notes', notesRoutes);
 
 // 社区路由
 app.use('/api/community', communityRouter);
+app.use('/api/social', socialRouter);
 
 // 聊天路由
 app.use('/api', chatRoutes);

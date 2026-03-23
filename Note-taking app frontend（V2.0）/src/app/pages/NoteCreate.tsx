@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { ParticleBackground } from '../components/ParticleBackground';
 
 import { documentService } from '../services/documentService';
+import { api } from '../services/api';
 
 /* ═══════════════════════════════════════════════════════════════
    FormatToolbar — iPhone Notes keyboard-accessory-style bar
@@ -1542,28 +1543,31 @@ export function NoteCreate() {
   const removeTag = (tag: string) => setTags(prev => prev.filter(t => t !== tag));
 
   /* ── Share to 思圈 ─────────────────��───────────────────────── */
-  const handleSharePublish = () => {
-    if (!shareCaption.trim() && !content.trim()) {
-      toast.error('请输入分享内容');
+  const handleSharePublish = async () => {
+    if (!existingNote?.id) {
+      toast.error('请先保存笔记');
       return;
     }
     setShareStep('publishing');
-    setTimeout(() => {
-      setShareStep('done');
-      const posts = JSON.parse(localStorage.getItem('si_quan_posts') || '[]');
-      posts.unshift({
-        id: Date.now().toString(),
-        author: { name: '我', avatar: null, id: 'me' },
-        content: shareCaption || title || content.replace(/<[^>]+>/g, '').slice(0, 120),
-        topics: tags,
-        visibility: shareVisibility,
-        createdAt: new Date().toISOString(),
-        likes: 0,
-        comments: 0,
-        isLiked: false,
+    try {
+      const res = await api.post('/community/publish', {
+        items: [{ id: existingNote.id, type: 'note' }],
+        isPublic: true
       });
-      localStorage.setItem('si_quan_posts', JSON.stringify(posts));
-    }, 1800);
+      if (res.data.success) {
+        setShareStep('done');
+        setTimeout(() => {
+          setShowShareSheet(false);
+          setShareStep('compose');
+        }, 1500);
+      } else {
+        toast.error('发布失败');
+        setShareStep('compose');
+      }
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || '发布失败');
+      setShareStep('compose');
+    }
   };
 
   /* ── Text selection for AI (long-press only) ────────────────── */

@@ -3048,6 +3048,7 @@ function LegacySiChain() {
 
 export function SiChain() {
   const navigate = useNavigate();
+  const { notes } = useNotes();
 
   const [mainTab, setMainTab] = useState<'unified' | 'doc'>('unified');
 
@@ -3204,6 +3205,98 @@ export function SiChain() {
     if (!set || set.size === 0) return [];
     return docGraph.entities.filter((e) => set.has(e.id)).slice(0, 8);
   }, [docGraph, docQuery]);
+
+  const [noteInnerTab, setNoteInnerTab] = useState<'combined' | 'single'>('combined');
+  const [noteEntityMap, setNoteEntityMap] = useState<Record<string, string[]>>({});
+  const [singleGraphMap, setSingleGraphMap] = useState<Record<string, { entities: BackendKgEntity[]; relations: BackendKgRelation[] }>>({});
+  const [noteMode, setNoteMode] = useState<'all' | string>('all');
+  const [noteSelectedNode, setNoteSelectedNode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mainTab !== 'note') return;
+    let cancelled = false;
+    const loadCombinedGraph = async () => {
+      if (!notes.length) {
+        if (!cancelled) setNoteEntityMap({});
+        return;
+      }
+      const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      try {
+        const response = await api.get('/kg/notes/graph');
+        const serverMap = response.data?.data?.noteEntityMap;
+        if (!cancelled && serverMap && typeof serverMap === 'object') setNoteEntityMap(serverMap);
+      } catch {
+        const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt;
+        await reportTelemetryEvent({
+          name: 'sichain_mobile_graph_fetch_failed',
+          data: { endpoint: '/kg/notes/graph' },
+        });
+        if (!cancelled) setNoteEntityMap({});
+        if (elapsed > 4000) {
+          await reportTelemetryEvent({
+            name: 'sichain_mobile_graph_fetch_slow',
+            data: { endpoint: '/kg/notes/graph', elapsedMs: Math.round(elapsed) },
+          });
+        }
+      }
+    };
+    loadCombinedGraph();
+    return () => {
+      cancelled = true;
+    };
+  }, [mainTab, notes]);
+
+  useEffect(() => {
+    if (mainTab !== 'note') return;
+    let cancelled = false;
+    const loadSingleGraph = async () => {
+      if (noteMode === 'all' || singleGraphMap[noteMode]) return;
+      const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      try {
+        const response = await api.get(`/kg/note/${noteMode}/graph`);
+        const entities = Array.isArray(response.data?.data?.entities) ? response.data.data.entities : [];
+        const relations = Array.isArray(response.data?.data?.relations) ? response.data.data.relations : [];
+        if (!cancelled) {
+          setSingleGraphMap((prev) => ({ ...prev, [noteMode]: { entities, relations } }));
+          if (entities.length > 0) {
+            setNoteEntityMap((prev) => ({
+              ...prev,
+              [noteMode]: Array.from(new Set(entities.map((entity: BackendKgEntity) => String(entity.name || '').trim()).filter(Boolean)))
+            }));
+          }
+        }
+      } catch (error) {
+        const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt;
+        await reportTelemetryEvent({
+          name: 'sichain_mobile_graph_fetch_failed',
+          data: { endpoint: '/kg/note/:noteId/graph', noteId: noteMode, message: error instanceof Error ? error.message : String(error) },
+        });
+        if (elapsed > 4000) {
+          await reportTelemetryEvent({
+            name: 'sichain_mobile_graph_fetch_slow',
+            data: { endpoint: '/kg/note/:noteId/graph', noteId: noteMode, elapsedMs: Math.round(elapsed) },
+          });
+        }
+      }
+    };
+    loadSingleGraph();
+    return () => {
+      cancelled = true;
+    };
+  }, [mainTab, noteMode, singleGraphMap]);
+
+  const graphNotes = useMemo(() => {
+    return notes.map(note => ({
+      ...note,
+      tags: mergeNoteTags(note, noteEntityMap)
+    }));
+  }, [notes, noteEntityMap]);
+
+  const allTags = useMemo(() => Array.from(new Set(graphNotes.flatMap(n => normalizeNoteTags(n.tags)))), [graphNotes]);
+
+  const selectedNote = noteSelectedNode && !noteSelectedNode.startsWith('tag_')
+    ? graphNotes.find(n => n.id === noteSelectedNode)
+    : null;
 
   const headerPill = useMemo(() => {
     if (mainTab === 'unified') return unifiedGraph ? `${unifiedGraph.entities.length} 实体 · ${unifiedGraph.relations.length} 关系` : '全局图谱';

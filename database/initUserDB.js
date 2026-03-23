@@ -190,38 +190,45 @@ function createTables(db) {
     )`);
 
     db.run(`CREATE TABLE IF NOT EXISTS community_posts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    document_id INTEGER NOT NULL,
-    title VARCHAR(255),
-    summary TEXT,
-    cover_image VARCHAR(500),
-    tags TEXT,
-    likes INTEGER DEFAULT 0,
-    view_count INTEGER DEFAULT 0,
-    status VARCHAR(20) DEFAULT 'published',
-    is_public BOOLEAN DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (document_id) REFERENCES documents(id)
-  )`);
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      document_id INTEGER, -- legacy, keeping for compatibility
+      source_type VARCHAR(20) DEFAULT 'document', -- 'document' or 'note'
+      source_id INTEGER, -- points to documents.id or notes.id
+      title VARCHAR(255),
+      summary TEXT,
+      cover_image VARCHAR(500),
+      tags TEXT,
+      likes INTEGER DEFAULT 0,
+      view_count INTEGER DEFAULT 0,
+      status VARCHAR(20) DEFAULT 'published',
+      is_public BOOLEAN DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`);
   
-  // 检查是否需要添加 is_public 列（针对旧数据库）
-  db.all("PRAGMA table_info(community_posts)", (err, rows) => {
-    if (err) {
-      console.error('Check table info failed:', err);
-      return;
-    }
-    const hasIsPublic = rows.some(row => row.name === 'is_public');
-    if (!hasIsPublic) {
-      console.log('Adding is_public column to community_posts table...');
-      db.run("ALTER TABLE community_posts ADD COLUMN is_public BOOLEAN DEFAULT 0", (err) => {
-        if (err) console.error('Add is_public column failed:', err);
-        else console.log('Added is_public column successfully');
-      });
-    }
-  });
+    // 检查并添加新增列
+    db.all("PRAGMA table_info(community_posts)", (err, rows) => {
+      if (err) {
+        console.error('Check table info failed:', err);
+        return;
+      }
+      
+      const columnNames = rows.map(row => row.name);
+      
+      if (!columnNames.includes('is_public')) {
+        db.run("ALTER TABLE community_posts ADD COLUMN is_public BOOLEAN DEFAULT 0");
+      }
+      if (!columnNames.includes('source_type')) {
+        db.run("ALTER TABLE community_posts ADD COLUMN source_type VARCHAR(20) DEFAULT 'document'");
+      }
+      if (!columnNames.includes('source_id')) {
+        db.run("ALTER TABLE community_posts ADD COLUMN source_id INTEGER");
+        // 如果有老的 document_id 数据，更新到 source_id
+        db.run("UPDATE community_posts SET source_id = document_id WHERE source_id IS NULL");
+      }
+    });
 
     db.run(`CREATE TABLE IF NOT EXISTS community_likes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -247,6 +254,63 @@ function createTables(db) {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS community_shares (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      post_id INTEGER NOT NULL,
+      platform VARCHAR(50), -- e.g., 'wechat', 'system'
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS community_reposts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      original_post_id INTEGER NOT NULL,
+      repost_post_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (original_post_id) REFERENCES community_posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (repost_post_id) REFERENCES community_posts(id) ON DELETE CASCADE
+    )`);
+
+    // ============================================================
+    // Social / Relationship Tables
+    // ============================================================
+    db.run(`CREATE TABLE IF NOT EXISTS user_follows (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      follower_id INTEGER NOT NULL,
+      following_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(follower_id, following_id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS friend_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sender_id INTEGER NOT NULL,
+      receiver_id INTEGER NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'accepted', 'rejected'
+      message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(sender_id, receiver_id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS friendships (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id1 INTEGER NOT NULL,
+      user_id2 INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id1) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id2) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id1, user_id2)
     )`);
 
     // ============================================================

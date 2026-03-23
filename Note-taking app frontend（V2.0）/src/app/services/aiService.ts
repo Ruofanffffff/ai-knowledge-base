@@ -125,6 +125,35 @@ export const aiService = {
     }
   },
 
+  async summarizeDocument(documentId: string, model?: string): Promise<any> {
+    try {
+      const response = await api.post(
+        '/ai/summary',
+        { documentId, ...(model ? { model } : {}) },
+        { timeout: 60000 },
+      );
+      const payload = response.data;
+      if (payload?.structured) return payload.structured;
+      if (payload?.summary) {
+        try {
+          return JSON.parse(payload.summary);
+        } catch {
+          return { overview: String(payload.summary || '') };
+        }
+      }
+      return { overview: '' };
+    } catch (err) {
+      const details = toSummaryApiError(err);
+      const e = new Error(details.title);
+      (e as any).title = details.title;
+      (e as any).subtitle = details.subtitle;
+      (e as any).status = details.status;
+      (e as any).errorId = details.errorId;
+      (e as any).errorCode = details.errorCode;
+      throw e;
+    }
+  },
+
   // 生成脑图
   async generateMindmap(text: string): Promise<{
     central_topic: string;

@@ -22,15 +22,15 @@ export const DM_USER_INFO: Record<string, { name: string; color: string; letter:
 
 // ── ConversationCard ──────────────────────────────────────────────────────────
 function ConversationCard({ conv, index, onOpen }: {
-  conv: Conversation; index: number; onOpen: () => void;
+  conv: any; index: number; onOpen: () => void;
 }) {
-  const info = DM_USER_INFO[conv.userId];
-  if (!info) return null;
-  const lastMsg = conv.messages[conv.messages.length - 1];
-  const isUnread = !!lastMsg && !lastMsg.fromMe;
-  const preview = lastMsg
-    ? (lastMsg.fromMe ? `我：${lastMsg.text}` : lastMsg.text)
-    : '暂无消息';
+  const isUnread = conv.unread_count > 0;
+  const preview = conv.last_message || '暂无消息';
+  
+  const name = conv.other_username || '用户';
+  const letter = name.charAt(0).toUpperCase();
+  const colors = ['#6366F1', '#8B5CF6', '#3B82F6', '#EC4899', '#10B981', '#F59E0B'];
+  const color = colors[name.length % colors.length];
 
   return (
     <motion.button
@@ -44,10 +44,10 @@ function ConversationCard({ conv, index, onOpen }: {
         background: 'rgba(255,255,255,0.9)',
         backdropFilter: 'blur(12px)',
         boxShadow: isUnread
-          ? `0 3px 16px ${info.color}1A, 0 1px 4px rgba(0,0,0,0.05)`
+          ? `0 3px 16px ${color}1A, 0 1px 4px rgba(0,0,0,0.05)`
           : '0 2px 12px rgba(30,27,75,0.05)',
         border: isUnread
-          ? `1.5px solid ${info.color}28`
+          ? `1.5px solid ${color}28`
           : '1.5px solid rgba(255,255,255,0.9)',
       }}
     >
@@ -55,9 +55,13 @@ function ConversationCard({ conv, index, onOpen }: {
       <div className="relative flex-shrink-0">
         <div
           className="w-13 h-13 rounded-2xl flex items-center justify-center"
-          style={{ width: '52px', height: '52px', background: `${info.color}18` }}
+          style={{ width: '52px', height: '52px', background: `${color}18` }}
         >
-          <span style={{ color: info.color, fontSize: '20px', fontWeight: 900 }}>{info.letter}</span>
+          {conv.other_avatar ? (
+            <img src={conv.other_avatar} className="w-full h-full rounded-2xl object-cover" />
+          ) : (
+            <span style={{ color: color, fontSize: '20px', fontWeight: 900 }}>{letter}</span>
+          )}
         </div>
         {isUnread && (
           <motion.div
@@ -68,17 +72,10 @@ function ConversationCard({ conv, index, onOpen }: {
             style={{ background: '#EF4444' }}
           >
             <span style={{ color: 'white', fontSize: '9px', fontWeight: 800 }}>
-              {conv.messages.filter(m => !m.fromMe).length > 9 ? '9+' : '1'}
+              {conv.unread_count > 9 ? '9+' : conv.unread_count}
             </span>
           </motion.div>
         )}
-        {/* Online pulse */}
-        <motion.div
-          animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
-          transition={{ duration: 2.4, repeat: Infinity, delay: index * 0.3 }}
-          className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white"
-          style={{ background: '#22C55E' }}
-        />
       </div>
 
       {/* Text content */}
@@ -89,10 +86,10 @@ function ConversationCard({ conv, index, onOpen }: {
             fontSize: '15px',
             fontWeight: isUnread ? 800 : 600,
           }}>
-            {info.name}
+            {name}
           </p>
           <span style={{ color: '#C4C9D4', fontSize: '11px', flexShrink: 0, marginLeft: '8px' }}>
-            {lastMsg ? formatMsgTime(lastMsg.timestamp) : ''}
+            {conv.last_message_time ? formatMsgTime(conv.last_message_time) : ''}
           </span>
         </div>
         <p
@@ -113,43 +110,45 @@ function ConversationCard({ conv, index, onOpen }: {
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ background: info.color, boxShadow: `0 0 6px ${info.color}80` }}
+          style={{ background: color, boxShadow: `0 0 6px ${color}80` }}
         />
       )}
     </motion.button>
   );
 }
 
+import { api } from '../services/api';
+
 // ── Messages page ─────────────────────────────────────────────────────────────
 export function Messages() {
   const navigate = useNavigate();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [unread, setUnread] = useState(0);
 
-  const loadConvs = useCallback(() => {
-    const convs = getAllConversations().sort((a, b) => {
-      const tA = a.messages[a.messages.length - 1]?.timestamp ?? 0;
-      const tB = b.messages[b.messages.length - 1]?.timestamp ?? 0;
-      return tB - tA;
-    });
-    setConversations(convs);
-    setUnread(getUnreadCount());
+  const loadConvs = useCallback(async () => {
+    try {
+      const res = await api.get('/chat/conversations');
+      if (res.data.success) {
+        const convs = res.data.data;
+        setConversations(convs);
+        setUnread(convs.reduce((acc: number, c: any) => acc + (c.unread_count || 0), 0));
+      }
+    } catch (e) {
+      console.error('Failed to load conversations', e);
+    }
   }, []);
 
   useEffect(() => {
     loadConvs();
-    window.addEventListener('hibrain_dm_update', loadConvs);
-    return () => window.removeEventListener('hibrain_dm_update', loadConvs);
   }, [loadConvs]);
 
   const filtered = conversations.filter(c => {
     if (!searchQuery) return true;
-    const info = DM_USER_INFO[c.userId];
-    return info?.name.includes(searchQuery) ||
-      c.messages.some(m => m.text.includes(searchQuery));
+    return c.other_username?.includes(searchQuery) ||
+      c.last_message?.includes(searchQuery);
   });
 
   const selectedUser = selectedUserId ? DM_USER_INFO[selectedUserId] : null;
