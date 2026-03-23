@@ -13,6 +13,7 @@ import Masonry, { ResponsiveMasonry } from 'react-responsive-masonry';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { toast } from '../components/ui/Toast';
+import { api } from '../services/api';
 
 /* ── Mindmap mini-thumbnail (pure JSX SVG, no DOM manipulation) ── */
 const MM_COLORS = ['#8B5CF6','#3B82F6','#10B981','#F59E0B','#EF4444','#EC4899','#14B8A6','#F97316'];
@@ -118,10 +119,11 @@ interface NoteCardProps {
   note: Note;
   onClick: (id: string) => void;
   onTagClick: (tag: string) => void;
+  onPublish?: (id: string) => void;
   index: number;
 }
 
-function NoteCard({ note, onClick, onTagClick, index }: NoteCardProps) {
+function NoteCard({ note, onClick, onTagClick, onPublish, index }: NoteCardProps) {
   const accent = getAccent(note.id);
   const [editFlash, setEditFlash] = useState(false);
 
@@ -129,6 +131,11 @@ function NoteCard({ note, onClick, onTagClick, index }: NoteCardProps) {
     e.stopPropagation();
     setEditFlash(true);
     setTimeout(() => { setEditFlash(false); onClick(note.id); }, 360);
+  };
+
+  const handlePublishClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onPublish?.(note.id);
   };
 
   return (
@@ -153,6 +160,37 @@ function NoteCard({ note, onClick, onTagClick, index }: NoteCardProps) {
           transition: 'background 0.25s, border-color 0.25s, box-shadow 0.25s',
         }}
       >
+        <div className="absolute top-3 right-3 flex items-center gap-2 z-30">
+          {onPublish && (
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.92 }}
+              onClick={handlePublishClick}
+              className="w-9 h-9 rounded-2xl flex items-center justify-center"
+              style={{
+                background: 'rgba(99,102,241,0.10)',
+                border: '1px solid rgba(99,102,241,0.18)',
+              }}
+              aria-label="发布到思圈"
+            >
+              <Sparkles size={16} style={{ color: '#6366F1' }} />
+            </motion.button>
+          )}
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.92 }}
+            onClick={handleEditClick}
+            className="w-9 h-9 rounded-2xl flex items-center justify-center"
+            style={{
+              background: 'rgba(255,255,255,0.6)',
+              border: '1px solid rgba(0,0,0,0.06)',
+            }}
+            aria-label="编辑"
+          >
+            <Pen size={16} style={{ color: accent.dot }} />
+          </motion.button>
+        </div>
+
         {/* Edit flash ripple overlay */}
         <AnimatePresence>
           {editFlash && (
@@ -344,25 +382,6 @@ function NoteCard({ note, onClick, onTagClick, index }: NoteCardProps) {
             <Clock size={10} />
             <span style={{ fontSize: '10px' }}>{formatDate(note.createdAt)}</span>
           </div>
-
-          {/* ── Edit button with interaction ── */}
-          <motion.button
-            onClick={handleEditClick}
-            whileTap={{ scale: 0.82 }}
-            animate={editFlash
-              ? { scale: [1, 1.35, 1.1], rotate: [-8, 8, 0] }
-              : { scale: 1, rotate: 0 }
-            }
-            transition={{ duration: 0.32 }}
-            className="relative w-6 h-6 rounded-full flex items-center justify-center overflow-hidden"
-            style={{
-              background: editFlash ? accent.dot : accent.tagBg,
-              boxShadow: editFlash ? `0 0 12px ${accent.dot}88` : 'none',
-              transition: 'background 0.2s, box-shadow 0.2s',
-            }}
-          >
-            <Pen size={9} color={editFlash ? 'white' : accent.dot} />
-          </motion.button>
         </div>
       </div>
     </motion.div>
@@ -485,6 +504,26 @@ export function NoteList() {
       });
     } finally {
       setUploadingDocument(false);
+    }
+  };
+
+  const publishToSiCircle = async (item: { id: string; type: 'note' | 'document' }) => {
+    const toastId = toast.loading('正在发布到思圈…');
+    try {
+      const res = await api.post('/community/publish', {
+        items: [{ id: item.id, type: item.type }],
+        isPublic: true,
+      });
+      toast.dismiss(toastId);
+      if (res.data?.success) {
+        toast.success('已发布到思圈');
+        navigate('/sicircle');
+        return;
+      }
+      toast.error('发布失败');
+    } catch (e: any) {
+      toast.dismiss(toastId);
+      toast.error(e?.response?.data?.error || '发布失败');
     }
   };
 
@@ -954,6 +993,7 @@ export function NoteList() {
                       note={note}
                       index={i}
                       onClick={(id) => navigate(`/siku/${id}`)}
+                      onPublish={(id) => publishToSiCircle({ id, type: 'note' })}
                       onTagClick={tag => {
                         setTagFilter(tag);
                         setFilter('all');
@@ -1042,9 +1082,27 @@ export function NoteList() {
                             {String(d.content || '').slice(0, 90)}
                           </p>
                         </div>
-                        <span style={{ color: '#9CA3AF', fontSize: '10px', flexShrink: 0 }}>
-                          {d.fileType ? String(d.fileType) : 'DOCUMENT'}
-                        </span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <motion.button
+                            type="button"
+                            whileTap={{ scale: 0.92 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              publishToSiCircle({ id: String(d.id), type: 'document' });
+                            }}
+                            className="w-9 h-9 rounded-2xl flex items-center justify-center"
+                            style={{
+                              background: 'rgba(99,102,241,0.10)',
+                              border: '1px solid rgba(99,102,241,0.18)',
+                            }}
+                            aria-label="发布到思圈"
+                          >
+                            <Sparkles size={16} style={{ color: '#6366F1' }} />
+                          </motion.button>
+                          <span style={{ color: 'var(--hi-text-secondary)', fontSize: '10px' }}>
+                            {d.fileType ? String(d.fileType) : 'DOCUMENT'}
+                          </span>
+                        </div>
                       </div>
                       {Array.isArray(d.tags) && d.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-3">

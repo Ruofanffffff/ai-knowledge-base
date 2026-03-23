@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -8,6 +8,7 @@ import {
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { DirectMessageSheet } from '../components/DirectMessageSheet';
+import { api } from '../services/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface GridPost {
@@ -678,15 +679,113 @@ export function UserProfile() {
   const [showDM, setShowDM] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const profile = USER_PROFILES[id] ?? USER_PROFILES['1'];
-  const gridPosts = GRID_POSTS[id] ?? GRID_POSTS['1'];
-  const leftPosts = gridPosts.filter((_, i) => i % 2 === 0);
-  const rightPosts = gridPosts.filter((_, i) => i % 2 === 1);
+  const [remoteProfile, setRemoteProfile] = useState<any | null>(null);
+  const [remoteGridPosts, setRemoteGridPosts] = useState<GridPost[] | null>(null);
 
-  const handleFollow = () => {
-    setFollowed(v => !v);
-    setShowFollowToast(true);
-    setTimeout(() => setShowFollowToast(false), 2000);
+  useEffect(() => {
+    let cancelled = false;
+
+    const colorList = ['#6366F1', '#8B5CF6', '#3B82F6', '#EC4899', '#10B981', '#F59E0B'];
+    const makePlaceholder = (seed: string, base: string) => {
+      const c1 = base;
+      const c2 = colorList[seed.length % colorList.length];
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`;
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    };
+
+    const load = async () => {
+      try {
+        const [profileRes, postsRes] = await Promise.all([
+          api.get(`/social/users/${id}/profile`),
+          api.get('/community/posts', { params: { authorId: id, limit: 60, sort: 'latest' } }),
+        ]);
+
+        if (cancelled) return;
+
+        const p = profileRes.data?.data;
+        if (profileRes.data?.success && p) {
+          const name = p.username || `用户${id}`;
+          const avatarColor = colorList[name.length % colorList.length];
+          const avatarLetter = name.charAt(0).toUpperCase();
+
+          setRemoteProfile({
+            name,
+            username: p.username || name,
+            avatarColor,
+            avatarLetter,
+            verified: false,
+            bio: '',
+            posts: p.counts?.posts ?? 0,
+            following: p.counts?.following ?? 0,
+            followers: String(p.counts?.followers ?? 0),
+            coverGradient: `linear-gradient(135deg, ${avatarColor} 0%, #8B5CF6 55%, #3B82F6 100%)`,
+            tags: [],
+          });
+
+          setFollowed(Boolean(p.relations?.isFollowed));
+        }
+
+        const list = postsRes.data?.data?.posts || [];
+        if (postsRes.data?.success && Array.isArray(list)) {
+          const mapped: GridPost[] = list.map((row: any, idx: number) => {
+            const title = String(row.title || '').trim() || String(row.summary || '').trim().slice(0, 18) || '未命名';
+            const body = String(row.summary || '').replace(/\s+/g, ' ').trim();
+            const created = row.createdAt ? new Date(row.createdAt) : new Date();
+            const mmdd = `${String(created.getMonth() + 1).padStart(2, '0')}-${String(created.getDate()).padStart(2, '0')}`;
+            const img = row.coverImage ? String(row.coverImage) : makePlaceholder(String(row.id), (remoteProfile?.avatarColor || '#6366F1'));
+
+            return {
+              id: String(row.id),
+              title,
+              image: img,
+              likes: row.likes || 0,
+              tall: idx % 3 === 0,
+              body,
+              date: mmdd,
+              readTime: '1分钟',
+            };
+          });
+          setRemoteGridPosts(mapped);
+        } else {
+          setRemoteGridPosts([]);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setRemoteProfile(null);
+          setRemoteGridPosts(null);
+        }
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  const profile = remoteProfile ?? USER_PROFILES[id] ?? USER_PROFILES['1'];
+  const gridPosts = remoteGridPosts ?? GRID_POSTS[id] ?? GRID_POSTS['1'];
+  const leftPosts = useMemo(() => gridPosts.filter((_, i) => i % 2 === 0), [gridPosts]);
+  const rightPosts = useMemo(() => gridPosts.filter((_, i) => i % 2 === 1), [gridPosts]);
+
+  const handleFollow = async () => {
+    try {
+      if (followed) {
+        await api.delete('/social/follow', { data: { followingId: id } });
+        setFollowed(false);
+        if (remoteProfile) {
+          setRemoteProfile((prev: any) => prev ? ({ ...prev, followers: String(Math.max(0, parseInt(prev.followers || '0', 10) - 1)) }) : prev);
+        }
+      } else {
+        await api.post('/social/follow', { followingId: id });
+        setFollowed(true);
+        if (remoteProfile) {
+          setRemoteProfile((prev: any) => prev ? ({ ...prev, followers: String(parseInt(prev.followers || '0', 10) + 1) }) : prev);
+        }
+      }
+      setShowFollowToast(true);
+      setTimeout(() => setShowFollowToast(false), 2000);
+    } catch (e) {
+      setShowFollowToast(false);
+    }
   };
 
   const handleSelectPost = (post: GridPost, layoutId: string) => {

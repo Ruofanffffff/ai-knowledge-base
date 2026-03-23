@@ -8,6 +8,7 @@ import { api } from '../services/api';
 
 interface Post {
   id: string;
+  userId: string;
   user: { name: string; username: string; avatarColor: string; avatarLetter: string; verified: boolean };
   content: string;
   image?: string;
@@ -92,7 +93,7 @@ function CommentDrawer({ post, onClose }: CommentDrawerProps) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-end justify-center"
-      style={{ background: 'rgba(30,27,75,0.5)', backdropFilter: 'blur(8px)' }}
+      style={{ background: 'var(--hi-overlay)', backdropFilter: 'blur(8px)' }}
       onClick={onClose}
     >
       <motion.div
@@ -101,12 +102,12 @@ function CommentDrawer({ post, onClose }: CommentDrawerProps) {
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 280 }}
         className="w-full max-w-lg rounded-t-3xl overflow-hidden flex flex-col"
-        style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', maxHeight: '80vh' }}
+        style={{ background: 'var(--hi-sheet-bg)', backdropFilter: 'blur(20px)', maxHeight: '80vh' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-4 pb-3 flex-shrink-0"
-          style={{ borderBottom: '1px solid rgba(99,102,241,0.08)' }}>
-          <p style={{ color: '#1E1B4B', fontSize: '16px', fontWeight: 800 }}>评论 ({comments.length})</p>
+          style={{ borderBottom: '1px solid var(--hi-card-border)' }}>
+          <p style={{ color: 'var(--hi-text-primary)', fontSize: '16px', fontWeight: 800 }}>评论 ({comments.length})</p>
           <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center"
             style={{ background: 'rgba(99,102,241,0.08)' }}>
             <X size={16} style={{ color: '#6366F1' }} />
@@ -141,10 +142,10 @@ function CommentDrawer({ post, onClose }: CommentDrawerProps) {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span style={{ color: '#1E1B4B', fontSize: '13px', fontWeight: 700 }}>{c.authorName}</span>
-                      <span style={{ color: '#9CA3AF', fontSize: '11px' }}>{formatTime(c.createdAt)}</span>
+                      <span style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 700 }}>{c.authorName}</span>
+                      <span style={{ color: 'var(--hi-text-secondary)', fontSize: '11px' }}>{formatTime(c.createdAt)}</span>
                     </div>
-                    <p style={{ color: '#4B5563', fontSize: '13px', lineHeight: 1.6 }}>{c.content}</p>
+                    <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', lineHeight: 1.6 }}>{c.content}</p>
                   </div>
                 </motion.div>
               );
@@ -152,7 +153,7 @@ function CommentDrawer({ post, onClose }: CommentDrawerProps) {
           )}
         </div>
 
-        <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid rgba(99,102,241,0.08)' }}>
+        <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--hi-card-border)' }}>
           <div className="flex gap-2 items-center">
             <div className="w-8 h-8 rounded-2xl flex items-center justify-center flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}>
@@ -165,7 +166,7 @@ function CommentDrawer({ post, onClose }: CommentDrawerProps) {
                 onChange={e => setComment(e.target.value)}
                 placeholder="说点什么..."
                 className="flex-1 bg-transparent outline-none"
-                style={{ color: '#1E1B4B', fontSize: '13px' }}
+                style={{ color: 'var(--hi-text-primary)', fontSize: '13px' }}
                 onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               />
               <button 
@@ -265,10 +266,10 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
         animate={{ opacity: 1, y: 0 }}
         className="rounded-3xl overflow-hidden mb-4"
         style={{
-          background: 'rgba(255,255,255,0.85)',
+          background: 'var(--hi-card-bg)',
           backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255,255,255,0.95)',
-          boxShadow: '0 4px 24px rgba(99,102,241,0.06)',
+          border: '1px solid var(--hi-card-border)',
+          boxShadow: 'var(--hi-card-shadow)',
         }}
       >
         {/* Header */}
@@ -291,7 +292,7 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
             </motion.div>
             <div>
               <div className="flex items-center gap-1.5">
-                <p style={{ color: '#1E1B4B', fontSize: '14px', fontWeight: 700 }}>{post.user.name}</p>
+                <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 700 }}>{post.user.name}</p>
                 {post.user.verified && (
                   <div className="w-4 h-4 rounded-full flex items-center justify-center"
                     style={{ background: '#6366F1' }}>
@@ -311,7 +312,7 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                   </motion.span>
                 )}
               </div>
-              <p style={{ color: '#9CA3AF', fontSize: '11px' }}>@{post.user.username} · {post.timestamp}</p>
+              <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px' }}>@{post.user.username} · {post.timestamp}</p>
             </div>
           </motion.button>
 
@@ -323,14 +324,14 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
             transition={{ type: 'spring', stiffness: 400, damping: 18 }}
             onClick={() => setMoreOpen(true)}
           >
-            <MoreHorizontal size={16} style={{ color: moreOpen ? '#6366F1' : '#9CA3AF' }} />
+            <MoreHorizontal size={16} style={{ color: moreOpen ? '#6366F1' : 'var(--hi-text-secondary)' }} />
           </motion.button>
         </div>
 
         {/* Content */}
         <div className="px-4 pb-3">
           <div style={{ position: 'relative' }}>
-            <p style={{ color: '#374151', fontSize: '14px', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
+            <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
               {isLong && !showFull ? post.content.slice(0, 120) + '…' : post.content}
             </p>
             {isLong && (
@@ -417,7 +418,7 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end justify-center"
-            style={{ background: 'rgba(30,27,75,0.4)', backdropFilter: 'blur(6px)' }}
+            style={{ background: 'var(--hi-overlay)', backdropFilter: 'blur(6px)' }}
             onClick={() => setMoreOpen(false)}
           >
             <motion.div
@@ -426,17 +427,17 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
               exit={{ y: 80, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 320, damping: 30 }}
               className="w-full max-w-lg mx-0 rounded-t-3xl overflow-hidden"
-              style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)' }}
+              style={{ background: 'var(--hi-sheet-bg)', backdropFilter: 'blur(20px)' }}
               onClick={e => e.stopPropagation()}
             >
               {/* Handle */}
               <div className="flex justify-center pt-3 pb-1">
-                <div className="w-9 h-1 rounded-full" style={{ background: 'rgba(30,27,75,0.12)' }} />
+                <div className="w-9 h-1 rounded-full" style={{ background: 'var(--hi-divider)' }} />
               </div>
 
               {/* User mini-info */}
               <div className="flex items-center gap-3 px-5 pt-2 pb-4"
-                style={{ borderBottom: '1px solid rgba(99,102,241,0.07)' }}>
+                style={{ borderBottom: '1px solid var(--hi-card-border)' }}>
                 <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
                   style={{ background: `${post.user.avatarColor}20` }}>
                   <span style={{ color: post.user.avatarColor, fontSize: '15px', fontWeight: 800 }}>
@@ -444,8 +445,8 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                   </span>
                 </div>
                 <div>
-                  <p style={{ color: '#1E1B4B', fontSize: '14px', fontWeight: 700 }}>{post.user.name}</p>
-                  <p style={{ color: '#9CA3AF', fontSize: '11px' }}>@{post.user.username}</p>
+                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 700 }}>{post.user.name}</p>
+                  <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px' }}>@{post.user.username}</p>
                 </div>
               </div>
 
@@ -486,7 +487,7 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setMoreOpen(false)}
                   className="w-full py-3.5 rounded-2xl"
-                  style={{ background: 'rgba(99,102,241,0.06)', color: '#6B7280', fontSize: '14.5px', fontWeight: 600 }}
+                  style={{ background: 'rgba(99,102,241,0.06)', color: 'var(--hi-text-secondary)', fontSize: '14.5px', fontWeight: 600 }}
                 >
                   取消
                 </motion.button>
@@ -504,7 +505,7 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end justify-center"
-            style={{ background: 'rgba(30,27,75,0.42)', backdropFilter: 'blur(8px)' }}
+            style={{ background: 'var(--hi-overlay)', backdropFilter: 'blur(8px)' }}
             onClick={() => setProfileOpen(false)}
           >
             <motion.div
@@ -513,12 +514,12 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
               exit={{ y: 100, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className="w-full max-w-lg mx-0 rounded-t-3xl overflow-hidden"
-              style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)' }}
+              style={{ background: 'var(--hi-sheet-bg)', backdropFilter: 'blur(20px)' }}
               onClick={e => e.stopPropagation()}
             >
               {/* Handle */}
               <div className="flex justify-center pt-3 pb-0">
-                <div className="w-9 h-1 rounded-full" style={{ background: 'rgba(30,27,75,0.12)' }} />
+                <div className="w-9 h-1 rounded-full" style={{ background: 'var(--hi-divider)' }} />
               </div>
 
               {/* Cover gradient bar */}
@@ -532,9 +533,9 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                     initial={{ scale: 0.7, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: 'spring', stiffness: 350, damping: 22, delay: 0.06 }}
-                    onClick={() => { setProfileOpen(false); navigate(`/user/${post.id}`); }}
+                    onClick={() => { setProfileOpen(false); navigate(`/user/${post.userId}`); }}
                     className="w-16 h-16 rounded-3xl flex items-center justify-center relative cursor-pointer"
-                    style={{ background: `${post.user.avatarColor}22`, border: `3px solid white`, boxShadow: `0 4px 18px ${post.user.avatarColor}30` }}
+                    style={{ background: `${post.user.avatarColor}22`, border: `3px solid var(--hi-sheet-bg)`, boxShadow: `0 4px 18px ${post.user.avatarColor}30` }}
                   >
                     <span style={{ color: post.user.avatarColor, fontSize: '24px', fontWeight: 800 }}>
                       {post.user.avatarLetter}
@@ -597,7 +598,7 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                         }
                       }}
                       className="px-3 py-2 rounded-2xl transition-all flex items-center justify-center"
-                      style={{ background: 'rgba(255,255,255,0.9)', color: '#1E1B4B', fontSize: '13px', fontWeight: 700, border: '1.5px solid rgba(30,27,75,0.1)' }}
+                      style={{ background: 'var(--hi-card-bg)', color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 700, border: '1.5px solid var(--hi-card-border)' }}
                     >
                       加好友
                     </motion.button>
@@ -665,7 +666,7 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                 <div className="flex gap-2.5 px-5 pt-3 pb-4">
                   <motion.button
                     whileTap={{ scale: 0.96 }}
-                    onClick={() => { setProfileOpen(false); navigate(`/user/${post.id}`); }}
+                    onClick={() => { setProfileOpen(false); navigate(`/user/${post.userId}`); }}
                     className="flex-1 py-3 rounded-2xl"
                     style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '14px', fontWeight: 700, boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
                   >
@@ -704,30 +705,6 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
         )}
       </AnimatePresence>
     </>
-  );
-}
-
-function StatusBar() {
-  const now = new Date();
-  const time = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-  return (
-    <div className="flex items-center justify-between px-5 pt-3 pb-1">
-      <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--hi-status-color)' }}>{time}</span>
-      <div className="flex items-center gap-1.5">
-        <svg width="15" height="11" viewBox="0 0 15 11" fill="none">
-          <rect x="0" y="6.5" width="3" height="4.5" rx="1" fill="var(--hi-status-color)" opacity="0.5" />
-          <rect x="4" y="4" width="3" height="7" rx="1" fill="var(--hi-status-color)" opacity="0.7" />
-          <rect x="8" y="2" width="3" height="9" rx="1" fill="var(--hi-status-color)" opacity="0.85" />
-          <rect x="12" y="0" width="3" height="11" rx="1" fill="var(--hi-status-color)" />
-        </svg>
-        <div className="flex items-center gap-0.5">
-          <div className="w-6 h-3 rounded-sm flex items-center px-0.5" style={{ border: '1.5px solid var(--hi-status-color)', opacity: 0.6 }}>
-            <div className="h-1.5 rounded-sm w-4/5" style={{ background: 'var(--hi-status-color)' }} />
-          </div>
-          <div className="w-0.5 h-1.5 rounded-r-sm" style={{ background: 'var(--hi-status-color)', opacity: 0.4 }} />
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -809,9 +786,10 @@ export function SiCircle() {
 
           return {
             id: String(p.id),
+            userId: String(p.userId),
             user: {
               name: name,
-              username: name, // Using name as username for now
+              username: p.authorName || name,
               avatarColor,
               avatarLetter,
               verified: false // Backend doesn't return verified status yet
@@ -876,17 +854,17 @@ export function SiCircle() {
       {/* Header */}
       <div className="relative z-20 flex-shrink-0"
         style={{ 
-          background: 'rgba(255,255,255,0.55)', 
+          background: 'var(--hi-header-bg)', 
           backdropFilter: 'blur(24px)', 
           WebkitBackdropFilter: 'blur(24px)', 
-          borderBottom: '1px solid rgba(255,255,255,0.75)',
+          borderBottom: '1px solid var(--hi-header-border)',
           paddingTop: 'calc(env(safe-area-inset-top) + 8px)'
         }}>
         {/* <StatusBar /> */}
         <div className="flex items-center justify-between px-5 py-2">
           <div>
             <p style={{ color: '#3B82F6', fontSize: '12px', fontWeight: 500 }}>灵感共享社区</p>
-            <h1 style={{ color: '#1E1B4B', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>思圈</h1>
+            <h1 style={{ color: 'var(--hi-text-primary)', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>思圈</h1>
           </div>
           <button
             className="w-10 h-10 rounded-2xl flex items-center justify-center active:scale-90 transition-all"
@@ -905,7 +883,7 @@ export function SiCircle() {
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as any)}
               className="pb-1.5 relative"
-              style={{ color: activeTab === t.key ? '#6366F1' : '#9CA3AF', fontSize: '14px', fontWeight: activeTab === t.key ? 700 : 500 }}>
+              style={{ color: activeTab === t.key ? '#6366F1' : 'var(--hi-text-secondary)', fontSize: '14px', fontWeight: activeTab === t.key ? 700 : 500 }}>
               {t.label}
               {activeTab === t.key && (
                 <motion.div layoutId="circle-tab" className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
@@ -929,7 +907,7 @@ export function SiCircle() {
                 >
                   <div
                     className="w-14 h-14 rounded-[16px] flex items-center justify-center"
-                    style={{ background: s.isMe ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.2)', border: s.isMe ? '1.5px dashed rgba(99,102,241,0.4)' : 'none' }}
+                    style={{ background: s.isMe ? 'var(--hi-card-bg)' : 'rgba(255,255,255,0.2)', border: s.isMe ? '1.5px dashed rgba(99,102,241,0.4)' : 'none' }}
                   >
                     {s.isMe ? (
                       <Plus size={20} style={{ color: '#6366F1' }} />
@@ -938,7 +916,7 @@ export function SiCircle() {
                     )}
                   </div>
                 </div>
-                <span style={{ color: '#6B7280', fontSize: '10px', fontWeight: 500, maxWidth: '60px', textAlign: 'center', lineHeight: 1.2 }}>
+                <span style={{ color: 'var(--hi-text-secondary)', fontSize: '10px', fontWeight: 500, maxWidth: '60px', textAlign: 'center', lineHeight: 1.2 }}>
                   {s.name}
                 </span>
               </button>

@@ -144,4 +144,67 @@ router.get('/friends', authMiddleware, (req, res) => {
   }
 });
 
+// 获取用户主页信息（真实数据）
+router.get('/users/:id/profile', authMiddleware, (req, res) => {
+  try {
+    const viewerId = req.userId;
+    const targetId = parseInt(req.params.id, 10);
+
+    if (isNaN(targetId)) {
+      return res.status(400).json({ success: false, error: '无效的用户ID' });
+    }
+
+    db.get('SELECT id, username, avatar FROM users WHERE id = ?', [targetId], (err, user) => {
+      if (err) {
+        console.error('查询用户失败:', err);
+        return res.status(500).json({ success: false, error: '服务器内部错误' });
+      }
+      if (!user) {
+        return res.status(404).json({ success: false, error: '用户不存在' });
+      }
+
+      const tasks = {
+        posts: (cb) => db.get('SELECT COUNT(*) AS c FROM community_posts WHERE user_id = ? AND status = "published"', [targetId], cb),
+        following: (cb) => db.get('SELECT COUNT(*) AS c FROM user_follows WHERE follower_id = ?', [targetId], cb),
+        followers: (cb) => db.get('SELECT COUNT(*) AS c FROM user_follows WHERE following_id = ?', [targetId], cb),
+        isFollowed: (cb) => db.get('SELECT 1 AS ok FROM user_follows WHERE follower_id = ? AND following_id = ? LIMIT 1', [viewerId, targetId], cb),
+        isFriend: (cb) => db.get('SELECT 1 AS ok FROM friendships WHERE (user_id1 = ? AND user_id2 = ?) OR (user_id1 = ? AND user_id2 = ?) LIMIT 1', [viewerId, targetId, targetId, viewerId], cb),
+      };
+
+      let done = 0;
+      const results = {};
+      const keys = Object.keys(tasks);
+
+      keys.forEach((k) => {
+        tasks[k]((err, row) => {
+          results[k] = err ? null : row;
+          done += 1;
+          if (done !== keys.length) return;
+
+          return res.json({
+            success: true,
+            data: {
+              id: user.id,
+              username: user.username,
+              avatar: user.avatar,
+              counts: {
+                posts: results.posts ? results.posts.c : 0,
+                following: results.following ? results.following.c : 0,
+                followers: results.followers ? results.followers.c : 0,
+              },
+              relations: {
+                isSelf: viewerId === targetId,
+                isFollowed: Boolean(results.isFollowed),
+                isFriend: Boolean(results.isFriend),
+              },
+            },
+          });
+        });
+      });
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: '服务器内部错误' });
+  }
+});
+
 module.exports = { router, initSocialRoutes };

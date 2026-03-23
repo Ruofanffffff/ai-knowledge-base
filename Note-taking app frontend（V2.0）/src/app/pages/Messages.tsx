@@ -3,22 +3,18 @@ import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Edit2, Search, MessageCircle } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
-import { BottomNav } from '../components/BottomNav';
-import { DirectMessageSheet } from '../components/DirectMessageSheet';
-import {
-  getAllConversations, getUnreadCount,
-  formatMsgTime, Conversation,
-} from '../services/messageStore';
+import { api } from '../services/api';
 
-// ── Shared user lookup ────────────────────────────────────────────────────────
-export const DM_USER_INFO: Record<string, { name: string; color: string; letter: string; bio: string }> = {
-  '1': { name: '小明同学', color: '#6366F1', letter: '明', bio: '设计师 × 思考者' },
-  '2': { name: '阿博读书', color: '#8B5CF6', letter: '博', bio: '每年读100本书' },
-  '3': { name: 'TechNote', color: '#3B82F6', letter: 'T', bio: '前端工程师' },
-  '4': { name: '晓雯创作', color: '#EC4899', letter: '晓', bio: '旅行者 × 写作者' },
-  '5': { name: '思维实验室', color: '#10B981', letter: '思', bio: '认知科学爱好者' },
-  '6': { name: '好奇心驱动', color: '#F59E0B', letter: '奇', bio: '笔记爱好者' },
-};
+function formatMsgTime(iso: string) {
+  try {
+    const d = new Date(iso);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  } catch {
+    return '';
+  }
+}
 
 // ── ConversationCard ──────────────────────────────────────────────────────────
 function ConversationCard({ conv, index, onOpen }: {
@@ -123,7 +119,6 @@ import { api } from '../services/api';
 export function Messages() {
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<any[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -151,8 +146,6 @@ export function Messages() {
       c.last_message?.includes(searchQuery);
   });
 
-  const selectedUser = selectedUserId ? DM_USER_INFO[selectedUserId] : null;
-
   return (
     <div
       className="relative min-h-screen w-full"
@@ -160,7 +153,7 @@ export function Messages() {
     >
       <ParticleBackground />
 
-      <div className="relative z-10 h-screen overflow-y-auto" style={{ paddingBottom: '80px' }}>
+      <div className="relative z-10 h-screen overflow-y-auto">
 
         {/* ── Header ── */}
         <div
@@ -328,32 +321,16 @@ export function Messages() {
             <div className="space-y-2.5 pb-4">
               {filtered.map((conv, i) => (
                 <ConversationCard
-                  key={conv.userId}
+                key={conv.id}
                   conv={conv}
                   index={i}
-                  onOpen={() => setSelectedUserId(conv.userId)}
+                onOpen={() => navigate(`/messages/${conv.id}`)}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
-
-      {/* ── Chat sheet ── */}
-      <AnimatePresence>
-        {selectedUserId && selectedUser && (
-          <DirectMessageSheet
-            key={selectedUserId}
-            userId={selectedUserId}
-            userName={selectedUser.name}
-            userColor={selectedUser.color}
-            userLetter={selectedUser.letter}
-            onClose={() => setSelectedUserId(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      <BottomNav />
     </div>
   );
 }

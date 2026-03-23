@@ -175,22 +175,6 @@ function ModelPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-function StatusBar() {
-  const now = new Date();
-  const time = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-  return (
-    <div className="flex items-center justify-between px-5 pt-3 pb-1">
-      <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--hi-status-color)' }}>{time}</span>
-      <div className="flex items-center gap-0.5">
-        <div className="w-6 h-3 rounded-sm flex items-center px-0.5" style={{ border: '1.5px solid var(--hi-status-color)', opacity: 0.6 }}>
-          <div className="h-1.5 rounded-sm w-4/5" style={{ background: 'var(--hi-status-color)' }} />
-        </div>
-        <div className="w-0.5 h-1.5 rounded-r-sm" style={{ background: 'var(--hi-status-color)', opacity: 0.4 }} />
-      </div>
-    </div>
-  );
-}
-
 export function Profile() {
   const { notes } = useNotes();
   const navigate = useNavigate();
@@ -221,7 +205,6 @@ export function Profile() {
       {/* Header */}
       <div className="relative z-20 flex-shrink-0"
         style={{ background: 'var(--hi-header-bg)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: '1px solid var(--hi-header-border)' }}>
-        <StatusBar />
         <div className="px-5 pb-3 pt-1">
           <h1 style={{ color: 'var(--hi-text-primary)', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>个人中心</h1>
         </div>

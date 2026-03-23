@@ -11,6 +11,7 @@ import { SiCircle } from "./pages/SiCircle";
 import { Profile } from "./pages/Profile";
 import { UserProfile } from "./pages/UserProfile";
 import { Messages } from "./pages/Messages";
+import { ConversationDetail } from "./pages/ConversationDetail";
 import { MyHomepage } from "./pages/MyHomepage";
 import { ToastDemo } from "./pages/ToastDemo";
 
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
       { path: "sicircle", Component: SiCircle },
       { path: "profile", Component: Profile },
       { path: "user/:id", Component: UserProfile },
+      { path: "messages/:id", Component: ConversationDetail },
       { path: "messages", Component: Messages },
       { path: "my-homepage", Component: MyHomepage },
       { path: "toast-demo", Component: ToastDemo },

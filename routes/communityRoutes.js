@@ -274,6 +274,7 @@ router.get('/posts', authMiddleware, (req, res) => {
     const sort = req.query.sort === 'hottest' ? 'hottest' : 'latest';
     const filter = req.query.filter;
     const search = req.query.search;
+    const authorId = req.query.authorId ? parseInt(req.query.authorId, 10) : null;
     const userId = req.userId;
     const offset = (page - 1) * limit;
 
@@ -293,6 +294,11 @@ router.get('/posts', authMiddleware, (req, res) => {
       conditions.push('cl.id IS NOT NULL');
     }
 
+    if (authorId && !isNaN(authorId)) {
+      conditions.push('cp.user_id = ?');
+      params.push(authorId);
+    }
+
     if (search) {
       conditions.push('(cp.title LIKE ? OR cp.summary LIKE ?)');
       params.push(`%${search}%`, `%${search}%`);
@@ -303,15 +309,10 @@ router.get('/posts', authMiddleware, (req, res) => {
 
     let countSql;
     let countParams;
-    
+
     if (filter === 'liked') {
-      countSql = `
-        SELECT COUNT(*) as total 
-        FROM community_posts cp
-        LEFT JOIN community_likes cl ON cl.post_id = cp.id AND cl.user_id = ?
-        WHERE cp.status = 'published' AND cl.id IS NOT NULL
-      `;
-      countParams = [userId];
+      countSql = `SELECT COUNT(*) as total FROM community_posts cp LEFT JOIN community_likes cl ON cl.post_id = cp.id AND cl.user_id = ? ${whereClause}`;
+      countParams = [userId, ...params];
     } else {
       countSql = `SELECT COUNT(*) as total FROM community_posts cp ${whereClause}`;
       countParams = params;
