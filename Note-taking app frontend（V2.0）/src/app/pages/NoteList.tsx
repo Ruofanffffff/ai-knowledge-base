@@ -149,6 +149,7 @@ function NoteCard({ note, onClick, onTagClick, onPublish, index }: NoteCardProps
       <div
         className="rounded-[18px] p-4 overflow-hidden relative"
         style={{
+          position: 'relative',
           background: 'var(--hi-card-bg)',
           backdropFilter: 'blur(14px)',
           WebkitBackdropFilter: 'blur(14px)',
@@ -160,7 +161,7 @@ function NoteCard({ note, onClick, onTagClick, onPublish, index }: NoteCardProps
           transition: 'background 0.25s, border-color 0.25s, box-shadow 0.25s',
         }}
       >
-        <div className="absolute top-3 right-3 flex items-center gap-2 z-30">
+        <div className="absolute top-3 right-3 flex items-center gap-2 z-30" style={{ zIndex: 30 }}>
           {onPublish && (
             <motion.button
               type="button"
