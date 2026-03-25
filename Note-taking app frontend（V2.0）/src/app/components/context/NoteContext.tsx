@@ -6,6 +6,7 @@ export type Note = {
   title?: string;
   content: string;
   type: "text" | "image" | "mixed";
+  status?: "inbox" | "archived";
   createdAt: number;
   tags?: string[];
   imageUrl?: string;
@@ -108,6 +109,7 @@ export function NoteProvider({ children }: { children: ReactNode }) {
           tags: normalizeTags(n.tags),
           id: n.id,
           title: deriveDisplayTitle(n.title, n.content),
+          status: (n.status === 'inbox' || n.status === 'archived') ? n.status : 'archived',
           // Infer type from attachments if present
           type: n.attachments && n.attachments.length > 0 
             ? (n.attachments.some((a: any) => a.type === 'image' || a.type === 'IMAGE') ? 'image' : 'mixed') 
@@ -141,7 +143,8 @@ export function NoteProvider({ children }: { children: ReactNode }) {
       // Optimistic update could be implemented here, but for now let's wait for server
       const response = await api.post('/notes', {
         content: normalizedContent,
-        tags: normalizeTags(note.tags)
+        tags: normalizeTags(note.tags),
+        status: note.status
       });
 
       if (response.data.success) {
@@ -173,7 +176,8 @@ export function NoteProvider({ children }: { children: ReactNode }) {
     try {
       await api.put(`/notes/${id}`, {
         content: updates.content,
-        tags: normalizeTags(updates.tags)
+        tags: updates.tags !== undefined ? normalizeTags(updates.tags) : undefined,
+        status: updates.status
       });
       
       // Update local state

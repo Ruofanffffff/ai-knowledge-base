@@ -42,7 +42,7 @@ const fragmentCollector = require('../services/fragmentCollector');
  */
 router.post('/', authMiddleware, requirePermission('document:write'), async (req, res) => {
   try {
-    const { content, tags } = req.body;
+    const { content, tags, status } = req.body;
     const user = req.user;
     const userId = user?.id;
 
@@ -65,7 +65,8 @@ router.post('/', authMiddleware, requirePermission('document:write'), async (req
     const note = await noteDAL.createNote({
       user,
       content,
-      tags
+      tags,
+      status
     });
 
     res.status(201).json({
@@ -175,14 +176,14 @@ router.get('/:id', authMiddleware, async (req, res) => {
 router.put('/:id', authMiddleware, requirePermission('document:write'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { content, tags } = req.body;
+    const { content, tags, status } = req.body;
     const userId = req.user.id;
 
     // Validate at least one field to update
-    if (content === undefined && tags === undefined) {
+    if (content === undefined && tags === undefined && status === undefined) {
       return res.status(400).json({
         success: false,
-        error: 'At least one field (content or tags) must be provided'
+        error: 'At least one field (content, tags, or status) must be provided'
       });
     }
 
@@ -190,7 +191,7 @@ router.put('/:id', authMiddleware, requirePermission('document:write'), async (r
     const oldNote = await noteDAL.getNoteById(id, userId);
 
     // Update note
-    const note = await noteDAL.updateNote(id, { content, tags }, userId);
+    const note = await noteDAL.updateNote(id, { content, tags, status }, userId);
 
     res.json({
       success: true,
@@ -320,6 +321,7 @@ router.get('/', authMiddleware, async (req, res) => {
       page = 1,
       limit = 20,
       tags,
+      status,
       sortBy = 'createdAt',
       order = 'desc'
     } = req.query;
@@ -353,6 +355,7 @@ router.get('/', authMiddleware, async (req, res) => {
     const result = await noteDAL.listNotes({
       userId,
       tags: parsedTags,
+      status: typeof status === 'string' ? status : undefined,
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
       sortBy,

@@ -74,10 +74,9 @@ function ProfileIcon({ active }: { active: boolean }) {
 }
 
 const NAV_ITEMS = [
-  { path: '/home', label: 'Hi Brain', Icon: HiBrainIcon },
+  { path: '/home', label: '拾思', Icon: HiBrainIcon },
   { path: '/siku', label: '思库', Icon: SiKuIcon },
   { path: '/sichain', label: '思链', Icon: SiChainIcon },
-  { path: '/sicircle', label: '思圈', Icon: SiCircleIcon },
   { path: '/profile', label: '我的', Icon: ProfileIcon },
 ];
 
@@ -85,6 +84,7 @@ export function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const [unread, setUnread] = useState(0);
+  const [showSiCircle, setShowSiCircle] = useState(false);
 
   useEffect(() => {
     const update = () => setUnread(getUnreadCount());
@@ -93,10 +93,33 @@ export function BottomNav() {
     return () => window.removeEventListener('hibrain_dm_update', update);
   }, []);
 
+  useEffect(() => {
+    const read = () => {
+      try {
+        const v = localStorage.getItem('shisi_nav_show_sicircle');
+        setShowSiCircle(v === '1');
+      } catch {
+        setShowSiCircle(false);
+      }
+    };
+    read();
+    const onCustom = () => read();
+    window.addEventListener('shisi_nav_update', onCustom as any);
+    window.addEventListener('storage', onCustom as any);
+    return () => {
+      window.removeEventListener('shisi_nav_update', onCustom as any);
+      window.removeEventListener('storage', onCustom as any);
+    };
+  }, []);
+
   const isActive = (path: string) => {
     if (path === '/siku') return location.pathname.startsWith('/siku');
     return location.pathname === path;
   };
+
+  const items = showSiCircle
+    ? [...NAV_ITEMS.slice(0, 3), { path: '/sicircle', label: '思圈', Icon: SiCircleIcon }, ...NAV_ITEMS.slice(3)]
+    : NAV_ITEMS;
 
   return (
     <div
@@ -111,7 +134,7 @@ export function BottomNav() {
       }}
     >
       <div className="flex items-center justify-around px-1 py-2">
-        {NAV_ITEMS.map(({ path, label, Icon }) => {
+        {items.map(({ path, label, Icon }) => {
           const active = isActive(path);
           const isProfile = path === '/profile';
           return (

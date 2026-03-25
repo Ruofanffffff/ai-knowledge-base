@@ -146,6 +146,7 @@ model Note {
   userId      String       @map("user_id")
   content     String
   tags        String       // JSON string for SQLite compatibility
+  status      String       @default("archived")
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
   
@@ -154,6 +155,7 @@ model Note {
   
   @@map("notes")
   @@index([userId])
+  @@index([status])
   @@index([createdAt])
 }
 

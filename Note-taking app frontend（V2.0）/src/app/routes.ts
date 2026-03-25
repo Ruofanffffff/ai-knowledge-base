@@ -3,6 +3,7 @@ import { RootLayout } from "./components/RootLayout";
 import { Splash } from "./pages/Splash";
 import { Auth } from "./pages/Auth";
 import { HiBrain } from "./pages/HiBrain";
+import { ShisiHome } from "./pages/ShisiHome";
 import { NoteList } from "./pages/NoteList";
 import { NoteCreate } from "./pages/NoteCreate";
 import { DocumentDetail } from "./pages/DocumentDetail";
@@ -12,6 +13,8 @@ import { Profile } from "./pages/Profile";
 import { UserProfile } from "./pages/UserProfile";
 import { Messages } from "./pages/Messages";
 import { ConversationDetail } from "./pages/ConversationDetail";
+import { Inbox } from "./pages/Inbox";
+import { DailyReview } from "./pages/DailyReview";
 import { MyHomepage } from "./pages/MyHomepage";
 import { ToastDemo } from "./pages/ToastDemo";
 
@@ -22,7 +25,10 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: Splash },
       { path: "auth", Component: Auth },
-      { path: "home", Component: HiBrain },
+      { path: "home", Component: ShisiHome },
+      { path: "assistant", Component: HiBrain },
+      { path: "inbox", Component: Inbox },
+      { path: "review/today", Component: DailyReview },
       { path: "siku", Component: NoteList },
       { path: "siku/create", Component: NoteCreate },
       { path: "siku/:id", Component: NoteCreate },

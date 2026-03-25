@@ -180,6 +180,7 @@ export function Profile() {
   const navigate = useNavigate();
   const [showModelPanel, setShowModelPanel] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [navCircleOn, setNavCircleOn] = useState(false);
 
   useEffect(() => {
     const update = () => setUnread(getUnreadCount());
@@ -187,6 +188,21 @@ export function Profile() {
     window.addEventListener('hibrain_dm_update', update);
     return () => window.removeEventListener('hibrain_dm_update', update);
   }, []);
+
+  useEffect(() => {
+    try {
+      setNavCircleOn(localStorage.getItem('shisi_nav_show_sicircle') === '1');
+    } catch {
+      setNavCircleOn(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('shisi_nav_show_sicircle', navCircleOn ? '1' : '0');
+      window.dispatchEvent(new Event('shisi_nav_update'));
+    } catch { }
+  }, [navCircleOn]);
 
   const totalTags = Array.from(new Set(notes.flatMap(n => n.tags || []))).length;
   const aiUsed = notes.filter(n => n.structuredData && Object.values(n.structuredData).some(Boolean)).length;
@@ -341,6 +357,25 @@ export function Profile() {
           <ToggleRow label="思链自动更新" desc="上传笔记后自动更新知识图谱" defaultOn={true} />
           <div style={{ height: '1px', background: 'var(--hi-divider)', margin: '0 -4px' }} />
           <ToggleRow label="思圈公开分享" desc="允许他人在思圈看到你的分享" />
+          <div style={{ height: '1px', background: 'var(--hi-divider)', margin: '0 -4px' }} />
+          <div className="flex items-center justify-between py-3.5">
+            <div className="flex-1 pr-4">
+              <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 600 }}>导航栏显示思圈</p>
+              <p style={{ color: 'var(--hi-text-secondary)', fontSize: '12px', marginTop: '1px' }}>关闭可减少社交入口噪音</p>
+            </div>
+            <button
+              onClick={() => setNavCircleOn(v => !v)}
+              className="relative transition-all"
+              style={{ width: '44px', height: '26px', borderRadius: '13px', background: navCircleOn ? 'linear-gradient(135deg, #10B981, #34D399)' : 'var(--hi-input-bg)', boxShadow: navCircleOn ? '0 2px 8px rgba(16,185,129,0.3)' : 'none' }}
+            >
+              <motion.div
+                animate={{ x: navCircleOn ? 18 : 2 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                className="absolute top-1 w-4.5 h-4.5 rounded-full"
+                style={{ width: '18px', height: '18px', top: '4px', background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
+              />
+            </button>
+          </div>
           <div style={{ height: '1px', background: 'var(--hi-divider)', margin: '0 -4px' }} />
           <ToggleRow label="AI 智能标签" desc="自动为笔记生成标签" defaultOn={true} />
           <div style={{ height: '1px', background: 'var(--hi-divider)', margin: '0 -4px' }} />

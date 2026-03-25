@@ -48,6 +48,9 @@ function normalizeNote(note) {
     normalized.tags = [];
   }
   normalized.title = deriveTitleFromContent(normalized.content);
+  normalized.status = typeof normalized.status === 'string' && normalized.status
+    ? normalized.status
+    : 'archived';
   return normalized;
 }
 
@@ -116,7 +119,7 @@ async function ensureUserExists(user) {
  * @returns {Promise<Object>} Created note
  */
 async function createNote(input = {}) {
-  const { user, content, tags, userId: legacyUserId } = input;
+  const { user, content, tags, status, userId: legacyUserId } = input;
 
   const resolvedUserId = user?.id ?? legacyUserId;
   if (!resolvedUserId) {
@@ -151,7 +154,8 @@ async function createNote(input = {}) {
       data: {
         userId,
         content,
-        tags: JSON.stringify(finalTags)
+        tags: JSON.stringify(finalTags),
+        status: typeof status === 'string' && status ? status : 'archived',
       },
       include: {
         attachments: true
@@ -177,7 +181,8 @@ async function createNote(input = {}) {
       data: {
         userId,
         content,
-        tags: JSON.stringify(finalTags)
+        tags: JSON.stringify(finalTags),
+        status: typeof status === 'string' && status ? status : 'archived',
       },
       include: {
         attachments: true
@@ -255,6 +260,10 @@ async function updateNote(noteId, data, userId) {
     updateData.tags = JSON.stringify(normalizeTags(data.tags));
   }
 
+  if (data.status !== undefined) {
+    updateData.status = data.status;
+  }
+
   const note = await prisma.note.update({
     where: { id: noteId },
     data: updateData,
@@ -310,6 +319,7 @@ async function listNotes(options = {}) {
   const {
     userId,
     tags,
+    status,
     page = 1,
     limit = 20,
     sortBy = 'createdAt',
@@ -320,6 +330,10 @@ async function listNotes(options = {}) {
   
   if (userId) {
     where.userId = userId;
+  }
+
+  if (status) {
+    where.status = status;
   }
   
   if (tags && tags.length > 0) {
