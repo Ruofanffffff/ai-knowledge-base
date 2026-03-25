@@ -9,3 +9,8 @@
   - [x] SubTask 2.2: Implement `SettingsContext` or similar to manage API Base URL in frontend.
   - [x] SubTask 2.3: Create a "Server Connection" settings page in React.
   - [x] SubTask 2.4: Update `client/src/api/client.ts` to use the dynamic Base URL.
+- [x] Task 3: Mobile Voice Capture (STT)
+  - [x] SubTask 3.1: Add Capacitor speech recognition plugin.
+  - [x] SubTask 3.2: Implement SpeechService with web fallback.
+  - [x] SubTask 3.3: Integrate into ShisiHome mic button with listening UI.
+  - [x] SubTask 3.4: Handle permissions and errors.

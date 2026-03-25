@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
-import { ChevronRight, Inbox, Mic, Sparkles } from 'lucide-react';
+import { ChevronRight, Inbox, Mic, Sparkles, Square } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { useNotes } from '../components/context/NoteContext';
 import { toast } from '../components/ui/Toast';
+import { SpeechService } from '../services/speechService';
 
 function stripHtmlToPlainText(raw: unknown): string {
   const content = typeof raw === 'string' ? raw : String(raw ?? '');
@@ -33,6 +34,9 @@ export function ShisiHome() {
   const navigate = useNavigate();
   const { notes, addNote } = useNotes();
   const [input, setInput] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const stopListeningRef = useRef<null | (() => Promise<void>)>(null);
+  const prefixRef = useRef('');
 
   const inboxNotes = useMemo(() => {
     return notes.filter((n) => n.status === 'inbox').sort((a, b) => b.createdAt - a.createdAt);
@@ -64,6 +68,42 @@ export function ShisiHome() {
       toast.dismiss(id);
       toast.error(e?.message || '保存失败');
     }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopListeningRef.current?.().catch(() => {});
+    };
+  }, []);
+
+  const handleMicToggle = async () => {
+    if (stopListeningRef.current) {
+      setIsListening(false);
+      await stopListeningRef.current?.();
+      stopListeningRef.current = null;
+      return;
+    }
+
+    const availability = await SpeechService.getAvailability();
+    if (!availability.available) {
+      toast.error('当前环境不支持语音识别');
+      return;
+    }
+
+    setIsListening(true);
+    const base = input.trim();
+    prefixRef.current = base ? `${base} ` : '';
+
+    const { stop } = await SpeechService.startListening(
+      { language: 'zh-CN' },
+      {
+        onPartial: (text) => setInput(`${prefixRef.current}${text}`.trimStart()),
+        onFinal: (text) => setInput(`${prefixRef.current}${text}`.trimStart()),
+        onListeningChange: setIsListening,
+        onError: (message) => toast.error(message),
+      }
+    );
+    stopListeningRef.current = stop;
   };
 
   const preview = inboxNotes.slice(0, 3);
@@ -107,27 +147,54 @@ export function ShisiHome() {
                 <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 2 }}>无需分类，直接进入收件箱</p>
               </div>
             </div>
-            <button
-              className="w-10 h-10 rounded-2xl flex items-center justify-center"
-              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.16)' }}
-              onClick={() => toast.info('语音捕捉即将上线')}
-            >
-              <Mic size={18} style={{ color: '#6366F1' }} />
-            </button>
+            <div className="relative flex items-center justify-center">
+              {isListening &&
+                [0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute rounded-2xl pointer-events-none"
+                    initial={{ opacity: 0.0, scale: 1 }}
+                    animate={{ opacity: [0.35, 0.0], scale: [1, 2.0] }}
+                    transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.18, ease: 'easeOut' }}
+                    style={{
+                      width: 40,
+                      height: 40,
+                      border: '1px solid rgba(239,68,68,0.55)',
+                    }}
+                  />
+                ))}
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={handleMicToggle}
+                className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                animate={{
+                  background: isListening
+                    ? 'linear-gradient(135deg, #EF4444, #F97316)'
+                    : 'rgba(99,102,241,0.08)',
+                  boxShadow: isListening ? '0 0 18px rgba(239,68,68,0.35)' : 'none',
+                }}
+                transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+                style={{
+                  border: isListening ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(99,102,241,0.16)',
+                }}
+              >
+                {isListening ? <Square size={16} style={{ color: 'white' }} /> : <Mic size={18} style={{ color: '#6366F1' }} />}
+              </motion.button>
+            </div>
           </div>
 
           <div className="mt-4">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="此刻想到什么？一句话也可以…"
+              placeholder={isListening ? '正在聆听…' : '此刻想到什么？一句话也可以…'}
               className="w-full p-4 rounded-3xl outline-none resize-none"
               rows={4}
               style={{ background: 'var(--hi-input-bg)', border: '1px solid var(--hi-card-border)', color: 'var(--hi-text-primary)', fontSize: '14px', lineHeight: 1.6 }}
             />
             <div className="flex items-center justify-between mt-3">
-              <span style={{ color: 'var(--hi-text-secondary)', fontSize: '11px' }}>
-                {input.trim() ? `${input.trim().length} 字` : '先捕捉，再整理'}
+              <span style={{ color: isListening ? '#EF4444' : 'var(--hi-text-secondary)', fontSize: '11px', fontWeight: isListening ? 800 : 400 }}>
+                {isListening ? '正在聆听…' : input.trim() ? `${input.trim().length} 字` : '先捕捉，再整理'}
               </span>
               <motion.button
                 whileTap={{ scale: 0.97 }}

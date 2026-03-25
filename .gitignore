@@ -45,6 +45,7 @@ data/documents.json
 data/categories.json
 data/users.db
 data/*.db
+data/*.db-journal
 data/knowledge-graph.json
 data/recommendations.json
 
