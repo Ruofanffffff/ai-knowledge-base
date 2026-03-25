@@ -204,7 +204,13 @@ export function Profile() {
 
       {/* Header */}
       <div className="relative z-20 flex-shrink-0"
-        style={{ background: 'var(--hi-header-bg)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: '1px solid var(--hi-header-border)' }}>
+        style={{
+          background: 'var(--hi-header-bg)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderBottom: '1px solid var(--hi-header-border)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 8px)'
+        }}>
         <div className="px-5 pb-3 pt-1">
           <h1 style={{ color: 'var(--hi-text-primary)', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>个人中心</h1>
         </div>

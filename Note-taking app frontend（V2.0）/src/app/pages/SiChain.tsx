@@ -2492,7 +2492,13 @@ function LegacySiChain() {
 
       {/* Header */}
       <div className="relative z-20 flex-shrink-0"
-        style={{ background: 'var(--hi-header-bg)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: '1px solid var(--hi-header-border)' }}>
+        style={{
+          background: 'var(--hi-header-bg)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderBottom: '1px solid var(--hi-header-border)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 8px)'
+        }}>
         <div className="px-5 pb-3 pt-1">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -3224,7 +3230,13 @@ export function SiChain() {
       </div>
 
       <div className="relative z-20 flex-shrink-0"
-        style={{ background: 'var(--hi-header-bg)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderBottom: '1px solid var(--hi-header-border)' }}>
+        style={{
+          background: 'var(--hi-header-bg)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderBottom: '1px solid var(--hi-header-border)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 8px)'
+        }}>
         <div className="px-5 pb-3 pt-1">
           <div className="flex items-center justify-between mb-3">
             <div>

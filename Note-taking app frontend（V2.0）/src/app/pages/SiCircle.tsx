@@ -197,6 +197,31 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
   const [profileOpen, setProfileOpen] = useState(false);
   const [followed, setFollowed] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [profileMeta, setProfileMeta] = useState<any | null>(null);
+  const [profileMetaLoading, setProfileMetaLoading] = useState(false);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    let cancelled = false;
+
+    const load = async () => {
+      setProfileMetaLoading(true);
+      try {
+        const res = await api.get(`/social/users/${post.userId}/profile`);
+        if (!cancelled && res.data?.success) {
+          setProfileMeta(res.data.data);
+          setFollowed(Boolean(res.data.data?.relations?.isFollowed));
+        }
+      } catch {
+        if (!cancelled) setProfileMeta(null);
+      } finally {
+        if (!cancelled) setProfileMetaLoading(false);
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [post.userId, profileOpen]);
 
 
   const showToast = (msg: string) => {
@@ -608,7 +633,7 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                 {/* Name + username */}
                 <div className="mt-3">
                   <div className="flex items-center gap-1.5">
-                    <p style={{ color: '#1E1B4B', fontSize: '18px', fontWeight: 800 }}>{post.user.name}</p>
+                    <p style={{ color: 'var(--hi-text-primary)', fontSize: '18px', fontWeight: 800 }}>{post.user.name}</p>
                     {post.user.verified && (
                       <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ background: '#6366F1' }}>
@@ -618,28 +643,30 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                       </div>
                     )}
                   </div>
-                  <p style={{ color: '#9CA3AF', fontSize: '13px', marginTop: '2px' }}>@{post.user.username}</p>
+                  <p style={{ color: 'var(--hi-text-secondary)', fontSize: '13px', marginTop: '2px' }}>
+                    @{profileMeta?.username || post.user.username}
+                  </p>
                 </div>
 
                 {/* Bio */}
-                <p className="mt-2.5" style={{ color: '#4B5563', fontSize: '13px', lineHeight: 1.65 }}>
+                <p className="mt-2.5" style={{ color: 'var(--hi-text-primary)', fontSize: '13px', lineHeight: 1.65, opacity: 0.85 }}>
                   知识探索者 | 每天分享思考与灵感 ✨<br />用思库积累，用思链连接，用思圈共鸣
                 </p>
 
                 {/* Stats */}
                 <div className="flex gap-5 mt-3.5 pb-1">
                   {[
-                    { label: '帖子', value: '42' },
-                    { label: '关注', value: '318' },
-                    { label: '粉丝', value: '1.2k' },
+                    { label: '帖子', value: profileMetaLoading ? '—' : String(profileMeta?.counts?.posts ?? '0') },
+                    { label: '关注', value: profileMetaLoading ? '—' : String(profileMeta?.counts?.following ?? '0') },
+                    { label: '粉丝', value: profileMetaLoading ? '—' : String(profileMeta?.counts?.followers ?? '0') },
                   ].map((s, i) => (
                     <motion.div
                       key={s.label}
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.08 + i * 0.05 }}
                     >
-                      <p style={{ color: '#1E1B4B', fontSize: '16px', fontWeight: 800 }}>{s.value}</p>
-                      <p style={{ color: '#9CA3AF', fontSize: '11px', marginTop: '1px' }}>{s.label}</p>
+                      <p style={{ color: 'var(--hi-text-primary)', fontSize: '16px', fontWeight: 800 }}>{s.value}</p>
+                      <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: '1px' }}>{s.label}</p>
                     </motion.div>
                   ))}
                 </div>
@@ -650,8 +677,8 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                   className="mt-3.5 mb-1 p-3 rounded-2xl"
                   style={{ background: `${post.user.avatarColor}08`, border: `1px solid ${post.user.avatarColor}18` }}
                 >
-                  <p style={{ color: '#9CA3AF', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' }}>最近动态</p>
-                  <p style={{ color: '#374151', fontSize: '12.5px', lineHeight: 1.6 }} className="line-clamp-2">
+                  <p style={{ color: 'var(--hi-text-secondary)', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' }}>最近动态</p>
+                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', lineHeight: 1.6, opacity: 0.9 }} className="line-clamp-2">
                     {post.content.slice(0, 72)}…
                   </p>
                 </motion.div>

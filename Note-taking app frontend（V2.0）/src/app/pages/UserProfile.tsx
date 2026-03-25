@@ -6,7 +6,6 @@ import {
   Share2, Check, Bookmark, X, Send, ChevronDown
 } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
-import { BottomNav } from '../components/BottomNav';
 import { DirectMessageSheet } from '../components/DirectMessageSheet';
 import { api } from '../services/api';
 
@@ -794,13 +793,13 @@ export function UserProfile() {
 
   return (
     <div
-      className="relative min-h-screen w-full"
+      className="h-screen flex flex-col overflow-hidden relative w-full"
       style={{ background: 'linear-gradient(160deg, #FDFDFF 0%, #F8F5FF 50%, #F3F8FF 100%)' }}
     >
       <ParticleBackground />
 
       {/* ── Content scroll container ── */}
-      <div ref={scrollRef} className="relative z-10 h-screen overflow-y-auto" style={{ paddingBottom: '80px' }}>
+      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
 
         {/* ── Sticky top bar ── */}
         <div
@@ -1140,8 +1139,9 @@ export function UserProfile() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
-            className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-2xl"
+            className="fixed left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-2xl"
             style={{
+              bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
               background: 'rgba(30,27,75,0.88)',
               backdropFilter: 'blur(12px)',
               color: 'white',
@@ -1155,8 +1155,6 @@ export function UserProfile() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <BottomNav />
     </div>
   );
 }

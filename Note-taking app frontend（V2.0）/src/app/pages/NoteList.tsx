@@ -166,7 +166,7 @@ function NoteCard({ note, onClick, onTagClick, onPublish, index }: NoteCardProps
               type="button"
               whileTap={{ scale: 0.92 }}
               onClick={handlePublishClick}
-              className="w-9 h-9 rounded-2xl flex items-center justify-center"
+              className="h-9 px-3 rounded-2xl flex items-center gap-1.5"
               style={{
                 background: 'rgba(99,102,241,0.10)',
                 border: '1px solid rgba(99,102,241,0.18)',
@@ -174,6 +174,7 @@ function NoteCard({ note, onClick, onTagClick, onPublish, index }: NoteCardProps
               aria-label="发布到思圈"
             >
               <Sparkles size={16} style={{ color: '#6366F1' }} />
+              <span style={{ color: '#6366F1', fontSize: '11px', fontWeight: 800 }}>思圈</span>
             </motion.button>
           )}
           <motion.button
