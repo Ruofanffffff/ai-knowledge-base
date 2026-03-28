@@ -1032,14 +1032,14 @@ router.get('/posts/:id', authMiddleware, async (req, res) => {
  * PUT /api/community/posts/:id
  * 更新帖子
  * 
- * Body: { title?: string, summary?: string }
- * Response: { success: true, data: { id, title, summary, updated_at } }
+ * Body: { title?: string, summary?: string, isPublic?: boolean }
+ * Response: { success: true, data: { id, title, summary, isPublic, updated_at } }
  */
 router.put('/posts/:id', authMiddleware, (req, res) => {
   try {
     const postId = parseInt(req.params.id);
     const userId = req.userId;
-    const { title, summary } = req.body;
+    const { title, summary, isPublic } = req.body;
 
     if (isNaN(postId)) {
       return res.status(400).json({
@@ -1048,7 +1048,7 @@ router.put('/posts/:id', authMiddleware, (req, res) => {
       });
     }
 
-    if (!title && !summary) {
+    if (title === undefined && summary === undefined && isPublic === undefined) {
       return res.status(400).json({
         success: false,
         error: '请提供要更新的内容'
@@ -1083,13 +1083,17 @@ router.put('/posts/:id', authMiddleware, (req, res) => {
 
         const updates = [];
         const params = [];
-        if (title) {
+        if (title !== undefined) {
           updates.push('title = ?');
           params.push(title);
         }
         if (summary !== undefined) {
           updates.push('summary = ?');
           params.push(summary);
+        }
+        if (isPublic !== undefined) {
+          updates.push('is_public = ?');
+          params.push(isPublic ? 1 : 0);
         }
         updates.push('updated_at = CURRENT_TIMESTAMP');
         params.push(postId);
@@ -1109,8 +1113,9 @@ router.put('/posts/:id', authMiddleware, (req, res) => {
               success: true,
               data: {
                 id: postId,
-                title: title || undefined,
-                summary: summary || undefined,
+                title: title !== undefined ? title : undefined,
+                summary: summary !== undefined ? summary : undefined,
+                isPublic: isPublic !== undefined ? Boolean(isPublic) : undefined,
                 updated_at: new Date().toISOString()
               }
             });
@@ -1132,7 +1137,7 @@ router.put('/posts/:id', authMiddleware, (req, res) => {
  * 
  * Validates: Requirements 5.1, 5.2, 5.3, 5.4
  */
-router.delete('/posts/:id', authMiddleware, requirePermission('community:delete'), (req, res) => {
+router.delete('/posts/:id', authMiddleware, (req, res) => {
   try {
     const postId = parseInt(req.params.id);
     const userId = req.userId;
@@ -1251,7 +1256,7 @@ router.delete('/posts/:id', authMiddleware, requirePermission('community:delete'
  * Body: { postIds: number[] }
  * Response: { success: true, data: { deleted: number[], failed: { id: number, reason: string }[] } }
  */
-router.post('/posts/batch-delete', authMiddleware, requirePermission('community:delete'), (req, res) => {
+router.post('/posts/batch-delete', authMiddleware, (req, res) => {
   try {
     const { postIds } = req.body;
     const userId = req.userId;

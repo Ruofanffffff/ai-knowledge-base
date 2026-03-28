@@ -411,7 +411,17 @@ export function Profile() {
 
         {/* Logout */}
         <div className="mx-4 mb-6">
-          <button className="w-full py-3.5 rounded-2xl text-center"
+          <button
+            className="w-full py-3.5 rounded-2xl text-center"
+            onClick={() => {
+              try {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                localStorage.removeItem('user_info');
+                localStorage.removeItem('hi_brain_authed');
+              } catch { }
+              navigate('/auth', { replace: true });
+            }}
             style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444', fontSize: '14px', fontWeight: 600, border: '1px solid rgba(239,68,68,0.15)' }}>
             退出登录
           </button>

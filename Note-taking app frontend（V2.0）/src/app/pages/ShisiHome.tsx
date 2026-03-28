@@ -77,11 +77,14 @@ export function ShisiHome() {
   }, []);
 
   const handleMicToggle = async () => {
-    if (stopListeningRef.current) {
+    if (stopListeningRef.current && isListening) {
       await stopListeningRef.current?.();
       stopListeningRef.current = null;
       setIsListening(false);
       return;
+    }
+    if (stopListeningRef.current && !isListening) {
+      stopListeningRef.current = null;
     }
 
     setIsListening(true);
@@ -100,7 +103,10 @@ export function ShisiHome() {
       {
         onPartial: (text) => setInput(`${prefixRef.current}${text}`.trimStart()),
         onFinal: (text) => setInput(`${prefixRef.current}${text}`.trimStart()),
-        onListeningChange: setIsListening,
+        onListeningChange: (listening) => {
+          setIsListening(listening);
+          if (!listening) stopListeningRef.current = null;
+        },
         onError: (message) => {
           toast.error(message);
           stopListeningRef.current = null;
@@ -265,6 +271,28 @@ export function ShisiHome() {
               })}
             </div>
           )}
+        </div>
+
+        <div className="mx-4 mt-4 p-5 rounded-3xl" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.10) 0%, rgba(139,92,246,0.10) 100%)', border: '1px solid rgba(99,102,241,0.16)', boxShadow: 'var(--hi-card-shadow)' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)' }}>
+                <Sparkles size={18} style={{ color: '#6366F1' }} />
+              </div>
+              <div>
+                <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>思圈</p>
+                <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 2 }}>看看别人怎么把想法写清楚</p>
+              </div>
+            </div>
+            <button
+              className="px-3 py-2 rounded-2xl flex items-center gap-1"
+              style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.18)', color: '#6366F1', fontSize: '12px', fontWeight: 900 }}
+              onClick={() => navigate('/sicircle')}
+            >
+              去看看
+              <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
 
         <div className="mx-4 mt-4 p-5 rounded-3xl" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)', boxShadow: 'var(--hi-card-shadow)' }}>

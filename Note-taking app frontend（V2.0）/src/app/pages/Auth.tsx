@@ -472,6 +472,14 @@ export function Auth() {
     apTimers.current.forEach(clearTimeout);
   }, []);
 
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const authed = localStorage.getItem('hi_brain_authed');
+      if (token || authed === '1') navigate('/home', { replace: true });
+    } catch { }
+  }, [navigate]);
+
   /* ── Login helpers ────────────────────────────── */
   const setF = (k: keyof typeof form) => (v: string) => {
     if (k === 'phone') v = v.replace(/\D/g,'').slice(0,11);

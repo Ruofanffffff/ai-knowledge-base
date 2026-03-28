@@ -21,6 +21,9 @@ interface Post {
   timestamp: string;
   liked: boolean;
   bookmarked: boolean;
+  sourceType?: string;
+  sourceId?: string;
+  isPublic?: boolean;
 }
 
 
@@ -184,11 +187,14 @@ function CommentDrawer({ post, onClose }: CommentDrawerProps) {
   );
 }
 
-function PostCard({ post, onLike, onBookmark, onComment }: {
+function PostCard({ post, onLike, onBookmark, onComment, isMine, onDelete, onToggleVisibility }: {
   post: Post;
   onLike: (id: string) => void;
   onBookmark: (id: string) => void;
   onComment: (id: string) => void;
+  isMine?: boolean;
+  onDelete?: (id: string) => void;
+  onToggleVisibility?: (id: string, isPublic: boolean) => void;
 }) {
   const navigate = useNavigate();
   const [showFull, setShowFull] = useState(false);
@@ -229,7 +235,31 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
     setTimeout(() => setToastMsg(null), 2200);
   };
 
+  const mineActions = isMine ? [
+    {
+      icon: <EyeOff size={17} />,
+      label: post.isPublic ? '设为私密' : '设为公开',
+      color: '#6B7280',
+      done: false,
+      action: () => {
+        setMoreOpen(false);
+        onToggleVisibility?.(post.id, Boolean(post.isPublic));
+      },
+    },
+    {
+      icon: <X size={17} />,
+      label: '删除',
+      color: '#EF4444',
+      done: false,
+      action: () => {
+        setMoreOpen(false);
+        onDelete?.(post.id);
+      },
+    },
+  ] : [];
+
   const moreActions = [
+    ...mineActions,
     {
       icon: <UserPlus size={17} />,
       label: followed ? `已关注 @${post.user.username}` : `关注 @${post.user.username}`,
@@ -337,7 +367,15 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
                   </motion.span>
                 )}
               </div>
-              <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px' }}>@{post.user.username} · {post.timestamp}</p>
+              <div className="flex items-center gap-2">
+                <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px' }}>@{post.user.username} · {post.timestamp}</p>
+                {isMine && post.isPublic !== undefined && (
+                  <span className="px-2 py-0.5 rounded-full"
+                    style={{ background: post.isPublic ? 'rgba(16,185,129,0.10)' : 'rgba(107,114,128,0.12)', color: post.isPublic ? '#10B981' : '#6B7280', fontSize: '10px', fontWeight: 700 }}>
+                    {post.isPublic ? '公开' : '私密'}
+                  </span>
+                )}
+              </div>
             </div>
           </motion.button>
 
@@ -376,6 +414,19 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
               </span>
             ))}
           </div>
+
+          {post.sourceType && post.sourceId && (
+            <div className="mt-3">
+              <button
+                className="px-3 py-2 rounded-2xl inline-flex items-center gap-2"
+                style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.14)', color: '#6366F1', fontSize: '12.5px', fontWeight: 700 }}
+                onClick={() => navigate(post.sourceType === 'document' ? `/documents/${post.sourceId}` : `/siku/${post.sourceId}`)}
+              >
+                <Link2 size={14} />
+                查看原文
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Image */}
@@ -738,8 +789,18 @@ function PostCard({ post, onLike, onBookmark, onComment }: {
 export function SiCircle() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [commentPost, setCommentPost] = useState<Post | null>(null);
-  const [activeTab, setActiveTab] = useState<'follow' | 'discover'>('discover');
+  const [activeTab, setActiveTab] = useState<'follow' | 'discover' | 'mine'>('discover');
   const navigate = useNavigate();
+  const myUserId = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user_info');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.id != null ? String(parsed.id) : null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   // Dynamic Stories from Posts
   const stories = useMemo(() => {
@@ -777,7 +838,7 @@ export function SiCircle() {
         params: {
           limit: 20,
           sort: activeTab === 'discover' ? 'latest' : 'latest',
-          filter: activeTab === 'follow' ? 'following' : undefined,
+          filter: activeTab === 'follow' ? 'following' : activeTab === 'mine' ? 'mine' : undefined,
         }
       });
 
@@ -831,13 +892,38 @@ export function SiCircle() {
             bookmarks: 0, // Not in backend yet (or isBookmarked only?)
             timestamp: timeStr,
             liked: p.isLiked,
-            bookmarked: p.isBookmarked
+            bookmarked: p.isBookmarked,
+            sourceType: p.sourceType,
+            sourceId: p.sourceId != null ? String(p.sourceId) : undefined,
+            isPublic: typeof p.isPublic === 'boolean' ? p.isPublic : undefined,
           };
         });
         setPosts(fetchedPosts);
       }
     } catch (error) {
       console.error('Failed to fetch community posts:', error);
+    }
+  };
+
+  const handleDeletePost = async (id: string) => {
+    try {
+      const { data } = await api.delete(`/community/posts/${id}`);
+      if (data.success) {
+        setPosts(prev => prev.filter(p => p.id !== id));
+      }
+    } catch (error) {
+      console.error('Delete failed', error);
+    }
+  };
+
+  const handleToggleVisibility = async (id: string, isPublic: boolean) => {
+    try {
+      const { data } = await api.put(`/community/posts/${id}`, { isPublic: !isPublic });
+      if (data.success) {
+        setPosts(prev => prev.map(p => p.id === id ? { ...p, isPublic: !isPublic } : p));
+      }
+    } catch (error) {
+      console.error('Update visibility failed', error);
     }
   };
 
@@ -907,6 +993,7 @@ export function SiCircle() {
           {[
             { key: 'discover', label: '发现' },
             { key: 'follow', label: '关注' },
+            { key: 'mine', label: '我的' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as any)}
               className="pb-1.5 relative"
@@ -965,6 +1052,9 @@ export function SiCircle() {
                 onLike={handleLike}
                 onBookmark={handleBookmark}
                 onComment={id => setCommentPost(posts.find(p => p.id === id) || null)}
+                isMine={activeTab === 'mine' || (myUserId != null && post.userId === myUserId)}
+                onDelete={handleDeletePost}
+                onToggleVisibility={handleToggleVisibility}
               />
             </motion.div>
           ))}

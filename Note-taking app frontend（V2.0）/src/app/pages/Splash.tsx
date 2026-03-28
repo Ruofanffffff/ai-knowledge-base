@@ -7,7 +7,15 @@ export function Splash() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const timer = setTimeout(() => navigate('/auth'), 3200);
+    const timer = setTimeout(() => {
+      try {
+        const token = localStorage.getItem('access_token');
+        const authed = localStorage.getItem('hi_brain_authed');
+        navigate(token || authed === '1' ? '/home' : '/auth');
+      } catch {
+        navigate('/auth');
+      }
+    }, 3200);
     return () => clearTimeout(timer);
   }, [navigate]);
 

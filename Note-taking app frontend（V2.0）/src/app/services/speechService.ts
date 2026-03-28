@@ -150,7 +150,7 @@ export class SpeechService {
         try {
           await CapacitorSpeechRecognition.stop();
         } catch {}
-        await new Promise((r) => setTimeout(r, 320));
+        await new Promise((r) => setTimeout(r, 1200));
         try {
           await partialHandle.remove();
         } catch {}
