@@ -1961,6 +1961,27 @@ export function NoteCreate() {
                   {action.label}
                 </button>
               ))}
+              <button
+                onClick={() => {
+                  if (!existingNote) {
+                    toast.error('请先保存笔记');
+                    return;
+                  }
+                  setShowShareSheet(true);
+                }}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl whitespace-nowrap flex-shrink-0 transition-all active:scale-95 disabled:opacity-60 disabled:active:scale-100"
+                disabled={!existingNote}
+                style={{
+                  background: 'rgba(99,102,241,0.10)',
+                  border: '1px solid rgba(99,102,241,0.18)',
+                  color: '#6366F1',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                }}
+              >
+                <Sparkles size={13} style={{ color: '#6366F1' }} />
+                思圈
+              </button>
             </div>}
 
             {/* ── Bottom bar ── */}

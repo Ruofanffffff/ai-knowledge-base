@@ -78,31 +78,41 @@ export function ShisiHome() {
 
   const handleMicToggle = async () => {
     if (stopListeningRef.current) {
-      setIsListening(false);
       await stopListeningRef.current?.();
       stopListeningRef.current = null;
-      return;
-    }
-
-    const availability = await SpeechService.getAvailability();
-    if (!availability.available) {
-      toast.error('当前环境不支持语音识别');
+      setIsListening(false);
       return;
     }
 
     setIsListening(true);
+    const availability = await SpeechService.getAvailability();
+    if (!availability.available) {
+      setIsListening(false);
+      toast.error('当前环境不支持语音识别');
+      return;
+    }
+
     const base = input.trim();
     prefixRef.current = base ? `${base} ` : '';
 
-    const { stop } = await SpeechService.startListening(
+    const { stop, started } = await SpeechService.startListening(
       { language: 'zh-CN' },
       {
         onPartial: (text) => setInput(`${prefixRef.current}${text}`.trimStart()),
         onFinal: (text) => setInput(`${prefixRef.current}${text}`.trimStart()),
         onListeningChange: setIsListening,
-        onError: (message) => toast.error(message),
+        onError: (message) => {
+          toast.error(message);
+          stopListeningRef.current = null;
+          setIsListening(false);
+        },
       }
     );
+    if (!started) {
+      stopListeningRef.current = null;
+      setIsListening(false);
+      return;
+    }
     stopListeningRef.current = stop;
   };
 

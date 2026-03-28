@@ -119,24 +119,11 @@ interface NoteCardProps {
   note: Note;
   onClick: (id: string) => void;
   onTagClick: (tag: string) => void;
-  onPublish?: (id: string) => void;
   index: number;
 }
 
-function NoteCard({ note, onClick, onTagClick, onPublish, index }: NoteCardProps) {
+function NoteCard({ note, onClick, onTagClick, index }: NoteCardProps) {
   const accent = getAccent(note.id);
-  const [editFlash, setEditFlash] = useState(false);
-
-  const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditFlash(true);
-    setTimeout(() => { setEditFlash(false); onClick(note.id); }, 360);
-  };
-
-  const handlePublishClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onPublish?.(note.id);
-  };
 
   return (
     <motion.div
@@ -161,53 +148,6 @@ function NoteCard({ note, onClick, onTagClick, onPublish, index }: NoteCardProps
           transition: 'background 0.25s, border-color 0.25s, box-shadow 0.25s',
         }}
       >
-        <div className="absolute top-3 right-3 flex items-center gap-2 z-30" style={{ zIndex: 30 }}>
-          {onPublish && (
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.92 }}
-              onClick={handlePublishClick}
-              className="h-9 px-3 rounded-2xl flex items-center gap-1.5"
-              style={{
-                background: 'rgba(99,102,241,0.10)',
-                border: '1px solid rgba(99,102,241,0.18)',
-              }}
-              aria-label="发布到思圈"
-            >
-              <Sparkles size={16} style={{ color: '#6366F1' }} />
-              <span style={{ color: '#6366F1', fontSize: '11px', fontWeight: 800 }}>思圈</span>
-            </motion.button>
-          )}
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.92 }}
-            onClick={handleEditClick}
-            className="w-9 h-9 rounded-2xl flex items-center justify-center"
-            style={{
-              background: 'rgba(255,255,255,0.6)',
-              border: '1px solid rgba(0,0,0,0.06)',
-            }}
-            aria-label="编辑"
-          >
-            <Pen size={16} style={{ color: accent.dot }} />
-          </motion.button>
-        </div>
-
-        {/* Edit flash ripple overlay */}
-        <AnimatePresence>
-          {editFlash && (
-            <motion.div
-              key="edit-ripple"
-              initial={{ opacity: 0.35, scale: 0.6 }}
-              animate={{ opacity: 0, scale: 2.2 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.38, ease: 'easeOut' }}
-              className="absolute inset-0 rounded-[16px] pointer-events-none z-20"
-              style={{ background: `radial-gradient(circle, ${accent.dot}55 0%, transparent 70%)` }}
-            />
-          )}
-        </AnimatePresence>
-
         {/* AI badge */}
         {note.structuredData && Object.values(note.structuredData).some(Boolean) && (
           <div className="flex items-center gap-1 mb-2">
@@ -995,7 +935,6 @@ export function NoteList() {
                       note={note}
                       index={i}
                       onClick={(id) => navigate(`/siku/${id}`)}
-                      onPublish={(id) => publishToSiCircle({ id, type: 'note' })}
                       onTagClick={tag => {
                         setTagFilter(tag);
                         setFilter('all');

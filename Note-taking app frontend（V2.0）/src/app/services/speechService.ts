@@ -100,7 +100,7 @@ export class SpeechService {
   static async startListening(
     options: SpeechListenOptions,
     callbacks: SpeechListenCallbacks
-  ): Promise<{ stop: () => Promise<void> }> {
+  ): Promise<{ stop: () => Promise<void>; started: boolean }> {
     const provider = SpeechService.getProvider();
     if (provider === 'native') {
       const permission = await SpeechService.checkPermissions();
@@ -109,7 +109,7 @@ export class SpeechService {
         if (requested !== 'granted') {
           callbacks.onError?.('未获得麦克风权限');
           callbacks.onListeningChange?.(false);
-          return { stop: async () => {} };
+          return { stop: async () => {}, started: false };
         }
       }
 
@@ -117,7 +117,7 @@ export class SpeechService {
       if (!available) {
         callbacks.onError?.('当前设备不支持语音识别');
         callbacks.onListeningChange?.(false);
-        return { stop: async () => {} };
+        return { stop: async () => {}, started: false };
       }
 
       const partialHandle = await CapacitorSpeechRecognition.addListener('partialResults', (data: any) => {
@@ -131,7 +131,6 @@ export class SpeechService {
       });
 
       try {
-        callbacks.onListeningChange?.(true);
         await CapacitorSpeechRecognition.start({
           language: options.language || 'zh-CN',
           maxResults: 3,
@@ -143,7 +142,7 @@ export class SpeechService {
         await stateHandle.remove();
         callbacks.onListeningChange?.(false);
         callbacks.onError?.(String((e as any)?.message || e || '语音识别启动失败'));
-        return { stop: async () => {} };
+        return { stop: async () => {}, started: false };
       }
 
       const stop = async () => {
@@ -151,6 +150,7 @@ export class SpeechService {
         try {
           await CapacitorSpeechRecognition.stop();
         } catch {}
+        await new Promise((r) => setTimeout(r, 320));
         try {
           await partialHandle.remove();
         } catch {}
@@ -170,7 +170,7 @@ export class SpeechService {
         } catch {}
       };
 
-      return { stop };
+      return { stop, started: true };
     }
 
     if (provider === 'web') {
@@ -178,7 +178,7 @@ export class SpeechService {
       if (!Ctor) {
         callbacks.onError?.('当前环境不支持语音识别');
         callbacks.onListeningChange?.(false);
-        return { stop: async () => {} };
+        return { stop: async () => {}, started: false };
       }
 
       const recognition = new Ctor();
@@ -222,7 +222,7 @@ export class SpeechService {
       } catch (e) {
         callbacks.onListeningChange?.(false);
         callbacks.onError?.(String((e as any)?.message || e || '语音识别启动失败'));
-        return { stop: async () => {} };
+        return { stop: async () => {}, started: false };
       }
 
       const stop = async () => {
@@ -234,11 +234,11 @@ export class SpeechService {
         callbacks.onListeningChange?.(false);
       };
 
-      return { stop };
+      return { stop, started: true };
     }
 
     callbacks.onError?.('当前环境不支持语音识别');
     callbacks.onListeningChange?.(false);
-    return { stop: async () => {} };
+    return { stop: async () => {}, started: false };
   }
 }
