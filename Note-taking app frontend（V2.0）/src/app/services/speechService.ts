@@ -26,18 +26,21 @@ export type SpeechListenOptions = {
   maxDurationMs?: number;
 };
 
-type WebSpeechRecognition = SpeechRecognition & {
+type WebSpeechRecognition = {
   continuous: boolean;
   interimResults: boolean;
   maxAlternatives: number;
   lang: string;
-  onresult: ((ev: SpeechRecognitionEvent) => void) | null;
+  onresult: ((ev: WebSpeechRecognitionEvent) => void) | null;
   onerror: ((ev: SpeechRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
   onstart: (() => void) | null;
+  start: () => void;
+  stop: () => void;
 };
 
 type SpeechRecognitionErrorEvent = Event & { error?: string; message?: string };
+type WebSpeechRecognitionEvent = { resultIndex: number; results: any[] };
 
 function getWebSpeechCtor(): (new () => WebSpeechRecognition) | null {
   if (typeof window === 'undefined') return null;
@@ -149,6 +152,7 @@ export class SpeechService {
       let listeningFromEvents: boolean | null = null;
       let stoppedAt = 0;
       let stopFinalizeTimer: any = null;
+      let fallbackTimer: any = null;
 
       const cleanup = async (reason: string) => {
         if (cleanedUp) return;
@@ -156,6 +160,9 @@ export class SpeechService {
         log('cleanup', reason);
         try {
           clearTimeout(stopFinalizeTimer);
+        } catch {}
+        try {
+          clearTimeout(fallbackTimer);
         } catch {}
         try {
           clearInterval(pollTimer);
@@ -288,6 +295,31 @@ export class SpeechService {
         return { stop: async () => {}, started: false };
       }
 
+      fallbackTimer = setTimeout(async () => {
+        if (cleanedUp) return;
+        if (userStopped) return;
+        if (lastHeardAt > 0) return;
+        try {
+          await stop();
+        } catch {}
+        callbacks.onListeningChange?.(true);
+        try {
+          const res = await CapacitorSpeechRecognition.start({
+            language: options.language || 'zh-CN',
+            maxResults: 1,
+            partialResults: false,
+            popup: true,
+          } as any);
+          const text = pickText(res);
+          if (text) callbacks.onFinal?.(text);
+          else callbacks.onError?.('未检测到语音');
+        } catch (e) {
+          callbacks.onError?.(String((e as any)?.message || e || '语音识别失败'));
+        } finally {
+          callbacks.onListeningChange?.(false);
+        }
+      }, 1500);
+
       const stop = async () => {
         if (cleanedUp) return;
         userStopped = true;
@@ -339,7 +371,7 @@ export class SpeechService {
         callbacks.onListeningChange?.(false);
         callbacks.onError?.(mapWebSpeechError((ev as any)?.error));
       };
-      recognition.onresult = (ev: SpeechRecognitionEvent) => {
+      recognition.onresult = (ev: WebSpeechRecognitionEvent) => {
         let interim = '';
         let final = '';
         for (let i = ev.resultIndex; i < ev.results.length; i += 1) {

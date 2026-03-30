@@ -36,7 +36,47 @@ export function ShisiHome() {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const stopListeningRef = useRef<null | (() => Promise<void>)>(null);
-  const prefixRef = useRef('');
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const dictationActiveRef = useRef(false);
+  const dictationBaseRef = useRef('');
+  const dictationInterimRef = useRef('');
+  const dictationUserEditedRef = useRef(false);
+  const sttDebug = useMemo(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('sttDebug') === '1';
+    } catch {
+      return false;
+    }
+  }, []);
+  const sttDebugRef = useRef({ partial: 0, final: 0, lastEventAt: 0, lastTextLen: 0 });
+
+  const applyDictationText = (text: string, kind: 'partial' | 'final') => {
+    if (!dictationActiveRef.current) return;
+    const t = String(text || '').trim();
+    if (!t) return;
+    const base = dictationBaseRef.current;
+    const sep = base && !/\s$/.test(base) ? ' ' : '';
+    if (kind === 'final') {
+      dictationBaseRef.current = `${base}${sep}${t}`;
+      dictationInterimRef.current = '';
+      setInput(dictationBaseRef.current);
+    } else {
+      dictationInterimRef.current = t;
+      setInput(`${base}${sep}${t}`);
+    }
+    sttDebugRef.current.lastEventAt = Date.now();
+    sttDebugRef.current.lastTextLen = t.length;
+    if (kind === 'final') sttDebugRef.current.final += 1;
+    else sttDebugRef.current.partial += 1;
+    try {
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      });
+    } catch {}
+  };
 
   const inboxNotes = useMemo(() => {
     return notes.filter((n) => n.status === 'inbox').sort((a, b) => b.createdAt - a.createdAt);
@@ -81,6 +121,8 @@ export function ShisiHome() {
       await stopListeningRef.current?.();
       stopListeningRef.current = null;
       setIsListening(false);
+      dictationActiveRef.current = false;
+      dictationInterimRef.current = '';
       return;
     }
     if (stopListeningRef.current && !isListening) {
@@ -95,28 +137,38 @@ export function ShisiHome() {
       return;
     }
 
-    const base = input.trim();
-    prefixRef.current = base ? `${base} ` : '';
+    dictationActiveRef.current = true;
+    dictationUserEditedRef.current = false;
+    dictationBaseRef.current = input.trimEnd();
+    dictationInterimRef.current = '';
+    sttDebugRef.current = { partial: 0, final: 0, lastEventAt: Date.now(), lastTextLen: 0 };
 
     const { stop, started } = await SpeechService.startListening(
       { language: 'zh-CN' },
       {
-        onPartial: (text) => setInput(`${prefixRef.current}${text}`.trimStart()),
-        onFinal: (text) => setInput(`${prefixRef.current}${text}`.trimStart()),
+        onPartial: (text) => applyDictationText(text, 'partial'),
+        onFinal: (text) => applyDictationText(text, 'final'),
         onListeningChange: (listening) => {
           setIsListening(listening);
-          if (!listening) stopListeningRef.current = null;
+          if (!listening) {
+            stopListeningRef.current = null;
+            dictationActiveRef.current = false;
+            dictationInterimRef.current = '';
+          }
         },
         onError: (message) => {
           toast.error(message);
           stopListeningRef.current = null;
           setIsListening(false);
+          dictationActiveRef.current = false;
+          dictationInterimRef.current = '';
         },
       }
     );
     if (!started) {
       stopListeningRef.current = null;
       setIsListening(false);
+      dictationActiveRef.current = false;
       return;
     }
     stopListeningRef.current = stop;
@@ -201,13 +253,29 @@ export function ShisiHome() {
 
           <div className="mt-4">
             <textarea
+              ref={textareaRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setInput(v);
+                if (isListening) {
+                  dictationUserEditedRef.current = true;
+                  dictationBaseRef.current = v.trimEnd();
+                  dictationInterimRef.current = '';
+                }
+              }}
               placeholder={isListening ? '正在聆听…' : '此刻想到什么？一句话也可以…'}
               className="w-full p-4 rounded-3xl outline-none resize-none"
               rows={4}
               style={{ background: 'var(--hi-input-bg)', border: '1px solid var(--hi-card-border)', color: 'var(--hi-text-primary)', fontSize: '14px', lineHeight: 1.6 }}
             />
+            {sttDebug && (
+              <div className="mt-2 px-3 py-2 rounded-2xl"
+                style={{ background: 'rgba(30,27,75,0.08)', border: '1px solid rgba(30,27,75,0.10)', color: 'var(--hi-text-secondary)', fontSize: '11px' }}>
+                <div>listening: {String(isListening)}</div>
+                <div>partial: {sttDebugRef.current.partial} · final: {sttDebugRef.current.final} · lastLen: {sttDebugRef.current.lastTextLen}</div>
+              </div>
+            )}
             <div className="flex items-center justify-between mt-3">
               <span style={{ color: isListening ? '#EF4444' : 'var(--hi-text-secondary)', fontSize: '11px', fontWeight: isListening ? 800 : 400 }}>
                 {isListening ? '正在聆听…' : input.trim() ? `${input.trim().length} 字` : '先捕捉，再整理'}
