@@ -147,11 +147,16 @@ export class SpeechService {
       let userStopped = false;
       let lastHeardAt = 0;
       let listeningFromEvents: boolean | null = null;
+      let stoppedAt = 0;
+      let stopFinalizeTimer: any = null;
 
       const cleanup = async (reason: string) => {
         if (cleanedUp) return;
         cleanedUp = true;
         log('cleanup', reason);
+        try {
+          clearTimeout(stopFinalizeTimer);
+        } catch {}
         try {
           clearInterval(pollTimer);
         } catch {}
@@ -178,6 +183,18 @@ export class SpeechService {
         lastFinal = lastText;
         log('final', source, lastFinal);
         callbacks.onFinal?.(lastFinal);
+      };
+
+      const scheduleFinalizeAfterStop = (source: string) => {
+        if (cleanedUp) return;
+        if (stopFinalizeTimer) return;
+        stoppedAt = stoppedAt || Date.now();
+        stopFinalizeTimer = setTimeout(async () => {
+          if (cleanedUp) return;
+          if (!lastText && Date.now() - lastHeardAt > 1200) callbacks.onError?.('未检测到语音');
+          else emitFinalIfNeeded(source);
+          await cleanup(`finalize:${source}`);
+        }, 1300);
       };
 
       const partialHandle = await CapacitorSpeechRecognition.addListener('partialResults', (data: any) => {
@@ -217,9 +234,7 @@ export class SpeechService {
         log('listeningState', status);
         callbacks.onListeningChange?.(listening);
         if (!listening) {
-          // Android 端在 partialResults=true 时通常不会单独发 result 事件；以最后一次 partialResults 为 final。
-          emitFinalIfNeeded('listeningState:stopped');
-          cleanup('listeningState:stopped').catch(() => {});
+          scheduleFinalizeAfterStop('listeningState:stopped');
         }
       });
 
@@ -236,13 +251,7 @@ export class SpeechService {
             if (listeningFromEvents !== false && !userStopped) {
               log('poll detected stopped without event');
               callbacks.onListeningChange?.(false);
-              // 如果完全没有识别到任何字，给一个更友好的提示（不打断用户手动停止的场景）
-              if (!lastText && Date.now() - lastHeardAt > 1200) {
-                callbacks.onError?.('未检测到语音');
-              } else {
-                emitFinalIfNeeded('poll:isListening=false');
-              }
-              cleanup('poll:isListening=false').catch(() => {});
+              scheduleFinalizeAfterStop('poll:isListening=false');
             }
           }
         } catch (e) {
@@ -287,7 +296,7 @@ export class SpeechService {
           await CapacitorSpeechRecognition.stop();
         } catch {}
         // 给 Android 最终结果/停止事件一个缓冲窗口
-        await new Promise((r) => setTimeout(r, 900));
+        await new Promise((r) => setTimeout(r, 1600));
         emitFinalIfNeeded('stop()');
         await cleanup('stop()');
         try {
