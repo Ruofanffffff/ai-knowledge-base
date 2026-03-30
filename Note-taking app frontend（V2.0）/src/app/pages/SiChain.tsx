@@ -3167,7 +3167,7 @@ export function SiChain() {
     const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
     try {
       const endpoint = sourceType === 'doc' ? `/kg/doc/${id}/graph` : `/kg/note/${id}/graph`;
-      const resp = await api.get(endpoint);
+      const resp = await api.get(endpoint, sourceType === 'note' ? { timeout: 60000 } : undefined);
       const payload = extractGraphPayload(resp.data);
       setDocGraphMap((prev) => ({ ...prev, [key]: normalizeGraphDTOv1(payload ?? { scope: sourceType, entities: [], relations: [] }) }));
     } catch (e) {

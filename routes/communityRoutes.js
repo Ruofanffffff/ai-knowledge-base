@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware, requirePermission } = require('../services/authService');
 const { initDatabase } = require('../database/initUserDB');
+const noteDAL = require('../services/notes/noteDAL');
 const { CoverGenerationService } = require('../services/coverGenerationService');
 const { JimengClient } = require('../services/jimengClient');
 const { notesConfig } = require('../config/notes.config');
@@ -140,19 +141,120 @@ router.post('/publish', authMiddleware, requirePermission('community:publish'), 
     let processed = 0;
 
     publishItems.forEach((item) => {
-      const numericId = parseInt(item.id, 10);
       const sourceType = item.type === 'note' ? 'note' : 'document';
+      const rawId = String(item.id ?? '').trim();
       
-      if (isNaN(numericId)) {
+      if (!rawId) {
         skipped.push({ id: item.id, reason: '无效的内容ID' });
         processed++;
-        if (processed === publishItems.length) {
-          return res.json({ success: true, data: { published, skipped } });
-        }
+        if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
         return;
       }
 
-      const table = sourceType === 'note' ? 'notes' : 'documents';
+      if (sourceType === 'note') {
+        const noteId = rawId;
+        noteDAL.getNoteById(noteId, String(userId))
+          .then((note) => {
+            if (!note) {
+              skipped.push({ id: item.id, reason: '内容不存在' });
+              processed++;
+              if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
+              return;
+            }
+
+            db.get(
+              'SELECT id FROM community_posts WHERE source_type = ? AND source_id = ?',
+              [sourceType, noteId],
+              (err, existing) => {
+                if (err) {
+                  console.error('查询社区帖子失败:', err);
+                  skipped.push({ id: item.id, reason: '查询帖子失败' });
+                  processed++;
+                  if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
+                  return;
+                }
+
+                if (existing) {
+                  skipped.push({ id: item.id, reason: '已发布' });
+                  processed++;
+                  if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
+                  return;
+                }
+
+                const safeTitle = note.title || '无标题';
+                const safeContent = typeof note.content === 'string' ? note.content : String(note.content || '');
+                const summary = safeContent
+                  .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+                  .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+                  .replace(/<[^>]+>/g, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim()
+                  .substring(0, 200);
+
+                const tagsVal = Array.isArray(note.tags) ? JSON.stringify(note.tags) : (note.tags ? String(note.tags) : null);
+                const coverImage = Array.isArray(note.attachments)
+                  ? (note.attachments.find((a) => String(a?.mimeType || '').startsWith('image/'))?.url || null)
+                  : null;
+
+                db.run(
+                  `INSERT INTO community_posts (user_id, document_id, source_type, source_id, title, summary, cover_image, tags, likes, view_count, status, is_public)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 'published', ?)`,
+                  [userId, null, sourceType, noteId, safeTitle, summary, coverImage, tagsVal, isPublic ? 1 : 0],
+                  function (err) {
+                    if (err) {
+                      console.error('插入社区帖子失败:', err);
+                      skipped.push({ id: item.id, reason: '插入失败' });
+                      processed++;
+                      if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
+                      return;
+                    }
+
+                    const postId = this.lastID;
+
+                    setImmediate(() => {
+                      const fragmentContent = [safeTitle, summary].filter(Boolean).join(' ');
+                      fragmentCollector.collect({
+                        userId,
+                        fragmentType: 'community_publish',
+                        content: fragmentContent,
+                        sourceId: String(postId),
+                        sourceMeta: { title: safeTitle, summary, sourceId: noteId, sourceType }
+                      }).catch(err => console.error('[FragmentCollector] community_publish collection error:', err));
+                    });
+
+                    published.push({
+                      id: postId,
+                      sourceId: noteId,
+                      sourceType,
+                      title: safeTitle
+                    });
+                    processed++;
+                    if (processed === publishItems.length) {
+                      return res.json({ success: true, data: { published, skipped } });
+                    }
+                  }
+                );
+              }
+            );
+          })
+          .catch((err) => {
+            console.error('查询内容失败:', err);
+            skipped.push({ id: item.id, reason: '查询失败' });
+            processed++;
+            if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
+          });
+        return;
+      }
+
+      const numericId = parseInt(rawId, 10);
+      if (isNaN(numericId)) {
+        skipped.push({ id: item.id, reason: '无效的内容ID' });
+        processed++;
+        if (processed === publishItems.length) return res.json({ success: true, data: { published, skipped } });
+        return;
+      }
+
+      const table = 'documents';
       
       db.get(
         `SELECT id, title, content, tags FROM ${table} WHERE id = ?`,

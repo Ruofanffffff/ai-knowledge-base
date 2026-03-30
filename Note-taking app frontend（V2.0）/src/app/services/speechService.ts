@@ -120,14 +120,41 @@ export class SpeechService {
         return { stop: async () => {}, started: false };
       }
 
+      const pickText = (data: any): string => {
+        const matches = data?.matches ?? data?.result?.matches ?? data?.data?.matches;
+        if (Array.isArray(matches)) return String(matches[0] ?? '').trim();
+        if (typeof matches === 'string') return matches.trim();
+        const value = data?.value ?? data?.result ?? data?.data;
+        if (typeof value === 'string') return value.trim();
+        return '';
+      };
+
+      let lastText = '';
+      let lastFinal = '';
+
       const partialHandle = await CapacitorSpeechRecognition.addListener('partialResults', (data: any) => {
-        const text = String(data?.matches?.[0] || '').trim();
-        if (text) callbacks.onPartial?.(text);
+        const text = pickText(data);
+        if (!text) return;
+        lastText = text;
+        callbacks.onPartial?.(text);
+      });
+
+      const resultHandle = await CapacitorSpeechRecognition.addListener('result', (data: any) => {
+        const text = pickText(data);
+        if (!text) return;
+        lastText = text;
+        lastFinal = text;
+        callbacks.onFinal?.(text);
       });
 
       const stateHandle = await CapacitorSpeechRecognition.addListener('listeningState', (data: any) => {
         const status = String(data?.status || '');
-        callbacks.onListeningChange?.(status === 'started');
+        const listening = status === 'started';
+        callbacks.onListeningChange?.(listening);
+        if (!listening && lastText && lastFinal !== lastText) {
+          lastFinal = lastText;
+          callbacks.onFinal?.(lastText);
+        }
       });
 
       try {
@@ -139,6 +166,7 @@ export class SpeechService {
         } as any);
       } catch (e) {
         await partialHandle.remove();
+        await resultHandle.remove();
         await stateHandle.remove();
         callbacks.onListeningChange?.(false);
         callbacks.onError?.(String((e as any)?.message || e || '语音识别启动失败'));
@@ -153,6 +181,9 @@ export class SpeechService {
         await new Promise((r) => setTimeout(r, 1200));
         try {
           await partialHandle.remove();
+        } catch {}
+        try {
+          await resultHandle.remove();
         } catch {}
         try {
           await stateHandle.remove();
