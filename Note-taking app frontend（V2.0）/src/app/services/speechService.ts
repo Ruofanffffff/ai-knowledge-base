@@ -19,6 +19,11 @@ export type SpeechListenCallbacks = {
 
 export type SpeechListenOptions = {
   language?: string;
+  /**
+   * 兜底超时：避免 Android 端在“无语音输入/超时”等错误场景下不回调导致 UI 一直处于聆听状态。
+   * 单位：ms
+   */
+  maxDurationMs?: number;
 };
 
 type WebSpeechRecognition = SpeechRecognition & {
@@ -103,6 +108,13 @@ export class SpeechService {
   ): Promise<{ stop: () => Promise<void>; started: boolean }> {
     const provider = SpeechService.getProvider();
     if (provider === 'native') {
+      const DEBUG = Boolean((import.meta as any)?.env?.DEV);
+      const log = (...args: any[]) => {
+        if (!DEBUG) return;
+        // eslint-disable-next-line no-console
+        console.debug('[SpeechService:native]', ...args);
+      };
+
       const permission = await SpeechService.checkPermissions();
       if (permission !== 'granted') {
         const requested = await SpeechService.requestPermissions();
@@ -131,66 +143,153 @@ export class SpeechService {
 
       let lastText = '';
       let lastFinal = '';
+      let cleanedUp = false;
+      let userStopped = false;
+      let lastHeardAt = 0;
+      let listeningFromEvents: boolean | null = null;
+
+      const cleanup = async (reason: string) => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        log('cleanup', reason);
+        try {
+          clearInterval(pollTimer);
+        } catch {}
+        try {
+          clearTimeout(hardTimeout);
+        } catch {}
+        try {
+          await partialHandle.remove();
+        } catch {}
+        try {
+          await stateHandle.remove();
+        } catch {}
+        try {
+          if (resultHandle?.remove) await resultHandle.remove();
+        } catch {}
+        try {
+          if (errorHandle?.remove) await errorHandle.remove();
+        } catch {}
+      };
+
+      const emitFinalIfNeeded = (source: string) => {
+        if (!lastText) return;
+        if (lastFinal === lastText) return;
+        lastFinal = lastText;
+        log('final', source, lastFinal);
+        callbacks.onFinal?.(lastFinal);
+      };
 
       const partialHandle = await CapacitorSpeechRecognition.addListener('partialResults', (data: any) => {
         const text = pickText(data);
         if (!text) return;
         lastText = text;
+        lastHeardAt = Date.now();
+        log('partialResults', text);
         callbacks.onPartial?.(text);
       });
 
-      const resultHandle = await CapacitorSpeechRecognition.addListener('result', (data: any) => {
+      /**
+       * 注意：@capacitor-community/speech-recognition（v6.x）在 Android 且 partialResults=true 时，
+       * 官方类型定义只保证会发出 partialResults/listeningState 事件，不保证会发出 result/error 事件。
+       * 这里保留监听是为了兼容可能的自定义插件/未来版本；真正兜底依赖 listeningState + isListening 轮询 + 超时。
+       */
+      const resultHandle = await (CapacitorSpeechRecognition as any).addListener?.('result', (data: any) => {
         const text = pickText(data);
         if (!text) return;
         lastText = text;
         lastFinal = text;
+        log('result', text);
         callbacks.onFinal?.(text);
+      });
+
+      const errorHandle = await (CapacitorSpeechRecognition as any).addListener?.('error', (data: any) => {
+        const msg = String(data?.message || data?.error || '语音识别失败');
+        log('error', data);
+        callbacks.onError?.(msg);
+        callbacks.onListeningChange?.(false);
       });
 
       const stateHandle = await CapacitorSpeechRecognition.addListener('listeningState', (data: any) => {
         const status = String(data?.status || '');
         const listening = status === 'started';
+        listeningFromEvents = listening;
+        log('listeningState', status);
         callbacks.onListeningChange?.(listening);
-        if (!listening && lastText && lastFinal !== lastText) {
-          lastFinal = lastText;
-          callbacks.onFinal?.(lastText);
+        if (!listening) {
+          // Android 端在 partialResults=true 时通常不会单独发 result 事件；以最后一次 partialResults 为 final。
+          emitFinalIfNeeded('listeningState:stopped');
+          cleanup('listeningState:stopped').catch(() => {});
         }
       });
 
+      // Android 端在“无语音输入/超时”等错误场景下可能既不发 error，也不发 listeningState=stopped。
+      // 通过 isListening 轮询 + 兜底超时把 UI 拉回到非聆听态，并尽可能提交最后一次识别文本。
+      const pollIntervalMs = 800;
+      const pollTimer = setInterval(async () => {
+        if (cleanedUp) return;
+        try {
+          const res = await CapacitorSpeechRecognition.isListening();
+          const nativeListening = Boolean((res as any)?.listening);
+          if (!nativeListening) {
+            // 如果事件流没有明确告诉我们“stopped”，也要兜底收尾，避免红色麦克风卡死。
+            if (listeningFromEvents !== false && !userStopped) {
+              log('poll detected stopped without event');
+              callbacks.onListeningChange?.(false);
+              // 如果完全没有识别到任何字，给一个更友好的提示（不打断用户手动停止的场景）
+              if (!lastText && Date.now() - lastHeardAt > 1200) {
+                callbacks.onError?.('未检测到语音');
+              } else {
+                emitFinalIfNeeded('poll:isListening=false');
+              }
+              cleanup('poll:isListening=false').catch(() => {});
+            }
+          }
+        } catch (e) {
+          // 忽略轮询错误（部分机型偶发），避免影响主流程
+          log('poll error', e);
+        }
+      }, pollIntervalMs);
+
+      const hardTimeout = setTimeout(async () => {
+        if (cleanedUp) return;
+        userStopped = true; // 防止后续兜底再弹一次错误
+        log('hard timeout reached, stopping');
+        callbacks.onListeningChange?.(false);
+        try {
+          await CapacitorSpeechRecognition.stop();
+        } catch {}
+        if (!lastText) callbacks.onError?.('语音识别超时');
+        else emitFinalIfNeeded('timeout');
+        await cleanup('timeout');
+      }, Math.max(3000, options.maxDurationMs ?? 15000));
+
       try {
+        log('start', { language: options.language || 'zh-CN' });
         await CapacitorSpeechRecognition.start({
           language: options.language || 'zh-CN',
-          maxResults: 3,
+          maxResults: 1,
           partialResults: true,
           popup: false,
         } as any);
       } catch (e) {
-        await partialHandle.remove();
-        await resultHandle.remove();
-        await stateHandle.remove();
+        await cleanup('start threw');
         callbacks.onListeningChange?.(false);
         callbacks.onError?.(String((e as any)?.message || e || '语音识别启动失败'));
         return { stop: async () => {}, started: false };
       }
 
       const stop = async () => {
+        if (cleanedUp) return;
+        userStopped = true;
         callbacks.onListeningChange?.(false);
         try {
           await CapacitorSpeechRecognition.stop();
         } catch {}
-        await new Promise((r) => setTimeout(r, 1200));
-        try {
-          await partialHandle.remove();
-        } catch {}
-        try {
-          await resultHandle.remove();
-        } catch {}
-        try {
-          await stateHandle.remove();
-        } catch {}
-        try {
-          await CapacitorSpeechRecognition.removeAllListeners();
-        } catch {}
+        // 给 Android 最终结果/停止事件一个缓冲窗口
+        await new Promise((r) => setTimeout(r, 900));
+        emitFinalIfNeeded('stop()');
+        await cleanup('stop()');
         try {
           const res = await CapacitorSpeechRecognition.isListening();
           if ((res as any)?.listening) {
