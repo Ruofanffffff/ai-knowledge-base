@@ -296,8 +296,9 @@ export class SpeechService {
           await CapacitorSpeechRecognition.stop();
         } catch {}
         // 给 Android 最终结果/停止事件一个缓冲窗口
-        await new Promise((r) => setTimeout(r, 1600));
-        emitFinalIfNeeded('stop()');
+        await new Promise((r) => setTimeout(r, 2600));
+        if (!lastText && Date.now() - lastHeardAt > 1200) callbacks.onError?.('未检测到语音');
+        else emitFinalIfNeeded('stop()');
         await cleanup('stop()');
         try {
           const res = await CapacitorSpeechRecognition.isListening();
