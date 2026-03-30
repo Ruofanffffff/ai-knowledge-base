@@ -37,7 +37,9 @@ export function ShisiHome() {
   const [isListening, setIsListening] = useState(false);
   const stopListeningRef = useRef<null | (() => Promise<void>)>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const dictationActiveRef = useRef(false);
+  const dictationSessionRef = useRef(0);
+  const dictationActiveSessionRef = useRef<number | null>(null);
+  const dictationEndTimerRef = useRef<any>(null);
   const dictationBaseRef = useRef('');
   const dictationInterimRef = useRef('');
   const dictationUserEditedRef = useRef(false);
@@ -50,8 +52,8 @@ export function ShisiHome() {
   }, []);
   const sttDebugRef = useRef({ partial: 0, final: 0, lastEventAt: 0, lastTextLen: 0 });
 
-  const applyDictationText = (text: string, kind: 'partial' | 'final') => {
-    if (!dictationActiveRef.current) return;
+  const applyDictationText = (sessionId: number, text: string, kind: 'partial' | 'final') => {
+    if (dictationActiveSessionRef.current !== sessionId) return;
     const t = String(text || '').trim();
     if (!t) return;
     const base = dictationBaseRef.current;
@@ -121,7 +123,7 @@ export function ShisiHome() {
       await stopListeningRef.current?.();
       stopListeningRef.current = null;
       setIsListening(false);
-      dictationActiveRef.current = false;
+      dictationActiveSessionRef.current = null;
       dictationInterimRef.current = '';
       return;
     }
@@ -137,7 +139,13 @@ export function ShisiHome() {
       return;
     }
 
-    dictationActiveRef.current = true;
+    dictationSessionRef.current += 1;
+    const sessionId = dictationSessionRef.current;
+    dictationActiveSessionRef.current = sessionId;
+    try {
+      clearTimeout(dictationEndTimerRef.current);
+    } catch {}
+    dictationEndTimerRef.current = null;
     dictationUserEditedRef.current = false;
     dictationBaseRef.current = input.trimEnd();
     dictationInterimRef.current = '';
@@ -146,21 +154,27 @@ export function ShisiHome() {
     const { stop, started } = await SpeechService.startListening(
       { language: 'zh-CN' },
       {
-        onPartial: (text) => applyDictationText(text, 'partial'),
-        onFinal: (text) => applyDictationText(text, 'final'),
+        onPartial: (text) => applyDictationText(sessionId, text, 'partial'),
+        onFinal: (text) => applyDictationText(sessionId, text, 'final'),
         onListeningChange: (listening) => {
           setIsListening(listening);
           if (!listening) {
             stopListeningRef.current = null;
-            dictationActiveRef.current = false;
             dictationInterimRef.current = '';
+            if (dictationActiveSessionRef.current === sessionId) {
+              dictationEndTimerRef.current = setTimeout(() => {
+                if (dictationActiveSessionRef.current === sessionId) {
+                  dictationActiveSessionRef.current = null;
+                }
+              }, 4000);
+            }
           }
         },
         onError: (message) => {
           toast.error(message);
           stopListeningRef.current = null;
           setIsListening(false);
-          dictationActiveRef.current = false;
+          dictationActiveSessionRef.current = null;
           dictationInterimRef.current = '';
         },
       }
@@ -168,7 +182,7 @@ export function ShisiHome() {
     if (!started) {
       stopListeningRef.current = null;
       setIsListening(false);
-      dictationActiveRef.current = false;
+      dictationActiveSessionRef.current = null;
       return;
     }
     stopListeningRef.current = stop;
