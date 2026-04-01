@@ -153,6 +153,8 @@ export class SpeechService {
       let stoppedAt = 0;
       let stopFinalizeTimer: any = null;
       let fallbackTimer: any = null;
+      let fallbackActive = false;
+      let switchingToFallback = false;
 
       const cleanup = async (reason: string) => {
         if (cleanedUp) return;
@@ -194,10 +196,12 @@ export class SpeechService {
 
       const scheduleFinalizeAfterStop = (source: string) => {
         if (cleanedUp) return;
+        if (fallbackActive || switchingToFallback) return;
         if (stopFinalizeTimer) return;
         stoppedAt = stoppedAt || Date.now();
         stopFinalizeTimer = setTimeout(async () => {
           if (cleanedUp) return;
+          if (fallbackActive || switchingToFallback) return;
           if (!lastText && Date.now() - lastHeardAt > 1200) callbacks.onError?.('未检测到语音');
           else emitFinalIfNeeded(source);
           await cleanup(`finalize:${source}`);
@@ -255,7 +259,7 @@ export class SpeechService {
           const nativeListening = Boolean((res as any)?.listening);
           if (!nativeListening) {
             // 如果事件流没有明确告诉我们“stopped”，也要兜底收尾，避免红色麦克风卡死。
-            if (listeningFromEvents !== false && !userStopped) {
+            if (!fallbackActive && !switchingToFallback && listeningFromEvents !== false && !userStopped) {
               log('poll detected stopped without event');
               callbacks.onListeningChange?.(false);
               scheduleFinalizeAfterStop('poll:isListening=false');
@@ -269,6 +273,7 @@ export class SpeechService {
 
       const hardTimeout = setTimeout(async () => {
         if (cleanedUp) return;
+        if (fallbackActive || switchingToFallback) return;
         userStopped = true; // 防止后续兜底再弹一次错误
         log('hard timeout reached, stopping');
         callbacks.onListeningChange?.(false);
@@ -295,19 +300,19 @@ export class SpeechService {
         return { stop: async () => {}, started: false };
       }
 
-      let isFallbackActive = false;
-
       fallbackTimer = setTimeout(async () => {
         if (cleanedUp) return;
         if (userStopped) return;
         if (lastHeardAt > 0) return;
         
         log('fallback: no speech detected within 1.5s, trying popup mode');
-        isFallbackActive = true;
+        switchingToFallback = true;
         
         try {
           await CapacitorSpeechRecognition.stop();
         } catch {}
+        switchingToFallback = false;
+        fallbackActive = true;
 
         // 停止不必要的轮询和超时，避免在弹窗期间误报
         clearInterval(pollTimer);
@@ -332,6 +337,7 @@ export class SpeechService {
           callbacks.onError?.(String((e as any)?.message || e || '语音识别失败'));
         } finally {
           callbacks.onListeningChange?.(false);
+          fallbackActive = false;
           await cleanup('fallback done');
         }
       }, 1500);
@@ -340,7 +346,7 @@ export class SpeechService {
         if (cleanedUp) return;
         userStopped = true;
         
-        if (isFallbackActive) {
+        if (fallbackActive || switchingToFallback) {
           // 如果弹窗已经弹起，原生的 stop 可能关不掉它，或者我们只需等它自然结束
           try {
             await CapacitorSpeechRecognition.stop();
