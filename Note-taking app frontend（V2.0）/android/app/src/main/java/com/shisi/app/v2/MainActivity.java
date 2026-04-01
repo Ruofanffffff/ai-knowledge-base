@@ -4,13 +4,14 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
-import android.view.WindowManager;
 import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
+import com.shisi.app.v2.plugins.AudioRecordPlugin;
 
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(AudioRecordPlugin.class);
         super.onCreate(savedInstanceState);
         setupFullScreenImmersive();
     }

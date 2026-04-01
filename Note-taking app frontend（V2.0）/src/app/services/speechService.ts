@@ -1,7 +1,9 @@
 import { Capacitor } from '@capacitor/core';
 import { SpeechRecognition as CapacitorSpeechRecognition } from '@capacitor-community/speech-recognition';
+import { AudioRecord, type AudioChunkEvent } from './audioRecordService';
+import { API_BASE_URL, api } from './api';
 
-export type SpeechProvider = 'native' | 'web' | 'none';
+export type SpeechProvider = 'native' | 'web' | 'cloud_streaming' | 'none';
 
 export type SpeechPermissionState = 'granted' | 'denied' | 'prompt' | 'prompt-with-rationale' | 'unknown';
 
@@ -11,6 +13,8 @@ export type SpeechAvailability = {
 };
 
 export type SpeechListenCallbacks = {
+  onProvider?: (provider: SpeechProvider) => void;
+  onChunk?: (seq: number) => void;
   onPartial?: (text: string) => void;
   onFinal?: (text: string) => void;
   onError?: (message: string) => void;
@@ -64,8 +68,33 @@ function mapWebSpeechError(err?: string): string {
   return `语音识别失败：${e}`;
 }
 
+function readPreferredProvider(): SpeechProvider | null {
+  const envPreferred = String((import.meta as any)?.env?.VITE_STT_PROVIDER || '').trim();
+  const fromEnv = envPreferred === 'cloud_streaming' ? 'cloud_streaming' : envPreferred === 'native' ? 'native' : envPreferred === 'web' ? 'web' : null;
+  if (fromEnv) return fromEnv;
+
+  try {
+    const qs = new URLSearchParams(window.location.search);
+    const q = String(qs.get('sttProvider') || qs.get('stt') || '').trim();
+    const fromQuery = q === 'cloud' || q === 'cloud_streaming' ? 'cloud_streaming' : q === 'native' ? 'native' : q === 'web' ? 'web' : null;
+    if (fromQuery) return fromQuery;
+  } catch {}
+
+  try {
+    const v = String(localStorage.getItem('stt_provider') || '').trim();
+    const fromStorage = v === 'cloud' || v === 'cloud_streaming' ? 'cloud_streaming' : v === 'native' ? 'native' : v === 'web' ? 'web' : null;
+    if (fromStorage) return fromStorage;
+  } catch {}
+
+  return null;
+}
+
 export class SpeechService {
   static getProvider(): SpeechProvider {
+    const preferred = readPreferredProvider();
+    if (preferred === 'cloud_streaming') return Capacitor.isNativePlatform() ? 'cloud_streaming' : 'none';
+    if (preferred === 'native') return Capacitor.isNativePlatform() ? 'native' : 'none';
+    if (preferred === 'web') return getWebSpeechCtor() ? 'web' : 'none';
     if (Capacitor.isNativePlatform()) return 'native';
     if (getWebSpeechCtor()) return 'web';
     return 'none';
@@ -73,6 +102,9 @@ export class SpeechService {
 
   static async getAvailability(): Promise<SpeechAvailability> {
     const provider = SpeechService.getProvider();
+    if (provider === 'cloud_streaming') {
+      return { provider, available: Capacitor.isNativePlatform() };
+    }
     if (provider === 'native') {
       try {
         const { available } = await CapacitorSpeechRecognition.available();
@@ -110,6 +142,244 @@ export class SpeechService {
     callbacks: SpeechListenCallbacks
   ): Promise<{ stop: () => Promise<void>; started: boolean }> {
     const provider = SpeechService.getProvider();
+    callbacks.onProvider?.(provider);
+    if (provider === 'cloud_streaming') {
+      const DEBUG = Boolean((import.meta as any)?.env?.DEV);
+      const log = (...args: any[]) => {
+        if (!DEBUG) return;
+        console.debug('[SpeechService:cloud_streaming]', ...args);
+      };
+
+      let cleanedUp = false;
+      let stopping = false;
+      let userStopped = false;
+      let lastPartial = '';
+      let lastFinal = '';
+      let lastHeardAt = 0;
+      let lastChunkAt = 0;
+      let sawAnyText = false;
+
+      const abortController = new AbortController();
+      const queue: Array<{ seq: number; chunk: AudioChunkEvent }> = [];
+      const pendingResults = new Map<number, { partial?: string; final?: string; text?: string }>();
+      let nextSeq = 0;
+      let nextEmitSeq = 1;
+      let inFlight = 0;
+      let listenerHandle: any = null;
+      let sttToken = '';
+      let hardTimeout: any = null;
+      let noSpeechTimer: any = null;
+
+      const language = options.language || 'zh-CN';
+      const maxInFlight = 2;
+      const hardTimeoutMs = Math.max(3000, options.maxDurationMs ?? 15000);
+
+      const flushPendingResults = () => {
+        while (pendingResults.has(nextEmitSeq)) {
+          const r = pendingResults.get(nextEmitSeq)!;
+          pendingResults.delete(nextEmitSeq);
+          nextEmitSeq += 1;
+
+          const partial = typeof r.partial === 'string' ? r.partial.trim() : '';
+          const final = typeof r.final === 'string' ? r.final.trim() : '';
+          const text = typeof r.text === 'string' ? r.text.trim() : '';
+
+          const now = Date.now();
+          lastHeardAt = now;
+          if (partial) {
+            sawAnyText = true;
+            lastPartial = partial;
+            callbacks.onPartial?.(partial);
+          }
+
+          const finalLike = final || text;
+          if (finalLike) {
+            sawAnyText = true;
+            lastFinal = finalLike;
+            lastPartial = '';
+            callbacks.onFinal?.(finalLike);
+          }
+        }
+      };
+
+      const toErrMsg = (err: unknown): string => {
+        const raw = err instanceof Error ? err.message : String(err || '');
+        const s = raw.trim();
+        if (!s) return '语音识别失败，请重试';
+        if (s.toLowerCase().includes('aborted')) return '语音识别已取消';
+        if (s.toLowerCase().includes('network')) return '网络异常导致语音识别失败';
+        return s;
+      };
+
+      const cleanup = async () => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        try {
+          clearTimeout(hardTimeout);
+          clearTimeout(noSpeechTimer);
+        } catch {}
+        try {
+          await listenerHandle?.remove?.();
+        } catch {}
+        listenerHandle = null;
+        try {
+          await AudioRecord.stop();
+        } catch {}
+        try {
+          await AudioRecord.removeAllListeners();
+        } catch {}
+        try {
+          abortController.abort();
+        } catch {}
+      };
+
+      const waitDrain = async (ms: number) => {
+        const start = Date.now();
+        while (!cleanedUp && Date.now() - start < ms) {
+          if (inFlight === 0 && queue.length === 0) return;
+          await new Promise((r) => setTimeout(r, 80));
+        }
+      };
+
+      const stopInternal = async (reason: string) => {
+        if (stopping || cleanedUp) return;
+        stopping = true;
+        log('stop', reason);
+        callbacks.onListeningChange?.(false);
+        try {
+          await AudioRecord.stop();
+        } catch {}
+        await waitDrain(1800);
+        flushPendingResults();
+        if (lastPartial && (!lastFinal || lastFinal !== lastPartial)) {
+          callbacks.onFinal?.(lastPartial);
+          lastFinal = lastPartial;
+          lastPartial = '';
+        }
+        if (!sawAnyText && Date.now() - Math.max(lastHeardAt, lastChunkAt) > 1200) {
+          callbacks.onError?.('未检测到语音');
+        }
+        await cleanup();
+      };
+
+      const failAndStop = async (err: unknown) => {
+        if (userStopped || cleanedUp) return;
+        callbacks.onError?.(toErrMsg(err));
+        await stopInternal('error');
+      };
+
+      const sendChunk = async (seq: number, chunk: AudioChunkEvent) => {
+        const resp = await fetch(`${API_BASE_URL}/stt/chunk`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${sttToken}`,
+          },
+          body: JSON.stringify({
+            pcm16leBase64: chunk.base64,
+            sampleRate: chunk.sampleRate,
+            channels: chunk.channels,
+            language,
+          }),
+          signal: abortController.signal,
+        });
+
+        const payloadText = await resp.text().catch(() => '');
+        let payload: any = null;
+        try {
+          payload = payloadText ? JSON.parse(payloadText) : null;
+        } catch {
+          payload = null;
+        }
+
+        if (!resp.ok) {
+          const msg = payload?.error || payload?.message || payloadText || `HTTP ${resp.status}`;
+          throw new Error(String(msg || '请求失败'));
+        }
+
+        if (payload && payload.success === false) {
+          throw new Error(String(payload?.error || payload?.message || '请求失败'));
+        }
+
+        const data = payload?.data ?? payload?.result ?? payload;
+        const partial =
+          typeof data?.partial === 'string'
+            ? data.partial
+            : typeof data?.partialText === 'string'
+              ? data.partialText
+              : undefined;
+        const final =
+          typeof data?.final === 'string'
+            ? data.final
+            : typeof data?.finalText === 'string'
+              ? data.finalText
+              : undefined;
+        const text = typeof data?.text === 'string' ? data.text : undefined;
+
+        pendingResults.set(seq, { partial, final, text });
+        flushPendingResults();
+      };
+
+      const pump = () => {
+        if (cleanedUp || stopping) return;
+        while (inFlight < maxInFlight && queue.length > 0) {
+          const item = queue.shift()!;
+          inFlight += 1;
+          sendChunk(item.seq, item.chunk)
+            .catch((e) => failAndStop(e))
+            .finally(() => {
+              inFlight -= 1;
+              pump();
+            });
+        }
+      };
+
+      const stop = async () => {
+        userStopped = true;
+        await stopInternal('user');
+      };
+
+      try {
+        const tokenResp = await api.post('/stt/token', {});
+        sttToken = String(tokenResp?.data?.data?.token || tokenResp?.data?.token || tokenResp?.data?.result?.token || '');
+        if (!sttToken) {
+          callbacks.onError?.('STT token 获取失败');
+          callbacks.onListeningChange?.(false);
+          return { stop: async () => {}, started: false };
+        }
+
+        listenerHandle = await AudioRecord.addListener('audioChunk', (ev) => {
+          if (cleanedUp || stopping) return;
+          const chunk = ev as AudioChunkEvent;
+          lastChunkAt = Date.now();
+          nextSeq += 1;
+          callbacks.onChunk?.(nextSeq);
+          queue.push({ seq: nextSeq, chunk });
+          pump();
+        });
+
+        await AudioRecord.start({ sampleRate: 16000, chunkDurationMs: 800 });
+
+        callbacks.onListeningChange?.(true);
+        hardTimeout = setTimeout(() => {
+          stopInternal('timeout').catch(() => {});
+        }, hardTimeoutMs);
+
+        noSpeechTimer = setTimeout(() => {
+          if (cleanedUp || stopping) return;
+          if (sawAnyText) return;
+          if (Date.now() - lastChunkAt < 1200) return;
+          stopInternal('no-speech').catch(() => {});
+        }, 6000);
+
+        return { stop, started: true };
+      } catch (e) {
+        await cleanup();
+        callbacks.onListeningChange?.(false);
+        callbacks.onError?.(toErrMsg(e));
+        return { stop: async () => {}, started: false };
+      }
+    }
     if (provider === 'native') {
       const DEBUG = Boolean((import.meta as any)?.env?.DEV);
       const log = (...args: any[]) => {

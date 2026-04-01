@@ -17,5 +17,7 @@ export async function reportTelemetryEvent(event: TelemetryEvent): Promise<void>
       },
       { timeout: 2000 }
     );
-  } catch (_) {}
+  } catch (_) {
+    return;
+  }
 }

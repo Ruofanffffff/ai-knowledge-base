@@ -695,6 +695,9 @@ app.use('/api/kg', kgRoutes);
 const telemetryRoutes = require('./routes/telemetryRoutes');
 app.use('/api/telemetry', telemetryRoutes);
 
+const sttRoutes = require('./routes/sttRoutes');
+app.use('/api/stt', sttRoutes);
+
 // 便签路由
 const notesRoutes = require('./routes/notesRoutes');
 app.use('/api/notes', notesRoutes);

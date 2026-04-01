@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
+import { Capacitor } from '@capacitor/core';
 import { ChevronRight, Inbox, Mic, Sparkles, Square } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { useNotes } from '../components/context/NoteContext';
 import { toast } from '../components/ui/Toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import { SpeechService } from '../services/speechService';
 
 function stripHtmlToPlainText(raw: unknown): string {
@@ -35,6 +46,16 @@ export function ShisiHome() {
   const { notes, addNote } = useNotes();
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [cloudDictationEnabled, setCloudDictationEnabled] = useState(() => {
+    try {
+      const v = String(localStorage.getItem('stt_provider') || '').trim();
+      return v === 'cloud_streaming' || v === 'cloud';
+    } catch {
+      return false;
+    }
+  });
+  const [cloudPrivacyOpen, setCloudPrivacyOpen] = useState(false);
+  const [cloudPrivacyIntent, setCloudPrivacyIntent] = useState<null | { enableCloud?: boolean; startMic?: boolean }>(null);
   const stopListeningRef = useRef<null | (() => Promise<void>)>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const dictationSessionRef = useRef(0);
@@ -50,7 +71,56 @@ export function ShisiHome() {
       return false;
     }
   }, []);
-  const sttDebugRef = useRef({ partial: 0, final: 0, lastEventAt: 0, lastTextLen: 0 });
+  const [sttDebugTick, setSttDebugTick] = useState(0);
+  const sttDebugRef = useRef({ provider: 'none', partial: 0, final: 0, chunks: 0, lastEventAt: 0, lastTextLen: 0 });
+  const cloudSupported = Capacitor.isNativePlatform();
+  const providerForced = useMemo(() => {
+    const envPreferred = String((import.meta as any)?.env?.VITE_STT_PROVIDER || '').trim();
+    if (envPreferred === 'cloud_streaming' || envPreferred === 'native' || envPreferred === 'web') return true;
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      return Boolean(qs.get('sttProvider') || qs.get('stt'));
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const readCloudPrivacyAck = () => {
+    try {
+      return localStorage.getItem('stt_cloud_privacy_ack_v1') === '1';
+    } catch {
+      return false;
+    }
+  };
+
+  const writeCloudPrivacyAck = () => {
+    try {
+      localStorage.setItem('stt_cloud_privacy_ack_v1', '1');
+    } catch {}
+  };
+
+  const writeCloudDictationEnabled = async (enabled: boolean) => {
+    if (enabled && isListening) {
+      await stopListeningRef.current?.().catch(() => {});
+      stopListeningRef.current = null;
+      setIsListening(false);
+      dictationActiveSessionRef.current = null;
+      dictationInterimRef.current = '';
+    }
+    if (!enabled && isListening) {
+      await stopListeningRef.current?.().catch(() => {});
+      stopListeningRef.current = null;
+      setIsListening(false);
+      dictationActiveSessionRef.current = null;
+      dictationInterimRef.current = '';
+    }
+    try {
+      if (enabled) localStorage.setItem('stt_provider', 'cloud_streaming');
+      else localStorage.removeItem('stt_provider');
+    } catch {}
+    setCloudDictationEnabled(enabled);
+    setSttDebugTick((v) => v + 1);
+  };
 
   const applyDictationText = (sessionId: number, text: string, kind: 'partial' | 'final') => {
     if (dictationActiveSessionRef.current !== sessionId) return;
@@ -131,6 +201,13 @@ export function ShisiHome() {
       stopListeningRef.current = null;
     }
 
+    const provider = SpeechService.getProvider();
+    if (provider === 'cloud_streaming' && !readCloudPrivacyAck()) {
+      setCloudPrivacyIntent({ startMic: true });
+      setCloudPrivacyOpen(true);
+      return;
+    }
+
     setIsListening(true);
     const availability = await SpeechService.getAvailability();
     if (!availability.available) {
@@ -149,11 +226,20 @@ export function ShisiHome() {
     dictationUserEditedRef.current = false;
     dictationBaseRef.current = input.trimEnd();
     dictationInterimRef.current = '';
-    sttDebugRef.current = { partial: 0, final: 0, lastEventAt: Date.now(), lastTextLen: 0 };
+    sttDebugRef.current = { provider: SpeechService.getProvider(), partial: 0, final: 0, chunks: 0, lastEventAt: Date.now(), lastTextLen: 0 };
+    setSttDebugTick((v) => v + 1);
 
     const { stop, started } = await SpeechService.startListening(
       { language: 'zh-CN' },
       {
+        onProvider: (p) => {
+          sttDebugRef.current.provider = p;
+          setSttDebugTick((v) => v + 1);
+        },
+        onChunk: (seq) => {
+          sttDebugRef.current.chunks = seq;
+          setSttDebugTick((v) => v + 1);
+        },
         onPartial: (text) => applyDictationText(sessionId, text, 'partial'),
         onFinal: (text) => applyDictationText(sessionId, text, 'final'),
         onListeningChange: (listening) => {
@@ -283,10 +369,73 @@ export function ShisiHome() {
               rows={4}
               style={{ background: 'var(--hi-input-bg)', border: '1px solid var(--hi-card-border)', color: 'var(--hi-text-primary)', fontSize: '14px', lineHeight: 1.6 }}
             />
+            <div
+              className="mt-2 px-3 py-2 rounded-2xl flex items-center justify-between gap-3"
+              style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span style={{ color: 'var(--hi-text-primary)', fontSize: '12px', fontWeight: 800 }}>云听写</span>
+                  <span style={{ color: 'var(--hi-text-secondary)', fontSize: '11px' }}>音频上行</span>
+                  {providerForced && (
+                    <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(148,163,184,0.18)', color: 'var(--hi-text-secondary)', fontSize: '10px', fontWeight: 700 }}>
+                      已固定
+                    </span>
+                  )}
+                  {!cloudSupported && (
+                    <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(148,163,184,0.18)', color: 'var(--hi-text-secondary)', fontSize: '10px', fontWeight: 700 }}>
+                      仅移动端
+                    </span>
+                  )}
+                </div>
+                <div className="truncate" style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 2 }}>
+                  开启后，语音音频会分片上传到服务器用于识别，可随时关闭
+                </div>
+              </div>
+              <motion.button
+                whileTap={{ scale: providerForced || !cloudSupported ? 1 : 0.96 }}
+                disabled={providerForced || !cloudSupported}
+                onClick={async () => {
+                  const next = !cloudDictationEnabled;
+                  if (!next) {
+                    await writeCloudDictationEnabled(false);
+                    toast.success('云听写已关闭');
+                    return;
+                  }
+                  if (!readCloudPrivacyAck()) {
+                    setCloudPrivacyIntent({ enableCloud: true });
+                    setCloudPrivacyOpen(true);
+                    return;
+                  }
+                  await writeCloudDictationEnabled(true);
+                  toast.success('云听写已开启');
+                }}
+                className="w-12 h-7 rounded-full px-1 flex items-center"
+                style={{
+                  background: (providerForced ? SpeechService.getProvider() === 'cloud_streaming' : cloudDictationEnabled) ? 'rgba(16,185,129,0.85)' : 'rgba(148,163,184,0.28)',
+                  border: '1px solid rgba(148,163,184,0.25)',
+                  opacity: providerForced || !cloudSupported ? 0.55 : 1,
+                }}
+                aria-pressed={providerForced ? SpeechService.getProvider() === 'cloud_streaming' : cloudDictationEnabled}
+              >
+                <motion.div
+                  layout
+                  transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+                  className="w-5 h-5 rounded-full"
+                  style={{
+                    background: 'white',
+                    marginLeft: (providerForced ? SpeechService.getProvider() === 'cloud_streaming' : cloudDictationEnabled) ? 'auto' : 0,
+                  }}
+                />
+              </motion.button>
+            </div>
             {sttDebug && (
-              <div className="mt-2 px-3 py-2 rounded-2xl"
+              <div
+                className="mt-2 px-3 py-2 rounded-2xl"
+                data-tick={sttDebugTick}
                 style={{ background: 'rgba(30,27,75,0.08)', border: '1px solid rgba(30,27,75,0.10)', color: 'var(--hi-text-secondary)', fontSize: '11px' }}>
                 <div>listening: {String(isListening)}</div>
+                <div>provider: {String(sttDebugRef.current.provider)} · chunks: {sttDebugRef.current.chunks}</div>
                 <div>partial: {sttDebugRef.current.partial} · final: {sttDebugRef.current.final} · lastLen: {sttDebugRef.current.lastTextLen}</div>
               </div>
             )}
@@ -413,6 +562,50 @@ export function ShisiHome() {
       </div>
 
       <BottomNav />
+
+      <AlertDialog
+        open={cloudPrivacyOpen}
+        onOpenChange={(o) => {
+          setCloudPrivacyOpen(o);
+          if (!o) setCloudPrivacyIntent(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>云听写隐私提示</AlertDialogTitle>
+            <AlertDialogDescription>
+              云听写会采集麦克风语音，并将音频分片上传到服务器进行语音识别处理。音频可能包含个人信息或敏感内容，你可以随时在此处关闭云听写。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setCloudPrivacyOpen(false);
+                setCloudPrivacyIntent(null);
+              }}
+            >
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                writeCloudPrivacyAck();
+                const intent = cloudPrivacyIntent;
+                setCloudPrivacyOpen(false);
+                setCloudPrivacyIntent(null);
+                if (intent?.enableCloud) {
+                  await writeCloudDictationEnabled(true);
+                  toast.success('云听写已开启');
+                }
+                if (intent?.startMic) {
+                  await handleMicToggle();
+                }
+              }}
+            >
+              同意并继续
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
