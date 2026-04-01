@@ -320,12 +320,16 @@ export class SpeechService {
 
         callbacks.onListeningChange?.(true);
         try {
-          const res = await CapacitorSpeechRecognition.start({
+          const startPopup = CapacitorSpeechRecognition.start({
             language: options.language || 'zh-CN',
             maxResults: 1,
             partialResults: false,
             popup: true,
           } as any);
+          const res = await Promise.race([
+            startPopup,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('popup timeout')), 12000)),
+          ]) as any;
           const text = pickText(res);
           if (text) {
             lastText = text;
@@ -334,7 +338,8 @@ export class SpeechService {
             callbacks.onError?.('未检测到语音');
           }
         } catch (e) {
-          callbacks.onError?.(String((e as any)?.message || e || '语音识别失败'));
+          const msg = String((e as any)?.message || e || '语音识别失败');
+          callbacks.onError?.(msg === 'popup timeout' ? '系统语音服务不可用或未返回结果' : msg);
         } finally {
           callbacks.onListeningChange?.(false);
           fallbackActive = false;
@@ -347,10 +352,13 @@ export class SpeechService {
         userStopped = true;
         
         if (fallbackActive || switchingToFallback) {
-          // 如果弹窗已经弹起，原生的 stop 可能关不掉它，或者我们只需等它自然结束
+          callbacks.onListeningChange?.(false);
           try {
             await CapacitorSpeechRecognition.stop();
           } catch {}
+          fallbackActive = false;
+          switchingToFallback = false;
+          await cleanup('stop:fallback');
           return;
         }
 
