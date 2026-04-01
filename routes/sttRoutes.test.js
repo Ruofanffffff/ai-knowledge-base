@@ -25,7 +25,7 @@ describe('STT Routes', () => {
   let sttRoutes;
 
   beforeEach(() => {
-    process.env.OPENAI_API_KEY = 'test-openai-key';
+    process.env.QWEN_API_KEY = 'test-qwen-key';
     sttRoutes = require('./sttRoutes');
     app = express();
     app.use(express.json({ limit: '50mb' }));
@@ -34,7 +34,7 @@ describe('STT Routes', () => {
 
   afterEach(() => {
     jest.resetModules();
-    delete process.env.OPENAI_API_KEY;
+    delete process.env.QWEN_API_KEY;
   });
 
   it('POST /api/stt/token should return short-lived stt jwt', async () => {
@@ -94,4 +94,3 @@ describe('STT Routes', () => {
     expect(res.body.success).toBe(false);
   });
 });
-

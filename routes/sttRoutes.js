@@ -82,14 +82,14 @@ router.post('/chunk', sttAuthMiddleware, async (req, res) => {
 
     const wavBuffer = pcm16leToWavBuffer(pcmBuffer, sampleRate, channels);
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY || process.env.QWEN_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ success: false, error: 'OPENAI_API_KEY is not configured' });
+      return res.status(500).json({ success: false, error: 'OPENAI_API_KEY 或 QWEN_API_KEY 未配置' });
     }
 
     const client = new OpenAI({
       apiKey,
-      baseURL: process.env.OPENAI_BASE_URL || undefined,
+      baseURL: process.env.OPENAI_BASE_URL || (process.env.OPENAI_API_KEY ? undefined : 'https://dashscope.aliyuncs.com/compatible-mode/v1'),
     });
 
     const model = req.body?.model || process.env.OPENAI_STT_MODEL || 'whisper-1';
