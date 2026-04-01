@@ -285,21 +285,6 @@ export class SpeechService {
         await cleanup('timeout');
       }, Math.max(3000, options.maxDurationMs ?? 15000));
 
-      try {
-        log('start', { language: options.language || 'zh-CN' });
-        await CapacitorSpeechRecognition.start({
-          language: options.language || 'zh-CN',
-          maxResults: 1,
-          partialResults: true,
-          popup: false,
-        } as any);
-      } catch (e) {
-        await cleanup('start threw');
-        callbacks.onListeningChange?.(false);
-        callbacks.onError?.(String((e as any)?.message || e || '语音识别启动失败'));
-        return { stop: async () => {}, started: false };
-      }
-
       fallbackTimer = setTimeout(async () => {
         if (cleanedUp) return;
         if (userStopped) return;
@@ -346,6 +331,31 @@ export class SpeechService {
           await cleanup('fallback done');
         }
       }, 1500);
+
+      log('start', { language: options.language || 'zh-CN' });
+      const startSilent = CapacitorSpeechRecognition.start({
+        language: options.language || 'zh-CN',
+        maxResults: 1,
+        partialResults: true,
+        popup: false,
+      } as any);
+
+      startSilent
+        .catch(async (e) => {
+          if (cleanedUp) return;
+          if (fallbackActive || switchingToFallback) return;
+          callbacks.onListeningChange?.(false);
+          callbacks.onError?.(String((e as any)?.message || e || '语音识别启动失败'));
+          await cleanup('start rejected');
+        })
+        .then(() => {
+          if (cleanedUp) return;
+          if (fallbackActive || switchingToFallback) return;
+          callbacks.onListeningChange?.(true);
+        });
+
+      // 防止某些设备/系统上 native start Promise 卡住，导致 UI 无法停止、兜底不执行
+      await Promise.race([startSilent, new Promise((resolve) => setTimeout(resolve, 1200))]);
 
       const stop = async () => {
         if (cleanedUp) return;
