@@ -295,13 +295,24 @@ export class SpeechService {
         return { stop: async () => {}, started: false };
       }
 
+      let isFallbackActive = false;
+
       fallbackTimer = setTimeout(async () => {
         if (cleanedUp) return;
         if (userStopped) return;
         if (lastHeardAt > 0) return;
+        
+        log('fallback: no speech detected within 1.5s, trying popup mode');
+        isFallbackActive = true;
+        
         try {
-          await stop();
+          await CapacitorSpeechRecognition.stop();
         } catch {}
+
+        // 停止不必要的轮询和超时，避免在弹窗期间误报
+        clearInterval(pollTimer);
+        clearTimeout(hardTimeout);
+
         callbacks.onListeningChange?.(true);
         try {
           const res = await CapacitorSpeechRecognition.start({
@@ -311,27 +322,46 @@ export class SpeechService {
             popup: true,
           } as any);
           const text = pickText(res);
-          if (text) callbacks.onFinal?.(text);
-          else callbacks.onError?.('未检测到语音');
+          if (text) {
+            lastText = text;
+            callbacks.onFinal?.(text);
+          } else {
+            callbacks.onError?.('未检测到语音');
+          }
         } catch (e) {
           callbacks.onError?.(String((e as any)?.message || e || '语音识别失败'));
         } finally {
           callbacks.onListeningChange?.(false);
+          await cleanup('fallback done');
         }
       }, 1500);
 
       const stop = async () => {
         if (cleanedUp) return;
         userStopped = true;
+        
+        if (isFallbackActive) {
+          // 如果弹窗已经弹起，原生的 stop 可能关不掉它，或者我们只需等它自然结束
+          try {
+            await CapacitorSpeechRecognition.stop();
+          } catch {}
+          return;
+        }
+
         callbacks.onListeningChange?.(false);
         try {
           await CapacitorSpeechRecognition.stop();
         } catch {}
+        
         // 给 Android 最终结果/停止事件一个缓冲窗口
-        await new Promise((r) => setTimeout(r, 2600));
-        if (!lastText && Date.now() - lastHeardAt > 1200) callbacks.onError?.('未检测到语音');
-        else emitFinalIfNeeded('stop()');
-        await cleanup('stop()');
+        await new Promise((r) => setTimeout(r, 800));
+        
+        if (!cleanedUp) {
+          if (!lastText && Date.now() - lastHeardAt > 1200) callbacks.onError?.('未检测到语音');
+          else emitFinalIfNeeded('stop()');
+          await cleanup('stop()');
+        }
+        
         try {
           const res = await CapacitorSpeechRecognition.isListening();
           if ((res as any)?.listening) {
