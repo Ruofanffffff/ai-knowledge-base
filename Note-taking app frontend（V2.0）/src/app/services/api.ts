@@ -5,6 +5,11 @@ const DEFAULT_SERVER_BASE_URL = 'http://120.26.35.225:3000/api';
 const envBaseUrl = import.meta.env.VITE_API_URL;
 const isNative = Capacitor.isNativePlatform();
 
+const isAbsoluteHttpUrl = (raw?: string): boolean => {
+  const v = String(raw || '').trim();
+  return /^https?:\/\//i.test(v);
+};
+
 const normalizeApiBaseUrl = (raw?: string): string => {
   const v = String(raw || '').trim();
   if (!v) return '/api';
@@ -16,7 +21,12 @@ const normalizeApiBaseUrl = (raw?: string): string => {
 let BASE_URL = normalizeApiBaseUrl(envBaseUrl);
 
 if (isNative) {
-  BASE_URL = envBaseUrl ? normalizeApiBaseUrl(envBaseUrl) : DEFAULT_SERVER_BASE_URL;
+  const v = String(envBaseUrl || '').trim();
+  if (!v || v.startsWith('/') || !isAbsoluteHttpUrl(v)) {
+    BASE_URL = DEFAULT_SERVER_BASE_URL;
+  } else {
+    BASE_URL = normalizeApiBaseUrl(v);
+  }
 } else if (import.meta.env.PROD) {
   BASE_URL = envBaseUrl ? normalizeApiBaseUrl(envBaseUrl) : DEFAULT_SERVER_BASE_URL;
 }
