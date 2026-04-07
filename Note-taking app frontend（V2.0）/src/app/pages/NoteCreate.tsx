@@ -1278,7 +1278,7 @@ export function NoteCreate() {
         'AI 服务暂时不可用，请稍后重试';
       const subtitle = (err as any)?.subtitle;
       if (subtitle) {
-        toast.error(title, { subtitle });
+        toast.error(title, { description: subtitle });
       } else {
         toast.error(title);
       }
@@ -1552,7 +1552,7 @@ export function NoteCreate() {
     try {
       const res = await api.post('/community/publish', {
         items: [{ id: existingNote.id, type: 'note' }],
-        isPublic: true
+        isPublic: shareVisibility === 'public'
       });
       if (res.data.success) {
         setShareStep('done');
@@ -2686,10 +2686,25 @@ export function NoteCreate() {
                       <X size={14} style={{ color: '#6366F1' }} />
                     </button>
                   </div>
+                  <div className="mb-3 p-3 rounded-2xl" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.12)' }}>
+                    <p style={{ fontSize: '12px', fontWeight: 800, color: 'var(--hi-text-primary)' }}>
+                      {String(title || existingNote?.title || '未命名').trim() || '未命名'}
+                    </p>
+                    <p style={{ fontSize: '11px', color: 'var(--hi-text-secondary)', marginTop: 6, lineHeight: 1.55 }}>
+                      {String(content || '')
+                        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+                        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+                        .replace(/<[^>]*>/g, ' ')
+                        .replace(/&nbsp;/gi, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .slice(0, 120) || '无内容'}
+                    </p>
+                  </div>
                   <textarea
                     value={shareCaption}
                     onChange={e => setShareCaption(e.target.value)}
-                    placeholder="添加一段话分享你的想法…"
+                    placeholder="附言（当前版本暂不支持附言，会被忽略）"
                     className="w-full p-3 rounded-2xl outline-none resize-none"
                     rows={3}
                     style={{

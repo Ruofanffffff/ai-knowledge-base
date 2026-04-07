@@ -450,11 +450,37 @@ export function NoteList() {
   };
 
   const publishToSiCircle = async (item: { id: string; type: 'note' | 'document' }) => {
+    const previewText = (() => {
+      if (item.type === 'note') {
+        const n = notes.find((x) => x.id === item.id);
+        const title = String(n?.title || '').trim();
+        const content = String(n?.content || '')
+          .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<[^>]*>/g, ' ')
+          .replace(/&nbsp;/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return `${title || '未命名'}\n\n${content.slice(0, 160) || '无内容'}`;
+      }
+      const d = documents.find((x) => String(x.id) === String(item.id));
+      const title = String(d?.title || '').trim();
+      const content = String(d?.content || '')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return `${title || '未命名'}\n\n${content.slice(0, 160) || '无内容'}`;
+    })();
+
+    const isPublic = window.confirm(`发布到思圈前预览：\n\n${previewText}\n\n确定公开发布？\n（取消则按私密发布）`);
     const toastId = toast.loading('正在发布到思圈…');
     try {
       const res = await api.post('/community/publish', {
         items: [{ id: item.id, type: item.type }],
-        isPublic: true,
+        isPublic,
       });
       toast.dismiss(toastId);
       if (res.data?.success) {

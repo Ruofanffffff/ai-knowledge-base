@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { Capacitor } from '@capacitor/core';
 import { ChevronRight, Inbox, Mic, Sparkles, Square } from 'lucide-react';
@@ -43,7 +43,8 @@ function startOfDay(ts: number) {
 
 export function ShisiHome() {
   const navigate = useNavigate();
-  const { notes, addNote } = useNotes();
+  const location = useLocation();
+  const { notes, addNote, deleteNote } = useNotes();
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [cloudDictationEnabled, setCloudDictationEnabled] = useState(() => {
@@ -64,6 +65,8 @@ export function ShisiHome() {
   const dictationBaseRef = useRef('');
   const dictationInterimRef = useRef('');
   const dictationUserEditedRef = useRef(false);
+  const micHoldRef = useRef({ active: false, startY: 0, cancelled: false });
+  const suppressNextSttErrorRef = useRef(false);
   const sttDebug = useMemo(() => {
     try {
       return new URLSearchParams(window.location.search).get('sttDebug') === '1';
@@ -159,6 +162,8 @@ export function ShisiHome() {
     return notes.filter((n) => n.createdAt >= s).length;
   }, [notes]);
 
+  const isAuthed = Boolean(localStorage.getItem('access_token'));
+
   const handleCapture = async () => {
     const text = input.trim();
     if (!text) {
@@ -167,7 +172,7 @@ export function ShisiHome() {
     }
     const id = toast.loading('正在保存到收件箱…');
     try {
-      await addNote({
+      const created = await addNote({
         content: text,
         tags: [],
         type: 'text',
@@ -175,7 +180,19 @@ export function ShisiHome() {
       });
       setInput('');
       toast.dismiss(id);
-      toast.success('已保存到收件箱');
+      if (created?.id) {
+        toast.save({
+          action: {
+            label: '撤销',
+            onClick: () => {
+              deleteNote(created.id).catch(() => {});
+              setInput(text);
+            },
+          },
+        });
+      } else {
+        toast.success('已保存到收件箱');
+      }
     } catch (e: any) {
       toast.dismiss(id);
       toast.error(e?.message || '保存失败');
@@ -257,6 +274,10 @@ export function ShisiHome() {
           }
         },
         onError: (message) => {
+          if (suppressNextSttErrorRef.current) {
+            suppressNextSttErrorRef.current = false;
+            return;
+          }
           toast.error(message);
           stopListeningRef.current = null;
           setIsListening(false);
@@ -275,6 +296,16 @@ export function ShisiHome() {
   };
 
   const preview = inboxNotes.slice(0, 3);
+
+  useEffect(() => {
+    const focus = (location as any)?.state?.focusCapture;
+    if (!focus) return;
+    try {
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus?.();
+      });
+    } catch {}
+  }, [location]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden relative" style={{ background: 'var(--hi-page-bg)' }}>
@@ -304,6 +335,23 @@ export function ShisiHome() {
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto pb-24">
+        {!isAuthed && (
+          <div className="mx-4 mt-4 p-4 rounded-3xl" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.14)' }}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', fontWeight: 900 }}>当前未登录</p>
+                <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11.5px', marginTop: 4, lineHeight: 1.5 }}>你仍可先记录，内容会临时保存在本机；登录后会自动同步。</p>
+              </div>
+              <button
+                onClick={() => navigate('/auth')}
+                className="px-4 py-2 rounded-2xl active:scale-95 transition-transform"
+                style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: '12px', fontWeight: 900, whiteSpace: 'nowrap' }}
+              >
+                去登录
+              </button>
+            </div>
+          </div>
+        )}
         <div className="mx-4 mt-4 p-5 rounded-3xl" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)', boxShadow: 'var(--hi-card-shadow)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -325,16 +373,48 @@ export function ShisiHome() {
                     animate={{ opacity: [0.35, 0.0], scale: [1, 2.0] }}
                     transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.18, ease: 'easeOut' }}
                     style={{
-                      width: 40,
-                      height: 40,
+                      width: 48,
+                      height: 48,
                       border: '1px solid rgba(239,68,68,0.55)',
                     }}
                   />
                 ))}
               <motion.button
                 whileTap={{ scale: 0.92 }}
-                onClick={handleMicToggle}
-                className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                onPointerDown={(e) => {
+                  if (isListening) return;
+                  micHoldRef.current = { active: true, startY: e.clientY, cancelled: false };
+                  handleMicToggle().catch(() => {});
+                }}
+                onPointerMove={(e) => {
+                  if (!micHoldRef.current.active) return;
+                  const dy = e.clientY - micHoldRef.current.startY;
+                  if (dy < -36) micHoldRef.current.cancelled = true;
+                }}
+                onPointerUp={() => {
+                  if (!micHoldRef.current.active) return;
+                  const cancelled = micHoldRef.current.cancelled;
+                  micHoldRef.current.active = false;
+                  if (!isListening) return;
+                  if (cancelled) {
+                    suppressNextSttErrorRef.current = true;
+                    dictationActiveSessionRef.current = null;
+                    dictationInterimRef.current = '';
+                    setInput(dictationBaseRef.current);
+                  }
+                  stopListeningRef.current?.().catch(() => {});
+                }}
+                onPointerCancel={() => {
+                  if (!micHoldRef.current.active) return;
+                  micHoldRef.current.active = false;
+                  if (!isListening) return;
+                  suppressNextSttErrorRef.current = true;
+                  dictationActiveSessionRef.current = null;
+                  dictationInterimRef.current = '';
+                  setInput(dictationBaseRef.current);
+                  stopListeningRef.current?.().catch(() => {});
+                }}
+                className="w-12 h-12 rounded-2xl flex items-center justify-center"
                 animate={{
                   background: isListening
                     ? 'linear-gradient(135deg, #EF4444, #F97316)'
@@ -364,7 +444,7 @@ export function ShisiHome() {
                   dictationInterimRef.current = '';
                 }
               }}
-              placeholder={isListening ? '正在聆听…' : '此刻想到什么？一句话也可以…'}
+              placeholder={isListening ? '松开结束，上滑取消' : '此刻想到什么？一句话也可以…'}
               className="w-full p-4 rounded-3xl outline-none resize-none"
               rows={4}
               style={{ background: 'var(--hi-input-bg)', border: '1px solid var(--hi-card-border)', color: 'var(--hi-text-primary)', fontSize: '14px', lineHeight: 1.6 }}
@@ -441,7 +521,7 @@ export function ShisiHome() {
             )}
             <div className="flex items-center justify-between mt-3">
               <span style={{ color: isListening ? '#EF4444' : 'var(--hi-text-secondary)', fontSize: '11px', fontWeight: isListening ? 800 : 400 }}>
-                {isListening ? '正在聆听…' : input.trim() ? `${input.trim().length} 字` : '先捕捉，再整理'}
+                {isListening ? '松开结束，上滑取消' : input.trim() ? `${input.trim().length} 字` : '按住说话，上滑取消'}
               </span>
               <motion.button
                 whileTap={{ scale: 0.97 }}

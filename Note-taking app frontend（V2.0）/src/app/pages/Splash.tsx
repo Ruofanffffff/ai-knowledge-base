@@ -9,11 +9,9 @@ export function Splash() {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        const token = localStorage.getItem('access_token');
-        const authed = localStorage.getItem('hi_brain_authed');
-        navigate(token || authed === '1' ? '/home' : '/auth');
+        navigate('/home');
       } catch {
-        navigate('/auth');
+        navigate('/home');
       }
     }, 3200);
     return () => clearTimeout(timer);

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
 import { api } from "../../services/api";
 
 export type Note = {
@@ -11,6 +11,8 @@ export type Note = {
   tags?: string[];
   imageUrl?: string;
   structuredData?: any;
+  localOnly?: boolean;
+  pendingSync?: boolean;
 };
 
 interface NoteContextType {
@@ -88,11 +90,71 @@ export function NoteProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const syncingLocalRef = useRef(false);
+
+  const LOCAL_NOTES_KEY = 'shisi_local_notes_v1';
+
+  const safeParseArray = (raw: any): any[] => {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    return [];
+  };
+
+  const loadLocalNotes = (): Note[] => {
+    try {
+      const text = localStorage.getItem(LOCAL_NOTES_KEY);
+      if (!text) return [];
+      const parsed = JSON.parse(text);
+      const arr = safeParseArray(parsed);
+      return arr
+        .map((n: any) => ({
+          id: String(n?.id || ''),
+          title: typeof n?.title === 'string' ? n.title : undefined,
+          content: normalizeContent(n?.content),
+          type: (n?.type === 'image' || n?.type === 'mixed') ? n.type : 'text',
+          status: (n?.status === 'inbox' || n?.status === 'archived') ? n.status : 'inbox',
+          createdAt: Number(n?.createdAt || Date.now()),
+          tags: normalizeTags(n?.tags),
+          imageUrl: typeof n?.imageUrl === 'string' ? n.imageUrl : undefined,
+          structuredData: n?.structuredData,
+          localOnly: true,
+          pendingSync: true,
+        }))
+        .filter((n: Note) => Boolean(n.id) && Boolean(n.content));
+    } catch {
+      return [];
+    }
+  };
+
+  const saveLocalNotes = (localNotes: Note[]) => {
+    try {
+      const toSave = localNotes
+        .filter((n) => n.localOnly)
+        .map((n) => ({
+          id: n.id,
+          title: n.title,
+          content: n.content,
+          type: n.type,
+          status: n.status,
+          createdAt: n.createdAt,
+          tags: n.tags || [],
+          imageUrl: n.imageUrl,
+          structuredData: n.structuredData,
+        }));
+      localStorage.setItem(LOCAL_NOTES_KEY, JSON.stringify(toSave));
+    } catch {}
+  };
+
+  const isLocalId = (id: string) => String(id || '').startsWith('local-');
+
+  const genLocalId = () => `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
   const fetchNotes = async () => {
     // Prevent fetching if no token is present (e.g. on login screen)
     const token = localStorage.getItem('access_token');
     if (!token) {
+      const local = loadLocalNotes();
+      setNotes(local.sort((a, b) => b.createdAt - a.createdAt));
       setLoading(false);
       return;
     }
@@ -104,6 +166,7 @@ export function NoteProvider({ children }: { children: ReactNode }) {
       const response = await api.get('/notes');
       
       if (response.data.success && response.data.data.notes) {
+        const local = loadLocalNotes();
         const fetchedNotes = response.data.data.notes.map((n: any) => ({
           content: normalizeContent(n.content),
           tags: normalizeTags(n.tags),
@@ -119,7 +182,29 @@ export function NoteProvider({ children }: { children: ReactNode }) {
           imageUrl: n.attachments?.find((a: any) => a.type === 'image' || a.type === 'IMAGE')?.url,
           structuredData: n.structuredData
         }));
-        setNotes(fetchedNotes);
+        const merged = [...local, ...fetchedNotes].sort((a, b) => b.createdAt - a.createdAt);
+        setNotes(merged);
+
+        if (local.length > 0 && !syncingLocalRef.current) {
+          syncingLocalRef.current = true;
+          (async () => {
+            try {
+              for (const ln of local) {
+                try {
+                  await api.post('/notes', {
+                    content: ln.content,
+                    tags: normalizeTags(ln.tags),
+                    status: ln.status || 'inbox',
+                  });
+                } catch {}
+              }
+              saveLocalNotes([]);
+            } finally {
+              syncingLocalRef.current = false;
+              fetchNotes().catch(() => {});
+            }
+          })();
+        }
       }
     } catch (err) {
       console.error('Failed to fetch notes:', err);
@@ -138,6 +223,27 @@ export function NoteProvider({ children }: { children: ReactNode }) {
       const normalizedContent = note.content?.trim();
       if (!normalizedContent) {
         throw new Error('笔记内容不能为空');
+      }
+
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        const localNote: Note = {
+          id: genLocalId(),
+          title: deriveDisplayTitle(note.title, normalizedContent),
+          content: normalizedContent,
+          tags: normalizeTags(note.tags),
+          status: note.status || 'inbox',
+          type: note.type || 'text',
+          createdAt: Date.now(),
+          imageUrl: (note as any)?.imageUrl,
+          structuredData: (note as any)?.structuredData,
+          localOnly: true,
+          pendingSync: true,
+        };
+        setNotes((prev) => [localNote, ...prev].sort((a, b) => b.createdAt - a.createdAt));
+        const local = loadLocalNotes();
+        saveLocalNotes([localNote, ...local].sort((a, b) => b.createdAt - a.createdAt));
+        return localNote;
       }
 
       // Optimistic update could be implemented here, but for now let's wait for server
@@ -164,6 +270,12 @@ export function NoteProvider({ children }: { children: ReactNode }) {
 
   const deleteNote = async (id: string) => {
     try {
+      if (isLocalId(id)) {
+        setNotes((prev) => prev.filter((n) => n.id !== id));
+        const local = loadLocalNotes().filter((n) => n.id !== id);
+        saveLocalNotes(local);
+        return;
+      }
       await api.delete(`/notes/${id}`);
       setNotes((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
@@ -174,6 +286,31 @@ export function NoteProvider({ children }: { children: ReactNode }) {
 
   const updateNote = async (id: string, updates: Partial<Note>) => {
     try {
+      if (isLocalId(id)) {
+        setNotes((prev) =>
+          prev.map((note) => (
+            note.id === id
+              ? {
+                  ...note,
+                  ...updates,
+                  content: updates.content !== undefined ? normalizeContent(updates.content) : note.content,
+                  tags: updates.tags !== undefined ? normalizeTags(updates.tags) : note.tags,
+                }
+              : note
+          ))
+        );
+        const local = loadLocalNotes().map((n) => {
+          if (n.id !== id) return n;
+          return {
+            ...n,
+            ...updates,
+            content: updates.content !== undefined ? normalizeContent(updates.content) : n.content,
+            tags: updates.tags !== undefined ? normalizeTags(updates.tags) : n.tags,
+          };
+        });
+        saveLocalNotes(local);
+        return;
+      }
       await api.put(`/notes/${id}`, {
         content: updates.content,
         tags: updates.tags !== undefined ? normalizeTags(updates.tags) : undefined,

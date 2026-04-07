@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { motion } from 'motion/react';
+import { Mic } from 'lucide-react';
 import { getUnreadCount } from '../services/messageStore';
 
 // Custom SVG icons for each tab
@@ -134,61 +135,78 @@ export function BottomNav() {
       }}
     >
       <div className="flex items-center justify-around px-1 py-2">
-        {items.map(({ path, label, Icon }) => {
+        {items.map(({ path, label, Icon }, idx) => {
           const active = isActive(path);
           const isProfile = path === '/profile';
           return (
-            <button
-              key={path}
-              onClick={() => navigate(path)}
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all relative"
-              style={{ minWidth: '52px' }}
-            >
-              {active && (
-                <motion.div
-                  layoutId="nav-active-bg"
-                  className="absolute inset-0 rounded-2xl"
-                  style={{ background: 'rgba(99,102,241,0.08)' }}
-                  transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-                />
+            <>
+              {idx === 2 && (
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => navigate('/home', { state: { focusCapture: true } })}
+                  className="w-14 h-14 rounded-3xl flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                    boxShadow: '0 10px 24px rgba(99,102,241,0.38)',
+                    border: '1px solid rgba(255,255,255,0.22)',
+                    marginTop: '-18px',
+                  }}
+                  aria-label="一键捕捉"
+                >
+                  <Mic size={22} style={{ color: 'white' }} />
+                </motion.button>
               )}
-              <div className="relative z-10">
-                <Icon active={active} />
-                {/* Unread badge on 我的 */}
-                {isProfile && unread > 0 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 600, damping: 18 }}
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white"
-                    style={{ background: '#EF4444' }}
-                  >
-                    <span style={{ color: 'white', fontSize: '8px', fontWeight: 800 }}>
-                      {unread > 9 ? '9+' : unread}
-                    </span>
-                  </motion.div>
-                )}
-              </div>
-              <span
-                className="relative z-10"
-                style={{
-                  fontSize: '10px',
-                  fontWeight: active ? 700 : 500,
-                  color: active ? '#6366F1' : '#9CA3AF',
-                  letterSpacing: active ? '0.01em' : 0,
-                }}
+              <button
+                key={path}
+                onClick={() => navigate(path)}
+                className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all relative"
+                style={{ minWidth: '52px' }}
               >
-                {label}
-              </span>
-              {active && (
-                <motion.div
-                  layoutId="nav-dot"
-                  className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
-                  style={{ background: '#6366F1' }}
-                  transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-                />
-              )}
-            </button>
+                {active && (
+                  <motion.div
+                    layoutId="nav-active-bg"
+                    className="absolute inset-0 rounded-2xl"
+                    style={{ background: 'rgba(99,102,241,0.08)' }}
+                    transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+                  />
+                )}
+                <div className="relative z-10">
+                  <Icon active={active} />
+                  {isProfile && unread > 0 && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 600, damping: 18 }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white"
+                      style={{ background: '#EF4444' }}
+                    >
+                      <span style={{ color: 'white', fontSize: '8px', fontWeight: 800 }}>
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    </motion.div>
+                  )}
+                </div>
+                <span
+                  className="relative z-10"
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: active ? 700 : 500,
+                    color: active ? '#6366F1' : '#9CA3AF',
+                    letterSpacing: active ? '0.01em' : 0,
+                  }}
+                >
+                  {label}
+                </span>
+                {active && (
+                  <motion.div
+                    layoutId="nav-dot"
+                    className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
+                    style={{ background: '#6366F1' }}
+                    transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+                  />
+                )}
+              </button>
+            </>
           );
         })}
       </div>

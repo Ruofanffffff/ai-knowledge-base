@@ -562,10 +562,20 @@ export function DocumentDetail() {
                 type="button"
                 onClick={async () => {
                   try {
+                    if (!doc) return;
+                    const previewText = `${String(doc?.title || '未命名').trim() || '未命名'}\n\n${String(doc?.content || '')
+                      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+                      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+                      .replace(/<[^>]*>/g, ' ')
+                      .replace(/&nbsp;/gi, ' ')
+                      .replace(/\s+/g, ' ')
+                      .trim()
+                      .slice(0, 160) || '无内容'}`;
+                    const isPublic = window.confirm(`发布到思圈前预览：\n\n${previewText}\n\n确定公开发布？\n（取消则按私密发布）`);
                     // @ts-ignore
                     const res = await api.post('/community/publish', {
                       items: [{ id: doc.id, type: 'document' }],
-                      isPublic: true
+                      isPublic
                     });
                     if (res.data.success) {
                       toast.success('已成功发布到思圈');

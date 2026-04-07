@@ -24,7 +24,7 @@ function stripHtmlToPlainText(raw: unknown): string {
 
 export function Inbox() {
   const navigate = useNavigate();
-  const { notes, updateNote, deleteNote } = useNotes();
+  const { notes, updateNote, deleteNote, addNote } = useNotes();
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const inboxNotes = useMemo(() => {
@@ -38,7 +38,14 @@ export function Inbox() {
     try {
       await updateNote(id, { status: 'archived' });
       toast.dismiss(t);
-      toast.success('已归档');
+      toast.success('已归档', {
+        action: {
+          label: '撤销',
+          onClick: () => {
+            updateNote(id, { status: 'inbox' }).catch(() => {});
+          },
+        },
+      });
     } catch (e: any) {
       toast.dismiss(t);
       toast.error(e?.message || '归档失败');
@@ -50,11 +57,26 @@ export function Inbox() {
   const remove = async (id: string) => {
     if (busyId) return;
     setBusyId(id);
+    const snapshot = inboxNotes.find((n) => n.id === id);
     const t = toast.loading('正在删除…');
     try {
       await deleteNote(id);
       toast.dismiss(t);
-      toast.delete('已删除');
+      toast.delete('已删除', {
+        action: snapshot
+          ? {
+              label: '撤销',
+              onClick: () => {
+                addNote({
+                  content: snapshot.content,
+                  tags: snapshot.tags || [],
+                  type: snapshot.type,
+                  status: 'inbox',
+                }).catch(() => {});
+              },
+            }
+          : undefined,
+      });
     } catch (e: any) {
       toast.dismiss(t);
       toast.error(e?.message || '删除失败');
@@ -111,41 +133,69 @@ export function Inbox() {
             {inboxNotes.map((n) => {
               const text = stripHtmlToPlainText(n.content);
               return (
-                <div key={n.id} className="p-4 rounded-3xl" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)', boxShadow: 'var(--hi-card-shadow)' }}>
-                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '13.5px', fontWeight: 800, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>
-                    {text || '无内容'}
-                  </p>
-                  <div className="mt-3 flex gap-2">
-                    <motion.button
-                      whileTap={{ scale: 0.98 }}
-                      className="flex-1 py-2.5 rounded-2xl flex items-center justify-center gap-2"
-                      style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.18)', color: '#10B981', fontSize: '12.5px', fontWeight: 900 }}
-                      onClick={() => archive(n.id)}
-                      disabled={busyId === n.id}
-                    >
-                      <Check size={16} />
-                      归档
-                    </motion.button>
-                    <motion.button
-                      whileTap={{ scale: 0.98 }}
-                      className="flex-1 py-2.5 rounded-2xl flex items-center justify-center gap-2"
-                      style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.18)', color: '#6366F1', fontSize: '12.5px', fontWeight: 900 }}
-                      onClick={() => navigate(`/siku/${n.id}`)}
-                      disabled={busyId === n.id}
-                    >
-                      <PenLine size={16} />
-                      去完善
-                    </motion.button>
-                    <motion.button
-                      whileTap={{ scale: 0.98 }}
-                      className="w-12 py-2.5 rounded-2xl flex items-center justify-center"
-                      style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.18)', color: '#EF4444' }}
-                      onClick={() => remove(n.id)}
-                      disabled={busyId === n.id}
-                    >
-                      <Trash2 size={16} />
-                    </motion.button>
+                <div key={n.id} className="relative rounded-3xl overflow-hidden" style={{ boxShadow: 'var(--hi-card-shadow)' }}>
+                  <div className="absolute inset-0 flex items-stretch justify-between">
+                    <div className="flex-1 flex items-center px-5" style={{ background: 'rgba(16,185,129,0.16)' }}>
+                      <div className="flex items-center gap-2" style={{ color: '#10B981', fontSize: '12.5px', fontWeight: 900 }}>
+                        <Check size={16} />
+                        右滑归档
+                      </div>
+                    </div>
+                    <div className="flex-1 flex items-center justify-end px-5" style={{ background: 'rgba(239,68,68,0.14)' }}>
+                      <div className="flex items-center gap-2" style={{ color: '#EF4444', fontSize: '12.5px', fontWeight: 900 }}>
+                        左滑删除
+                        <Trash2 size={16} />
+                      </div>
+                    </div>
                   </div>
+                  <motion.div
+                    drag="x"
+                    dragConstraints={{ left: -120, right: 120 }}
+                    dragElastic={0.12}
+                    dragMomentum={false}
+                    onDragEnd={(_, info) => {
+                      if (busyId === n.id) return;
+                      if (info.offset.x > 80) archive(n.id).catch(() => {});
+                      else if (info.offset.x < -80) remove(n.id).catch(() => {});
+                    }}
+                    className="p-4 rounded-3xl"
+                    style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}
+                  >
+                    <p style={{ color: 'var(--hi-text-primary)', fontSize: '13.5px', fontWeight: 800, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>
+                      {text || '无内容'}
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 py-2.5 rounded-2xl flex items-center justify-center gap-2"
+                        style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.18)', color: '#10B981', fontSize: '12.5px', fontWeight: 900 }}
+                        onClick={() => archive(n.id)}
+                        disabled={busyId === n.id}
+                      >
+                        <Check size={16} />
+                        归档
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 py-2.5 rounded-2xl flex items-center justify-center gap-2"
+                        style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.18)', color: '#6366F1', fontSize: '12.5px', fontWeight: 900 }}
+                        onClick={() => navigate(`/siku/${n.id}`)}
+                        disabled={busyId === n.id}
+                      >
+                        <PenLine size={16} />
+                        去完善
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        className="w-12 py-2.5 rounded-2xl flex items-center justify-center"
+                        style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.18)', color: '#EF4444' }}
+                        onClick={() => remove(n.id)}
+                        disabled={busyId === n.id}
+                      >
+                        <Trash2 size={16} />
+                      </motion.button>
+                    </div>
+                  </motion.div>
                 </div>
               );
             })}
@@ -155,4 +205,3 @@ export function Inbox() {
     </div>
   );
 }
-
