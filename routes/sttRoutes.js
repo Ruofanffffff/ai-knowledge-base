@@ -82,33 +82,60 @@ router.post('/chunk', sttAuthMiddleware, async (req, res) => {
 
     const wavBuffer = pcm16leToWavBuffer(pcmBuffer, sampleRate, channels);
 
-    const apiKey = process.env.OPENAI_API_KEY || process.env.QWEN_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ success: false, error: 'OPENAI_API_KEY 或 QWEN_API_KEY 未配置' });
+    if (process.env.OPENAI_API_KEY) {
+      const apiKey = process.env.OPENAI_API_KEY;
+      const client = new OpenAI({
+        apiKey,
+        baseURL: process.env.OPENAI_BASE_URL || undefined,
+      });
+
+      const model = req.body?.model || process.env.OPENAI_STT_MODEL || 'whisper-1';
+      const language = req.body?.language;
+      const prompt = req.body?.prompt;
+
+      const file = await toFile(wavBuffer, 'audio.wav', { type: 'audio/wav' });
+      const transcription = await client.audio.transcriptions.create({
+        file,
+        model,
+        language,
+        prompt,
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          text: transcription?.text || '',
+          model,
+        },
+      });
     }
 
-    const client = new OpenAI({
-      apiKey,
-      baseURL: process.env.OPENAI_BASE_URL || (process.env.OPENAI_API_KEY ? undefined : 'https://dashscope.aliyuncs.com/compatible-mode/v1'),
+    const dashscopeKey = process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY;
+    if (!dashscopeKey) {
+      return res.status(500).json({ success: false, error: 'DASHSCOPE_API_KEY 或 QWEN_API_KEY 未配置' });
+    }
+
+    const { createOrGetSession } = require('../services/stt/dashscopeRealtimeAsr');
+    const authHeader = String(req.headers.authorization || '');
+    const sttToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+    const session = createOrGetSession(sttToken, {
+      apiKey: dashscopeKey,
+      model: process.env.DASHSCOPE_ASR_MODEL || 'paraformer-realtime-v2',
+      wsUrl: process.env.DASHSCOPE_ASR_WS_URL || undefined,
+      sampleRate,
     });
 
-    const model = req.body?.model || process.env.OPENAI_STT_MODEL || 'whisper-1';
-    const language = req.body?.language;
-    const prompt = req.body?.prompt;
+    const prev = session.lastText || '';
+    await session.sendPcmChunk(pcmBuffer);
+    const text = await session.waitForTextChange(prev, 650);
 
-    const file = await toFile(wavBuffer, 'audio.wav', { type: 'audio/wav' });
-    const transcription = await client.audio.transcriptions.create({
-      file,
-      model,
-      language,
-      prompt,
-    });
-
-    res.json({
+    return res.json({
       success: true,
       data: {
-        text: transcription?.text || '',
-        model,
+        partial: text || '',
+        text: text || '',
+        provider: 'dashscope-paraformer',
+        model: process.env.DASHSCOPE_ASR_MODEL || 'paraformer-realtime-v2',
       },
     });
   } catch (error) {

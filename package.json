@@ -132,6 +132,7 @@
     "socket.io": "^4.8.3",
     "sqlite3": "^5.1.6",
     "uuid": "^13.0.0",
+    "ws": "^8.18.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

@@ -46,7 +46,12 @@ router.post('/ingest', authMiddleware, requirePermission('document:write'), asyn
 
     res.status(201).json({ success: true, data: source });
   } catch (e) {
-    res.status(400).json({ success: false, error: String(e?.message || e || 'Bad Request') });
+    const msg = String(e?.message || e || 'Bad Request');
+    const lower = msg.toLowerCase();
+    if (lower.includes('short_video_sources') || lower.includes('short_video') || lower.includes('no such table') || lower.includes('does not exist')) {
+      return res.status(500).json({ success: false, error: '服务器需要先执行数据库迁移：npx prisma migrate deploy' });
+    }
+    res.status(400).json({ success: false, error: msg });
   }
 });
 
