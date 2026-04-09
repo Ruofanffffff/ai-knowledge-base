@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, Check, Trash2, PenLine } from 'lucide-react';
@@ -37,9 +37,11 @@ function stripHtmlToPlainText(raw: unknown): string {
 
 export function Inbox() {
   const navigate = useNavigate();
-  const { notes, updateNote, deleteNote, addNote } = useNotes();
+  const { notes, updateNote, deleteNote, addNote, refreshNotes } = useNotes();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [videoSources, setVideoSources] = useState<ShortVideoSource[]>([]);
+  const lastSeenNoteIdsRef = useRef<Set<string>>(new Set());
+  const lastRefreshedAtRef = useRef<number>(0);
 
   const inboxNotes = useMemo(() => {
     return notes.filter((n) => n.status === 'inbox').sort((a, b) => b.createdAt - a.createdAt);
@@ -52,12 +54,34 @@ export function Inbox() {
         const res = await api.get('/short-videos/sources');
         const list = Array.isArray(res?.data?.data) ? (res.data.data as ShortVideoSource[]) : [];
         if (!alive) return;
-        setVideoSources(
-          list
-            .filter((s) => s.status === 'queued' || s.status === 'running' || s.status === 'failed')
-            .slice(0, 10)
-        );
-      } catch {}
+        const display = list
+          .filter((s) => s.status === 'queued' || s.status === 'running' || s.status === 'failed' || s.status === 'succeeded')
+          .slice(0, 10);
+
+        setVideoSources(display);
+
+        const noteIds = display
+          .map((s) => s.noteRefinedId || s.noteQuickId)
+          .filter(Boolean) as string[];
+
+        let shouldRefresh = false;
+        for (const id of noteIds) {
+          if (!lastSeenNoteIdsRef.current.has(id)) {
+            lastSeenNoteIdsRef.current.add(id);
+            shouldRefresh = true;
+          }
+        }
+        if (display.some((s) => s.status === 'succeeded')) shouldRefresh = true;
+
+        const now = Date.now();
+        if (shouldRefresh && now - lastRefreshedAtRef.current > 2000) {
+          lastRefreshedAtRef.current = now;
+          refreshNotes().catch(() => {});
+        }
+      } catch (e: any) {
+        const status = e?.response?.status;
+        if (status === 401) toast.error('登录已过期，请重新登录');
+      }
     };
     load();
     const t = setInterval(load, 2500);
@@ -65,7 +89,7 @@ export function Inbox() {
       alive = false;
       clearInterval(t);
     };
-  }, []);
+  }, [refreshNotes]);
 
   const archive = async (id: string) => {
     if (busyId) return;
@@ -160,7 +184,14 @@ export function Inbox() {
             </p>
             <div className="mt-3 flex flex-col gap-2">
               {videoSources.map((s) => {
-                const statusText = s.status === 'queued' ? '排队中' : s.status === 'running' ? '解析中' : '失败';
+                const statusText =
+                  s.status === 'queued'
+                    ? '排队中'
+                    : s.status === 'running'
+                      ? '解析中'
+                      : s.status === 'succeeded'
+                        ? '已完成'
+                        : '失败';
                 const noteId = s.noteRefinedId || s.noteQuickId;
                 return (
                   <div key={s.id} className="p-3 rounded-2xl flex items-center justify-between gap-3" style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(99,102,241,0.10)' }}>
