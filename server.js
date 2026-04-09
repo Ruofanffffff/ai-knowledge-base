@@ -702,6 +702,10 @@ app.use('/api/stt', sttRoutes);
 const notesRoutes = require('./routes/notesRoutes');
 app.use('/api/notes', notesRoutes);
 
+// 短视频导入与串联路由
+const shortVideoRoutes = require('./routes/shortVideoRoutes');
+app.use('/api/short-videos', shortVideoRoutes);
+
 // 社区路由
 app.use('/api/community', communityRouter);
 app.use('/api/social', socialRouter);
@@ -4733,6 +4737,22 @@ if (process.env.NODE_ENV !== 'test') {
     // Start UnificationScheduler
     unificationScheduler.start();
     console.log('[UnificationScheduler] Started (checking every hour for new documents)');
+
+    try {
+      const shortVideoWorker = require('./services/shortVideo/shortVideoWorker');
+      shortVideoWorker.start();
+      console.log('[ShortVideoWorker] Started (polling queued short-video sources)');
+    } catch (err) {
+      console.warn('[ShortVideoWorker] Failed to start:', err?.message || err);
+    }
+
+    try {
+      const shortVideoDigestScheduler = require('./services/shortVideo/shortVideoDigestScheduler');
+      shortVideoDigestScheduler.start();
+      console.log('[ShortVideoDigestScheduler] Started');
+    } catch (err) {
+      console.warn('[ShortVideoDigestScheduler] Failed to start:', err?.message || err);
+    }
     
     // KG module removed — pending redesign
     console.log('[KG Module] Knowledge Graph module removed, pending redesign');
@@ -4798,6 +4818,18 @@ const gracefulShutdown = (signal) => {
   // Stop UnificationScheduler
   unificationScheduler.stop();
   console.log('[UnificationScheduler] Stopped');
+
+  try {
+    const shortVideoWorker = require('./services/shortVideo/shortVideoWorker');
+    shortVideoWorker.stop();
+    console.log('[ShortVideoWorker] Stopped');
+  } catch {}
+
+  try {
+    const shortVideoDigestScheduler = require('./services/shortVideo/shortVideoDigestScheduler');
+    shortVideoDigestScheduler.stop();
+    console.log('[ShortVideoDigestScheduler] Stopped');
+  } catch {}
   
   // Close Prisma connection if needed
   // prisma.$disconnect() can be called here if needed

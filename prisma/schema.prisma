@@ -17,14 +17,17 @@ model User {
   email     String?  @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // 关联关系
-  documents Document[]
-  settings  Setting[]
-  backups   Backup[]
-  notes     Note[]     // 新增: 便签关联
+  documents               Document[]
+  settings                Setting[]
+  backups                 Backup[]
+  notes                   Note[] // 新增: 便签关联
+  shortVideoSources       ShortVideoSource[]
+  shortVideoDigestSetting ShortVideoDigestSetting?
+  shortVideoDailyDigests  ShortVideoDailyDigest[]
   // memories  Memory[] // Relation removed to avoid foreign key issues with legacy DB
-  
+
   @@map("users")
 }
 
@@ -34,18 +37,18 @@ model Document {
   title     String
   content   String
   type      String   @default("document")
-  fileType  String?  // .md, .pdf, .docx, .txt
-  metadata  String?  // 文档元数据 (JSON string)
+  fileType  String? // .md, .pdf, .docx, .txt
+  metadata  String? // 文档元数据 (JSON string)
   userId    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // 关联关系
-  user           User?            @relation(fields: [userId], references: [id])
-  tags           DocumentTag[]
-  searchItems    SearchHistory[]
-  imageAnalyses  ImageAnalysis[]
-  
+  user          User?           @relation(fields: [userId], references: [id])
+  tags          DocumentTag[]
+  searchItems   SearchHistory[]
+  imageAnalyses ImageAnalysis[]
+
   @@map("documents")
 }
 
@@ -56,7 +59,7 @@ model Tag {
   color       String        @default("#999999")
   description String?
   documentTag DocumentTag[]
-  
+
   @@map("tags")
 }
 
@@ -66,23 +69,23 @@ model DocumentTag {
   tagId      String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  
+
   @@id([documentId, tagId])
   @@map("document_tags")
 }
 
 // 搜索历史表
 model SearchHistory {
-  id          String   @id @default(uuid())
-  query       String
-  documentId  String?
-  userId      String?
-  score       Float?   // 搜索结果的相关度
-  createdAt   DateTime @default(now())
-  
+  id         String   @id @default(uuid())
+  query      String
+  documentId String?
+  userId     String?
+  score      Float? // 搜索结果的相关度
+  createdAt  DateTime @default(now())
+
   // 关联关系
-  document    Document? @relation(fields: [documentId], references: [id])
-  
+  document Document? @relation(fields: [documentId], references: [id])
+
   @@map("search_history")
 }
 
@@ -94,25 +97,25 @@ model Backup {
   description String?
   userId      String?
   createdAt   DateTime @default(now())
-  
+
   // 关联关系
-  user        User?    @relation(fields: [userId], references: [id])
-  
+  user User? @relation(fields: [userId], references: [id])
+
   @@map("backups")
 }
 
 // 设置表
 model Setting {
-  id          String   @id @default(uuid())
-  key         String   @unique
-  value       String   // JSON string
-  userId      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String // JSON string
+  userId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // 关联关系
-  user        User?    @relation(fields: [userId], references: [id])
-  
+  user User? @relation(fields: [userId], references: [id])
+
   @@map("settings")
 }
 
@@ -123,17 +126,17 @@ model Setting {
 // 文档索引表
 // 存储LLM生成的文档索引叙述文本
 model DocumentIndex {
-  id           String   @id @default(uuid())
-  docId        String   @map("doc_id")
-  indexedText  String   @map("indexed_text")  // 索引叙述文本
-  metadata     String                         // JSON string: {generated_at, llm_model, token_count, fact_count, etc.}
-  version      Int      @default(1)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  
-  @@map("document_index")
+  id          String   @id @default(uuid())
+  docId       String   @map("doc_id")
+  indexedText String   @map("indexed_text") // 索引叙述文本
+  metadata    String // JSON string: {generated_at, llm_model, token_count, fact_count, etc.}
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
   @@index([docId])
   @@index([createdAt])
+  @@map("document_index")
 }
 
 // ============================================
@@ -142,55 +145,134 @@ model DocumentIndex {
 
 // 便签表
 model Note {
-  id          String       @id @default(uuid())
-  userId      String       @map("user_id")
-  content     String
-  tags        String       // JSON string for SQLite compatibility
-  status      String       @default("archived")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  content   String
+  tags      String // JSON string for SQLite compatibility
+  status    String   @default("archived")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   attachments Attachment[]
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@map("notes")
+
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@map("notes")
 }
 
 // 附件表
 model Attachment {
-  id          String              @id @default(uuid())
-  noteId      String              @map("note_id")
-  type        String              // Changed from enum to String for SQLite
-  storageKey  String              @map("storage_key")  // S3对象键
-  url         String
-  size        Int
-  mimeType    String              @map("mime_type")
-  createdAt   DateTime            @default(now()) @map("created_at")
-  
-  analysis    AttachmentAnalysis?
-  note        Note                @relation(fields: [noteId], references: [id], onDelete: Cascade)
-  
-  @@map("attachments")
+  id         String   @id @default(uuid())
+  noteId     String   @map("note_id")
+  type       String // Changed from enum to String for SQLite
+  storageKey String   @map("storage_key") // S3对象键
+  url        String
+  size       Int
+  mimeType   String   @map("mime_type")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  analysis AttachmentAnalysis?
+  note     Note                @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
   @@index([noteId])
   @@index([type])
+  @@map("attachments")
 }
 
 // 附件分析表
 model AttachmentAnalysis {
-  id           String     @id @default(uuid())
-  attachmentId String     @unique @map("attachment_id")
-  textContent  String?    @map("text_content")
+  id           String   @id @default(uuid())
+  attachmentId String   @unique @map("attachment_id")
+  textContent  String?  @map("text_content")
   description  String?
-  tags         String     // JSON string for SQLite compatibility
-  metadata     String     // JSON string for SQLite compatibility
-  createdAt    DateTime   @default(now()) @map("created_at")
-  
-  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
-  
+  tags         String // JSON string for SQLite compatibility
+  metadata     String // JSON string for SQLite compatibility
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  attachment Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
   @@map("attachment_analysis")
+}
+
+// ============================================
+// Short Video Ingest Models (抖音/短视频导入)
+// ============================================
+
+model ShortVideoSource {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  platform      String   @default("unknown")
+  originalUrl   String   @map("original_url")
+  normalizedUrl String   @map("normalized_url")
+  inputText     String?  @map("input_text")
+  ingestLevel   String   @default("L0") // L0/L1/L2/L3
+  status        String   @default("queued") // queued/running/succeeded/failed/canceled
+  progress      String? // JSON string
+  error         String?
+  noteQuickId   String?  @map("note_quick_id")
+  noteRefinedId String?  @map("note_refined_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artifacts ShortVideoArtifact[]
+
+  @@index([userId])
+  @@index([platform])
+  @@index([status])
+  @@index([createdAt])
+  @@map("short_video_sources")
+}
+
+model ShortVideoArtifact {
+  id        String   @id @default(uuid())
+  sourceId  String   @map("source_id")
+  kind      String
+  payload   String
+  metadata  String // JSON string
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  source ShortVideoSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([kind])
+  @@index([createdAt])
+  @@map("short_video_artifacts")
+}
+
+model ShortVideoDigestSetting {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  enabled   Boolean  @default(true)
+  hour      Int      @default(20)
+  minute    Int      @default(0)
+  timezone  String   @default("Asia/Shanghai")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("short_video_digest_settings")
+}
+
+model ShortVideoDailyDigest {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  date      String // YYYY-MM-DD (server timezone)
+  content   String // JSON string
+  status    String   @default("ready")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@index([createdAt])
+  @@map("short_video_daily_digests")
 }
 
 // ============================================
@@ -200,36 +282,36 @@ model AttachmentAnalysis {
 // 清洗实体表 — 图谱字段表的实体部分
 model CleanedEntity {
   id              String   @id @default(uuid())
-  cleanedName     String   @map("cleaned_name")      // 清洗后名称，≤6个字
-  description     String                              // 清洗后描述，≤20个字
-  sourceEntityIds String   @map("source_entity_ids")  // JSON string: 关联的原始 KGEntity ID 列表
+  cleanedName     String   @map("cleaned_name") // 清洗后名称，≤6个字
+  description     String // 清洗后描述，≤20个字
+  sourceEntityIds String   @map("source_entity_ids") // JSON string: 关联的原始 KGEntity ID 列表
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   relationsAsSource CleanedRelation[] @relation("CleanedSourceEntity")
   relationsAsTarget CleanedRelation[] @relation("CleanedTargetEntity")
 
-  @@map("cleaned_entities")
   @@index([cleanedName])
+  @@map("cleaned_entities")
 }
 
 // 清洗关系表 — 图谱字段表的关系部分
 model CleanedRelation {
   id                String   @id @default(uuid())
-  cleanedName       String   @map("cleaned_name")        // 清洗后关系名称，≤4个字
-  description       String                                // 关系描述
-  sourceEntityId    String   @map("source_entity_id")     // 关联的 CleanedEntity（源）
-  targetEntityId    String   @map("target_entity_id")     // 关联的 CleanedEntity（目标）
-  sourceRelationIds String   @map("source_relation_ids")  // JSON string: 关联的原始 KGRelation ID 列表
+  cleanedName       String   @map("cleaned_name") // 清洗后关系名称，≤4个字
+  description       String // 关系描述
+  sourceEntityId    String   @map("source_entity_id") // 关联的 CleanedEntity（源）
+  targetEntityId    String   @map("target_entity_id") // 关联的 CleanedEntity（目标）
+  sourceRelationIds String   @map("source_relation_ids") // JSON string: 关联的原始 KGRelation ID 列表
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   source CleanedEntity @relation("CleanedSourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
   target CleanedEntity @relation("CleanedTargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
 
-  @@map("cleaned_relations")
   @@index([sourceEntityId])
   @@index([targetEntityId])
+  @@map("cleaned_relations")
 }
 
 // ============================================
@@ -240,29 +322,29 @@ model CleanedRelation {
 model DocEntity {
   id          String   @id @default(uuid())
   docId       String   @map("doc_id")
-  cleanedName String   @map("cleaned_name")      // ≤6个字
-  description String                              // ≤30个字
-  entityType  String   @default("concept") @map("entity_type")  // Entity_Type 枚举值
-  source      String   @default("fact")                          // Source_Tag
+  cleanedName String   @map("cleaned_name") // ≤6个字
+  description String // ≤30个字
+  entityType  String   @default("concept") @map("entity_type") // Entity_Type 枚举值
+  source      String   @default("fact") // Source_Tag
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   relationsAsSource DocRelation[] @relation("DocSourceEntity")
   relationsAsTarget DocRelation[] @relation("DocTargetEntity")
 
-  @@map("doc_entities")
   @@index([docId])
   @@index([cleanedName])
+  @@map("doc_entities")
 }
 
 // 分文章关系表 — 按文档隔离的关系
 model DocRelation {
   id             String   @id @default(uuid())
   docId          String   @map("doc_id")
-  cleanedName    String   @map("cleaned_name")        // ≤4个字
-  description    String                                // ≤20个字
-  layer          String   @default("how")              // "how" | "why"
-  source         String   @default("fact")             // Source_Tag
+  cleanedName    String   @map("cleaned_name") // ≤4个字
+  description    String // ≤20个字
+  layer          String   @default("how") // "how" | "why"
+  source         String   @default("fact") // Source_Tag
   sourceEntityId String   @map("source_entity_id")
   targetEntityId String   @map("target_entity_id")
   createdAt      DateTime @default(now()) @map("created_at")
@@ -271,75 +353,75 @@ model DocRelation {
   sourceEntity DocEntity @relation("DocSourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
   targetEntity DocEntity @relation("DocTargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
 
-  @@map("doc_relations")
   @@index([docId])
   @@index([sourceEntityId])
   @@index([targetEntityId])
+  @@map("doc_relations")
 }
 
 // 分文章原则表 — So What 层提取的原则和模式
 model DocPrinciple {
   id               String   @id @default(uuid())
   docId            String   @map("doc_id")
-  name             String                              // ≤8个字
-  description      String                              // ≤40个字
+  name             String // ≤8个字
+  description      String // ≤40个字
   relatedEntityIds String   @map("related_entity_ids") // JSON string: DocEntity ID 列表
-  source           String   @default("pattern")        // Source_Tag
+  source           String   @default("pattern") // Source_Tag
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  @@map("doc_principles")
   @@index([docId])
+  @@map("doc_principles")
 }
 
 // 统一实体表 — 语义归纳后的上层概念实体
 model UnifiedEntity {
   id                 String   @id @default(uuid())
-  cleanedName        String   @map("cleaned_name")           // ≤6个字
-  description        String                                   // ≤20个字，包含目录和总结
-  entityType         String   @default("concept") @map("entity_type")  // 新增：Entity_Type 枚举值
-  source             String   @default("fact")                          // 新增：Source_Tag
-  sourceDocEntityIds String   @map("source_doc_entity_ids")  // JSON: 关联的 DocEntity ID 列表
+  cleanedName        String   @map("cleaned_name") // ≤6个字
+  description        String // ≤20个字，包含目录和总结
+  entityType         String   @default("concept") @map("entity_type") // 新增：Entity_Type 枚举值
+  source             String   @default("fact") // 新增：Source_Tag
+  sourceDocEntityIds String   @map("source_doc_entity_ids") // JSON: 关联的 DocEntity ID 列表
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   relationsAsSource UnifiedRelation[] @relation("UnifiedSourceEntity")
   relationsAsTarget UnifiedRelation[] @relation("UnifiedTargetEntity")
 
-  @@map("unified_entities")
   @@index([cleanedName])
+  @@map("unified_entities")
 }
 
 // 统一关系表 — 语义归纳后的上层概念关系
 model UnifiedRelation {
-  id                    String   @id @default(uuid())
-  cleanedName           String   @map("cleaned_name")              // ≤4个字
-  description           String                                      // ≤20个字
-  layer                 String   @default("how")                    // 新增："how" | "why"
-  source                String   @default("fact")                   // 新增：Source_Tag
-  sourceEntityId        String   @map("source_entity_id")
-  targetEntityId        String   @map("target_entity_id")
-  sourceDocRelationIds  String   @map("source_doc_relation_ids")   // JSON: 关联的 DocRelation ID 列表
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                   String   @id @default(uuid())
+  cleanedName          String   @map("cleaned_name") // ≤4个字
+  description          String // ≤20个字
+  layer                String   @default("how") // 新增："how" | "why"
+  source               String   @default("fact") // 新增：Source_Tag
+  sourceEntityId       String   @map("source_entity_id")
+  targetEntityId       String   @map("target_entity_id")
+  sourceDocRelationIds String   @map("source_doc_relation_ids") // JSON: 关联的 DocRelation ID 列表
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   sourceEntity UnifiedEntity @relation("UnifiedSourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
   targetEntity UnifiedEntity @relation("UnifiedTargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
 
-  @@map("unified_relations")
   @@index([sourceEntityId])
   @@index([targetEntityId])
+  @@map("unified_relations")
 }
 
 // 统一原则表 — 语义归纳后的上层原则和模式
 model UnifiedPrinciple {
-  id                     String   @id @default(uuid())
-  name                   String                                        // ≤8个字
-  description            String                                        // ≤40个字
-  source                 String   @default("pattern")                  // Source_Tag
-  sourceDocPrincipleIds  String   @map("source_doc_principle_ids")    // JSON string
-  createdAt              DateTime @default(now()) @map("created_at")
-  updatedAt              DateTime @updatedAt @map("updated_at")
+  id                    String   @id @default(uuid())
+  name                  String // ≤8个字
+  description           String // ≤40个字
+  source                String   @default("pattern") // Source_Tag
+  sourceDocPrincipleIds String   @map("source_doc_principle_ids") // JSON string
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("unified_principles")
 }
@@ -347,19 +429,18 @@ model UnifiedPrinciple {
 // 统一归纳日志表 — 记录每次统一归纳的执行状态
 model UnificationLog {
   id             String    @id @default(uuid())
-  status         String                              // 'running' | 'completed' | 'failed'
+  status         String // 'running' | 'completed' | 'failed'
   entityCount    Int       @default(0) @map("entity_count")
   relationCount  Int       @default(0) @map("relation_count")
-  principleCount Int       @default(0) @map("principle_count")  // 新增
-  triggeredBy    String    @map("triggered_by")      // 'scheduler' | 'manual'
+  principleCount Int       @default(0) @map("principle_count") // 新增
+  triggeredBy    String    @map("triggered_by") // 'scheduler' | 'manual'
   error          String?
   startedAt      DateTime  @default(now()) @map("started_at")
   completedAt    DateTime? @map("completed_at")
 
-  @@map("unification_logs")
   @@index([startedAt])
+  @@map("unification_logs")
 }
-
 
 // ============================================
 // AI Insights Persistence (AI 洞察持久化)
@@ -368,14 +449,14 @@ model UnificationLog {
 model DocumentInsight {
   id         String   @id @default(uuid())
   docId      String   @unique @map("doc_id")
-  concepts   String   // JSON string
-  references String   // JSON string
+  concepts   String // JSON string
+  references String // JSON string
   summary    String
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  @@map("document_insights")
   @@index([docId])
+  @@map("document_insights")
 }
 
 // ============================================
@@ -396,14 +477,13 @@ model ImageAnalysis {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  document    Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
-  @@map("image_analyses")
   @@index([imageKey])
   @@index([documentId])
   @@index([status])
+  @@map("image_analyses")
 }
-
 
 // ============================================
 // Knowledge Growth Models (知识生长)
@@ -420,9 +500,9 @@ model CognitiveFragment {
   embedding    String?
   createdAt    DateTime @default(now()) @map("created_at")
 
-  @@map("cognitive_fragments")
   @@index([userId, createdAt])
   @@index([sourceId, createdAt])
+  @@map("cognitive_fragments")
 }
 
 // 知识体表
@@ -449,11 +529,11 @@ model KnowledgeBody {
   nodes              KnowledgeBodyNode[]
   themeEvolutionLogs ThemeEvolutionLog[]
 
-  @@map("knowledge_bodies")
   @@index([userId, growthPhase])
   @@index([parentId])
   @@index([userId, bodyType])
   @@index([userId, lifecycleStatus])
+  @@map("knowledge_bodies")
 }
 
 // 知识体大纲节点表
@@ -469,13 +549,13 @@ model KnowledgeBodyNode {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  body       KnowledgeBody      @relation(fields: [bodyId], references: [id], onDelete: Cascade)
-  parent     KnowledgeBodyNode?  @relation("NodeHierarchy", fields: [parentNodeId], references: [id])
-  children   KnowledgeBodyNode[] @relation("NodeHierarchy")
+  body     KnowledgeBody       @relation(fields: [bodyId], references: [id], onDelete: Cascade)
+  parent   KnowledgeBodyNode?  @relation("NodeHierarchy", fields: [parentNodeId], references: [id])
+  children KnowledgeBodyNode[] @relation("NodeHierarchy")
 
-  @@map("knowledge_body_nodes")
   @@index([bodyId])
   @@index([parentNodeId])
+  @@map("knowledge_body_nodes")
 }
 
 // 主题发现日志表
@@ -495,8 +575,8 @@ model ThemeDiscoveryLog {
   startedAt           DateTime  @default(now()) @map("started_at")
   completedAt         DateTime? @map("completed_at")
 
-  @@map("theme_discovery_logs")
   @@index([startedAt])
+  @@map("theme_discovery_logs")
 }
 
 // 主题演化日志表
@@ -512,9 +592,9 @@ model ThemeEvolutionLog {
 
   body KnowledgeBody @relation(fields: [bodyId], references: [id], onDelete: Cascade)
 
-  @@map("theme_evolution_logs")
   @@index([bodyId])
   @@index([createdAt])
+  @@map("theme_evolution_logs")
 }
 
 // ============================================
@@ -535,6 +615,6 @@ model Memory {
 
   // user            User     @relation(fields: [userId], references: [id], onDelete: Cascade) // Removed
 
-  @@map("memories")
   @@index([userId])
+  @@map("memories")
 }

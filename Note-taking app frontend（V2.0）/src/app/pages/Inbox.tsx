@@ -1,10 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, Check, Trash2, PenLine } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { useNotes } from '../components/context/NoteContext';
 import { toast } from '../components/ui/Toast';
+import { api } from '../services/api';
+
+type ShortVideoSource = {
+  id: string;
+  platform: string;
+  originalUrl: string;
+  status: string;
+  progress?: any;
+  error?: string | null;
+  noteQuickId?: string | null;
+  noteRefinedId?: string | null;
+  createdAt: string;
+};
 
 function stripHtmlToPlainText(raw: unknown): string {
   const content = typeof raw === 'string' ? raw : String(raw ?? '');
@@ -26,10 +39,33 @@ export function Inbox() {
   const navigate = useNavigate();
   const { notes, updateNote, deleteNote, addNote } = useNotes();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [videoSources, setVideoSources] = useState<ShortVideoSource[]>([]);
 
   const inboxNotes = useMemo(() => {
     return notes.filter((n) => n.status === 'inbox').sort((a, b) => b.createdAt - a.createdAt);
   }, [notes]);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const res = await api.get('/short-videos/sources');
+        const list = Array.isArray(res?.data?.data) ? (res.data.data as ShortVideoSource[]) : [];
+        if (!alive) return;
+        setVideoSources(
+          list
+            .filter((s) => s.status === 'queued' || s.status === 'running' || s.status === 'failed')
+            .slice(0, 10)
+        );
+      } catch {}
+    };
+    load();
+    const t = setInterval(load, 2500);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
 
   const archive = async (id: string) => {
     if (busyId) return;
@@ -116,6 +152,69 @@ export function Inbox() {
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto px-4 py-4 pb-24">
+        {videoSources.length > 0 && (
+          <div className="mb-4 p-4 rounded-3xl" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.14)', boxShadow: 'var(--hi-card-shadow)' }}>
+            <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>短视频处理中</p>
+            <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11.5px', marginTop: 6, lineHeight: 1.5 }}>
+              解析完成后会自动生成笔记，出现在收件箱。
+            </p>
+            <div className="mt-3 flex flex-col gap-2">
+              {videoSources.map((s) => {
+                const statusText = s.status === 'queued' ? '排队中' : s.status === 'running' ? '解析中' : '失败';
+                const noteId = s.noteRefinedId || s.noteQuickId;
+                return (
+                  <div key={s.id} className="p-3 rounded-2xl flex items-center justify-between gap-3" style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(99,102,241,0.10)' }}>
+                    <div className="min-w-0">
+                      <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '12px', fontWeight: 900 }}>
+                        {s.platform === 'douyin' ? '抖音' : '短视频'} · {statusText}
+                      </p>
+                      <p className="truncate" style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 2 }}>
+                        {s.originalUrl}
+                      </p>
+                      {s.status === 'failed' && s.error && (
+                        <p className="truncate" style={{ color: '#EF4444', fontSize: '11px', marginTop: 4 }}>
+                          {s.error}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {noteId && (
+                        <motion.button
+                          whileTap={{ scale: 0.98 }}
+                          className="px-3 py-2 rounded-2xl"
+                          style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.18)', color: '#6366F1', fontSize: '11.5px', fontWeight: 900, whiteSpace: 'nowrap' }}
+                          onClick={() => navigate(`/siku/${noteId}`)}
+                        >
+                          查看
+                        </motion.button>
+                      )}
+                      {s.status === 'failed' && (
+                        <motion.button
+                          whileTap={{ scale: 0.98 }}
+                          className="px-3 py-2 rounded-2xl"
+                          style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.18)', color: '#10B981', fontSize: '11.5px', fontWeight: 900, whiteSpace: 'nowrap' }}
+                          onClick={async () => {
+                            const t = toast.loading('正在重试…');
+                            try {
+                              await api.post(`/short-videos/sources/${s.id}/retry`);
+                              toast.dismiss(t);
+                              toast.success('已加入队列');
+                            } catch (e: any) {
+                              toast.dismiss(t);
+                              toast.error(e?.response?.data?.error || e?.message || '重试失败');
+                            }
+                          }}
+                        >
+                          重试
+                        </motion.button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {inboxNotes.length === 0 ? (
           <div className="rounded-3xl p-6" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}>
             <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>收件箱为空</p>

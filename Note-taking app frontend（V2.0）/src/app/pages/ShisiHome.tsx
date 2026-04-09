@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { SpeechService } from '../services/speechService';
+import { api } from '../services/api';
 
 function stripHtmlToPlainText(raw: unknown): string {
   const content = typeof raw === 'string' ? raw : String(raw ?? '');
@@ -170,6 +171,23 @@ export function ShisiHome() {
       toast.error('先写一句话再保存');
       return;
     }
+
+    const urlMatch = text.match(/https?:\/\/[^\s]+/i);
+    const url = urlMatch ? urlMatch[0] : '';
+    if (url && /(^|\.)douyin\.com$/i.test(new URL(url).hostname)) {
+      const t = toast.loading('正在解析短视频…');
+      try {
+        await api.post('/short-videos/ingest', { url, text });
+        setInput('');
+        toast.dismiss(t);
+        toast.success('已开始解析短视频，稍后会出现在收件箱');
+      } catch (e: any) {
+        toast.dismiss(t);
+        toast.error(e?.response?.data?.error || e?.message || '解析失败');
+      }
+      return;
+    }
+
     const id = toast.loading('正在保存到收件箱…');
     try {
       const created = await addNote({

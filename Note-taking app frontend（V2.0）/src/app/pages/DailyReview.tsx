@@ -1,10 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, Check, Trash2 } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { useNotes } from '../components/context/NoteContext';
 import { toast } from '../components/ui/Toast';
+import { api } from '../services/api';
+
+type ShortVideoDigest = {
+  id: string;
+  date: string;
+  content: {
+    date: string;
+    topics: Array<{
+      label: string;
+      oneLiner?: string;
+      nextAction?: string;
+      items: Array<{ sourceId: string; noteId?: string | null; title: string; summary?: string }>;
+    }>;
+  } | null;
+};
 
 function startOfDay(ts: number) {
   const d = new Date(ts);
@@ -32,6 +47,7 @@ export function DailyReview() {
   const navigate = useNavigate();
   const { notes, updateNote, deleteNote } = useNotes();
   const [busy, setBusy] = useState(false);
+  const [digest, setDigest] = useState<ShortVideoDigest | null>(null);
 
   const todayStart = useMemo(() => startOfDay(Date.now()), []);
 
@@ -40,6 +56,22 @@ export function DailyReview() {
       .filter((n) => n.createdAt >= todayStart && n.status === 'inbox')
       .sort((a, b) => b.createdAt - a.createdAt);
   }, [notes, todayStart]);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const res = await api.get('/short-videos/digest/today');
+        const d = res?.data?.data ? (res.data.data as ShortVideoDigest) : null;
+        if (!alive) return;
+        setDigest(d);
+      } catch {}
+    };
+    load();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const archiveAll = async () => {
     if (busy || todayInbox.length === 0) return;
@@ -110,6 +142,47 @@ export function DailyReview() {
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto px-4 py-4 pb-24">
+        {digest?.content?.topics?.length ? (
+          <div className="mb-4 p-4 rounded-3xl" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.14)', boxShadow: 'var(--hi-card-shadow)' }}>
+            <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>今日主题串联</p>
+            <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11.5px', marginTop: 6, lineHeight: 1.5 }}>
+              把碎片连起来，才会变成你的知识。
+            </p>
+            <div className="mt-3 flex flex-col gap-3">
+              {digest.content.topics.map((t, idx) => (
+                <div key={`${t.label}-${idx}`} className="p-3 rounded-2xl" style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(139,92,246,0.10)' }}>
+                  <p style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', fontWeight: 900 }}>{t.label}</p>
+                  {t.oneLiner && (
+                    <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11.5px', marginTop: 6, lineHeight: 1.55 }}>{t.oneLiner}</p>
+                  )}
+                  <div className="mt-2 flex flex-col gap-2">
+                    {t.items.slice(0, 5).map((it) => (
+                      <button
+                        key={it.sourceId}
+                        className="text-left p-2 rounded-xl"
+                        style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.10)' }}
+                        onClick={() => it.noteId && navigate(`/siku/${it.noteId}`)}
+                        disabled={!it.noteId}
+                      >
+                        <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '11.5px', fontWeight: 900 }}>
+                          {it.title}
+                        </p>
+                        {it.summary && (
+                          <p className="truncate" style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 2 }}>
+                            {it.summary}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  {t.nextAction && (
+                    <p style={{ color: '#10B981', fontSize: '11.5px', marginTop: 10, fontWeight: 800 }}>下一步：{t.nextAction}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="p-4 rounded-3xl" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)', boxShadow: 'var(--hi-card-shadow)' }}>
           <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>先把闪念变成经验</p>
           <p style={{ color: 'var(--hi-text-secondary)', fontSize: '12px', marginTop: 6, lineHeight: 1.6 }}>
@@ -185,4 +258,3 @@ export function DailyReview() {
     </div>
   );
 }
-
