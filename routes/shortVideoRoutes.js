@@ -51,6 +51,12 @@ router.post('/ingest', authMiddleware, requirePermission('document:write'), asyn
     if (lower.includes('short_video_sources') || lower.includes('short_video') || lower.includes('no such table') || lower.includes('does not exist')) {
       return res.status(500).json({ success: false, error: '服务器需要先执行数据库迁移：npx prisma migrate deploy' });
     }
+    if (lower.includes('cannot read properties of undefined') && lower.includes('findfirst')) {
+      return res.status(500).json({
+        success: false,
+        error: '服务器 Prisma Client 未更新。请在服务器执行：npm install && npx prisma generate && npx prisma migrate deploy，然后重启服务',
+      });
+    }
     res.status(400).json({ success: false, error: msg });
   }
 });
