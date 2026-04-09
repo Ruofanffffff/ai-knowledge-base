@@ -172,9 +172,26 @@ export function ShisiHome() {
       return;
     }
 
-    const urlMatch = text.match(/https?:\/\/[^\s]+/i);
-    const url = urlMatch ? urlMatch[0] : '';
-    if (url && /(^|\.)douyin\.com$/i.test(new URL(url).hostname)) {
+    const extractFirstUrl = (value: string): string => {
+      const match = String(value || '').match(/https?:\/\/[^\s]+/i);
+      if (!match) return '';
+      let u = match[0];
+      while (u && /[`"'“”‘’()<>[\]{}，。！？、；：,.;:]+$/.test(u)) u = u.slice(0, -1);
+      while (u && /^[`"'“”‘’()<>[\]{}，。！？、；：,.;:]+/.test(u)) u = u.slice(1);
+      return u;
+    };
+
+    const isSupportedShortVideoHost = (u: string): boolean => {
+      try {
+        const host = new URL(u).hostname.toLowerCase();
+        return host === 'v.douyin.com' || host.endsWith('.douyin.com') || host === 'www.douyin.com' || host.endsWith('.iesdouyin.com') || host === 'www.iesdouyin.com';
+      } catch {
+        return false;
+      }
+    };
+
+    const url = extractFirstUrl(text);
+    if (url && isSupportedShortVideoHost(url)) {
       const t = toast.loading('正在解析短视频…');
       try {
         await api.post('/short-videos/ingest', { url, text });
