@@ -1,19 +1,44 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, BookOpen, Copy, HeartPulse, RefreshCcw } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { toast } from '../components/ui/Toast';
-import { loadWikiEntry, wikiService } from '../services/wikiService';
+import { wikiService } from '../services/wikiService';
 
 export function WikiDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
   const wikiId = String(id || '').trim();
-  const entry = useMemo(() => (wikiId ? loadWikiEntry(wikiId) : null), [wikiId]);
+  
+  const [entry, setEntry] = useState<any>(null);
+  const [loadingEntry, setLoadingEntry] = useState(false);
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthResult, setHealthResult] = useState<string>('');
+
+  useEffect(() => {
+    if (wikiId) {
+      loadEntry();
+    }
+  }, [wikiId]);
+
+  const loadEntry = async () => {
+    setLoadingEntry(true);
+    try {
+      const res = await wikiService.getPage(wikiId);
+      if (res.data?.success) {
+        setEntry(res.data.data);
+      } else {
+        toast.error('未找到该页面');
+      }
+    } catch (e) {
+      console.error('Failed to load wiki page', e);
+      toast.error('加载页面失败');
+    } finally {
+      setLoadingEntry(false);
+    }
+  };
 
   const title = useMemo(() => {
     const candidates = [
@@ -164,7 +189,11 @@ export function WikiDetail() {
             }}
           >
             <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 900 }}>保存内容</p>
-            {entry ? (
+            {loadingEntry ? (
+               <div className="py-4 text-center">
+                 <RefreshCcw size={20} className="animate-spin mx-auto" style={{ color: '#6366F1' }} />
+               </div>
+            ) : entry ? (
               <pre className="mt-2 whitespace-pre-wrap break-words" style={{ color: 'var(--hi-text-secondary)', fontSize: '12px', lineHeight: 1.6 }}>
                 {(() => {
                   try {
@@ -176,7 +205,7 @@ export function WikiDetail() {
               </pre>
             ) : (
               <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '12px', lineHeight: 1.6 }}>
-                暂无本地缓存内容。请从 HiBrain 重新保存生成。
+                暂无记录。
               </p>
             )}
           </motion.div>

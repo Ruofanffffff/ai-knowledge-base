@@ -1,17 +1,37 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { BookOpen, HeartPulse, ArrowRight, Sparkles, RefreshCcw } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { toast } from '../components/ui/Toast';
-import { loadWikiRecent, wikiService } from '../services/wikiService';
+import { wikiService } from '../services/wikiService';
 
 export function WikiList() {
   const navigate = useNavigate();
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthResult, setHealthResult] = useState<string>('');
-  const recent = useMemo(() => loadWikiRecent(), []);
+  
+  const [pages, setPages] = useState<any[]>([]);
+  const [loadingPages, setLoadingPages] = useState(false);
+
+  useEffect(() => {
+    loadPages();
+  }, []);
+
+  const loadPages = async () => {
+    setLoadingPages(true);
+    try {
+      const res = await wikiService.getPages();
+      if (res.data?.success) {
+        setPages(res.data.data || []);
+      }
+    } catch (e) {
+      console.error('Failed to load wiki pages', e);
+    } finally {
+      setLoadingPages(false);
+    }
+  };
 
   const checkHealth = async () => {
     if (healthLoading) return;
@@ -167,11 +187,16 @@ export function WikiList() {
 
         <div className="px-4 pb-6">
           <div className="flex items-center justify-between mb-3">
-            <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>最近保存</p>
-            <span style={{ color: '#9CA3AF', fontSize: '12px', fontWeight: 700 }}>{recent.length}</span>
+            <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>所有 Wiki</p>
+            <span style={{ color: '#9CA3AF', fontSize: '12px', fontWeight: 700 }}>{pages.length}</span>
           </div>
 
-          {recent.length === 0 ? (
+          {loadingPages ? (
+            <div className="py-10 text-center">
+              <RefreshCcw size={24} className="animate-spin mx-auto" style={{ color: '#6366F1' }} />
+              <p className="mt-4 text-sm" style={{ color: 'var(--hi-text-secondary)' }}>加载中...</p>
+            </div>
+          ) : pages.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -189,31 +214,17 @@ export function WikiList() {
               </div>
               <p style={{ color: 'var(--hi-text-primary)', fontSize: '15px', fontWeight: 900 }}>还没有 Wiki 条目</p>
               <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '13px', lineHeight: 1.6 }}>
-                去 HiBrain 点击「保存为洞察/概念」即可生成
+                知识库由后台 LLM 自动提取生成
               </p>
-              <button
-                onClick={() => navigate('/assistant')}
-                className="mt-6 px-6 py-2.5 rounded-2xl flex items-center gap-2 active:scale-[0.98] transition-all"
-                style={{
-                  background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: 800,
-                  boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
-                }}
-              >
-                <Sparkles size={16} color="white" />
-                去 HiBrain 保存
-              </button>
             </motion.div>
           ) : (
             <div className="space-y-3">
-              {recent.map((item, i) => (
+              {pages.map((item, i) => (
                 <motion.button
-                  key={item.id}
+                  key={item.slug}
                   type="button"
                   whileTap={{ scale: 0.99 }}
-                  onClick={() => navigate(`/wiki/${item.id}`)}
+                  onClick={() => navigate(`/wiki/${item.slug}`)}
                   className="w-full text-left rounded-[18px] p-4"
                   style={{
                     background: 'var(--hi-card-bg)',
@@ -232,12 +243,12 @@ export function WikiList() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontWeight: 900, fontSize: '13.5px' }}>
-                        {item.title}
+                        {item.title || item.slug}
                       </p>
                       <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 4, lineHeight: 1.5 }}>
-                        {new Date(item.createdAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {item.type || 'concept'}
                         {' · '}
-                        {item.id}
+                        {(item.related || []).length} 个关联
                       </p>
                     </div>
                     <ArrowRight size={16} style={{ color: '#10B981', flexShrink: 0, marginTop: 2 }} />
