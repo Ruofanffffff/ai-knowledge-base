@@ -14,11 +14,13 @@ import { Editor } from './pages/Editor';
 import { KnowledgeGrowth } from './pages/KnowledgeGrowth';
 import { KnowledgeBodyDetail } from './pages/KnowledgeBodyDetail';
 import { ServerConfig } from './pages/ServerConfig';
+import Wiki from './pages/Wiki';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
 import { AdminRoute } from './components/AdminRoute';
 import { DashboardHome } from './pages/admin/DashboardHome';
 import { UserManagement } from './pages/admin/UserManagement';
+import { WIKI_ENABLED } from './config/constants';
 
 function App() {
   return (
@@ -34,6 +36,8 @@ function App() {
             <Route path="/documents" element={<Documents />} />
             <Route path="/documents/:id" element={<DocumentDetail />} />
             <Route path="/documents/new" element={<CreateDocument />} />
+            {WIKI_ENABLED && <Route path="/wiki" element={<Wiki />} />}
+            {WIKI_ENABLED && <Route path="/wiki/:slug" element={<Wiki />} />}
             <Route path="/graph" element={<Graph />} />
             <Route path="/community" element={<Community />} />
             <Route path="/knowledge-growth" element={<KnowledgeGrowth />} />

@@ -17,6 +17,11 @@ import { Inbox } from "./pages/Inbox";
 import { DailyReview } from "./pages/DailyReview";
 import { MyHomepage } from "./pages/MyHomepage";
 import { ToastDemo } from "./pages/ToastDemo";
+import { WikiList } from "./pages/WikiList";
+import { WikiDetail } from "./pages/WikiDetail";
+import { isWikiEnabled } from "./utils/featureFlags";
+
+const wikiEnabled = isWikiEnabled();
 
 export const router = createBrowserRouter([
   {
@@ -41,6 +46,10 @@ export const router = createBrowserRouter([
       { path: "messages", Component: Messages },
       { path: "my-homepage", Component: MyHomepage },
       { path: "toast-demo", Component: ToastDemo },
+      ...(wikiEnabled ? [
+        { path: "wiki", Component: WikiList },
+        { path: "wiki/:id", Component: WikiDetail },
+      ] : []),
       // Legacy aliases
       { path: "notes", Component: NoteList },
       { path: "create", Component: NoteCreate },

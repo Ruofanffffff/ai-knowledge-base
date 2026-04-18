@@ -14,3 +14,7 @@
   - [x] SubTask 3.2: Implement SpeechService with web fallback.
   - [x] SubTask 3.3: Integrate into ShisiHome mic button with listening UI.
   - [x] SubTask 3.4: Handle permissions and errors.
+- [x] Task 4: Global Voice Recording
+  - [x] SubTask 4.1: Implement long-press on BottomNav Mic button.
+  - [x] SubTask 4.2: Add slide-up to cancel and visual overlay.
+  - [x] SubTask 4.3: Save text as new note via useNotes.

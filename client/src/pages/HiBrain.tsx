@@ -5,10 +5,12 @@ import {
   Mic, Plus, Camera, Send, LayoutDashboard, FileText, Network, 
   Compass, Settings, Shield, ChevronRight, MessageCircle, X
 } from 'lucide-react';
+import { message as antdMessage } from 'antd';
 import { useAuth } from '../contexts/AuthContext';
 import { useDocuments } from '../hooks/useDocuments';
 import { formatTimeAgo, getAvatarUrl } from '../utils/transformers';
 import { COLORS, RADIUS, SPACING, ANIMATION, SIZES, GRADIENTS, TYPOGRAPHY } from '../theme/hibrain';
+import apiService from '../services/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -17,6 +19,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  query?: string;
 }
 
 interface KnowledgeStats {
@@ -53,6 +56,7 @@ export function HiBrainPage() {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [isSavingWiki, setIsSavingWiki] = useState(false);
   const [knowledgeStats, setKnowledgeStats] = useState<KnowledgeStats>({
     documentCount: 0,
     knowledgeNodeCount: 0,
@@ -177,6 +181,7 @@ export function HiBrainPage() {
         role: 'assistant',
         content: '',
         timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        query: userMessage.content,
       }]);
 
       if (reader) {
@@ -219,6 +224,32 @@ export function HiBrainPage() {
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleSaveToWiki = async (kind: 'insight' | 'concept', msg: Message) => {
+    if (isSavingWiki) return;
+    const query = (msg.query || '').trim();
+    const titleSeed = query || msg.content.split('\n').find(Boolean) || 'HiBrain';
+    const title = `${kind}: ${String(titleSeed).slice(0, 40)}`;
+    const rawContent = [
+      query ? `用户问题：${query}` : '',
+      'HiBrain 回答：',
+      msg.content || '',
+    ].filter(Boolean).join('\n\n');
+
+    setIsSavingWiki(true);
+    const res = await apiService.compileWikiSource({
+      sourceType: kind,
+      title,
+      rawContent,
+      force: false,
+    });
+    if (res.success) {
+      antdMessage.success('已提交到 Wiki 编译');
+    } else {
+      antdMessage.error(res.error || '提交失败');
+    }
+    setIsSavingWiki(false);
   };
 
   useEffect(() => {
@@ -796,6 +827,24 @@ export function HiBrainPage() {
                   >
                     {msg.timestamp}
                   </p>
+                  {msg.role === 'assistant' && msg.content && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        disabled={isSavingWiki}
+                        onClick={() => handleSaveToWiki('insight', msg)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        保存为洞察页
+                      </button>
+                      <button
+                        disabled={isSavingWiki}
+                        onClick={() => handleSaveToWiki('concept', msg)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        保存为概念页
+                      </button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}

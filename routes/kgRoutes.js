@@ -435,38 +435,60 @@ router.get('/note/:noteId/graph', authMiddleware, requirePermission('kg:read'), 
 router.get('/notes/graph', authMiddleware, requirePermission('kg:read'), async (req, res) => {
   try {
     const userId = req.user.id;
-    const notes = await prisma.note.findMany({
+    // LLM Wiki pattern: Instead of re-deriving heuristic graphs from 100 raw notes on every query,
+    // we query the persistent compiled Wiki pages to form the knowledge graph.
+    const pages = await prisma.wikiPage.findMany({
       where: { userId },
-      orderBy: { updatedAt: 'desc' },
-      take: 100,
-      select: { id: true, content: true, tags: true, updatedAt: true }
+      select: { id: true, slug: true, title: true, type: true, related: true }
     });
-    const noteGraphs = notes.map(note => createHeuristicGraphFromNote(note));
+
     const entities = [];
     const relations = [];
-    const noteEntityMap = {};
-    noteGraphs.forEach((graph, idx) => {
-      const noteId = notes[idx].id;
-      noteEntityMap[noteId] = graph.entities.map(entity => entity.name);
-      entities.push(...graph.entities);
-      relations.push(...graph.relations);
+    let relationIdCounter = 1;
+
+    const slugToId = {};
+    pages.forEach(p => {
+      slugToId[p.slug] = p.id;
+      entities.push({
+        id: p.id,
+        name: p.title || p.slug,
+        description: `Wiki Page: ${p.slug}`,
+        entityType: p.type || 'concept',
+        source: 'wiki'
+      });
     });
-    const graphDto = graphDtoService.fromNotesAggregate({ entities, relations });
-    return res.json({
+
+    pages.forEach(p => {
+      let related = [];
+      try {
+        if (typeof p.related === 'string') related = JSON.parse(p.related);
+        else if (Array.isArray(p.related)) related = p.related;
+      } catch(e) {}
+      
+      related.forEach(targetSlug => {
+        if (slugToId[targetSlug]) {
+          relations.push({
+            id: `rel_${relationIdCounter++}`,
+            source: p.id,
+            target: slugToId[targetSlug],
+            name: 'related_to',
+            description: '',
+            layer: 'how',
+            source_tag: 'wiki_link'
+          });
+        }
+      });
+    });
+
+    const graphData = graphDtoService.fromNotesAggregate({ entities, relations });
+    
+    res.json({
       success: true,
-      data: {
-        entities,
-        relations,
-        noteEntityMap,
-        graph: graphDto
-      }
+      data: graphData
     });
   } catch (error) {
-    console.error('[KG Routes] Error building notes graph:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error'
-    });
+    console.error('Error generating graph from wiki pages:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate graph' });
   }
 });
 

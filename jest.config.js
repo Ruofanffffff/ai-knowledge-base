@@ -4,11 +4,13 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist-electron/',
+    '/__tests__/e2e/',
     '/Note-taking app frontend \\(V1\\.1\\)/',
     '/Note-taking app frontend（V2\\.0）/',
   ],
   modulePathIgnorePatterns: [
     '<rootDir>/dist-electron/',
+    '<rootDir>/__tests__/e2e/',
     '<rootDir>/Note-taking app frontend (V1.1)/',
     '<rootDir>/Note-taking app frontend（V2.0）/',
   ],

@@ -702,6 +702,15 @@ app.use('/api/stt', sttRoutes);
 const notesRoutes = require('./routes/notesRoutes');
 app.use('/api/notes', notesRoutes);
 
+const wikiEnabled = (() => {
+  const v = String(process.env.WIKI_ENABLED ?? '1').trim().toLowerCase();
+  return v !== '0' && v !== 'false' && v !== 'off' && v !== 'no';
+})();
+if (wikiEnabled) {
+  const wikiRoutes = require('./routes/wikiRoutes');
+  app.use('/api/wiki', wikiRoutes);
+}
+
 // 短视频导入与串联路由
 const shortVideoRoutes = require('./routes/shortVideoRoutes');
 app.use('/api/short-videos', shortVideoRoutes);
@@ -4747,6 +4756,16 @@ if (process.env.NODE_ENV !== 'test') {
     }
 
     try {
+      if (wikiEnabled) {
+        const wikiWorker = require('./services/wiki/wikiWorker');
+        wikiWorker.start();
+        console.log('[WikiWorker] Started (polling queued wiki sources)');
+      }
+    } catch (err) {
+      console.warn('[WikiWorker] Failed to start:', err?.message || err);
+    }
+
+    try {
       const shortVideoDigestScheduler = require('./services/shortVideo/shortVideoDigestScheduler');
       shortVideoDigestScheduler.start();
       console.log('[ShortVideoDigestScheduler] Started');
@@ -4823,6 +4842,12 @@ const gracefulShutdown = (signal) => {
     const shortVideoWorker = require('./services/shortVideo/shortVideoWorker');
     shortVideoWorker.stop();
     console.log('[ShortVideoWorker] Stopped');
+  } catch {}
+
+  try {
+    const wikiWorker = require('./services/wiki/wikiWorker');
+    wikiWorker.stop();
+    console.log('[WikiWorker] Stopped');
   } catch {}
 
   try {

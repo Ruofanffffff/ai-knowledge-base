@@ -28,6 +28,7 @@ import { coercePersistedSources, type PersistedSource } from '../types/sources';
 import { useVisualViewportMetrics } from '../components/ui/use-visual-viewport';
 import { useCapacitorKeyboardMetrics } from '../components/ui/use-capacitor-keyboard';
 import { useIsMobile } from '../components/ui/use-mobile';
+import { toast } from '../components/ui/Toast';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,8 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '../components/ui/drawer';
+import { saveWikiEntry, upsertWikiRecent, wikiService } from '../services/wikiService';
+import { isWikiEnabled } from '../utils/featureFlags';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants & types
@@ -1303,6 +1306,67 @@ function HiBrainNewDesign() {
 
   const handleRollback = () => { localStorage.setItem('hi_brain_classic','1'); window.location.reload(); };
 
+  const saveAsWiki = useCallback(async () => {
+    const latestAi = [...messages].reverse().find(m => m.role === 'ai' && String(m.content || '').trim().length > 0);
+    if (!latestAi) {
+      toast.warning('暂无可保存内容');
+      return;
+    }
+
+    const sessionTitle = sessions.find(s => String(s.id) === String(currentSessionId))?.title || '';
+    const payload = {
+      sessionId: currentSessionId,
+      sessionTitle,
+      content: latestAi.content,
+      sources: latestAi.sources || [],
+      messages: messages.slice(-20).map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : String(m.timestamp || ''),
+      })),
+    };
+
+    const toastId = toast.loading('正在保存为洞察/概念…');
+    try {
+      const resp = await wikiService.compileSource(payload);
+      const data = resp?.data;
+      const wikiId = String(
+        data?.id
+          ?? data?.data?.id
+          ?? data?.wikiId
+          ?? data?.result?.id
+          ?? data?.entry?.id
+          ?? data?.page?.id
+          ?? '',
+      ).trim();
+
+      toast.dismiss(toastId);
+
+      const derivedTitle = String(
+        data?.title
+          ?? data?.data?.title
+          ?? data?.entry?.title
+          ?? data?.page?.title
+          ?? sessionTitle
+          ?? '',
+      ).trim() || String(latestAi.content || '').replace(/\s+/g, ' ').slice(0, 18) || '未命名';
+
+      if (wikiId) {
+        saveWikiEntry(wikiId, data);
+        upsertWikiRecent({ id: wikiId, title: derivedTitle, createdAt: Date.now() });
+        toast.save({ subtitle: `ID: ${wikiId}` });
+        if (isWikiEnabled()) navigate(`/wiki/${wikiId}`);
+        return;
+      }
+
+      toast.save();
+      if (isWikiEnabled()) navigate('/wiki');
+    } catch (e: any) {
+      toast.dismiss(toastId);
+      toast.error('保存失败', { subtitle: e?.response?.data?.error || e?.message || '请求失败' });
+    }
+  }, [currentSessionId, messages, navigate, sessions]);
+
   const todayCount = notes.filter(n => Date.now() - n.createdAt < 86400000).length;
   const matureClusters = clusters.filter(c => c.stage === 'growing' || c.stage === 'mature');
 
@@ -1615,6 +1679,7 @@ function HiBrainNewDesign() {
             { icon:PenLine,  label:'记录灵感', color:'#6366F1', bg:'rgba(99,102,241,0.10)', action:()=>navigate('/siku/create') },
             { icon:Search,   label:'全局搜索', color:'#0EA5E9', bg:'rgba(14,165,233,0.10)',  action:()=>setShowSearch(true) },
             { icon:ScanLine, label:'扫描识别', color:'#F59E0B', bg:'rgba(245,158,11,0.10)',  action:()=>setShowScan(true) },
+            { icon:Wand2,    label:'保存为洞察/概念', color:'#10B981', bg:'rgba(16,185,129,0.10)', action:saveAsWiki },
           ].map((item,i) => (
             <motion.button key={item.label}
               initial={{ opacity:0, x:-10 }} animate={{ opacity:1, x:0 }}

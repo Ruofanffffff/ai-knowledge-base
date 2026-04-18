@@ -618,3 +618,122 @@ model Memory {
   @@index([userId])
   @@map("memories")
 }
+
+model WikiSource {
+  id String @id @default(uuid())
+
+  userId      String   @map("user_id")
+  sourceType  String   @map("source_type")
+  sourceId    String?  @map("source_id")
+  sourceUrl   String?  @map("source_url")
+  title       String?
+  rawContent  String?  @map("raw_content")
+  contentHash String?  @map("content_hash")
+
+  status         String    @default("queued")
+  progress       String?
+  error          String?
+  lastCompiledAt DateTime? @map("last_compiled_at")
+
+  nextRunAt     DateTime? @map("next_run_at")
+  lockedAt      DateTime? @map("locked_at")
+  lockOwner     String?   @map("lock_owner")
+  attemptCount  Int       @default(0) @map("attempt_count")
+  lastAttemptAt DateTime? @map("last_attempt_at")
+
+  lastRunId       String? @map("last_run_id")
+  lastTraceId     String? @map("last_trace_id")
+  lastDurationMs  Int?    @map("last_duration_ms")
+  lastExtractedAt DateTime? @map("last_extracted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  refs WikiSourceRef[]
+  runs WikiCompileRun[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([nextRunAt])
+  @@index([lockedAt])
+  @@map("wiki_sources")
+}
+
+model WikiPage {
+  id String @id @default(uuid())
+
+  userId String @map("user_id")
+  slug   String
+  title  String
+  summary String?
+
+  type       String @default("concept")
+  tags       String @default("[]")
+  sources    String @default("[]")
+  related    String @default("[]")
+  confidence Float  @default(0.5)
+
+  markdown String
+  html     String?
+  embedding String?
+
+  version Int    @default(1)
+  status  String @default("active")
+
+  lastCompiledAt DateTime? @map("last_compiled_at")
+  lastSourceId   String?   @map("last_source_id")
+  lastRunId      String?   @map("last_run_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  refs WikiSourceRef[]
+
+  @@unique([userId, slug])
+  @@index([userId, updatedAt])
+  @@index([userId, slug])
+  @@index([userId, type])
+  @@map("wiki_pages")
+}
+
+model WikiSourceRef {
+  id String @id @default(uuid())
+
+  sourceId String @map("source_id")
+  pageId   String @map("page_id")
+  kind     String
+  score    Float?
+  metadata String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  source WikiSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  page   WikiPage   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([pageId])
+  @@map("wiki_source_refs")
+}
+
+model WikiCompileRun {
+  id String @id @default(uuid())
+
+  sourceId String @map("source_id")
+  status   String @default("running")
+  stage    String?
+  traceId  String? @map("trace_id")
+  metrics  String?
+  error    String?
+  llmPromptTokens     Int? @map("llm_prompt_tokens")
+  llmCompletionTokens Int? @map("llm_completion_tokens")
+  llmTotalTokens      Int? @map("llm_total_tokens")
+  llmInputChars       Int? @map("llm_input_chars")
+
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  source WikiSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([startedAt])
+  @@map("wiki_compile_runs")
+}

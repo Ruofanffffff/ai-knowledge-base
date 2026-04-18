@@ -11,6 +11,7 @@ const { authMiddleware, requirePermission } = require('../services/authService')
 const noteDAL = require('../services/notes/noteDAL');
 const attachmentDAL = require('../services/notes/attachmentDAL');
 const fragmentCollector = require('../services/fragmentCollector');
+const wikiDAL = require('../services/wiki/wikiDAL');
 
 // ============================================
 // Note Routes
@@ -84,6 +85,18 @@ router.post('/', authMiddleware, requirePermission('document:write'), async (req
         sourceId: note.id,
         sourceMeta: { tags: note.tags }
       }).catch(err => console.error('[FragmentCollector] note_create collection error:', err));
+
+      // [LLM Wiki] Ingest into wiki sources
+      wikiDAL.createSource({
+        userId,
+        sourceType: 'note',
+        sourceId: note.id,
+        title: `Note ${note.id.substring(0, 8)}`,
+        rawContent: note.content + tagsStr,
+        status: 'queued',
+        progress: { stage: 'queued' },
+        nextRunAt: new Date()
+      }).catch(err => console.error('[Wiki] note_create enqueue error:', err));
     });
   } catch (error) {
     console.error('Error creating note:', error);
@@ -227,6 +240,18 @@ router.put('/:id', authMiddleware, requirePermission('document:write'), async (r
           }).catch(err => console.error('[FragmentCollector] tag_add collection error:', err));
         }
       }
+
+      // [LLM Wiki] Update wiki source on note edit
+      wikiDAL.createSource({
+        userId,
+        sourceType: 'note_edit',
+        sourceId: note.id,
+        title: `Note Edit ${note.id.substring(0, 8)}`,
+        rawContent: editContent,
+        status: 'queued',
+        progress: { stage: 'queued' },
+        nextRunAt: new Date()
+      }).catch(err => console.error('[Wiki] note_edit enqueue error:', err));
     });
   } catch (error) {
     console.error('Error updating note:', error);

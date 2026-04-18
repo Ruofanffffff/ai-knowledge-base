@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Mic } from 'lucide-react';
 import { getUnreadCount } from '../services/messageStore';
+import { isWikiEnabled } from '../utils/featureFlags';
+import { SpeechService } from '../services/speechService';
+import { useNotes } from './context/NoteContext';
+import { toast } from '../components/ui/Toast';
 
 // Custom SVG icons for each tab
 function HiBrainIcon({ active }: { active: boolean }) {
@@ -29,6 +33,24 @@ function SiKuIcon({ active }: { active: boolean }) {
       <rect x="3" y="4" width="5" height="14" rx="1.5" fill={active ? 'rgba(99,102,241,0.15)' : 'none'} stroke={c} strokeWidth="1.5" />
       <rect x="9" y="4" width="5" height="14" rx="1.5" fill={active ? 'rgba(99,102,241,0.15)' : 'none'} stroke={c} strokeWidth="1.5" />
       <rect x="15" y="4" width="4" height="14" rx="1.5" fill={active ? 'rgba(99,102,241,0.15)' : 'none'} stroke={c} strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function WikiIcon({ active }: { active: boolean }) {
+  const c = active ? '#6366F1' : '#9CA3AF';
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path
+        d="M5 4.5C5 3.7 5.7 3 6.5 3H16.5C17.3 3 18 3.7 18 4.5V18.2C18 18.6 17.6 19 17.2 19H6.8C6 19 5.4 18.5 5.1 17.8C5 17.6 5 17.3 5 17V4.5Z"
+        fill={active ? 'rgba(99,102,241,0.12)' : 'none'}
+        stroke={c}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M8 7H15" stroke={c} strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M8 10H15" stroke={c} strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M8 13H12.5" stroke={c} strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -77,15 +99,27 @@ function ProfileIcon({ active }: { active: boolean }) {
 const NAV_ITEMS = [
   { path: '/home', label: '拾思', Icon: HiBrainIcon },
   { path: '/siku', label: '思库', Icon: SiKuIcon },
+  { path: '/wiki', label: 'Wiki', Icon: WikiIcon },
   { path: '/sichain', label: '思链', Icon: SiChainIcon },
   { path: '/profile', label: '我的', Icon: ProfileIcon },
-];
+].filter(i => isWikiEnabled() || i.path !== '/wiki');
 
 export function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const [unread, setUnread] = useState(0);
   const [showSiCircle, setShowSiCircle] = useState(false);
+  const { addNote } = useNotes();
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingText, setRecordingText] = useState('');
+  const [isCanceling, setIsCanceling] = useState(false);
+
+  const pressTimer = useRef<NodeJS.Timeout>();
+  const isLongPress = useRef(false);
+  const startY = useRef(0);
+  const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  const recordingTextRef = useRef('');
 
   useEffect(() => {
     const update = () => setUnread(getUnreadCount());
@@ -113,13 +147,126 @@ export function BottomNav() {
     };
   }, []);
 
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    startY.current = e.clientY;
+    isLongPress.current = false;
+    setIsCanceling(false);
+    setRecordingText('');
+    recordingTextRef.current = '';
+
+    pressTimer.current = setTimeout(async () => {
+      isLongPress.current = true;
+      setIsRecording(true);
+
+      const res = await SpeechService.startListening(
+        { language: 'zh-CN', maxDurationMs: 60000 },
+        {
+          onPartial: (text) => {
+            setRecordingText(text);
+            recordingTextRef.current = text;
+          },
+          onFinal: (text) => {
+            setRecordingText(text);
+            recordingTextRef.current = text;
+          },
+          onError: (msg) => {
+            console.error('Speech error:', msg);
+            setIsRecording(false);
+          },
+          onListeningChange: (listening) => {
+            if (!listening) {
+              setIsRecording(false);
+            }
+          }
+        }
+      );
+      
+      // If user already released finger while we were starting:
+      if (!isLongPress.current) {
+        await res.stop();
+      } else {
+        stopRecordingRef.current = res.stop;
+      }
+    }, 300);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (isRecording) {
+      const dy = e.clientY - startY.current;
+      setIsCanceling(dy < -40);
+    }
+  };
+
+  const handlePointerUp = async (e: React.PointerEvent) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    clearTimeout(pressTimer.current);
+
+    if (isLongPress.current) {
+      isLongPress.current = false; // mark as released
+      if (stopRecordingRef.current) {
+        await stopRecordingRef.current();
+        stopRecordingRef.current = null;
+      }
+      setIsRecording(false);
+
+      if (!isCanceling) {
+        const finalTxt = recordingTextRef.current.trim();
+        if (finalTxt) {
+          try {
+            await addNote({
+              content: finalTxt,
+              type: 'text',
+              status: 'inbox'
+            });
+            toast.success('已保存到收件箱');
+          } catch (error) {
+            console.error('Failed to save note:', error);
+            toast.error('保存失败');
+          }
+        }
+      }
+      setIsCanceling(false);
+      setRecordingText('');
+      recordingTextRef.current = '';
+    } else {
+      // Short click
+      navigate('/home', { state: { focusCapture: true } });
+    }
+  };
+
+  const handlePointerCancel = async (e: React.PointerEvent) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    clearTimeout(pressTimer.current);
+    isLongPress.current = false;
+    if (isRecording) {
+      if (stopRecordingRef.current) {
+        await stopRecordingRef.current();
+        stopRecordingRef.current = null;
+      }
+      setIsRecording(false);
+      setIsCanceling(false);
+      setRecordingText('');
+      recordingTextRef.current = '';
+    }
+  };
+
   const isActive = (path: string) => {
     if (path === '/siku') return location.pathname.startsWith('/siku');
+    if (path === '/wiki') return location.pathname.startsWith('/wiki');
     return location.pathname === path;
   };
 
+  const wikiEnabled = isWikiEnabled();
+  const insertAt = (() => {
+    const after = wikiEnabled ? '/wiki' : '/siku';
+    const idx = NAV_ITEMS.findIndex(i => i.path === after);
+    return idx >= 0 ? idx + 1 : 2;
+  })();
+
   const items = showSiCircle
-    ? [...NAV_ITEMS.slice(0, 3), { path: '/sicircle', label: '思圈', Icon: SiCircleIcon }, ...NAV_ITEMS.slice(3)]
+    ? [...NAV_ITEMS.slice(0, insertAt), { path: '/sicircle', label: '思圈', Icon: SiCircleIcon }, ...NAV_ITEMS.slice(insertAt)]
     : NAV_ITEMS;
 
   return (
@@ -134,6 +281,29 @@ export function BottomNav() {
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
+      <AnimatePresence>
+        {isRecording && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="absolute bottom-[calc(100%+16px)] left-4 right-4 p-4 rounded-2xl flex flex-col items-center justify-center gap-3"
+            style={{
+              background: 'var(--hi-bg-primary, #ffffff)',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+              border: '1px solid var(--hi-border, #e5e7eb)'
+            }}
+          >
+            <div className={`text-sm font-medium transition-colors ${isCanceling ? 'text-red-500' : 'text-gray-500'}`}>
+              {isCanceling ? '松开手指，取消发送' : '松开发送，上滑取消'}
+            </div>
+            <div className="text-base text-gray-800 min-h-[24px] max-h-[100px] overflow-y-auto w-full text-center">
+              {recordingText || '正在聆听...'}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex items-center justify-around px-1 py-2">
         {items.map(({ path, label, Icon }, idx) => {
           const active = isActive(path);
@@ -143,13 +313,21 @@ export function BottomNav() {
               {idx === 2 && (
                 <motion.button
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => navigate('/home', { state: { focusCapture: true } })}
-                  className="w-14 h-14 rounded-3xl flex items-center justify-center"
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerCancel}
+                  className="w-14 h-14 rounded-3xl flex items-center justify-center touch-none"
                   style={{
-                    background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                    boxShadow: '0 10px 24px rgba(99,102,241,0.38)',
+                    background: isRecording
+                      ? 'linear-gradient(135deg, #EF4444, #F87171)'
+                      : 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                    boxShadow: isRecording
+                      ? '0 10px 24px rgba(239,68,68,0.38)'
+                      : '0 10px 24px rgba(99,102,241,0.38)',
                     border: '1px solid rgba(255,255,255,0.22)',
                     marginTop: '-18px',
+                    transition: 'background 0.3s, box-shadow 0.3s'
                   }}
                   aria-label="一键捕捉"
                 >

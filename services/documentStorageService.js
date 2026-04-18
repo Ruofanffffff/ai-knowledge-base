@@ -48,18 +48,20 @@ class DocumentStorageService {
         await this._ensureDirectoryExists(path.dirname(finalFilePath));
 
         // 开始数据库事务
-        this.db.serialize(() => {
-          this.db.run('BEGIN TRANSACTION', (err) => {
+        const db = this.db;
+        db.serialize(() => {
+          db.run('BEGIN TRANSACTION', (err) => {
             if (err) {
               return reject(new Error(`Failed to begin transaction: ${err.message}`));
             }
 
             // 准备元数据字符串
-            const metadataStr = metadata.metadata ? JSON.stringify(metadata.metadata) : null;
+            const baseMetadata = metadata.metadata && typeof metadata.metadata === 'object' ? metadata.metadata : {};
+            const metadataStr = JSON.stringify({ ...baseMetadata, filePath: finalFilePath });
             const tagsStr = metadata.tags ? JSON.stringify(metadata.tags) : null;
 
             // 插入文档记录（使用 prepared statement）
-            this.db.run(
+            db.run(
               `INSERT INTO documents (user_id, title, content, type, file_type, metadata, tags, hash, size) 
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
@@ -76,7 +78,7 @@ class DocumentStorageService {
               async function(err) {
                 if (err) {
                   // 回滚事务
-                  this.db.run('ROLLBACK', () => {
+                  db.run('ROLLBACK', () => {
                     reject(new Error(`Failed to insert document: ${err.message}`));
                   });
                   return;
@@ -89,7 +91,7 @@ class DocumentStorageService {
                   await rename(tempFilePath, finalFilePath);
 
                   // 提交事务
-                  this.db.run('COMMIT', (err) => {
+                  db.run('COMMIT', (err) => {
                     if (err) {
                       // 如果提交失败，尝试删除已移动的文件
                       unlink(finalFilePath).catch(() => {});
@@ -104,7 +106,7 @@ class DocumentStorageService {
                       content: metadata.content || '',
                       type: metadata.type || 'document',
                       fileType: metadata.fileType,
-                      metadata: metadata.metadata || {},
+                      metadata: baseMetadata,
                       tags: metadata.tags || [],
                       hash: metadata.hash ? metadata.hash.toLowerCase() : null,
                       size: metadata.size,
@@ -118,11 +120,11 @@ class DocumentStorageService {
 
                 } catch (fileError) {
                   // 文件移动失败，回滚事务
-                  this.db.run('ROLLBACK', () => {
+                  db.run('ROLLBACK', () => {
                     reject(new Error(`Failed to move file: ${fileError.message}`));
                   });
                 }
-              }.bind(this)
+              }
             );
           });
         });
@@ -176,18 +178,20 @@ class DocumentStorageService {
             await this._ensureDirectoryExists(path.dirname(finalFilePath));
 
             // 开始数据库事务
-            this.db.serialize(() => {
-              this.db.run('BEGIN TRANSACTION', (err) => {
+            const db = this.db;
+            db.serialize(() => {
+              db.run('BEGIN TRANSACTION', (err) => {
                 if (err) {
                   return reject(new Error(`Failed to begin transaction: ${err.message}`));
                 }
 
                 // 准备元数据字符串
-                const metadataStr = metadata.metadata ? JSON.stringify(metadata.metadata) : null;
+                const baseMetadata = metadata.metadata && typeof metadata.metadata === 'object' ? metadata.metadata : {};
+                const metadataStr = JSON.stringify({ ...baseMetadata, filePath: finalFilePath });
                 const tagsStr = metadata.tags ? JSON.stringify(metadata.tags) : null;
 
                 // 更新文档记录（使用 prepared statement）
-                this.db.run(
+                db.run(
                   `UPDATE documents 
                    SET title = ?, content = ?, type = ?, file_type = ?, metadata = ?, tags = ?, hash = ?, size = ?, updated_at = CURRENT_TIMESTAMP 
                    WHERE id = ? AND user_id = ?`,
@@ -206,14 +210,14 @@ class DocumentStorageService {
                   async function(err) {
                     if (err) {
                       // 回滚事务
-                      this.db.run('ROLLBACK', () => {
+                      db.run('ROLLBACK', () => {
                         reject(new Error(`Failed to update document: ${err.message}`));
                       });
                       return;
                     }
 
                     if (this.changes === 0) {
-                      this.db.run('ROLLBACK', () => {
+                      db.run('ROLLBACK', () => {
                         reject(new Error('Document not found or no changes made'));
                       });
                       return;
@@ -224,7 +228,7 @@ class DocumentStorageService {
                       await rename(tempFilePath, finalFilePath);
 
                       // 提交事务
-                      this.db.run('COMMIT', async (err) => {
+                      db.run('COMMIT', async (err) => {
                         if (err) {
                           // 如果提交失败，尝试删除已移动的文件
                           unlink(finalFilePath).catch(() => {});
@@ -249,7 +253,7 @@ class DocumentStorageService {
                           content: metadata.content || '',
                           type: metadata.type || 'document',
                           fileType: metadata.fileType,
-                          metadata: metadata.metadata || {},
+                          metadata: baseMetadata,
                           tags: metadata.tags || [],
                           hash: metadata.hash ? metadata.hash.toLowerCase() : null,
                           size: metadata.size,
@@ -262,11 +266,11 @@ class DocumentStorageService {
 
                     } catch (fileError) {
                       // 文件移动失败，回滚事务
-                      this.db.run('ROLLBACK', () => {
+                      db.run('ROLLBACK', () => {
                         reject(new Error(`Failed to move file: ${fileError.message}`));
                       });
                     }
-                  }.bind(this)
+                  }
                 );
               });
             });
@@ -311,33 +315,34 @@ class DocumentStorageService {
           }
 
           // 开始数据库事务
-          this.db.serialize(() => {
-            this.db.run('BEGIN TRANSACTION', (err) => {
+          const db = this.db;
+          db.serialize(() => {
+            db.run('BEGIN TRANSACTION', (err) => {
               if (err) {
                 return reject(new Error(`Failed to begin transaction: ${err.message}`));
               }
 
               // 删除数据库记录（使用 prepared statement）
-              this.db.run(
+              db.run(
                 'DELETE FROM documents WHERE id = ? AND user_id = ?',
                 [documentId, userId],
                 async function(err) {
                   if (err) {
-                    this.db.run('ROLLBACK', () => {
+                    db.run('ROLLBACK', () => {
                       reject(new Error(`Failed to delete document: ${err.message}`));
                     });
                     return;
                   }
 
                   if (this.changes === 0) {
-                    this.db.run('ROLLBACK', () => {
+                    db.run('ROLLBACK', () => {
                       reject(new Error('Document not found'));
                     });
                     return;
                   }
 
                   // 提交事务
-                  this.db.run('COMMIT', async (err) => {
+                  db.run('COMMIT', async (err) => {
                     if (err) {
                       return reject(new Error(`Failed to commit transaction: ${err.message}`));
                     }
@@ -354,7 +359,7 @@ class DocumentStorageService {
 
                     resolve(true);
                   });
-                }.bind(this)
+                }
               );
             });
           });
@@ -432,7 +437,14 @@ class DocumentStorageService {
   async _validateFileExists(filePath) {
     try {
       await access(filePath, fs.constants.F_OK);
+      const st = await stat(filePath);
+      if (!st.isFile()) {
+        throw new Error(`Not a file: ${filePath}`);
+      }
     } catch (error) {
+      if (String(error?.message || '').startsWith('Not a file:')) {
+        throw error;
+      }
       throw new Error(`File does not exist: ${filePath}`);
     }
   }
@@ -450,7 +462,11 @@ class DocumentStorageService {
     const uploadsDir = path.join(__dirname, '../uploads');
     const userDir = path.join(uploadsDir, `user_${userId}`);
     const timestamp = Date.now();
-    const filename = `${title}_${timestamp}${fileType}`;
+    const rawTitle = String(title || 'document');
+    const safeTitle = rawTitle.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim() || 'document';
+    const base = safeTitle.slice(0, 80) || 'document';
+    const ext = String(fileType || '').trim();
+    const filename = `${base}_${timestamp}${ext}`;
     return path.join(userDir, filename);
   }
 

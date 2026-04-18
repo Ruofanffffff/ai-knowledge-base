@@ -11,19 +11,13 @@ class LLMClient {
     this.model = DEFAULT_MODEL;
   }
 
-  /**
-   * 调用Qwen API，返回文本响应
-   * @param {string} prompt - 提示词
-   * @param {object} options - 可选参数 {temperature, maxTokens, timeout, model}
-   * @returns {Promise<string>} LLM响应文本
-   */
-  async call(prompt, options = {}) {
+  async _callApi(prompt, options = {}) {
     const {
       temperature = 0.7,
       maxTokens = 2000,
       timeout = DEFAULT_TIMEOUT,
       model = this.model,
-      systemPrompt = null, // New option
+      systemPrompt = null,
     } = options;
 
     const messages = [];
@@ -65,7 +59,7 @@ class LLMClient {
       }
 
       const data = await response.json();
-      return this._extractText(data);
+      return data;
     } catch (err) {
       if (err.name === 'AbortError') {
         console.error('Qwen API request timed out');
@@ -79,6 +73,22 @@ class LLMClient {
   }
 
   /**
+   * 调用Qwen API，返回文本响应
+   * @param {string} prompt - 提示词
+   * @param {object} options - 可选参数 {temperature, maxTokens, timeout, model}
+   * @returns {Promise<string>} LLM响应文本
+   */
+  async call(prompt, options = {}) {
+    const data = await this._callApi(prompt, options);
+    return this._extractText(data);
+  }
+
+  async callWithMeta(prompt, options = {}) {
+    const data = await this._callApi(prompt, options);
+    return { text: this._extractText(data), usage: this._extractUsage(data) };
+  }
+
+  /**
    * 调用Qwen API并解析JSON响应
    * @param {string} prompt - 提示词
    * @param {object} options - 可选参数
@@ -87,6 +97,11 @@ class LLMClient {
   async callJSON(prompt, options = {}) {
     const text = await this.call(prompt, options);
     return this._parseJSON(text);
+  }
+
+  async callJSONWithMeta(prompt, options = {}) {
+    const { text, usage } = await this.callWithMeta(prompt, options);
+    return { data: this._parseJSON(text), usage };
   }
 
   /**
@@ -104,6 +119,22 @@ class LLMClient {
     }
     console.error('Cannot parse Qwen API response:', JSON.stringify(data));
     throw new Error('Invalid response format from Qwen API');
+  }
+
+  _extractUsage(data) {
+    const u = data?.usage || data?.output?.usage || null;
+    if (!u || typeof u !== 'object') return null;
+
+    const promptTokens = Number(u.prompt_tokens ?? u.input_tokens ?? u.inputTokens ?? NaN);
+    const completionTokens = Number(u.completion_tokens ?? u.output_tokens ?? u.outputTokens ?? NaN);
+    const totalTokens = Number(u.total_tokens ?? u.totalTokens ?? NaN);
+
+    const out = {};
+    if (!Number.isNaN(promptTokens)) out.promptTokens = promptTokens;
+    if (!Number.isNaN(completionTokens)) out.completionTokens = completionTokens;
+    if (!Number.isNaN(totalTokens)) out.totalTokens = totalTokens;
+    if (!Object.keys(out).length) return null;
+    return out;
   }
 
   /**

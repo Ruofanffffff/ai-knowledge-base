@@ -21,7 +21,16 @@ export default function Layout() {
 
   const syncCurrentPage = (path: string) => {
     if (path) {
-      setCurrentPage(path);
+      const segments = path.split('/').filter(Boolean);
+      if (!segments.length) {
+        setCurrentPage('dashboard');
+        return;
+      }
+      if (segments[0] === 'admin') {
+        setCurrentPage(`admin/${segments[1] || 'dashboard'}`);
+        return;
+      }
+      setCurrentPage(segments[0]);
     }
   };
 

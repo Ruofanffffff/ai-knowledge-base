@@ -17,3 +17,5 @@
 * [x] Mobile STT: ShisiHome mic button can start/stop listening with UI
 
 * [x] Mobile STT: Permission and error handling works (toast feedback)
+
+* [x] Global STT: BottomNav Mic long-press records and slide-up cancels, saving to Inbox

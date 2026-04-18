@@ -103,6 +103,26 @@ describe('LLMClient', () => {
     });
   });
 
+  describe('callWithMeta', () => {
+    it('returns text and token usage when available', async () => {
+      mockFetch({
+        output: { text: 'ok' },
+        usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
+      });
+      const res = await LLMClient.callWithMeta('test prompt');
+      expect(res).toEqual({
+        text: 'ok',
+        usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+      });
+    });
+
+    it('returns null usage when unavailable', async () => {
+      mockFetch({ output: { text: 'ok' } });
+      const res = await LLMClient.callWithMeta('test prompt');
+      expect(res).toEqual({ text: 'ok', usage: null });
+    });
+  });
+
   describe('callJSON', () => {
     it('returns parsed JSON from API response', async () => {
       mockFetch({ output: { text: '[{"name":"entity1"}]' } });
@@ -119,6 +139,20 @@ describe('LLMClient', () => {
     it('throws when response is not valid JSON', async () => {
       mockFetch({ output: { text: 'This is not JSON at all' } });
       await expect(LLMClient.callJSON('test')).rejects.toThrow('not valid JSON');
+    });
+  });
+
+  describe('callJSONWithMeta', () => {
+    it('returns parsed JSON and usage', async () => {
+      mockFetch({
+        output: { text: '{"ok":true}' },
+        usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
+      });
+      const res = await LLMClient.callJSONWithMeta('test');
+      expect(res).toEqual({
+        data: { ok: true },
+        usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 },
+      });
     });
   });
 });

@@ -206,7 +206,9 @@ describe('DocumentStorageService - Unit Tests', () => {
         });
       });
 
-      expect(JSON.parse(dbDoc.metadata)).toEqual(metadata.metadata);
+      const storedMeta = JSON.parse(dbDoc.metadata);
+      expect(storedMeta).toEqual(expect.objectContaining(metadata.metadata));
+      expect(typeof storedMeta.filePath).toBe('string');
       expect(JSON.parse(dbDoc.tags)).toEqual(metadata.tags);
 
       testFiles.push(savedDoc.filePath);

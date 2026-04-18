@@ -166,3 +166,29 @@ export interface UploadResponse {
   document: Document;
   message: string;
 }
+
+export interface WikiPage {
+  id: string;
+  userId: string;
+  slug: string;
+  title: string;
+  summary: string | null;
+  markdown: string;
+  html: string | null;
+  embedding: number[] | null;
+  version: number;
+  status: string;
+  lastCompiledAt: string | null;
+  lastSourceId: string | null;
+  lastRunId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WikiHealth {
+  ok: boolean;
+  db: { ok: boolean; error?: string };
+  llm: { ok: boolean; provider?: string; model?: string; configured?: boolean };
+  embedding: { ok: boolean; model?: string; configured?: boolean };
+  time: string;
+}

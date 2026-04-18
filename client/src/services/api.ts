@@ -1,5 +1,5 @@
 import apiClient from '../api/client';
-import type { ApiResponse } from '../api/types';
+import type { ApiResponse, WikiHealth, WikiPage } from '../api/types';
 import type { 
   KGStatus, 
   KGStatusResponse, 
@@ -1001,6 +1001,58 @@ class ApiService {
         success: false,
         error: this.handleError(error),
       };
+    }
+  }
+
+  async getWikiPages(params?: { q?: string; limit?: number; offset?: number }): Promise<ApiResponse<WikiPage[]>> {
+    try {
+      const response = await apiClient.get('/wiki/pages', { params });
+      if (response.data?.success) {
+        return { success: true, data: response.data.data || [] };
+      }
+      return { success: false, data: [], error: response.data?.error || '获取 Wiki 页面失败' };
+    } catch (error) {
+      return { success: false, data: [], error: this.handleError(error) };
+    }
+  }
+
+  async compileWikiSource(input: {
+    sourceType: string;
+    sourceId?: string | null;
+    sourceUrl?: string | null;
+    url?: string | null;
+    title?: string | null;
+    rawContent?: string | null;
+    force?: boolean;
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post('/wiki/compile-source', input);
+      if (response.data?.success) {
+        return { success: true, data: response.data.data };
+      }
+      return { success: false, error: response.data?.error || '提交编译失败' };
+    } catch (error) {
+      return { success: false, error: this.handleError(error) };
+    }
+  }
+
+  async wikiHealth(): Promise<ApiResponse<WikiHealth>> {
+    try {
+      const response = await apiClient.get('/wiki/health');
+      if (response.data?.success) {
+        return { success: true, data: response.data.data };
+      }
+      return { success: false, error: response.data?.error || '健康检查失败' };
+    } catch (error) {
+      try {
+        const fallback = await apiClient.get('/wiki/healthcheck');
+        if (fallback.data?.success) {
+          return { success: true, data: fallback.data.data };
+        }
+        return { success: false, error: fallback.data?.error || '健康检查失败' };
+      } catch (e) {
+        return { success: false, error: this.handleError(error) };
+      }
     }
   }
 

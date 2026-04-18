@@ -333,6 +333,22 @@ export default function Documents() {
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl md:text-2xl font-bold text-slate-900">思库</h1>
                 {!isSelectMode && <p className="text-slate-500 mt-0.5 text-sm">管理和组织你的文档</p>}
+                {!isSelectMode && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={() => navigate('/documents')}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-900 text-white"
+                    >
+                      文档
+                    </button>
+                    <button
+                      onClick={() => navigate('/wiki')}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                    >
+                      Wiki
+                    </button>
+                  </div>
+                )}
               </div>
               
               {/* Action buttons */}

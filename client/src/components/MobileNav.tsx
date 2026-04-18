@@ -1,6 +1,7 @@
 import React from 'react';
-import { LayoutDashboard, FileText, Network, Settings, Compass, Shield, Sprout } from 'lucide-react';
+import { LayoutDashboard, FileText, Network, Settings, Compass, Shield, Sprout, BookOpen } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { WIKI_ENABLED } from '../config/constants';
 
 interface MenuItem {
   id: string;
@@ -20,11 +21,12 @@ export function MobileNav({ currentPage, setCurrentPage, menuItems: customMenuIt
   const defaultMenuItems = [
     { id: 'dashboard', label: 'Hi Brain', icon: LayoutDashboard },
     { id: 'documents', label: '思库', icon: FileText },
+    { id: 'wiki', label: 'Wiki', icon: BookOpen },
     { id: 'graph', label: '思链', icon: Network },
     { id: 'community', label: '思圈', icon: Compass },
     { id: 'knowledge-growth', label: '知识生长', icon: Sprout },
     { id: 'settings', label: '设置', icon: Settings },
-  ];
+  ].filter(item => WIKI_ENABLED || item.id !== 'wiki');
 
   if (user?.role === 'admin' || user?.username === 'admin') {
      if (!defaultMenuItems.some(item => item.id === 'admin/dashboard')) {

@@ -14,6 +14,7 @@ import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { toast } from '../components/ui/Toast';
 import { api } from '../services/api';
+import { isWikiEnabled } from '../utils/featureFlags';
 
 /* ── Mindmap mini-thumbnail (pure JSX SVG, no DOM manipulation) ── */
 const MM_COLORS = ['#8B5CF6','#3B82F6','#10B981','#F59E0B','#EF4444','#EC4899','#14B8A6','#F97316'];
@@ -370,6 +371,7 @@ function StatusBar() {
 export function NoteList() {
   const navigate = useNavigate();
   const location = useLocation();
+  const wikiEnabled = isWikiEnabled();
   const { notes } = useNotes();
   const [libraryView, setLibraryView] = useState<'notes' | 'documents'>('notes');
   const [search, setSearch] = useState('');
@@ -668,6 +670,21 @@ export function NoteList() {
               )}
               <span style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', fontWeight: 800 }}>上传</span>
             </button>
+
+            {wikiEnabled && (
+              <button
+                onClick={() => navigate('/wiki')}
+                className="h-10 px-3 rounded-2xl flex items-center gap-1.5 transition-all active:scale-90"
+                style={{
+                  background: 'var(--hi-chip-bg)',
+                  border: '1px solid var(--hi-card-border)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                }}
+              >
+                <BookOpen size={16} style={{ color: '#6366F1' }} />
+                <span style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', fontWeight: 800 }}>Wiki</span>
+              </button>
+            )}
           </div>
         </div>
 

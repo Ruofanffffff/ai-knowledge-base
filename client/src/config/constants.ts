@@ -49,3 +49,8 @@ export const ROUTES = {
   COMMUNITY: '/community',
   SETTINGS: '/settings',
 };
+
+export const WIKI_ENABLED = (() => {
+  const v = String(import.meta.env.VITE_WIKI_ENABLED ?? '1').trim().toLowerCase();
+  return v !== '0' && v !== 'false' && v !== 'off' && v !== 'no';
+})();

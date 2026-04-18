@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { SpeechRecognition as NativeSpeechRecognition } from '@capacitor-community/speech-recognition';
 
 // Web Speech API 类型定义
 interface SpeechRecognitionEvent extends Event {
@@ -27,7 +29,7 @@ interface SpeechRecognitionErrorEvent extends Event {
   message?: string;
 }
 
-interface SpeechRecognition extends EventTarget {
+interface WebSpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
@@ -43,118 +45,203 @@ interface SpeechRecognition extends EventTarget {
 declare global {
   interface Window {
     SpeechRecognition: {
-      new (): SpeechRecognition;
+      new (): WebSpeechRecognition;
     };
     webkitSpeechRecognition: {
-      new (): SpeechRecognition;
+      new (): WebSpeechRecognition;
     };
   }
 }
 
-interface UseSpeechRecognitionProps {
-  onResult?: (transcript: string, isFinal: boolean) => void;
+interface SpeechRecognitionOptions {
+  onResult?: (text: string, isFinal: boolean) => void;
   onError?: (error: string) => void;
-  onEnd?: () => void;
 }
 
-export function useSpeechRecognition({ onResult, onError, onEnd }: UseSpeechRecognitionProps = {}) {
-  const [isListening, setIsListening] = useState(false);
+export function useSpeechRecognition(options?: SpeechRecognitionOptions) {
   const [isSupported, setIsSupported] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  
-  // 使用 Ref 保存回调，避免闭包陷阱
-  const onResultRef = useRef(onResult);
-  const onErrorRef = useRef(onError);
-  const onEndRef = useRef(onEnd);
+  const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const recognitionRef = useRef<any>(null);
+  const shouldListenRef = useRef(false);
+  const onResultRef = useRef(options?.onResult);
+  const onErrorRef = useRef(options?.onError);
 
   useEffect(() => {
-    onResultRef.current = onResult;
-    onErrorRef.current = onError;
-    onEndRef.current = onEnd;
-  }, [onResult, onError, onEnd]);
+    onResultRef.current = options?.onResult;
+    onErrorRef.current = options?.onError;
+  }, [options?.onResult, options?.onError]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognitionConstructor) {
-        setIsSupported(true);
-        const recognition = new SpeechRecognitionConstructor();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'zh-CN';
+    const initSpeech = async () => {
+      const isNative = Capacitor.isNativePlatform();
 
-        recognition.onstart = () => setIsListening(true);
-        
-        recognition.onend = () => {
-          setIsListening(false);
-          if (onEndRef.current) onEndRef.current();
-        };
-
-        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          // ignore no-speech error which happens often
-          if (event.error === 'no-speech') return;
-          
-          setIsListening(false);
-          console.error('Speech recognition error:', event.error);
-          if (onErrorRef.current) onErrorRef.current(event.error);
-        };
-
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-          let interimTranscript = '';
-          let finalTranscript = '';
-
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            } else {
-              interimTranscript += event.results[i][0].transcript;
-            }
+      if (isNative) {
+        // Capacitor 移动端环境
+        try {
+          const { available } = await NativeSpeechRecognition.available();
+          if (available) {
+            setIsSupported(true);
+            
+            // 请求权限
+            await NativeSpeechRecognition.requestPermissions();
+            
+            // 监听部分结果
+            NativeSpeechRecognition.addListener('partialResults', (data: any) => {
+              if (data.matches && data.matches.length > 0 && onResultRef.current) {
+                onResultRef.current(data.matches[0], false);
+              }
+            });
+            
+            // 错误监听可能没有特定事件，或者可以通过try/catch捕获
+          } else {
+            setIsSupported(false);
           }
-
-          if (onResultRef.current) {
-            // 传递当前片段的文本
-            // 如果是 final，说明这段话结束了；如果是 interim，说明是正在说的话
-            // 这种方式让调用者决定如何拼接
-            const text = finalTranscript || interimTranscript;
-            if (text) {
-                onResultRef.current(text, !!finalTranscript);
-            }
-          }
-        };
-
-        recognitionRef.current = recognition;
+        } catch (err) {
+          console.error('Native speech init error', err);
+          setIsSupported(false);
+        }
       } else {
-        setIsSupported(false);
+        // Web 端环境
+        if (typeof window !== 'undefined') {
+          const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (SpeechRecognitionConstructor) {
+            setIsSupported(true);
+            const recognition = new SpeechRecognitionConstructor();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'zh-CN';
+
+            recognition.onstart = () => {
+              setIsListening(true);
+              setError(null);
+            };
+
+            recognition.onresult = (event: any) => {
+              let interimTranscript = '';
+              let finalTranscript = '';
+
+              for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                  finalTranscript += event.results[i][0].transcript;
+                } else {
+                  interimTranscript += event.results[i][0].transcript;
+                }
+              }
+
+              if (onResultRef.current) {
+                const text = finalTranscript || interimTranscript;
+                if (text) {
+                  onResultRef.current(text, !!finalTranscript);
+                }
+              }
+            };
+
+            recognition.onerror = (event: any) => {
+              console.error('Web Speech recognition error', event.error);
+              setError(event.error);
+              if (onErrorRef.current) onErrorRef.current(event.error);
+              
+              if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                setIsListening(false);
+                shouldListenRef.current = false;
+              }
+            };
+
+            recognition.onend = () => {
+              if (shouldListenRef.current) {
+                try {
+                  recognition.start();
+                } catch (err) {
+                  setIsListening(false);
+                  shouldListenRef.current = false;
+                }
+              } else {
+                setIsListening(false);
+              }
+            };
+
+            recognitionRef.current = recognition;
+          }
+        }
       }
-    }
+    };
+
+    initSpeech();
     
     return () => {
-        if (recognitionRef.current) {
-            recognitionRef.current.abort();
-        }
+      shouldListenRef.current = false;
+      const isNative = Capacitor.isNativePlatform();
+      
+      if (isNative) {
+        NativeSpeechRecognition.removeAllListeners();
+        try {
+          NativeSpeechRecognition.stop();
+        } catch (e) {}
+      } else if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
+      }
     };
   }, []);
 
-  const startListening = useCallback(() => {
-    if (recognitionRef.current && !isListening) {
-      try {
-        // 每次开始前重置某些状态如果需要
-        recognitionRef.current.start();
-      } catch (e) {
-        console.error('Failed to start recognition:', e);
-      }
-    }
-  }, [isListening]);
+  const startListening = useCallback(async () => {
+    shouldListenRef.current = true;
+    const isNative = Capacitor.isNativePlatform();
 
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current && isListening) {
+    if (isNative) {
       try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        console.error('Failed to stop recognition:', e);
+        setIsListening(true);
+        setError(null);
+        await NativeSpeechRecognition.start({
+          language: 'zh-CN',
+          maxResults: 1,
+          prompt: '请说话...',
+          partialResults: true,
+          popup: false,
+        });
+      } catch (err: any) {
+        console.error('Failed to start native recognition', err);
+        setError(err.message || '启动失败');
+        setIsListening(false);
+      }
+    } else {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+          setError(null);
+        } catch (err) {
+          console.error('Failed to start web recognition', err);
+        }
       }
     }
-  }, [isListening]);
+  }, []);
+
+  const stopListening = useCallback(async () => {
+    shouldListenRef.current = false;
+    const isNative = Capacitor.isNativePlatform();
+
+    if (isNative) {
+      try {
+        await NativeSpeechRecognition.stop();
+      } catch (err) {
+        console.error('Failed to stop native recognition', err);
+      } finally {
+        setIsListening(false);
+      }
+    } else {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+          setIsListening(false);
+        } catch (err) {
+          console.error('Failed to stop web recognition', err);
+        }
+      }
+    }
+  }, []);
 
   const toggleListening = useCallback(() => {
     if (isListening) {
@@ -167,6 +254,7 @@ export function useSpeechRecognition({ onResult, onError, onEnd }: UseSpeechReco
   return {
     isSupported,
     isListening,
+    error,
     startListening,
     stopListening,
     toggleListening
