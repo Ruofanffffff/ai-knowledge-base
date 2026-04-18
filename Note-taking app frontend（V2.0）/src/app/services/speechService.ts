@@ -92,9 +92,10 @@ function readPreferredProvider(): SpeechProvider | null {
 export class SpeechService {
   static getProvider(): SpeechProvider {
     const preferred = readPreferredProvider();
-    if (preferred === 'cloud_streaming') return Capacitor.isNativePlatform() ? 'cloud_streaming' : 'none';
-    if (preferred === 'native') return Capacitor.isNativePlatform() ? 'native' : 'none';
-    if (preferred === 'web') return getWebSpeechCtor() ? 'web' : 'none';
+    if (preferred === 'cloud_streaming' && Capacitor.isNativePlatform()) return 'cloud_streaming';
+    if (preferred === 'native' && Capacitor.isNativePlatform()) return 'native';
+    if (preferred === 'web' && getWebSpeechCtor()) return 'web';
+    
     if (Capacitor.isNativePlatform()) return 'native';
     if (getWebSpeechCtor()) return 'web';
     return 'none';
@@ -501,12 +502,7 @@ export class SpeechService {
         callbacks.onFinal?.(text);
       });
 
-      const errorHandle = await (CapacitorSpeechRecognition as any).addListener?.('error', (data: any) => {
-        const msg = String(data?.message || data?.error || '语音识别失败');
-        log('error', data);
-        callbacks.onError?.(msg);
-        callbacks.onListeningChange?.(false);
-      });
+
 
       const stateHandle = await CapacitorSpeechRecognition.addListener('listeningState', (data: any) => {
         const status = String(data?.status || '');
@@ -555,12 +551,11 @@ export class SpeechService {
         await cleanup('timeout');
       }, Math.max(3000, options.maxDurationMs ?? 15000));
 
-      fallbackTimer = setTimeout(async () => {
+      const triggerFallback = async () => {
         if (cleanedUp) return;
         if (userStopped) return;
-        if (lastHeardAt > 0) return;
         
-        log('fallback: no speech detected within 1.5s, trying popup mode');
+        log('triggering fallback popup mode');
         switchingToFallback = true;
         
         try {
@@ -569,9 +564,9 @@ export class SpeechService {
         switchingToFallback = false;
         fallbackActive = true;
 
-        // 停止不必要的轮询和超时，避免在弹窗期间误报
         clearInterval(pollTimer);
         clearTimeout(hardTimeout);
+        clearTimeout(fallbackTimer);
 
         callbacks.onListeningChange?.(true);
         try {
@@ -600,7 +595,25 @@ export class SpeechService {
           fallbackActive = false;
           await cleanup('fallback done');
         }
-      }, 1500);
+      };
+
+      fallbackTimer = setTimeout(async () => {
+        if (lastHeardAt > 0) return;
+        log('fallback: no speech detected within 0.8s');
+        await triggerFallback();
+      }, 800);
+
+      const errorHandle = await (CapacitorSpeechRecognition as any).addListener?.('error', async (data: any) => {
+        const msg = String(data?.message || data?.error || '语音识别失败');
+        log('error', data);
+        if (!fallbackActive && !switchingToFallback && !cleanedUp && !userStopped) {
+          log('error received, triggering fallback immediately');
+          await triggerFallback();
+        } else {
+          callbacks.onError?.(msg);
+          callbacks.onListeningChange?.(false);
+        }
+      });
 
       log('start', { language: options.language || 'zh-CN' });
       const startSilent = CapacitorSpeechRecognition.start({

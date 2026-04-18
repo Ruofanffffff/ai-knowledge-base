@@ -55,23 +55,6 @@ function WikiIcon({ active }: { active: boolean }) {
   );
 }
 
-function SiChainIcon({ active }: { active: boolean }) {
-  const c = active ? '#6366F1' : '#9CA3AF';
-  return (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <circle cx="11" cy="11" r="2.5" fill={active ? '#6366F1' : 'none'} stroke={c} strokeWidth="1.5" />
-      <circle cx="4" cy="5" r="2" fill={active ? 'rgba(99,102,241,0.3)' : 'none'} stroke={c} strokeWidth="1.5" />
-      <circle cx="18" cy="5" r="2" fill={active ? 'rgba(99,102,241,0.3)' : 'none'} stroke={c} strokeWidth="1.5" />
-      <circle cx="4" cy="17" r="2" fill={active ? 'rgba(99,102,241,0.3)' : 'none'} stroke={c} strokeWidth="1.5" />
-      <circle cx="18" cy="17" r="2" fill={active ? 'rgba(99,102,241,0.3)' : 'none'} stroke={c} strokeWidth="1.5" />
-      <line x1="6" y1="6.5" x2="9.2" y2="9.8" stroke={c} strokeWidth="1.2" strokeLinecap="round" />
-      <line x1="16" y1="6.5" x2="12.8" y2="9.8" stroke={c} strokeWidth="1.2" strokeLinecap="round" />
-      <line x1="6" y1="15.5" x2="9.2" y2="12.2" stroke={c} strokeWidth="1.2" strokeLinecap="round" />
-      <line x1="16" y1="15.5" x2="12.8" y2="12.2" stroke={c} strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function SiCircleIcon({ active }: { active: boolean }) {
   const c = active ? '#6366F1' : '#9CA3AF';
   return (
@@ -100,7 +83,6 @@ const NAV_ITEMS = [
   { path: '/home', label: '拾思', Icon: HiBrainIcon },
   { path: '/siku', label: '思库', Icon: SiKuIcon },
   { path: '/wiki', label: 'Wiki', Icon: WikiIcon },
-  { path: '/sichain', label: '思链', Icon: SiChainIcon },
   { path: '/profile', label: '我的', Icon: ProfileIcon },
 ].filter(i => isWikiEnabled() || i.path !== '/wiki');
 

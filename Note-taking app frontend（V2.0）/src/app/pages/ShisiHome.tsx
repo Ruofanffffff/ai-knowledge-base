@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { Capacitor } from '@capacitor/core';
-import { ChevronRight, Inbox, Mic, Sparkles, Square } from 'lucide-react';
+import { ChevronRight, Inbox, Sparkles } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { useNotes } from '../components/context/NoteContext';
@@ -47,7 +47,6 @@ export function ShisiHome() {
   const location = useLocation();
   const { notes, addNote, deleteNote } = useNotes();
   const [input, setInput] = useState('');
-  const [isListening, setIsListening] = useState(false);
   const [cloudDictationEnabled, setCloudDictationEnabled] = useState(() => {
     try {
       const v = String(localStorage.getItem('stt_provider') || '').trim();
@@ -57,26 +56,8 @@ export function ShisiHome() {
     }
   });
   const [cloudPrivacyOpen, setCloudPrivacyOpen] = useState(false);
-  const [cloudPrivacyIntent, setCloudPrivacyIntent] = useState<null | { enableCloud?: boolean; startMic?: boolean }>(null);
-  const stopListeningRef = useRef<null | (() => Promise<void>)>(null);
+  const [cloudPrivacyIntent, setCloudPrivacyIntent] = useState<null | { enableCloud?: boolean }>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const dictationSessionRef = useRef(0);
-  const dictationActiveSessionRef = useRef<number | null>(null);
-  const dictationEndTimerRef = useRef<any>(null);
-  const dictationBaseRef = useRef('');
-  const dictationInterimRef = useRef('');
-  const dictationUserEditedRef = useRef(false);
-  const micHoldRef = useRef({ active: false, startY: 0, cancelled: false });
-  const suppressNextSttErrorRef = useRef(false);
-  const sttDebug = useMemo(() => {
-    try {
-      return new URLSearchParams(window.location.search).get('sttDebug') === '1';
-    } catch {
-      return false;
-    }
-  }, []);
-  const [sttDebugTick, setSttDebugTick] = useState(0);
-  const sttDebugRef = useRef({ provider: 'none', partial: 0, final: 0, chunks: 0, lastEventAt: 0, lastTextLen: 0 });
   const cloudSupported = Capacitor.isNativePlatform();
   const providerForced = useMemo(() => {
     const envPreferred = String((import.meta as any)?.env?.VITE_STT_PROVIDER || '').trim();
@@ -104,54 +85,11 @@ export function ShisiHome() {
   };
 
   const writeCloudDictationEnabled = async (enabled: boolean) => {
-    if (enabled && isListening) {
-      await stopListeningRef.current?.().catch(() => {});
-      stopListeningRef.current = null;
-      setIsListening(false);
-      dictationActiveSessionRef.current = null;
-      dictationInterimRef.current = '';
-    }
-    if (!enabled && isListening) {
-      await stopListeningRef.current?.().catch(() => {});
-      stopListeningRef.current = null;
-      setIsListening(false);
-      dictationActiveSessionRef.current = null;
-      dictationInterimRef.current = '';
-    }
     try {
       if (enabled) localStorage.setItem('stt_provider', 'cloud_streaming');
       else localStorage.removeItem('stt_provider');
     } catch {}
     setCloudDictationEnabled(enabled);
-    setSttDebugTick((v) => v + 1);
-  };
-
-  const applyDictationText = (sessionId: number, text: string, kind: 'partial' | 'final') => {
-    if (dictationActiveSessionRef.current !== sessionId) return;
-    const t = String(text || '').trim();
-    if (!t) return;
-    const base = dictationBaseRef.current;
-    const sep = base && !/\s$/.test(base) ? ' ' : '';
-    if (kind === 'final') {
-      dictationBaseRef.current = `${base}${sep}${t}`;
-      dictationInterimRef.current = '';
-      setInput(dictationBaseRef.current);
-    } else {
-      dictationInterimRef.current = t;
-      setInput(`${base}${sep}${t}`);
-    }
-    sttDebugRef.current.lastEventAt = Date.now();
-    sttDebugRef.current.lastTextLen = t.length;
-    if (kind === 'final') sttDebugRef.current.final += 1;
-    else sttDebugRef.current.partial += 1;
-    try {
-      requestAnimationFrame(() => {
-        const el = textareaRef.current;
-        if (!el) return;
-        const len = el.value.length;
-        el.setSelectionRange(len, len);
-      });
-    } catch {}
   };
 
   const inboxNotes = useMemo(() => {
@@ -234,102 +172,6 @@ export function ShisiHome() {
     }
   };
 
-  useEffect(() => {
-    return () => {
-      stopListeningRef.current?.().catch(() => {});
-    };
-  }, []);
-
-  const handleMicToggle = async () => {
-    if (stopListeningRef.current && isListening) {
-      await stopListeningRef.current?.();
-      stopListeningRef.current = null;
-      setIsListening(false);
-      dictationActiveSessionRef.current = null;
-      dictationInterimRef.current = '';
-      return;
-    }
-    if (stopListeningRef.current && !isListening) {
-      stopListeningRef.current = null;
-    }
-
-    const provider = SpeechService.getProvider();
-    if (provider === 'cloud_streaming' && !readCloudPrivacyAck()) {
-      setCloudPrivacyIntent({ startMic: true });
-      setCloudPrivacyOpen(true);
-      return;
-    }
-
-    setIsListening(true);
-    const availability = await SpeechService.getAvailability();
-    if (!availability.available) {
-      setIsListening(false);
-      toast.error('当前环境不支持语音识别');
-      return;
-    }
-
-    dictationSessionRef.current += 1;
-    const sessionId = dictationSessionRef.current;
-    dictationActiveSessionRef.current = sessionId;
-    try {
-      clearTimeout(dictationEndTimerRef.current);
-    } catch {}
-    dictationEndTimerRef.current = null;
-    dictationUserEditedRef.current = false;
-    dictationBaseRef.current = input.trimEnd();
-    dictationInterimRef.current = '';
-    sttDebugRef.current = { provider: SpeechService.getProvider(), partial: 0, final: 0, chunks: 0, lastEventAt: Date.now(), lastTextLen: 0 };
-    setSttDebugTick((v) => v + 1);
-
-    const { stop, started } = await SpeechService.startListening(
-      { language: 'zh-CN' },
-      {
-        onProvider: (p) => {
-          sttDebugRef.current.provider = p;
-          setSttDebugTick((v) => v + 1);
-        },
-        onChunk: (seq) => {
-          sttDebugRef.current.chunks = seq;
-          setSttDebugTick((v) => v + 1);
-        },
-        onPartial: (text) => applyDictationText(sessionId, text, 'partial'),
-        onFinal: (text) => applyDictationText(sessionId, text, 'final'),
-        onListeningChange: (listening) => {
-          setIsListening(listening);
-          if (!listening) {
-            stopListeningRef.current = null;
-            dictationInterimRef.current = '';
-            if (dictationActiveSessionRef.current === sessionId) {
-              dictationEndTimerRef.current = setTimeout(() => {
-                if (dictationActiveSessionRef.current === sessionId) {
-                  dictationActiveSessionRef.current = null;
-                }
-              }, 4000);
-            }
-          }
-        },
-        onError: (message) => {
-          if (suppressNextSttErrorRef.current) {
-            suppressNextSttErrorRef.current = false;
-            return;
-          }
-          toast.error(message);
-          stopListeningRef.current = null;
-          setIsListening(false);
-          dictationActiveSessionRef.current = null;
-          dictationInterimRef.current = '';
-        },
-      }
-    );
-    if (!started) {
-      stopListeningRef.current = null;
-      setIsListening(false);
-      dictationActiveSessionRef.current = null;
-      return;
-    }
-    stopListeningRef.current = stop;
-  };
-
   const preview = inboxNotes.slice(0, 3);
 
   useEffect(() => {
@@ -398,72 +240,6 @@ export function ShisiHome() {
                 <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 2 }}>无需分类，直接进入收件箱</p>
               </div>
             </div>
-            <div className="relative flex items-center justify-center">
-              {isListening &&
-                [0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute rounded-2xl pointer-events-none"
-                    initial={{ opacity: 0.0, scale: 1 }}
-                    animate={{ opacity: [0.35, 0.0], scale: [1, 2.0] }}
-                    transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.18, ease: 'easeOut' }}
-                    style={{
-                      width: 48,
-                      height: 48,
-                      border: '1px solid rgba(239,68,68,0.55)',
-                    }}
-                  />
-                ))}
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                onPointerDown={(e) => {
-                  if (isListening) return;
-                  micHoldRef.current = { active: true, startY: e.clientY, cancelled: false };
-                  handleMicToggle().catch(() => {});
-                }}
-                onPointerMove={(e) => {
-                  if (!micHoldRef.current.active) return;
-                  const dy = e.clientY - micHoldRef.current.startY;
-                  if (dy < -36) micHoldRef.current.cancelled = true;
-                }}
-                onPointerUp={() => {
-                  if (!micHoldRef.current.active) return;
-                  const cancelled = micHoldRef.current.cancelled;
-                  micHoldRef.current.active = false;
-                  if (!isListening) return;
-                  if (cancelled) {
-                    suppressNextSttErrorRef.current = true;
-                    dictationActiveSessionRef.current = null;
-                    dictationInterimRef.current = '';
-                    setInput(dictationBaseRef.current);
-                  }
-                  stopListeningRef.current?.().catch(() => {});
-                }}
-                onPointerCancel={() => {
-                  if (!micHoldRef.current.active) return;
-                  micHoldRef.current.active = false;
-                  if (!isListening) return;
-                  suppressNextSttErrorRef.current = true;
-                  dictationActiveSessionRef.current = null;
-                  dictationInterimRef.current = '';
-                  setInput(dictationBaseRef.current);
-                  stopListeningRef.current?.().catch(() => {});
-                }}
-                className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                animate={{
-                  background: isListening
-                    ? 'linear-gradient(135deg, #EF4444, #F97316)'
-                    : 'rgba(99,102,241,0.08)',
-                  boxShadow: isListening ? '0 0 18px rgba(239,68,68,0.35)' : 'none',
-                }}
-                transition={{ type: 'spring', stiffness: 420, damping: 26 }}
-                style={{
-                  border: isListening ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(99,102,241,0.16)',
-                }}
-              >
-                {isListening ? <Square size={16} style={{ color: 'white' }} /> : <Mic size={18} style={{ color: '#6366F1' }} />}
-              </motion.button>
-            </div>
           </div>
 
           <div className="mt-4">
@@ -473,13 +249,8 @@ export function ShisiHome() {
               onChange={(e) => {
                 const v = e.target.value;
                 setInput(v);
-                if (isListening) {
-                  dictationUserEditedRef.current = true;
-                  dictationBaseRef.current = v.trimEnd();
-                  dictationInterimRef.current = '';
-                }
               }}
-              placeholder={isListening ? '松开结束，上滑取消' : '此刻想到什么？一句话也可以…'}
+              placeholder="此刻想到什么？一句话也可以…"
               className="w-full p-4 rounded-3xl outline-none resize-none"
               rows={4}
               style={{ background: 'var(--hi-input-bg)', border: '1px solid var(--hi-card-border)', color: 'var(--hi-text-primary)', fontSize: '14px', lineHeight: 1.6 }}
@@ -544,19 +315,9 @@ export function ShisiHome() {
                 />
               </motion.button>
             </div>
-            {sttDebug && (
-              <div
-                className="mt-2 px-3 py-2 rounded-2xl"
-                data-tick={sttDebugTick}
-                style={{ background: 'rgba(30,27,75,0.08)', border: '1px solid rgba(30,27,75,0.10)', color: 'var(--hi-text-secondary)', fontSize: '11px' }}>
-                <div>listening: {String(isListening)}</div>
-                <div>provider: {String(sttDebugRef.current.provider)} · chunks: {sttDebugRef.current.chunks}</div>
-                <div>partial: {sttDebugRef.current.partial} · final: {sttDebugRef.current.final} · lastLen: {sttDebugRef.current.lastTextLen}</div>
-              </div>
-            )}
             <div className="flex items-center justify-between mt-3">
-              <span style={{ color: isListening ? '#EF4444' : 'var(--hi-text-secondary)', fontSize: '11px', fontWeight: isListening ? 800 : 400 }}>
-                {isListening ? '松开结束，上滑取消' : input.trim() ? `${input.trim().length} 字` : '按住说话，上滑取消'}
+              <span style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', fontWeight: 400 }}>
+                {input.trim() ? `${input.trim().length} 字` : ''}
               </span>
               <motion.button
                 whileTap={{ scale: 0.97 }}
@@ -710,9 +471,6 @@ export function ShisiHome() {
                 if (intent?.enableCloud) {
                   await writeCloudDictationEnabled(true);
                   toast.success('云听写已开启');
-                }
-                if (intent?.startMic) {
-                  await handleMicToggle();
                 }
               }}
             >
