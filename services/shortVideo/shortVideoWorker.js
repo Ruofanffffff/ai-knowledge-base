@@ -47,7 +47,7 @@ async function processOne(source) {
   const tags = Array.from(new Set(['短视频', source.platform, ...(quick.topics || [])])).filter(Boolean);
   const noteQuick = await noteDAL.createNote({
     userId: source.userId,
-    content: renderMarkdownNote({ title: meta.title }, meta.finalUrl || source.originalUrl, quick, null),
+    content: renderMarkdownNote({ title: meta.title }, meta.finalUrl || source.originalUrl, quick, null, source.inputText || ''),
     tags,
     status: 'inbox',
   });
@@ -75,7 +75,7 @@ async function processOne(source) {
 
   const noteRefined = await noteDAL.createNote({
     userId: source.userId,
-    content: renderMarkdownNote({ title: meta.title }, meta.finalUrl || source.originalUrl, quick, refined),
+    content: renderMarkdownNote({ title: meta.title }, meta.finalUrl || source.originalUrl, quick, refined, source.inputText || ''),
     tags,
     status: 'inbox',
   });

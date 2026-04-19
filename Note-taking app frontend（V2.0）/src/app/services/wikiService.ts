@@ -56,6 +56,7 @@ export const wikiService = {
   health: () => api.get('/wiki/health'),
   compileSource: (data: { sourceId: string; sourceType: string }) => api.post('/wiki/compile-source', data),
   getPages: (params?: { type?: string; limit?: number }) => api.get('/wiki/pages', { params }),
+  getPagesBySource: (sourceId: string) => api.get(`/wiki/pages/by-source/${sourceId}`),
   getPage: (slug: string) => api.get(`/wiki/pages/${slug}`)
 };
 

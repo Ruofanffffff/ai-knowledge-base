@@ -49,6 +49,18 @@ router.get('/pages', authMiddleware, async (req, res) => {
   }
 });
 
+// [NEW] Get Wiki pages generated from a specific source (note, document, etc.)
+router.get('/pages/by-source/:sourceId', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const pages = await wikiService.getPagesBySourceId(userId, req.params.sourceId);
+    res.json({ success: true, data: pages });
+  } catch (error) {
+    console.error('[WikiRoutes] getPagesBySourceId error:', error);
+    res.status(500).json({ success: false, error: String(error?.message || error || 'get_failed') });
+  }
+});
+
 // [NEW] Get single Wiki page by slug
 router.get('/pages/:slug', authMiddleware, async (req, res) => {
   try {

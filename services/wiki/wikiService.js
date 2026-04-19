@@ -227,6 +227,10 @@ async function getPage(userId, slug) {
   return wikiDAL.getPageBySlug(userId, slug);
 }
 
+async function getPagesBySourceId(userId, sourceId) {
+  return wikiDAL.getPagesBySourceId(userId, sourceId);
+}
+
 module.exports = {
   compileSource,
   compileSourceById,
@@ -235,4 +239,5 @@ module.exports = {
   health,
   _compiler: compiler,
   getPage,
+  getPagesBySourceId,
 };

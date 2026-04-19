@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { ParticleBackground } from '../components/ParticleBackground';
 
 import { documentService } from '../services/documentService';
+import { wikiService } from '../services/wikiService';
 import { api } from '../services/api';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1057,6 +1058,20 @@ export function NoteCreate() {
   const [tagInput, setTagInput] = useState('');
   const [showTagPanel, setShowTagPanel] = useState(false);
 
+  // Derived Wiki Pages
+  const [derivedWikiPages, setDerivedWikiPages] = useState<any[]>([]);
+  useEffect(() => {
+    if (existingNote?.id) {
+      wikiService.getPagesBySource(existingNote.id)
+        .then(res => {
+          if (res.data?.success) {
+            setDerivedWikiPages(res.data.data || []);
+          }
+        })
+        .catch(err => console.error('Failed to load derived wiki pages:', err));
+    }
+  }, [existingNote?.id]);
+
   /* ── High-frequency tags derived from all saved notes ──────── */
   const freqTags = useMemo(() => {
     const freq: Record<string, number> = {};
@@ -1939,6 +1954,42 @@ export function NoteCreate() {
                     </button>
                   </span>
                 ))}
+              </div>
+            )}
+
+            {/* ── Derived Wiki Graph ── */}
+            {aiPanel === 'none' && derivedWikiPages.length > 0 && (
+              <div className="px-4 py-3 mx-4 mt-2 mb-2 rounded-2xl" style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)', boxShadow: '0 2px 12px rgba(99,102,241,0.06)' }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles size={14} style={{ color: '#10B981' }} />
+                  <span style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 800 }}>衍生思链图谱</span>
+                </div>
+                <div className="flex flex-col items-center gap-2 py-2 relative">
+                  {/* Central Node (The Note) */}
+                  <div className="px-3 py-1.5 rounded-full text-center z-10 relative" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                    <span style={{ color: '#4F46E5', fontSize: '12px', fontWeight: 800 }}>
+                      当前笔记
+                    </span>
+                  </div>
+                  {/* Connecting Line */}
+                  <div className="w-px h-6" style={{ background: 'linear-gradient(to bottom, rgba(99,102,241,0.4), rgba(16,185,129,0.4))' }}></div>
+                  {/* Derived Nodes */}
+                  <div className="flex flex-wrap justify-center gap-3 w-full">
+                    {derivedWikiPages.map(wp => (
+                      <button
+                        key={wp.id}
+                        onClick={() => navigate(`/wiki/${wp.slug}`)}
+                        className="px-3 py-1.5 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 z-10 relative"
+                        style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', boxShadow: '0 2px 6px rgba(16,185,129,0.08)' }}
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }}></div>
+                        <span style={{ color: '#059669', fontSize: '12px', fontWeight: 700 }}>
+                          {wp.title || wp.slug}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 

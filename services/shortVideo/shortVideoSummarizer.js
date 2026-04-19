@@ -31,16 +31,20 @@ async function generateQuickNote(meta, userText) {
 
   const input = buildInputText(meta, userText);
   const prompt = [
-    '你是拾思（Shisi）的内容整理助手。用户投递了一条短视频链接或分享文案，请将其整理成“速记版笔记”。',
+    '你是拾思（Shisi）的内容整理助手。用户投递了一条短视频链接或分享文案（可能是长达几十分钟的音频/视频文案），请将其整理成“笔记”。',
     '要求：',
     '1) 只输出 JSON，不要输出任何多余文字。',
-    '2) 内容要短、可读、可执行：标题、要点、金句、行动建议。',
+    '2) 必须进行深度总结：',
+    '   - "summary"：一段信息量充足的摘要（3-5句话），交代核心背景与结论。',
+    '   - "content"：模块化、详尽的讲解。如果原内容较长，请分点、分段详尽阐述（支持Markdown格式）。绝对不要用一句话带过！',
+    '   - "quotes"：提取至少 3-5 条最有价值的原文金句（必须是原汁原味的金句）。',
+    '   - "nextAction"：具体、可落地的建议动作（写出1-2步具体该怎么做）。',
     '3) 如果信息不足，明确标注 unknown，不要编造事实。',
     '输出 JSON 格式：',
     '{',
     '  "summary": "摘要",',
     '  "content": "主要内容（模块化详细讲解）",',
-    '  "quotes": ["金句1", "金句2"],',
+    '  "quotes": ["金句1", "金句2", "金句3", "金句4"],',
     '  "nextAction": "建议动作"',
     '}',
     '',
@@ -104,7 +108,7 @@ async function generateRefinedNote(meta, userText, quick) {
   };
 }
 
-function renderMarkdownNote(meta, url, quick, refined) {
+function renderMarkdownNote(meta, url, quick, refined, originalText) {
   const lines = [];
   const title = (quick?.title || meta?.title || '短视频笔记').trim();
   lines.push(`# ${title}`);
@@ -129,6 +133,11 @@ function renderMarkdownNote(meta, url, quick, refined) {
   if (quick?.nextAction) {
     lines.push('## 建议动作');
     lines.push(`- ${quick.nextAction}`);
+    lines.push('');
+  }
+  if (originalText && originalText.trim()) {
+    lines.push('## 原文转写');
+    lines.push(originalText.trim());
     lines.push('');
   }
   return lines.join('\n').trim() + '\n';

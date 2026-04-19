@@ -316,6 +316,44 @@ async function createSourceRef(input) {
   });
 }
 
+async function getPagesBySourceId(userId, noteId) {
+  // Find the WikiSource corresponding to this note/source ID
+  const sources = await prisma.wikiSource.findMany({
+    where: { userId: String(userId), sourceId: String(noteId) },
+    select: { id: true },
+  });
+  if (!sources.length) return [];
+  const wsIds = sources.map(s => s.id);
+
+  // Find all refs that link these WikiSources to WikiPages
+  const refs = await prisma.wikiSourceRef.findMany({
+    where: { sourceId: { in: wsIds } },
+    select: { pageId: true },
+  });
+  if (!refs.length) return [];
+  const pageIds = refs.map(r => r.pageId);
+
+  // Query the actual WikiPages
+  const pages = await prisma.wikiPage.findMany({
+    where: { userId: String(userId), id: { in: pageIds } },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      type: true,
+      summary: true,
+      tags: true,
+      related: true,
+    }
+  });
+
+  return pages.map(p => ({
+    ...p,
+    tags: safeJson(p.tags, []),
+    related: safeJson(p.related, []),
+  }));
+}
+
 module.exports = {
   createSource,
   getSourceById,
@@ -327,6 +365,7 @@ module.exports = {
   updateCompileRun,
   listPages,
   getPageBySlug,
+  getPagesBySourceId,
   upsertPageBySlug,
   createSourceRef,
   _prisma: prisma,
