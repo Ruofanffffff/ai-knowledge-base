@@ -18,3 +18,8 @@
   - [x] SubTask 4.1: Implement long-press on BottomNav Mic button.
   - [x] SubTask 4.2: Add slide-up to cancel and visual overlay.
   - [x] SubTask 4.3: Save text as new note via useNotes.
+- [x] Task 5: Refactor WikiDetail.tsx
+  - [x] SubTask 5.1: Install react-markdown and remark-gfm
+  - [x] SubTask 5.2: Remove health check, healthResult, and entry ID cards
+  - [x] SubTask 5.3: Use ReactMarkdown to render entry.markdown || entry.content
+  - [x] SubTask 5.4: Render entry.summary, entry.sources, entry.related nicely

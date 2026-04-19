@@ -19,3 +19,6 @@
 * [x] Mobile STT: Permission and error handling works (toast feedback)
 
 * [x] Global STT: BottomNav Mic long-press records and slide-up cancels, saving to Inbox
+
+* [x] Refactor WikiDetail.tsx to use ReactMarkdown and remark-gfm, and remove health check components
+
