@@ -617,8 +617,8 @@ export function NoteList() {
         {/* <StatusBar /> */}
 
         {/* App header row */}
-        <div className="flex items-center justify-between px-5 pb-3 pt-1">
-          <div>
+        <div className="flex items-center justify-between px-4 pb-3 pt-1 gap-2">
+          <div className="flex-shrink-0">
             <p style={{ color: '#6366F1', fontSize: '12px', fontWeight: 500 }}>
               {greeting} 👋
             </p>
@@ -627,36 +627,36 @@ export function NoteList() {
             </h1>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide py-1 pr-1 flex-1 justify-end">
             {/* Search toggle */}
             <button
               onClick={() => setSearchOpen(v => !v)}
-              className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-90"
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 flex-shrink-0"
               style={{
                 background: searchOpen ? 'rgba(99,102,241,0.12)' : 'var(--hi-chip-bg)',
                 border: searchOpen ? '1px solid rgba(99,102,241,0.3)' : '1px solid var(--hi-card-border)',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
               }}
             >
-              <Search size={18} style={{ color: searchOpen ? '#6366F1' : 'var(--hi-text-dim)' }} />
+              <Search size={16} style={{ color: searchOpen ? '#6366F1' : 'var(--hi-text-dim)' }} />
             </button>
 
             <button
               onClick={() => navigate('/siku/create')}
-              className="h-10 px-3 rounded-2xl flex items-center gap-1.5 transition-all active:scale-90"
+              className="h-9 px-2.5 rounded-xl flex items-center gap-1 transition-all active:scale-90 flex-shrink-0"
               style={{
                 background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
                 boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
               }}
             >
-              <Plus size={18} color="white" strokeWidth={2.5} />
-              <span style={{ color: 'white', fontSize: '12.5px', fontWeight: 800 }}>新建</span>
+              <Plus size={16} color="white" strokeWidth={2.5} />
+              <span style={{ color: 'white', fontSize: '12px', fontWeight: 800 }}>新建</span>
             </button>
 
             <button
               onClick={openUploadDocument}
               disabled={uploadingDocument}
-              className="h-10 px-3 rounded-2xl flex items-center gap-1.5 transition-all active:scale-90 disabled:opacity-60 disabled:active:scale-100"
+              className="h-9 px-2.5 rounded-xl flex items-center gap-1 transition-all active:scale-90 disabled:opacity-60 disabled:active:scale-100 flex-shrink-0"
               style={{
                 background: 'var(--hi-chip-bg)',
                 border: '1px solid var(--hi-card-border)',
@@ -664,25 +664,25 @@ export function NoteList() {
               }}
             >
               {uploadingDocument ? (
-                <Loader2 size={16} className="animate-spin" style={{ color: '#10B981' }} />
+                <Loader2 size={14} className="animate-spin" style={{ color: '#10B981' }} />
               ) : (
-                <Upload size={16} style={{ color: '#10B981' }} />
+                <Upload size={14} style={{ color: '#10B981' }} />
               )}
-              <span style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', fontWeight: 800 }}>上传</span>
+              <span style={{ color: 'var(--hi-text-primary)', fontSize: '12px', fontWeight: 800 }}>上传</span>
             </button>
 
             {wikiEnabled && (
               <button
                 onClick={() => navigate('/wiki')}
-                className="h-10 px-3 rounded-2xl flex items-center gap-1.5 transition-all active:scale-90"
+                className="h-9 px-2.5 rounded-xl flex items-center gap-1 transition-all active:scale-90 flex-shrink-0"
                 style={{
                   background: 'var(--hi-chip-bg)',
                   border: '1px solid var(--hi-card-border)',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                 }}
               >
-                <BookOpen size={16} style={{ color: '#6366F1' }} />
-                <span style={{ color: 'var(--hi-text-primary)', fontSize: '12.5px', fontWeight: 800 }}>Wiki</span>
+                <BookOpen size={14} style={{ color: '#6366F1' }} />
+                <span style={{ color: 'var(--hi-text-primary)', fontSize: '12px', fontWeight: 800 }}>思链</span>
               </button>
             )}
           </div>

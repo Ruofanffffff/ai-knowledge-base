@@ -57,7 +57,7 @@ export function Inbox() {
         const list = Array.isArray(res?.data?.data) ? (res.data.data as ShortVideoSource[]) : [];
         if (!alive) return;
         const display = list
-          .filter((s) => s.status === 'queued' || s.status === 'running' || s.status === 'failed' || s.status === 'succeeded')
+          .filter((s) => s.status === 'queued' || s.status === 'running' || s.status === 'failed')
           .slice(0, 10);
 
         setVideoSources(display);

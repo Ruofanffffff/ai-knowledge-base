@@ -188,21 +188,44 @@ export function WikiDetail() {
               boxShadow: '0 2px 16px rgba(99,102,241,0.07), 0 1px 4px rgba(0,0,0,0.04)',
             }}
           >
-            <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 900 }}>保存内容</p>
             {loadingEntry ? (
                <div className="py-4 text-center">
                  <RefreshCcw size={20} className="animate-spin mx-auto" style={{ color: '#6366F1' }} />
                </div>
             ) : entry ? (
-              <pre className="mt-2 whitespace-pre-wrap break-words" style={{ color: 'var(--hi-text-secondary)', fontSize: '12px', lineHeight: 1.6 }}>
-                {(() => {
-                  try {
-                    return JSON.stringify(entry, null, 2);
-                  } catch {
-                    return String(entry);
-                  }
-                })()}
-              </pre>
+              <div className="space-y-4">
+                {entry.type && (
+                  <div>
+                    <span className="px-2 py-1 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366F1', fontSize: '11px', fontWeight: 700 }}>
+                      {entry.type === 'concept' ? '概念' : entry.type === 'entity' ? '实体' : entry.type === 'insight' ? '洞察' : entry.type}
+                    </span>
+                  </div>
+                )}
+                
+                {(entry.content || entry.rawContent) && (
+                  <div style={{ color: 'var(--hi-text-primary)', fontSize: '13.5px', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    {entry.content || entry.rawContent}
+                  </div>
+                )}
+
+                {Array.isArray(entry.related) && entry.related.length > 0 && (
+                  <div className="pt-3 mt-3" style={{ borderTop: '1px solid var(--hi-card-border)' }}>
+                    <p style={{ color: 'var(--hi-text-primary)', fontSize: '13px', fontWeight: 900, mb: 2 }}>关联节点</p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {entry.related.map((r: string) => (
+                        <button
+                          key={r}
+                          onClick={() => navigate(`/wiki/${r}`)}
+                          className="px-3 py-1.5 rounded-full active:scale-95 transition-all"
+                          style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10B981', fontSize: '12px', fontWeight: 600 }}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '12px', lineHeight: 1.6 }}>
                 暂无记录。
