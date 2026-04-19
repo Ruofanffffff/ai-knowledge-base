@@ -37,7 +37,7 @@ function SiKuIcon({ active }: { active: boolean }) {
   );
 }
 
-function WikiIcon({ active }: { active: boolean }) {
+function SiChainIcon({ active }: { active: boolean }) {
   const c = active ? '#6366F1' : '#9CA3AF';
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
