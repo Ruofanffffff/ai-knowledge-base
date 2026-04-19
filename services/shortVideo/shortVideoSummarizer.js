@@ -38,15 +38,13 @@ async function generateQuickNote(meta, userText) {
     '3) 如果信息不足，明确标注 unknown，不要编造事实。',
     '输出 JSON 格式：',
     '{',
-    '  "title": string,',
-    '  "summary": string,',
-    '  "bullets": string[],',
-    '  "quotes": string[],',
-    '  "nextAction": string,',
-    '  "topics": string[]',
+    '  "summary": "摘要",',
+    '  "content": "主要内容（模块化详细讲解）",',
+    '  "quotes": ["金句1", "金句2"],',
+    '  "nextAction": "建议动作"',
     '}',
     '',
-    '输入：',
+    '# 短视频内容：',
     input || '（无）',
   ].join('\n');
 
@@ -108,61 +106,30 @@ async function generateRefinedNote(meta, userText, quick) {
 
 function renderMarkdownNote(meta, url, quick, refined) {
   const lines = [];
-  const title = (quick?.title || '短视频笔记').trim();
+  const title = (quick?.title || meta?.title || '短视频笔记').trim();
   lines.push(`# ${title}`);
   lines.push('');
   if (url) lines.push(`来源：${url}`);
   lines.push('');
-  if (meta?.title && meta.title !== title) {
-    lines.push(`视频标题：${meta.title}`);
-    lines.push('');
-  }
   if (quick?.summary) {
-    lines.push('## 速记');
+    lines.push('## 摘要');
     lines.push(quick.summary);
     lines.push('');
   }
-  if (Array.isArray(quick?.bullets) && quick.bullets.length) {
-    lines.push('### 要点');
-    for (const b of quick.bullets) lines.push(`- ${b}`);
+  if (quick?.content) {
+    lines.push('## 主要内容（模块化详细讲解）');
+    lines.push(quick.content);
     lines.push('');
   }
   if (Array.isArray(quick?.quotes) && quick.quotes.length) {
-    lines.push('### 金句');
+    lines.push('## 金句');
     for (const q of quick.quotes) lines.push(`- ${q}`);
     lines.push('');
   }
   if (quick?.nextAction) {
-    lines.push('### 下一步');
+    lines.push('## 建议动作');
     lines.push(`- ${quick.nextAction}`);
     lines.push('');
-  }
-  if (refined) {
-    lines.push('## 精编');
-    if (refined.insight) {
-      lines.push(`一句话洞察：${refined.insight}`);
-      lines.push('');
-    }
-    if (Array.isArray(refined.keyPoints) && refined.keyPoints.length) {
-      lines.push('### 关键要点');
-      for (const p of refined.keyPoints) lines.push(`- ${p}`);
-      lines.push('');
-    }
-    if (Array.isArray(refined.steps) && refined.steps.length) {
-      lines.push('### 方法/步骤');
-      for (const s of refined.steps) lines.push(`- ${s}`);
-      lines.push('');
-    }
-    if (Array.isArray(refined.pitfalls) && refined.pitfalls.length) {
-      lines.push('### 常见误区');
-      for (const p of refined.pitfalls) lines.push(`- ${p}`);
-      lines.push('');
-    }
-    if (refined.nextAction) {
-      lines.push('### 建议行动');
-      lines.push(`- ${refined.nextAction}`);
-      lines.push('');
-    }
   }
   return lines.join('\n').trim() + '\n';
 }

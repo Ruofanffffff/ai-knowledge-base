@@ -24,6 +24,7 @@ function stripHtmlToPlainText(raw: unknown): string {
   return content
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
@@ -31,7 +32,8 @@ function stripHtmlToPlainText(raw: unknown): string {
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
-    .replace(/\s+/g, ' ')
+    .replace(/[ \t]+/g, ' ') // Only replace multiple spaces/tabs with single space, don't destroy newlines
+    .replace(/\n\s*\n/g, '\n\n') // Normalize multiple newlines
     .trim();
 }
 
@@ -264,30 +266,7 @@ export function Inbox() {
               const text = stripHtmlToPlainText(n.content);
               return (
                 <div key={n.id} className="relative rounded-3xl overflow-hidden" style={{ boxShadow: 'var(--hi-card-shadow)' }}>
-                  <div className="absolute inset-0 flex items-stretch justify-between">
-                    <div className="flex-1 flex items-center px-5" style={{ background: 'rgba(16,185,129,0.16)' }}>
-                      <div className="flex items-center gap-2" style={{ color: '#10B981', fontSize: '12.5px', fontWeight: 900 }}>
-                        <Check size={16} />
-                        右滑归档
-                      </div>
-                    </div>
-                    <div className="flex-1 flex items-center justify-end px-5" style={{ background: 'rgba(239,68,68,0.14)' }}>
-                      <div className="flex items-center gap-2" style={{ color: '#EF4444', fontSize: '12.5px', fontWeight: 900 }}>
-                        左滑删除
-                        <Trash2 size={16} />
-                      </div>
-                    </div>
-                  </div>
                   <motion.div
-                    drag="x"
-                    dragConstraints={{ left: -120, right: 120 }}
-                    dragElastic={0.12}
-                    dragMomentum={false}
-                    onDragEnd={(_, info) => {
-                      if (busyId === n.id) return;
-                      if (info.offset.x > 80) archive(n.id).catch(() => {});
-                      else if (info.offset.x < -80) remove(n.id).catch(() => {});
-                    }}
                     className="p-4 rounded-3xl"
                     style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}
                   >

@@ -82,9 +82,9 @@ function ProfileIcon({ active }: { active: boolean }) {
 const NAV_ITEMS = [
   { path: '/home', label: '拾思', Icon: HiBrainIcon },
   { path: '/siku', label: '思库', Icon: SiKuIcon },
-  { path: '/wiki', label: 'Wiki', Icon: WikiIcon },
+  { path: '/wiki', label: '思链', Icon: SiChainIcon },
   { path: '/profile', label: '我的', Icon: ProfileIcon },
-].filter(i => isWikiEnabled() || i.path !== '/wiki');
+];
 
 export function BottomNav() {
   const navigate = useNavigate();

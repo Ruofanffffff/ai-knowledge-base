@@ -94,7 +94,7 @@ export function WikiList() {
           <div>
             <p style={{ color: '#6366F1', fontSize: '12px', fontWeight: 600 }}>知识维基</p>
             <h1 style={{ color: 'var(--hi-text-primary)', fontSize: '24px', fontWeight: 900, lineHeight: 1.15 }}>
-              Wiki
+              思链
             </h1>
           </div>
 
@@ -187,7 +187,7 @@ export function WikiList() {
 
         <div className="px-4 pb-6">
           <div className="flex items-center justify-between mb-3">
-            <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>所有 Wiki</p>
+            <p style={{ color: 'var(--hi-text-primary)', fontSize: '14px', fontWeight: 900 }}>所有思链</p>
             <span style={{ color: '#9CA3AF', fontSize: '12px', fontWeight: 700 }}>{pages.length}</span>
           </div>
 
@@ -212,7 +212,7 @@ export function WikiList() {
               >
                 <BookOpen size={26} style={{ color: '#6366F1' }} />
               </div>
-              <p style={{ color: 'var(--hi-text-primary)', fontSize: '15px', fontWeight: 900 }}>还没有 Wiki 条目</p>
+              <p style={{ color: 'var(--hi-text-primary)', fontSize: '15px', fontWeight: 900 }}>还没有思链条目</p>
               <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '13px', lineHeight: 1.6 }}>
                 知识库由后台 LLM 自动提取生成
               </p>

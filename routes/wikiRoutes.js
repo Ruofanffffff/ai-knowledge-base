@@ -49,6 +49,19 @@ router.get('/pages', authMiddleware, async (req, res) => {
   }
 });
 
+// [NEW] Get single Wiki page by slug
+router.get('/pages/:slug', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const page = await wikiService.getPage(userId, req.params.slug);
+    if (!page) return res.status(404).json({ success: false, error: 'not_found' });
+    res.json({ success: true, data: page });
+  } catch (error) {
+    console.error('[WikiRoutes] getPage error:', error);
+    res.status(500).json({ success: false, error: String(error?.message || error || 'get_failed') });
+  }
+});
+
 router.get('/healthcheck', authMiddleware, async (req, res) => {
   try {
     const userId = req.userId;

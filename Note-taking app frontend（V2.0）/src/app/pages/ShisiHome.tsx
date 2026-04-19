@@ -263,57 +263,14 @@ export function ShisiHome() {
                 <div className="flex items-center gap-2">
                   <span style={{ color: 'var(--hi-text-primary)', fontSize: '12px', fontWeight: 800 }}>云听写</span>
                   <span style={{ color: 'var(--hi-text-secondary)', fontSize: '11px' }}>音频上行</span>
-                  {providerForced && (
-                    <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(148,163,184,0.18)', color: 'var(--hi-text-secondary)', fontSize: '10px', fontWeight: 700 }}>
-                      已固定
-                    </span>
-                  )}
-                  {!cloudSupported && (
-                    <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(148,163,184,0.18)', color: 'var(--hi-text-secondary)', fontSize: '10px', fontWeight: 700 }}>
-                      仅移动端
-                    </span>
-                  )}
+                  <span className="px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', fontSize: '10px', fontWeight: 700 }}>
+                    已开启
+                  </span>
                 </div>
                 <div className="truncate" style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 2 }}>
-                  开启后，语音音频会分片上传到服务器用于识别，可随时关闭
+                  语音会分片上传到服务器进行高精度识别
                 </div>
               </div>
-              <motion.button
-                whileTap={{ scale: providerForced || !cloudSupported ? 1 : 0.96 }}
-                disabled={providerForced || !cloudSupported}
-                onClick={async () => {
-                  const next = !cloudDictationEnabled;
-                  if (!next) {
-                    await writeCloudDictationEnabled(false);
-                    toast.success('云听写已关闭');
-                    return;
-                  }
-                  if (!readCloudPrivacyAck()) {
-                    setCloudPrivacyIntent({ enableCloud: true });
-                    setCloudPrivacyOpen(true);
-                    return;
-                  }
-                  await writeCloudDictationEnabled(true);
-                  toast.success('云听写已开启');
-                }}
-                className="w-12 h-7 rounded-full px-1 flex items-center"
-                style={{
-                  background: (providerForced ? SpeechService.getProvider() === 'cloud_streaming' : cloudDictationEnabled) ? 'rgba(16,185,129,0.85)' : 'rgba(148,163,184,0.28)',
-                  border: '1px solid rgba(148,163,184,0.25)',
-                  opacity: providerForced || !cloudSupported ? 0.55 : 1,
-                }}
-                aria-pressed={providerForced ? SpeechService.getProvider() === 'cloud_streaming' : cloudDictationEnabled}
-              >
-                <motion.div
-                  layout
-                  transition={{ type: 'spring', stiffness: 520, damping: 34 }}
-                  className="w-5 h-5 rounded-full"
-                  style={{
-                    background: 'white',
-                    marginLeft: (providerForced ? SpeechService.getProvider() === 'cloud_streaming' : cloudDictationEnabled) ? 'auto' : 0,
-                  }}
-                />
-              </motion.button>
             </div>
             <div className="flex items-center justify-between mt-3">
               <span style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', fontWeight: 400 }}>

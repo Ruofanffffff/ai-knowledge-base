@@ -91,14 +91,7 @@ function readPreferredProvider(): SpeechProvider | null {
 
 export class SpeechService {
   static getProvider(): SpeechProvider {
-    const preferred = readPreferredProvider();
-    if (preferred === 'cloud_streaming' && Capacitor.isNativePlatform()) return 'cloud_streaming';
-    if (preferred === 'native' && Capacitor.isNativePlatform()) return 'native';
-    if (preferred === 'web' && getWebSpeechCtor()) return 'web';
-    
-    if (Capacitor.isNativePlatform()) return 'native';
-    if (getWebSpeechCtor()) return 'web';
-    return 'none';
+    return Capacitor.isNativePlatform() ? 'cloud_streaming' : 'none';
   }
 
   static async getAvailability(): Promise<SpeechAvailability> {

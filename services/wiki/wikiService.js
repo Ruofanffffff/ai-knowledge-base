@@ -223,6 +223,10 @@ async function health() {
   return res;
 }
 
+async function getPage(userId, slug) {
+  return wikiDAL.getPageBySlug(userId, slug);
+}
+
 module.exports = {
   compileSource,
   compileSourceById,
@@ -230,4 +234,5 @@ module.exports = {
   healthcheck,
   health,
   _compiler: compiler,
+  getPage,
 };

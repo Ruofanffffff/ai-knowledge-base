@@ -114,7 +114,7 @@ export function WikiDetail() {
               <ArrowLeft size={18} style={{ color: 'var(--hi-text-primary)' }} />
             </button>
             <div className="min-w-0">
-              <p style={{ color: '#6366F1', fontSize: '12px', fontWeight: 700 }}>Wiki 条目</p>
+              <p style={{ color: '#6366F1', fontSize: '12px', fontWeight: 700 }}>思链条目</p>
               <h1 className="truncate" style={{ color: 'var(--hi-text-primary)', fontSize: '16px', fontWeight: 900, lineHeight: 1.2 }}>
                 {title}
               </h1>
