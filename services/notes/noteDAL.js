@@ -7,6 +7,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const { extractTags, normalizeTags } = require('./tagExtractor');
+const wikiDAL = require('../wiki/wikiDAL');
 
 const prisma = new PrismaClient();
 
@@ -295,6 +296,13 @@ async function deleteNote(noteId, userId) {
   const existingNote = await prisma.note.findUnique({ where });
   if (!existingNote) {
     throw new Error('Note not found');
+  }
+
+  // Delete related Wiki data (Sources, Refs, and Orphan Pages)
+  if (userId) {
+    await wikiDAL.deleteWikiDataBySourceId(userId, noteId).catch(err => {
+      console.error('[deleteNote] Failed to delete related Wiki data:', err);
+    });
   }
 
   const note = await prisma.note.delete({

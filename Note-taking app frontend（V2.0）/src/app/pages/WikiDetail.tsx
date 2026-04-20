@@ -77,7 +77,7 @@ export function WikiDetail() {
         <div className="flex items-center justify-between px-5 pb-3 pt-1 gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => navigate('/wiki')}
+              onClick={() => navigate(-1)}
               className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-90"
               style={{
                 background: 'var(--hi-chip-bg)',

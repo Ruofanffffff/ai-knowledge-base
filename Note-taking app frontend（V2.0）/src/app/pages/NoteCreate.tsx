@@ -1492,8 +1492,8 @@ export function NoteCreate() {
         setSavePhase('syncing');
       }, 1300);
 
-      // Navigate to SiChain
-      setTimeout(() => navigate('/sichain'), 2200);
+      // Navigate back to Siku
+      setTimeout(() => navigate('/siku'), 2200);
     } catch (error) {
       console.error('Save failed:', error);
       toast.error('保存失败，请重试');

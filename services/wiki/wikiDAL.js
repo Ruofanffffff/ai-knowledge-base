@@ -354,6 +354,45 @@ async function getPagesBySourceId(userId, noteId) {
   }));
 }
 
+async function deleteWikiDataBySourceId(userId, sourceId) {
+  // Find the WikiSource
+  const sources = await prisma.wikiSource.findMany({
+    where: { userId: String(userId), sourceId: String(sourceId) },
+    select: { id: true },
+  });
+  if (!sources.length) return;
+  const wsIds = sources.map(s => s.id);
+
+  // Find refs that link these WikiSources to WikiPages
+  const refs = await prisma.wikiSourceRef.findMany({
+    where: { sourceId: { in: wsIds } },
+    select: { pageId: true },
+  });
+  const pageIds = [...new Set(refs.map(r => r.pageId))];
+
+  // Delete refs
+  await prisma.wikiSourceRef.deleteMany({
+    where: { sourceId: { in: wsIds } },
+  });
+
+  // Delete WikiSource
+  await prisma.wikiSource.deleteMany({
+    where: { id: { in: wsIds } },
+  });
+
+  // For each page, check if it has any remaining refs. If not, delete it.
+  for (const pid of pageIds) {
+    const remainingRefs = await prisma.wikiSourceRef.count({
+      where: { pageId: pid },
+    });
+    if (remainingRefs === 0) {
+      await prisma.wikiPage.deleteMany({
+        where: { id: pid, userId: String(userId) },
+      });
+    }
+  }
+}
+
 module.exports = {
   createSource,
   getSourceById,
@@ -366,6 +405,7 @@ module.exports = {
   listPages,
   getPageBySlug,
   getPagesBySourceId,
+  deleteWikiDataBySourceId,
   upsertPageBySlug,
   createSourceRef,
   _prisma: prisma,

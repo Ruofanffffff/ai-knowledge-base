@@ -246,9 +246,8 @@ export function WikiList() {
                         {item.title || item.slug}
                       </p>
                       <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 4, lineHeight: 1.5 }}>
-                        {item.type || 'concept'}
-                        {' · '}
-                        {(item.related || []).length} 个关联
+                        {item.type === 'concept' ? '概念' : item.type === 'entity' ? '实体' : item.type === 'insight' ? '洞察' : item.type || '概念'}
+                        {(item.related && item.related.length > 0) ? ` · ${item.related.length} 个相关节点` : ''}
                       </p>
                     </div>
                     <ArrowRight size={16} style={{ color: '#10B981', flexShrink: 0, marginTop: 2 }} />
