@@ -8,7 +8,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 39
-        versionName "3.7.6"
+        versionName "3.7.7"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -34,7 +34,7 @@ android {
             signingConfig signingConfigs.release
             applicationVariants.all { variant ->
                 variant.outputs.all {
-                    outputFileName = "shisi-3.7.6.apk"
+                    outputFileName = "shisi-3.7.7.apk"
                 }
             }
         }

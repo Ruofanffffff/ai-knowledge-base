@@ -146,11 +146,11 @@ export function WikiList() {
             <div className="absolute top-0 left-0 right-0 h-1/2 rounded-t-[22px]" style={{ background: 'rgba(255,255,255,0.08)' }} />
             <div className="relative z-10 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: '12px', fontWeight: 600 }}>
-                  把对话与资料沉淀成洞察/概念
+                <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '12px', fontWeight: 600 }}>
+                  这里是你的专属知识大脑
                 </p>
-                <p style={{ color: 'white', fontSize: '18px', fontWeight: 900, lineHeight: 1.2, marginTop: 6 }}>
-                  一键进入可复用知识库
+                <p style={{ color: 'white', fontSize: '15px', fontWeight: 900, lineHeight: 1.4, marginTop: 4 }}>
+                  AI 已为你默默阅读并提炼出以下核心概念与洞察。
                 </p>
               </div>
               <div
@@ -212,9 +212,9 @@ export function WikiList() {
               >
                 <BookOpen size={26} style={{ color: '#6366F1' }} />
               </div>
-              <p style={{ color: 'var(--hi-text-primary)', fontSize: '15px', fontWeight: 900 }}>还没有思链条目</p>
-              <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '13px', lineHeight: 1.6 }}>
-                知识库由后台 LLM 自动提取生成
+              <p style={{ color: 'var(--hi-text-primary)', fontSize: '15px', fontWeight: 900 }}>这里是你的专属知识大脑</p>
+              <p className="mt-2 px-6" style={{ color: '#9CA3AF', fontSize: '13px', lineHeight: 1.6 }}>
+                目前还没有沉淀内容。<br/>AI 会在后台默默阅读你保存的思库笔记，并自动将它们提炼成可复用的概念与洞察。
               </p>
             </motion.div>
           ) : (
@@ -245,7 +245,16 @@ export function WikiList() {
                       <p className="truncate" style={{ color: 'var(--hi-text-primary)', fontWeight: 900, fontSize: '13.5px' }}>
                         {item.title || item.slug}
                       </p>
-                      <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: 4, lineHeight: 1.5 }}>
+                      
+                      {/* AI Provenance Label */}
+                      {item.sources && item.sources.length > 0 && (
+                        <p className="truncate mt-1.5 flex items-center gap-1" style={{ color: '#10B981', fontSize: '11px', fontWeight: 600 }}>
+                          <Sparkles size={10} />
+                          AI 提炼自你的笔记：{item.sources[0]?.title || '未命名'}
+                        </p>
+                      )}
+
+                      <p style={{ color: 'var(--hi-text-secondary)', fontSize: '11px', marginTop: item.sources && item.sources.length > 0 ? 2 : 4, lineHeight: 1.5 }}>
                         {item.type === 'concept' ? '概念' : item.type === 'entity' ? '实体' : item.type === 'insight' ? '洞察' : item.type || '概念'}
                         {(item.related && item.related.length > 0) ? ` · ${item.related.length} 个相关节点` : ''}
                       </p>
