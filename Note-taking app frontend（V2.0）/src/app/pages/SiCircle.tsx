@@ -910,9 +910,13 @@ export function SiCircle() {
       const { data } = await api.delete(`/community/posts/${id}`);
       if (data.success) {
         setPosts(prev => prev.filter(p => p.id !== id));
+        showToast('删除成功');
+      } else {
+        showToast('删除失败: ' + (data.error || '未知错误'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete failed', error);
+      showToast('删除失败: ' + (error.response?.data?.error || error.message));
     }
   };
 

@@ -104,14 +104,11 @@ function tagColor(tag?: string) {
   return TAG_COLORS[tag] ?? '#6366F1';
 }
 
-const TABS = ['笔记', '粉丝', '获赞', '收藏'] as const;
+const TABS = ['笔记'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_ICONS = {
   '笔记': FileText,
-  '粉丝': Users,
-  '获赞': Heart,
-  '收藏': Bookmark,
 };
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
@@ -461,11 +458,10 @@ export function MyHomepage() {
           >
             {[
               { label: '笔记', value: notes.length },
-              { label: '粉丝', value: MOCK_USERS.length },
-              { label: '关注', value: 38 },
-              { label: '获赞', value: totalLikes + 128 },
+              { label: '关注', value: 0 },
+              { label: '获赞', value: 0 },
             ].map((s, i) => (
-              <div key={s.label} className="flex-1 flex flex-col items-center gap-0.5">
+              <div key={s.label} className="flex-1 flex flex-col items-center gap-0.5 relative">
                 {i > 0 && (
                   <div className="absolute" style={{ left: 0, top: '20%', bottom: '20%', width: '1px', background: 'rgba(255,255,255,0.15)' }} />
                 )}

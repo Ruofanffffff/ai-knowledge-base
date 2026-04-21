@@ -703,33 +703,6 @@ export function DocumentDetail() {
                 </div>
               )}
 
-              {contentView.kind === 'json' && contentView.rawJson && (
-                <details
-                  className="rounded-[18px] p-4 mt-3"
-                  style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}
-                >
-                  <summary
-                    className="cursor-pointer select-none"
-                    style={{ color: 'var(--hi-text-secondary)', fontSize: '12.5px', fontWeight: 700 }}
-                  >
-                    查看原始JSON
-                  </summary>
-                  <pre
-                    style={{
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      margin: 0,
-                      marginTop: 10,
-                      color: 'var(--hi-text-primary)',
-                      fontSize: '12.5px',
-                      lineHeight: 1.6,
-                      opacity: 0.9,
-                    }}
-                  >
-                    {contentView.rawJson}
-                  </pre>
-                </details>
-              )}
             </>
           )}
         </div>

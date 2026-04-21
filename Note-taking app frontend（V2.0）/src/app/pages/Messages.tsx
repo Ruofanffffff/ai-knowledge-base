@@ -16,6 +16,17 @@ function formatMsgTime(iso: string) {
   }
 }
 
+// ── Shared user lookup ────────────────────────────────────────────────────────
+// Keeping this for fallback or static data if API doesn't provide enough info yet
+export const DM_USER_INFO: Record<string, { name: string; color: string; letter: string; bio: string }> = {
+  '1': { name: '小明同学', color: '#6366F1', letter: '明', bio: '设计师 × 思考者' },
+  '2': { name: '阿博读书', color: '#8B5CF6', letter: '博', bio: '每年读100本书' },
+  '3': { name: 'TechNote', color: '#3B82F6', letter: 'T', bio: '前端工程师' },
+  '4': { name: '晓雯创作', color: '#EC4899', letter: '晓', bio: '旅行者 × 写作者' },
+  '5': { name: '思维实验室', color: '#10B981', letter: '思', bio: '认知科学爱好者' },
+  '6': { name: '好奇心驱动', color: '#F59E0B', letter: '奇', bio: '笔记爱好者' },
+};
+
 // ── ConversationCard ──────────────────────────────────────────────────────────
 function ConversationCard({ conv, index, onOpen }: {
   conv: any; index: number; onOpen: () => void;

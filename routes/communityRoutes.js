@@ -1176,7 +1176,7 @@ router.put('/posts/:id', authMiddleware, (req, res) => {
           });
         }
 
-        if (post.user_id !== userId) {
+        if (String(post.user_id) !== String(userId)) {
           return res.status(403).json({
             success: false,
             error: '无权修改此帖子'
@@ -1272,7 +1272,7 @@ router.delete('/posts/:id', authMiddleware, (req, res) => {
         }
 
         // 检查是否为帖子所有者
-        if (post.user_id !== userId) {
+        if (String(post.user_id) !== String(userId)) {
           return res.status(403).json({
             success: false,
             error: '无权删除此帖子'
@@ -1407,7 +1407,7 @@ router.post('/posts/batch-delete', authMiddleware, (req, res) => {
             return;
           }
 
-          if (post.user_id !== userId) {
+          if (String(post.user_id) !== String(userId)) {
             failed.push({ id: numericId, reason: '无权删除' });
             processed++;
             if (processed === postIds.length) {

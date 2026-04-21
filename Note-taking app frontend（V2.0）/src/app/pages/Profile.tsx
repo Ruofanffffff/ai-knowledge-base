@@ -20,10 +20,9 @@ import { SubscriptionSection } from '../components/SubscriptionSection';
 import { useTheme, type ThemeId as ThemeIdCtx } from '../components/context/ThemeContext';
 
 const AI_MODELS = [
-  { id: 'gpt4o', name: 'GPT-4o', provider: 'OpenAI', speed: '快', quality: '极高', active: true, badge: '推荐', badgeColor: '#6366F1' },
-  { id: 'claude35', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', speed: '中', quality: '极高', active: false, badge: '专业', badgeColor: '#8B5CF6' },
-  { id: 'gemini', name: 'Gemini Pro', provider: 'Google', speed: '快', quality: '高', active: false, badge: '均衡', badgeColor: '#3B82F6' },
-  { id: 'qwen', name: '通义千问', provider: 'Alibaba', speed: '极快', quality: '高', active: false, badge: '国内', badgeColor: '#10B981' },
+  { id: 'qwen', name: 'Qwen-Plus', provider: 'Alibaba', speed: '极快', quality: '高', active: true, badge: '推荐', badgeColor: '#10B981' },
+  { id: 'gpt4o', name: 'GPT-4o', provider: 'OpenAI', speed: '快', quality: '极高', active: false, badge: '专业', badgeColor: '#6366F1' },
+  { id: 'claude35', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', speed: '中', quality: '极高', active: false, badge: '均衡', badgeColor: '#8B5CF6' },
 ];
 
 interface ToggleRowProps {
@@ -340,7 +339,7 @@ export function Profile() {
           <SettingRow
             icon={<Cpu size={18} style={{ color: '#6366F1' }} />}
             label="AI 模型管理"
-            desc="当前：GPT-4o"
+            desc="当前：Qwen-Plus"
             value="切换"
             onClick={() => setShowModelPanel(true)}
           />
