@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, X, Send, Plus, UserPlus, EyeOff, Link2, Flag, Check } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, X, Send, Plus, UserPlus, EyeOff, Link2, Flag, Check, Compass } from 'lucide-react';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { BottomNav } from '../components/BottomNav';
 import { api } from '../services/api';
@@ -1044,24 +1044,49 @@ export function SiCircle() {
 
         {/* Posts */}
         <div className="px-3 pb-24">
-          {posts.map((post, i) => (
+          {posts.length === 0 ? (
             <motion.div
-              key={post.id}
-              initial={{ opacity: 0, y: 18 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.06 }}
+              className="flex flex-col items-center justify-center py-16 text-center mt-4 mx-1 rounded-[24px]"
+              style={{ background: 'var(--hi-card-bg)', border: '1px solid var(--hi-card-border)' }}
             >
-              <PostCard
-                post={post}
-                onLike={handleLike}
-                onBookmark={handleBookmark}
-                onComment={id => setCommentPost(posts.find(p => p.id === id) || null)}
-                isMine={activeTab === 'mine' || (myUserId != null && post.userId === myUserId)}
-                onDelete={handleDeletePost}
-                onToggleVisibility={handleToggleVisibility}
-              />
+              <div
+                className="w-16 h-16 rounded-[20px] flex items-center justify-center mb-4"
+                style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
+              >
+                <Compass size={28} style={{ color: '#6366F1' }} />
+              </div>
+              <p style={{ color: 'var(--hi-text-primary)', fontSize: '16px', fontWeight: 800 }}>
+                {activeTab === 'explore' ? '这里是思圈，你的灵感分享地' : '你还没有发布过动态'}
+              </p>
+              <p className="mt-2 px-8" style={{ color: 'var(--hi-text-secondary)', fontSize: '13px', lineHeight: 1.6 }}>
+                {activeTab === 'explore' 
+                  ? '目前社区还没有人发布内容。当你在思库保存了笔记后，可以将它们发布到这里与大家交流。'
+                  : '在思库中查看你的笔记或文档，点击底部的「分享至思圈」即可发布到这里。'
+                }
+              </p>
             </motion.div>
-          ))}
+          ) : (
+            posts.map((post, i) => (
+              <motion.div
+                key={post.id}
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.06 }}
+              >
+                <PostCard
+                  post={post}
+                  onLike={handleLike}
+                  onBookmark={handleBookmark}
+                  onComment={id => setCommentPost(posts.find(p => p.id === id) || null)}
+                  isMine={activeTab === 'mine' || (myUserId != null && post.userId === myUserId)}
+                  onDelete={handleDeletePost}
+                  onToggleVisibility={handleToggleVisibility}
+                />
+              </motion.div>
+            ))
+          )}
         </div>
       </div>
 

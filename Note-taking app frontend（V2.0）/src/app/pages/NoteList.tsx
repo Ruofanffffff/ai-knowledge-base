@@ -948,10 +948,10 @@ export function NoteList() {
                   }
                 </div>
                 <p style={{ color: '#1E1B4B', fontSize: '17px', fontWeight: 700 }}>
-                  {search ? '未找到相关笔记' : '还没有笔记'}
+                  {search ? '未找到相关笔记' : '这是你的灵感收件箱'}
                 </p>
-                <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '13.5px' }}>
-                  {search ? '试试其他关键词' : '点击右上角「新建」记录你的第一个灵感'}
+                <p className="mt-2 px-6 text-center" style={{ color: '#9CA3AF', fontSize: '13.5px', lineHeight: 1.6 }}>
+                  {search ? '试试其他关键词' : '把你的碎片灵感、文章和短视频链接都丢进来吧，AI 会帮你自动提炼整理。'}
                 </p>
                 {!search && (
                   <button
@@ -1007,10 +1007,10 @@ export function NoteList() {
                     <FileText size={30} style={{ color: '#6366F1' }} />
                   </div>
                   <p style={{ color: '#1E1B4B', fontSize: '17px', fontWeight: 700 }}>
-                    {search ? '未找到相关文档' : '还没有文档'}
+                    {search ? '未找到相关文档' : '上传长文档，自动提取知识'}
                   </p>
-                  <p className="mt-2" style={{ color: '#9CA3AF', fontSize: '13.5px' }}>
-                    {search ? '试试其他关键词' : '上传文档到思库，自动解析后可在这里查看'}
+                  <p className="mt-2 px-6 text-center" style={{ color: '#9CA3AF', fontSize: '13.5px', lineHeight: 1.6 }}>
+                    {search ? '试试其他关键词' : '上传 PDF 或 Word 等长文档，AI 会帮你解析内容并自动提取关键信息。'}
                   </p>
                   {!search && (
                     <button

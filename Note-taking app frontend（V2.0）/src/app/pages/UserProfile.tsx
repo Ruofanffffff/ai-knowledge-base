@@ -949,9 +949,7 @@ export function UserProfile() {
             className="flex gap-7 mt-3.5"
           >
             {[
-              { label: '笔记', value: profile.posts },
-              { label: '关注', value: profile.following },
-              { label: '粉丝', value: profile.followers },
+              { label: '公开笔记', value: profile.posts },
             ].map((s, i) => (
               <motion.div
                 key={s.label}

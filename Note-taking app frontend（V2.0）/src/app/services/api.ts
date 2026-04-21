@@ -104,6 +104,23 @@ api.interceptors.response.use(
         }
       }
     }
+
+    // Global Error Translation for C-End UX
+    if (!error.response) {
+      error.message = '网络开小差了，请检查网络连接或稍后再试';
+    } else if (error.response.status >= 500) {
+      error.message = '服务器打了个盹，请稍后再试';
+    } else if (error.response.data && error.response.data.error) {
+      // If the backend provided a specific error string, we can optionally use it,
+      // but ensure it's not a raw SQL/JSON error by keeping it simple
+      const backendError = String(error.response.data.error);
+      if (backendError.includes('SQL') || backendError.includes('JSON') || backendError.includes('not defined')) {
+        error.message = '系统遇到一点小问题，请稍后重试';
+      } else {
+        error.message = backendError;
+      }
+    }
+
     return Promise.reject(error);
   }
 );
