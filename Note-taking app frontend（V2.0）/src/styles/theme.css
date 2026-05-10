@@ -81,6 +81,14 @@
   --hi-mindmap-node-fill: white;
   --hi-user-decor1:    rgba(255,255,255,0.07);
   --hi-user-decor2:    rgba(255,255,255,0.05);
+
+  --dt-nav-bg: rgba(255,255,255,0.86);
+  --dt-nav-border: rgba(15, 23, 42, 0.08);
+  --dt-nav-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+  --dt-nav-active-color: #111827;
+  --dt-nav-inactive-color: #6B7280;
+  --dt-nav-active-bg: rgba(15, 23, 42, 0.08);
+  --dt-nav-badge-border: #ffffff;
 }
 
 [data-theme="dark"] {
@@ -125,6 +133,14 @@
   --hi-mindmap-node-fill: #1E1B4B;
   --hi-user-decor1:    rgba(255,255,255,0.07);
   --hi-user-decor2:    rgba(255,255,255,0.04);
+
+  --dt-nav-bg: rgba(10,9,20,0.92);
+  --dt-nav-border: rgba(255,255,255,0.10);
+  --dt-nav-shadow: 0 10px 28px rgba(0,0,0,0.50);
+  --dt-nav-active-color: #F3F4F6;
+  --dt-nav-inactive-color: rgba(243,244,246,0.62);
+  --dt-nav-active-bg: rgba(255,255,255,0.10);
+  --dt-nav-badge-border: rgba(10,9,20,0.92);
 }
 
 .dark {

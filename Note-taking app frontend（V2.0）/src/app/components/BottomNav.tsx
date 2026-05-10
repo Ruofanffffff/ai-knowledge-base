@@ -8,9 +8,9 @@ import { SpeechService } from '../services/speechService';
 import { useNotes } from './context/NoteContext';
 import { toast } from '../components/ui/Toast';
 
-const ACTIVE_COLOR = '#111827';
-const INACTIVE_COLOR = '#6B7280';
-const ACTIVE_BG = 'rgba(15, 23, 42, 0.08)';
+const ACTIVE_COLOR = 'var(--dt-nav-active-color)';
+const INACTIVE_COLOR = 'var(--dt-nav-inactive-color)';
+const ACTIVE_BG = 'var(--dt-nav-active-bg)';
 
 function HiBrainIcon({ active }: { active: boolean }) {
   return (
@@ -102,13 +102,9 @@ export function BottomNav() {
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingText, setRecordingText] = useState('');
-  const [isCanceling, setIsCanceling] = useState(false);
-
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isLongPress = useRef(false);
-  const startY = useRef(0);
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const recordingTextRef = useRef('');
+  const isBusyRef = useRef(false);
 
   useEffect(() => {
     const update = () => setUnread(getUnreadCount());
@@ -136,121 +132,89 @@ export function BottomNav() {
     };
   }, []);
 
-  const handlePointerDown = (e: PointerEvent) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    startY.current = e.clientY;
-    isLongPress.current = false;
-    setIsCanceling(false);
+  const startRecording = async () => {
+    if (isBusyRef.current || isRecording) return;
+    isBusyRef.current = true;
     setRecordingText('');
     recordingTextRef.current = '';
-
-    pressTimer.current = setTimeout(async () => {
-      try {
-        isLongPress.current = true;
-        setIsRecording(true);
-
-        const res = await SpeechService.startListening(
-          { language: 'zh-CN', maxDurationMs: 60000 },
-          {
-            onPartial: (text) => {
-              setRecordingText(text);
-              recordingTextRef.current = text;
-            },
-            onFinal: (text) => {
-              setRecordingText(text);
-              recordingTextRef.current = text;
-            },
-            onError: (msg) => {
-              console.error('Speech error:', msg);
+    try {
+      setIsRecording(true);
+      const res = await SpeechService.startListening(
+        { language: 'zh-CN', maxDurationMs: 60000 },
+        {
+          onPartial: (text) => {
+            setRecordingText(text);
+            recordingTextRef.current = text;
+          },
+          onFinal: (text) => {
+            setRecordingText(text);
+            recordingTextRef.current = text;
+          },
+          onError: (msg) => {
+            console.error('Speech error:', msg);
+            setIsRecording(false);
+            stopRecordingRef.current = null;
+          },
+          onListeningChange: (listening) => {
+            if (!listening) {
               setIsRecording(false);
-            },
-            onListeningChange: (listening) => {
-              if (!listening) {
-                setIsRecording(false);
-              }
+              stopRecordingRef.current = null;
             }
           }
-        );
-
-        if (!isLongPress.current) {
-          await res.stop();
-        } else {
-          stopRecordingRef.current = res.stop;
         }
-      } catch (error) {
-        console.error('Failed to start recording:', error);
-        setIsRecording(false);
-        stopRecordingRef.current = null;
-      }
-    }, 300);
-  };
-
-  const handlePointerMove = (e: PointerEvent) => {
-    if (isRecording) {
-      const dy = e.clientY - startY.current;
-      setIsCanceling(dy < -40);
+      );
+      stopRecordingRef.current = res.stop;
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      setIsRecording(false);
+      stopRecordingRef.current = null;
+      toast.error('录音启动失败');
+    } finally {
+      isBusyRef.current = false;
     }
   };
 
-  const handlePointerUp = async (e: PointerEvent) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    if (pressTimer.current != null) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-
-    if (isLongPress.current) {
-      isLongPress.current = false; // mark as released
+  const stopRecording = async () => {
+    if (isBusyRef.current || !isRecording) return;
+    isBusyRef.current = true;
+    try {
       if (stopRecordingRef.current) {
         await stopRecordingRef.current();
         stopRecordingRef.current = null;
       }
       setIsRecording(false);
 
-      if (!isCanceling) {
-        const finalTxt = recordingTextRef.current.trim();
-        if (finalTxt) {
-          try {
-            await addNote({
-              content: finalTxt,
-              type: 'text',
-              status: 'inbox'
-            });
-            toast.success('已保存到收件箱');
-          } catch (error) {
-            console.error('Failed to save note:', error);
-            toast.error('保存失败');
-          }
+      const finalTxt = recordingTextRef.current.trim();
+      if (finalTxt) {
+        try {
+          await addNote({
+            content: finalTxt,
+            type: 'text',
+            status: 'inbox'
+          });
+          toast.success('已保存到收件箱');
+        } catch (error) {
+          console.error('Failed to save note:', error);
+          toast.error('保存失败');
         }
       }
-      setIsCanceling(false);
       setRecordingText('');
       recordingTextRef.current = '';
-    } else {
-      // Short click
-      navigate('/home', { state: { focusCapture: true } });
+    } finally {
+      isBusyRef.current = false;
     }
   };
 
-  const handlePointerCancel = async (e: PointerEvent) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    if (pressTimer.current != null) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-    isLongPress.current = false;
-    if (isRecording) {
-      if (stopRecordingRef.current) {
-        await stopRecordingRef.current();
-        stopRecordingRef.current = null;
-      }
-      setIsRecording(false);
-      setIsCanceling(false);
-      setRecordingText('');
-      recordingTextRef.current = '';
-    }
+  const toggleRecording = async () => {
+    if (isRecording) await stopRecording();
+    else await startRecording();
   };
+
+  useEffect(() => {
+    return () => {
+      if (stopRecordingRef.current) stopRecordingRef.current().catch(() => {});
+    };
+  }, []);
 
   const isActive = (path: string) => {
     if (path === '/siku') return location.pathname.startsWith('/siku');
@@ -317,8 +281,8 @@ export function BottomNav() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 650, damping: 18 }}
-              className="absolute -top-1 -right-2 min-w-5 h-5 rounded-full flex items-center justify-center border-2 border-white px-1"
-              style={{ background: '#F59E0B' }}
+              className="absolute -top-1 -right-2 min-w-5 h-5 rounded-full flex items-center justify-center px-1"
+              style={{ background: '#F59E0B', border: '2px solid var(--dt-nav-badge-border)' }}
             >
               <span style={{ color: 'white', fontSize: '10px', fontWeight: 800, lineHeight: 1 }}>
                 {unread > 99 ? '99+' : unread}
@@ -344,10 +308,7 @@ export function BottomNav() {
         {kind === 'capture' ? (
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerCancel}
+            onClick={toggleRecording}
             className="touch-none"
             aria-label="捕捉"
             style={{ WebkitTapHighlightColor: 'transparent' }}
@@ -378,15 +339,15 @@ export function BottomNav() {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className="absolute bottom-[calc(100%+16px)] left-4 right-4 p-4 rounded-2xl flex flex-col items-center justify-center gap-3"
             style={{
-              background: 'var(--hi-bg-primary, #ffffff)',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-              border: '1px solid var(--hi-border, #e5e7eb)'
+              background: 'var(--hi-card-bg)',
+              boxShadow: 'var(--hi-card-shadow)',
+              border: '1px solid var(--hi-card-border)'
             }}
           >
-            <div className={`text-sm font-medium transition-colors ${isCanceling ? 'text-red-500' : 'text-gray-500'}`}>
-              {isCanceling ? '松开手指，取消发送' : '松开发送，上滑取消'}
+            <div className="text-sm font-medium" style={{ color: 'var(--hi-text-dim)' }}>
+              再次点击结束录音
             </div>
-            <div className="text-base text-gray-800 min-h-[24px] max-h-[100px] overflow-y-auto w-full text-center">
+            <div className="text-base min-h-[24px] max-h-[100px] overflow-y-auto w-full text-center" style={{ color: 'var(--hi-text-primary)' }}>
               {recordingText || '正在聆听...'}
             </div>
           </motion.div>
@@ -405,9 +366,9 @@ export function BottomNav() {
             style={{
               height: 66,
               borderRadius: 999,
-              background: 'rgba(255,255,255,0.86)',
-              border: '1px solid rgba(15, 23, 42, 0.08)',
-              boxShadow: '0 10px 28px rgba(15, 23, 42, 0.12)',
+              background: 'var(--dt-nav-bg)',
+              border: '1px solid var(--dt-nav-border)',
+              boxShadow: 'var(--dt-nav-shadow)',
               backdropFilter: 'blur(18px)',
               WebkitBackdropFilter: 'blur(18px)',
             }}

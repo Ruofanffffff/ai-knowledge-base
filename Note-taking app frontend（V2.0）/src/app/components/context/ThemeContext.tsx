@@ -9,7 +9,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: 'system',
+  theme: 'light',
   isDark: false,
   setTheme: () => {},
 });
@@ -62,11 +62,11 @@ function applyToDOM(resolved: 'light' | 'dark') {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>(
-    () => (safeGetStorage('hibrain_theme') as ThemeId) || 'system'
+    () => (safeGetStorage('hibrain_theme') as ThemeId) || 'light'
   );
 
   const [isDark, setIsDark] = useState<boolean>(
-    () => resolveTheme((safeGetStorage('hibrain_theme') as ThemeId) || 'system') === 'dark'
+    () => resolveTheme((safeGetStorage('hibrain_theme') as ThemeId) || 'light') === 'dark'
   );
 
   const applyTheme = useCallback((t: ThemeId) => {
