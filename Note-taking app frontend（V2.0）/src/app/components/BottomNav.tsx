@@ -343,83 +343,44 @@ export function BottomNav() {
       </AnimatePresence>
 
       <div className="px-3">
-        <div className="relative mx-auto" style={{ maxWidth: 560 }}>
-          <div className="flex items-end justify-between gap-3">
-            <div
-              className="flex-1"
-              style={{
-                position: 'relative',
-                background: 'var(--hi-nav-bg)',
-                backdropFilter: 'blur(28px)',
-                WebkitBackdropFilter: 'blur(28px)',
-                border: '1px solid var(--hi-nav-border)',
-                boxShadow: 'var(--hi-nav-shadow)',
-                borderRadius: '26px',
-                padding: '8px 10px',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  width: 72,
-                  height: 72,
-                  borderRadius: 999,
-                  right: -36,
-                  top: -30,
-                  background: 'var(--hi-page-bg)',
-                  zIndex: 0,
-                }}
-              />
-              <div className="flex items-center justify-around" style={{ position: 'relative', zIndex: 1 }}>
-                {leftItems.map(renderItem)}
-              </div>
+        <div className="relative mx-auto" style={{ maxWidth: 560, height: 92 }}>
+          <svg
+            viewBox="0 0 400 92"
+            preserveAspectRatio="none"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              filter: 'drop-shadow(var(--hi-nav-shadow))',
+            }}
+          >
+            <rect x="0" y="24" width="176" height="56" rx="22" fill="var(--hi-nav-bg)" stroke="var(--hi-nav-border)" strokeWidth="1.5" />
+            <rect x="224" y="24" width="176" height="56" rx="22" fill="var(--hi-nav-bg)" stroke="var(--hi-nav-border)" strokeWidth="1.5" />
+            <circle cx="200" cy="52" r="40" fill="var(--hi-nav-bg)" stroke="var(--hi-nav-border)" strokeWidth="1.5" />
+          </svg>
+
+          <div
+            className="absolute left-0 right-0"
+            style={{
+              bottom: 18,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              paddingLeft: 10,
+              paddingRight: 10,
+            }}
+          >
+            <div className="flex flex-1 items-center justify-around" style={{ paddingRight: 52 }}>
+              {leftItems.map(renderItem)}
             </div>
-
-            <div style={{ width: 74, flex: '0 0 74px' }} />
-
-            <div
-              className="flex-1"
-              style={{
-                position: 'relative',
-                background: 'var(--hi-nav-bg)',
-                backdropFilter: 'blur(28px)',
-                WebkitBackdropFilter: 'blur(28px)',
-                border: '1px solid var(--hi-nav-border)',
-                boxShadow: 'var(--hi-nav-shadow)',
-                borderRadius: '26px',
-                padding: '8px 10px',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  width: 72,
-                  height: 72,
-                  borderRadius: 999,
-                  left: -36,
-                  top: -30,
-                  background: 'var(--hi-page-bg)',
-                  zIndex: 0,
-                }}
-              />
-              <div className="flex items-center justify-around" style={{ position: 'relative', zIndex: 1 }}>
-                {rightItems.map(renderItem)}
-              </div>
+            <div style={{ width: 84, flex: '0 0 84px' }} />
+            <div className="flex flex-1 items-center justify-around" style={{ paddingLeft: 52 }}>
+              {rightItems.map(renderItem)}
             </div>
           </div>
 
-          <div
-            style={{
-              position: 'absolute',
-              left: '50%',
-              bottom: 12,
-              transform: 'translateX(-50%)',
-              width: 78,
-              height: 78,
-              borderRadius: 999,
-              background: 'var(--hi-page-bg)',
-            }}
-          />
           <motion.button
             whileTap={{ scale: 0.95 }}
             onPointerDown={handlePointerDown}
@@ -430,7 +391,7 @@ export function BottomNav() {
             style={{
               position: 'absolute',
               left: '50%',
-              bottom: 18,
+              bottom: 12,
               transform: 'translateX(-50%)',
               width: 60,
               height: 60,
@@ -442,6 +403,7 @@ export function BottomNav() {
               boxShadow: isRecording ? '0 10px 24px rgba(239,68,68,0.38)' : '0 10px 24px rgba(99,102,241,0.38)',
               border: '1px solid rgba(255,255,255,0.22)',
               transition: 'background 0.3s, box-shadow 0.3s',
+              zIndex: 2,
             }}
             aria-label="一键捕捉"
           >
