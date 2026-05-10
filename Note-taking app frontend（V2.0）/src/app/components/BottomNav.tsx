@@ -8,42 +8,44 @@ import { SpeechService } from '../services/speechService';
 import { useNotes } from './context/NoteContext';
 import { toast } from '../components/ui/Toast';
 
-// Custom SVG icons for each tab
+const ACTIVE_COLOR = '#1677FF';
+const INACTIVE_COLOR = '#8A8F9C';
+
 function HiBrainIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
       <path
         d="M11 2C8.5 2 6.5 3.5 5.5 5.5C4 5.7 2.5 6.9 2.5 8.5C2.5 9.5 3 10.3 3.8 10.8C3.5 11.3 3.3 11.8 3.3 12.5C3.3 14.5 4.9 16 6.8 16H7V17.5C7 18.3 7.7 19 8.5 19H13.5C14.3 19 15 18.3 15 17.5V16H15.2C17.1 16 18.7 14.5 18.7 12.5C18.7 11.8 18.5 11.3 18.2 10.8C19 10.3 19.5 9.5 19.5 8.5C19.5 6.9 18 5.7 16.5 5.5C15.5 3.5 13.5 2 11 2Z"
-        fill={active ? '#6366F1' : 'none'}
-        stroke={active ? '#6366F1' : '#9CA3AF'}
+        fill={active ? ACTIVE_COLOR : 'none'}
+        stroke={active ? ACTIVE_COLOR : INACTIVE_COLOR}
         strokeWidth="1.5"
         strokeLinejoin="round"
       />
-      <circle cx="8.5" cy="10" r="1" fill={active ? 'white' : '#9CA3AF'} />
-      <circle cx="11" cy="9" r="1" fill={active ? 'white' : '#9CA3AF'} />
-      <circle cx="13.5" cy="10" r="1" fill={active ? 'white' : '#9CA3AF'} />
+      <circle cx="8.5" cy="10" r="1" fill={active ? 'white' : INACTIVE_COLOR} />
+      <circle cx="11" cy="9" r="1" fill={active ? 'white' : INACTIVE_COLOR} />
+      <circle cx="13.5" cy="10" r="1" fill={active ? 'white' : INACTIVE_COLOR} />
     </svg>
   );
 }
 
 function SiKuIcon({ active }: { active: boolean }) {
-  const c = active ? '#6366F1' : '#9CA3AF';
+  const c = active ? ACTIVE_COLOR : INACTIVE_COLOR;
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <rect x="3" y="4" width="5" height="14" rx="1.5" fill={active ? 'rgba(99,102,241,0.15)' : 'none'} stroke={c} strokeWidth="1.5" />
-      <rect x="9" y="4" width="5" height="14" rx="1.5" fill={active ? 'rgba(99,102,241,0.15)' : 'none'} stroke={c} strokeWidth="1.5" />
-      <rect x="15" y="4" width="4" height="14" rx="1.5" fill={active ? 'rgba(99,102,241,0.15)' : 'none'} stroke={c} strokeWidth="1.5" />
+      <rect x="3" y="4" width="5" height="14" rx="1.5" fill={active ? 'rgba(22,119,255,0.14)' : 'none'} stroke={c} strokeWidth="1.5" />
+      <rect x="9" y="4" width="5" height="14" rx="1.5" fill={active ? 'rgba(22,119,255,0.14)' : 'none'} stroke={c} strokeWidth="1.5" />
+      <rect x="15" y="4" width="4" height="14" rx="1.5" fill={active ? 'rgba(22,119,255,0.14)' : 'none'} stroke={c} strokeWidth="1.5" />
     </svg>
   );
 }
 
 function SiChainIcon({ active }: { active: boolean }) {
-  const c = active ? '#6366F1' : '#9CA3AF';
+  const c = active ? ACTIVE_COLOR : INACTIVE_COLOR;
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
       <path
         d="M5 4.5C5 3.7 5.7 3 6.5 3H16.5C17.3 3 18 3.7 18 4.5V18.2C18 18.6 17.6 19 17.2 19H6.8C6 19 5.4 18.5 5.1 17.8C5 17.6 5 17.3 5 17V4.5Z"
-        fill={active ? 'rgba(99,102,241,0.12)' : 'none'}
+        fill={active ? 'rgba(22,119,255,0.12)' : 'none'}
         stroke={c}
         strokeWidth="1.5"
         strokeLinejoin="round"
@@ -56,12 +58,12 @@ function SiChainIcon({ active }: { active: boolean }) {
 }
 
 function SiCircleIcon({ active }: { active: boolean }) {
-  const c = active ? '#6366F1' : '#9CA3AF';
+  const c = active ? ACTIVE_COLOR : INACTIVE_COLOR;
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <circle cx="11" cy="8" r="3" fill={active ? 'rgba(99,102,241,0.2)' : 'none'} stroke={c} strokeWidth="1.5" />
-      <circle cx="5" cy="14" r="2.5" fill={active ? 'rgba(99,102,241,0.15)' : 'none'} stroke={c} strokeWidth="1.5" />
-      <circle cx="17" cy="14" r="2.5" fill={active ? 'rgba(99,102,241,0.15)' : 'none'} stroke={c} strokeWidth="1.5" />
+      <circle cx="11" cy="8" r="3" fill={active ? 'rgba(22,119,255,0.18)' : 'none'} stroke={c} strokeWidth="1.5" />
+      <circle cx="5" cy="14" r="2.5" fill={active ? 'rgba(22,119,255,0.14)' : 'none'} stroke={c} strokeWidth="1.5" />
+      <circle cx="17" cy="14" r="2.5" fill={active ? 'rgba(22,119,255,0.14)' : 'none'} stroke={c} strokeWidth="1.5" />
       <path d="M8 17.5C8.5 16 9.7 15 11 15C12.3 15 13.5 16 14 17.5" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
       <path d="M2.5 19C3 17.5 3.8 16.5 5 16.5" stroke={c} strokeWidth="1.3" strokeLinecap="round" />
       <path d="M19.5 19C19 17.5 18.2 16.5 17 16.5" stroke={c} strokeWidth="1.3" strokeLinecap="round" />
@@ -70,10 +72,10 @@ function SiCircleIcon({ active }: { active: boolean }) {
 }
 
 function ProfileIcon({ active }: { active: boolean }) {
-  const c = active ? '#6366F1' : '#9CA3AF';
+  const c = active ? ACTIVE_COLOR : INACTIVE_COLOR;
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <circle cx="11" cy="8" r="3.5" fill={active ? 'rgba(99,102,241,0.2)' : 'none'} stroke={c} strokeWidth="1.5" />
+      <circle cx="11" cy="8" r="3.5" fill={active ? 'rgba(22,119,255,0.18)' : 'none'} stroke={c} strokeWidth="1.5" />
       <path d="M4 19C4 15.7 7.1 13 11 13C14.9 13 18 15.7 18 19" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
@@ -273,18 +275,9 @@ export function BottomNav() {
       <button
         key={path}
         onClick={() => navigate(path)}
-        className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all relative"
-        style={{ minWidth: '52px' }}
+        className="flex flex-1 flex-col items-center justify-center gap-0.5"
       >
-        {active && (
-          <motion.div
-            layoutId="nav-active-bg"
-            className="absolute inset-0 rounded-2xl"
-            style={{ background: 'rgba(99,102,241,0.08)' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-          />
-        )}
-        <div className="relative z-10">
+        <div className="relative">
           <Icon active={active} />
           {isProfile && unread > 0 && (
             <motion.div
@@ -301,24 +294,14 @@ export function BottomNav() {
           )}
         </div>
         <span
-          className="relative z-10"
           style={{
             fontSize: '10px',
-            fontWeight: active ? 700 : 500,
-            color: active ? '#6366F1' : '#9CA3AF',
-            letterSpacing: active ? '0.01em' : 0,
+            fontWeight: active ? 600 : 500,
+            color: active ? ACTIVE_COLOR : INACTIVE_COLOR,
           }}
         >
           {label}
         </span>
-        {active && (
-          <motion.div
-            layoutId="nav-dot"
-            className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
-            style={{ background: '#6366F1' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-          />
-        )}
       </button>
     );
   };
@@ -327,7 +310,7 @@ export function BottomNav() {
     <div
       className="fixed bottom-0 left-0 right-0 z-50"
       style={{
-        paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
       <AnimatePresence>
@@ -353,122 +336,56 @@ export function BottomNav() {
         )}
       </AnimatePresence>
 
-      <div className="px-3">
-        <div className="relative mx-auto" style={{ maxWidth: 620, height: 96 }}>
-          <div
-            className="absolute left-0 right-0"
-            style={{
-              bottom: 10,
-              height: 72,
-              borderRadius: 999,
-              background: 'rgba(255,255,255,0.72)',
-              border: '1px solid rgba(255,255,255,0.42)',
-              boxShadow: '0 18px 50px rgba(15, 23, 42, 0.14)',
-              backdropFilter: 'blur(26px)',
-              WebkitBackdropFilter: 'blur(26px)',
-              overflow: 'hidden',
-            }}
-          >
-            <div
+      <div
+        style={{
+          background: '#ffffff',
+          borderTop: '1px solid rgba(15, 23, 42, 0.08)',
+          boxShadow: '0 -6px 18px rgba(15, 23, 42, 0.06)',
+        }}
+      >
+        <div
+          className="flex items-center"
+          style={{
+            height: 64,
+            paddingLeft: 8,
+            paddingRight: 8,
+          }}
+        >
+          <div className="flex flex-1 items-center">{leftItems.map(renderItem)}</div>
+          <div className="flex flex-col items-center justify-center" style={{ width: 80 }}>
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerCancel}
+              className="touch-none"
               style={{
-                position: 'absolute',
-                inset: 0,
-                background:
-                  'linear-gradient(180deg, rgba(255,255,255,0.70) 0%, rgba(255,255,255,0.48) 55%, rgba(255,255,255,0.42) 100%)',
-                opacity: 0.9,
-                pointerEvents: 'none',
+                width: 44,
+                height: 44,
+                borderRadius: 999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: isRecording ? '#EF4444' : ACTIVE_COLOR,
+                boxShadow: isRecording ? '0 10px 18px rgba(239, 68, 68, 0.30)' : '0 10px 18px rgba(22, 119, 255, 0.25)',
               }}
-            />
-            <div
+              aria-label="一键捕捉"
+            >
+              <Mic size={20} style={{ color: 'white' }} />
+            </motion.button>
+            <span
               style={{
-                position: 'absolute',
-                left: -80,
-                top: -40,
-                width: 220,
-                height: 140,
-                background: 'radial-gradient(circle, rgba(99,102,241,0.12), rgba(99,102,241,0) 70%)',
-                filter: 'blur(2px)',
-                pointerEvents: 'none',
-              }}
-            />
-            <div
-              style={{
-                position: 'absolute',
-                right: -80,
-                bottom: -50,
-                width: 220,
-                height: 160,
-                background: 'radial-gradient(circle, rgba(99,102,241,0.10), rgba(99,102,241,0) 70%)',
-                filter: 'blur(2px)',
-                pointerEvents: 'none',
-              }}
-            />
-
-            <div
-              className="h-full flex items-center justify-between"
-              style={{
-                position: 'relative',
-                paddingLeft: 10,
-                paddingRight: 10,
+                marginTop: 2,
+                fontSize: '10px',
+                fontWeight: 600,
+                color: ACTIVE_COLOR,
               }}
             >
-              <div className="flex flex-1 items-center justify-around" style={{ paddingRight: 48 }}>
-                {leftItems.map(renderItem)}
-              </div>
-              <div style={{ width: 96, flex: '0 0 96px' }} />
-              <div className="flex flex-1 items-center justify-around" style={{ paddingLeft: 48 }}>
-                {rightItems.map(renderItem)}
-              </div>
-            </div>
+              捕捉
+            </span>
           </div>
-
-          <div
-            style={{
-              position: 'absolute',
-              left: '50%',
-              bottom: 18,
-              transform: 'translateX(-50%)',
-              width: 78,
-              height: 78,
-              borderRadius: 999,
-              background: 'rgba(255,255,255,0.62)',
-              border: '1px solid rgba(255,255,255,0.55)',
-              boxShadow: '0 18px 50px rgba(15, 23, 42, 0.18)',
-              backdropFilter: 'blur(22px)',
-              WebkitBackdropFilter: 'blur(22px)',
-            }}
-          />
-
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerCancel}
-            className="touch-none"
-            style={{
-              position: 'absolute',
-              left: '50%',
-              bottom: 26,
-              transform: 'translateX(-50%)',
-              width: 62,
-              height: 62,
-              borderRadius: 999,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: isRecording
-                ? 'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.28), rgba(255,255,255,0) 55%), linear-gradient(135deg, #EF4444, #F87171)'
-                : 'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.28), rgba(255,255,255,0) 55%), linear-gradient(135deg, #2563EB, #4F46E5)',
-              boxShadow: isRecording ? '0 18px 40px rgba(239,68,68,0.38)' : '0 18px 40px rgba(37,99,235,0.36)',
-              border: '1px solid rgba(255,255,255,0.26)',
-              transition: 'background 0.25s, box-shadow 0.25s',
-              zIndex: 2,
-            }}
-            aria-label="一键捕捉"
-          >
-            <Mic size={22} style={{ color: 'white' }} />
-          </motion.button>
+          <div className="flex flex-1 items-center">{rightItems.map(renderItem)}</div>
         </div>
       </div>
     </div>
