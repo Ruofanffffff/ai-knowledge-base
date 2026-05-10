@@ -95,7 +95,9 @@ async function processOne(source) {
   }
 
   if ((level === 'L2' || level === 'L3') && pageImages.length) {
-    const o = await imageOcr.ocrImages(pageImages, { maxImages: 4 }).catch((e) => ({
+    const platform = String(source.platform || '').toLowerCase();
+    const maxImages = platform === 'xhs' ? Math.min(24, pageImages.length) : 4;
+    const o = await imageOcr.ocrImages(pageImages, { maxImages }).catch((e) => ({
       ok: false,
       text: '',
       items: [],
@@ -109,7 +111,7 @@ async function processOne(source) {
         sourceId,
         kind: 'ocr',
         payload: JSON.stringify({ ok: Boolean(o?.ok), text: ocrText, items: o?.items || [], error: o?.error || null }),
-        metadata: { maxImages: 4 },
+        metadata: { maxImages },
       })
       .catch(() => {});
   }

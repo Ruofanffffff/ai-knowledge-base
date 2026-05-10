@@ -16,6 +16,18 @@ import { toast } from '../components/ui/Toast';
 import { api } from '../services/api';
 import { isWikiEnabled } from '../utils/featureFlags';
 
+type ShortVideoSource = {
+  id: string;
+  platform: string;
+  originalUrl: string;
+  status: string;
+  progress?: any;
+  error?: string | null;
+  noteQuickId?: string | null;
+  noteRefinedId?: string | null;
+  createdAt: string;
+};
+
 /* ── Mindmap mini-thumbnail (pure JSX SVG, no DOM manipulation) ── */
 const MM_COLORS = ['#8B5CF6','#3B82F6','#10B981','#F59E0B','#EF4444','#EC4899','#14B8A6','#F97316'];
 
@@ -387,6 +399,7 @@ export function NoteList() {
   const [documentsLoaded, setDocumentsLoaded] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [hideQuickNoteIds, setHideQuickNoteIds] = useState<string[]>([]);
 
   useEffect(() => {
     const state = location.state as any;
@@ -422,6 +435,28 @@ export function NoteList() {
       cancelled = true;
     };
   }, [documentsLoaded, libraryView]);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const res = await api.get('/short-videos/sources');
+        const list = Array.isArray(res?.data?.data) ? (res.data.data as ShortVideoSource[]) : [];
+        if (!alive) return;
+        const hideQuick = list
+          .filter((s) => s.noteQuickId && s.noteRefinedId)
+          .map((s) => s.noteQuickId as string);
+        setHideQuickNoteIds(hideQuick);
+      } catch {
+      }
+    };
+    load();
+    const t = setInterval(load, 6000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
 
   const openUploadDocument = () => {
     if (uploadingDocument) return;
@@ -498,7 +533,9 @@ export function NoteList() {
   };
 
   const filtered = useMemo(() => {
+    const hide = new Set(hideQuickNoteIds);
     return notes.filter(n => {
+      if (hide.has(n.id)) return false;
       const matchesSearch = !search
         || n.title?.toLowerCase().includes(search.toLowerCase())
         || n.content.toLowerCase().includes(search.toLowerCase())
@@ -511,7 +548,7 @@ export function NoteList() {
       const matchesTag = !tagFilter || n.tags?.includes(tagFilter);
       return matchesSearch && matchesFilter && matchesTag;
     });
-  }, [notes, search, filter, tagFilter]);
+  }, [notes, search, filter, tagFilter, hideQuickNoteIds]);
 
   const filteredDocuments = useMemo(() => {
     const q = search.trim().toLowerCase();
