@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type PointerEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mic } from 'lucide-react';
@@ -97,7 +97,7 @@ export function BottomNav() {
   const [recordingText, setRecordingText] = useState('');
   const [isCanceling, setIsCanceling] = useState(false);
 
-  const pressTimer = useRef<NodeJS.Timeout>();
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPress = useRef(false);
   const startY = useRef(0);
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
@@ -129,7 +129,7 @@ export function BottomNav() {
     };
   }, []);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (e: PointerEvent) => {
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     startY.current = e.clientY;
@@ -139,51 +139,59 @@ export function BottomNav() {
     recordingTextRef.current = '';
 
     pressTimer.current = setTimeout(async () => {
-      isLongPress.current = true;
-      setIsRecording(true);
+      try {
+        isLongPress.current = true;
+        setIsRecording(true);
 
-      const res = await SpeechService.startListening(
-        { language: 'zh-CN', maxDurationMs: 60000 },
-        {
-          onPartial: (text) => {
-            setRecordingText(text);
-            recordingTextRef.current = text;
-          },
-          onFinal: (text) => {
-            setRecordingText(text);
-            recordingTextRef.current = text;
-          },
-          onError: (msg) => {
-            console.error('Speech error:', msg);
-            setIsRecording(false);
-          },
-          onListeningChange: (listening) => {
-            if (!listening) {
+        const res = await SpeechService.startListening(
+          { language: 'zh-CN', maxDurationMs: 60000 },
+          {
+            onPartial: (text) => {
+              setRecordingText(text);
+              recordingTextRef.current = text;
+            },
+            onFinal: (text) => {
+              setRecordingText(text);
+              recordingTextRef.current = text;
+            },
+            onError: (msg) => {
+              console.error('Speech error:', msg);
               setIsRecording(false);
+            },
+            onListeningChange: (listening) => {
+              if (!listening) {
+                setIsRecording(false);
+              }
             }
           }
+        );
+
+        if (!isLongPress.current) {
+          await res.stop();
+        } else {
+          stopRecordingRef.current = res.stop;
         }
-      );
-      
-      // If user already released finger while we were starting:
-      if (!isLongPress.current) {
-        await res.stop();
-      } else {
-        stopRecordingRef.current = res.stop;
+      } catch (error) {
+        console.error('Failed to start recording:', error);
+        setIsRecording(false);
+        stopRecordingRef.current = null;
       }
     }, 300);
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
+  const handlePointerMove = (e: PointerEvent) => {
     if (isRecording) {
       const dy = e.clientY - startY.current;
       setIsCanceling(dy < -40);
     }
   };
 
-  const handlePointerUp = async (e: React.PointerEvent) => {
+  const handlePointerUp = async (e: PointerEvent) => {
     e.currentTarget.releasePointerCapture(e.pointerId);
-    clearTimeout(pressTimer.current);
+    if (pressTimer.current != null) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
 
     if (isLongPress.current) {
       isLongPress.current = false; // mark as released
@@ -218,9 +226,12 @@ export function BottomNav() {
     }
   };
 
-  const handlePointerCancel = async (e: React.PointerEvent) => {
+  const handlePointerCancel = async (e: PointerEvent) => {
     e.currentTarget.releasePointerCapture(e.pointerId);
-    clearTimeout(pressTimer.current);
+    if (pressTimer.current != null) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
     isLongPress.current = false;
     if (isRecording) {
       if (stopRecordingRef.current) {
@@ -343,71 +354,69 @@ export function BottomNav() {
       </AnimatePresence>
 
       <div className="px-3">
-        <div className="relative mx-auto" style={{ maxWidth: 520, height: 92 }}>
+        <div className="relative mx-auto" style={{ maxWidth: 620, height: 96 }}>
           <div
             className="absolute left-0 right-0"
             style={{
-              bottom: 12,
-              display: 'flex',
-              alignItems: 'flex-end',
-              justifyContent: 'space-between',
-              gap: 12,
+              bottom: 10,
+              height: 72,
+              borderRadius: 999,
+              background: 'rgba(255,255,255,0.72)',
+              border: '1px solid rgba(255,255,255,0.42)',
+              boxShadow: '0 18px 50px rgba(15, 23, 42, 0.14)',
+              backdropFilter: 'blur(26px)',
+              WebkitBackdropFilter: 'blur(26px)',
+              overflow: 'hidden',
             }}
           >
             <div
-              className="relative flex-1"
               style={{
-                height: 60,
-                borderRadius: 28,
-                background: 'rgba(255,255,255,0.58)',
-                border: '1px solid rgba(255,255,255,0.35)',
-                boxShadow: '0 10px 26px rgba(15, 23, 42, 0.10)',
-                backdropFilter: 'blur(22px)',
-                WebkitBackdropFilter: 'blur(22px)',
-                overflow: 'hidden',
+                position: 'absolute',
+                inset: 0,
+                background:
+                  'linear-gradient(180deg, rgba(255,255,255,0.70) 0%, rgba(255,255,255,0.48) 55%, rgba(255,255,255,0.42) 100%)',
+                opacity: 0.9,
+                pointerEvents: 'none',
               }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background:
-                    'linear-gradient(180deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.46) 60%, rgba(255,255,255,0.38) 100%)',
-                  opacity: 0.55,
-                  pointerEvents: 'none',
-                }}
-              />
-              <div className="flex items-center justify-around h-full" style={{ position: 'relative', paddingRight: 44 }}>
-                {leftItems.map(renderItem)}
-              </div>
-            </div>
-
-            <div style={{ width: 92, flex: '0 0 92px' }} />
+            />
+            <div
+              style={{
+                position: 'absolute',
+                left: -80,
+                top: -40,
+                width: 220,
+                height: 140,
+                background: 'radial-gradient(circle, rgba(99,102,241,0.12), rgba(99,102,241,0) 70%)',
+                filter: 'blur(2px)',
+                pointerEvents: 'none',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                right: -80,
+                bottom: -50,
+                width: 220,
+                height: 160,
+                background: 'radial-gradient(circle, rgba(99,102,241,0.10), rgba(99,102,241,0) 70%)',
+                filter: 'blur(2px)',
+                pointerEvents: 'none',
+              }}
+            />
 
             <div
-              className="relative flex-1"
+              className="h-full flex items-center justify-between"
               style={{
-                height: 60,
-                borderRadius: 28,
-                background: 'rgba(255,255,255,0.58)',
-                border: '1px solid rgba(255,255,255,0.35)',
-                boxShadow: '0 10px 26px rgba(15, 23, 42, 0.10)',
-                backdropFilter: 'blur(22px)',
-                WebkitBackdropFilter: 'blur(22px)',
-                overflow: 'hidden',
+                position: 'relative',
+                paddingLeft: 10,
+                paddingRight: 10,
               }}
             >
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background:
-                    'linear-gradient(180deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.46) 60%, rgba(255,255,255,0.38) 100%)',
-                  opacity: 0.55,
-                  pointerEvents: 'none',
-                }}
-              />
-              <div className="flex items-center justify-around h-full" style={{ position: 'relative', paddingLeft: 44 }}>
+              <div className="flex flex-1 items-center justify-around" style={{ paddingRight: 48 }}>
+                {leftItems.map(renderItem)}
+              </div>
+              <div style={{ width: 96, flex: '0 0 96px' }} />
+              <div className="flex flex-1 items-center justify-around" style={{ paddingLeft: 48 }}>
                 {rightItems.map(renderItem)}
               </div>
             </div>
@@ -419,24 +428,14 @@ export function BottomNav() {
               left: '50%',
               bottom: 18,
               transform: 'translateX(-50%)',
-              width: 86,
-              height: 86,
+              width: 78,
+              height: 78,
               borderRadius: 999,
-              background: 'var(--hi-page-bg)',
-              boxShadow: '0 12px 28px rgba(15, 23, 42, 0.10)',
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              left: '50%',
-              bottom: 18,
-              transform: 'translateX(-50%)',
-              width: 86,
-              height: 86,
-              borderRadius: 999,
-              border: '1px solid rgba(255,255,255,0.40)',
-              pointerEvents: 'none',
+              background: 'rgba(255,255,255,0.62)',
+              border: '1px solid rgba(255,255,255,0.55)',
+              boxShadow: '0 18px 50px rgba(15, 23, 42, 0.18)',
+              backdropFilter: 'blur(22px)',
+              WebkitBackdropFilter: 'blur(22px)',
             }}
           />
 
@@ -450,7 +449,7 @@ export function BottomNav() {
             style={{
               position: 'absolute',
               left: '50%',
-              bottom: 30,
+              bottom: 26,
               transform: 'translateX(-50%)',
               width: 62,
               height: 62,
@@ -458,10 +457,12 @@ export function BottomNav() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: isRecording ? 'linear-gradient(135deg, #EF4444, #F87171)' : 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-              boxShadow: isRecording ? '0 14px 30px rgba(239,68,68,0.38)' : '0 14px 30px rgba(99,102,241,0.40)',
-              border: '1px solid rgba(255,255,255,0.22)',
-              transition: 'background 0.3s, box-shadow 0.3s',
+              background: isRecording
+                ? 'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.28), rgba(255,255,255,0) 55%), linear-gradient(135deg, #EF4444, #F87171)'
+                : 'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.28), rgba(255,255,255,0) 55%), linear-gradient(135deg, #2563EB, #4F46E5)',
+              boxShadow: isRecording ? '0 18px 40px rgba(239,68,68,0.38)' : '0 18px 40px rgba(37,99,235,0.36)',
+              border: '1px solid rgba(255,255,255,0.26)',
+              transition: 'background 0.25s, box-shadow 0.25s',
               zIndex: 2,
             }}
             aria-label="一键捕捉"
