@@ -170,7 +170,7 @@ export function NoteProvider({ children }: { children: ReactNode }) {
         const fetchedNotes = response.data.data.notes.map((n: any) => ({
           content: normalizeContent(n.content),
           tags: normalizeTags(n.tags),
-          id: n.id,
+          id: String(n.id),
           title: deriveDisplayTitle(n.title, n.content),
           status: (n.status === 'inbox' || n.status === 'archived') ? n.status : 'archived',
           // Infer type from attachments if present
@@ -182,7 +182,10 @@ export function NoteProvider({ children }: { children: ReactNode }) {
           imageUrl: n.attachments?.find((a: any) => a.type === 'image' || a.type === 'IMAGE')?.url,
           structuredData: n.structuredData
         }));
-        const merged = [...local, ...fetchedNotes].sort((a, b) => b.createdAt - a.createdAt);
+        const byId = new Map<string, Note>();
+        for (const n of fetchedNotes) byId.set(n.id, n);
+        for (const n of local) if (!byId.has(n.id)) byId.set(n.id, n);
+        const merged = Array.from(byId.values()).sort((a, b) => b.createdAt - a.createdAt);
         setNotes(merged);
 
         if (local.length > 0 && !syncingLocalRef.current) {

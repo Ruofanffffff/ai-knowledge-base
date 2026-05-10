@@ -11,11 +11,14 @@ router.post('/ingest', authMiddleware, requirePermission('document:write'), asyn
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
-    const { url, text } = req.body || {};
+    const { url, text, ingestLevel: ingestLevelRaw } = req.body || {};
     const { platform, originalUrl, normalizedUrl } = normalizeUrl(url);
 
     const inputText = typeof text === 'string' && text.trim() ? text.trim() : null;
-    const ingestLevel = inputText ? 'L1' : 'L0';
+    const allowed = new Set(['L0', 'L1', 'L2', 'L3']);
+    const envDefault = String(process.env.SHORT_VIDEO_DEFAULT_LEVEL || 'L3').toUpperCase();
+    const requestLevel = String(ingestLevelRaw || '').toUpperCase();
+    const ingestLevel = allowed.has(requestLevel) ? requestLevel : (allowed.has(envDefault) ? envDefault : (inputText ? 'L3' : 'L3'));
 
     const existing = await shortVideoDAL.findLatestByUrl(userId, normalizedUrl);
     if (existing && ['queued', 'running', 'succeeded'].includes(existing.status)) {

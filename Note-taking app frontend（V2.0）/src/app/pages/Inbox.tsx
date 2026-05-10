@@ -42,12 +42,16 @@ export function Inbox() {
   const { notes, updateNote, deleteNote, addNote, refreshNotes } = useNotes();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [videoSources, setVideoSources] = useState<ShortVideoSource[]>([]);
+  const [hideInboxNoteIds, setHideInboxNoteIds] = useState<string[]>([]);
   const lastSeenNoteIdsRef = useRef<Set<string>>(new Set());
   const lastRefreshedAtRef = useRef<number>(0);
 
   const inboxNotes = useMemo(() => {
-    return notes.filter((n) => n.status === 'inbox').sort((a, b) => b.createdAt - a.createdAt);
-  }, [notes]);
+    const hide = new Set(hideInboxNoteIds);
+    return notes
+      .filter((n) => n.status === 'inbox' && !hide.has(n.id))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }, [notes, hideInboxNoteIds]);
 
   useEffect(() => {
     let alive = true;
@@ -56,13 +60,17 @@ export function Inbox() {
         const res = await api.get('/short-videos/sources');
         const list = Array.isArray(res?.data?.data) ? (res.data.data as ShortVideoSource[]) : [];
         if (!alive) return;
-        const display = list
-          .filter((s) => s.status === 'queued' || s.status === 'running' || s.status === 'failed')
-          .slice(0, 10);
+        const hideQuick = list
+          .filter((s) => s.noteQuickId && s.noteRefinedId)
+          .map((s) => s.noteQuickId as string);
+        setHideInboxNoteIds(hideQuick);
+
+        const display = list.filter((s) => s.status === 'queued' || s.status === 'running' || s.status === 'failed').slice(0, 10);
 
         setVideoSources(display);
 
-        const noteIds = display
+        const noteIds = list
+          .slice(0, 20)
           .map((s) => s.noteRefinedId || s.noteQuickId)
           .filter(Boolean) as string[];
 
@@ -73,7 +81,6 @@ export function Inbox() {
             shouldRefresh = true;
           }
         }
-        if (display.some((s) => s.status === 'succeeded')) shouldRefresh = true;
 
         const now = Date.now();
         if (shouldRefresh && now - lastRefreshedAtRef.current > 2000) {

@@ -251,16 +251,72 @@ export function BottomNav() {
     ? [...NAV_ITEMS.slice(0, insertAt), { path: '/sicircle', label: '思圈', Icon: SiCircleIcon }, ...NAV_ITEMS.slice(insertAt)]
     : NAV_ITEMS;
 
+  const micIndex = 2;
+  const leftItems = items.slice(0, micIndex);
+  const rightItems = items.slice(micIndex);
+
+  const renderItem = ({ path, label, Icon }: { path: string; label: string; Icon: any }) => {
+    const active = isActive(path);
+    const isProfile = path === '/profile';
+    return (
+      <button
+        key={path}
+        onClick={() => navigate(path)}
+        className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all relative"
+        style={{ minWidth: '52px' }}
+      >
+        {active && (
+          <motion.div
+            layoutId="nav-active-bg"
+            className="absolute inset-0 rounded-2xl"
+            style={{ background: 'rgba(99,102,241,0.08)' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+          />
+        )}
+        <div className="relative z-10">
+          <Icon active={active} />
+          {isProfile && unread > 0 && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 600, damping: 18 }}
+              className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white"
+              style={{ background: '#EF4444' }}
+            >
+              <span style={{ color: 'white', fontSize: '8px', fontWeight: 800 }}>
+                {unread > 9 ? '9+' : unread}
+              </span>
+            </motion.div>
+          )}
+        </div>
+        <span
+          className="relative z-10"
+          style={{
+            fontSize: '10px',
+            fontWeight: active ? 700 : 500,
+            color: active ? '#6366F1' : '#9CA3AF',
+            letterSpacing: active ? '0.01em' : 0,
+          }}
+        >
+          {label}
+        </span>
+        {active && (
+          <motion.div
+            layoutId="nav-dot"
+            className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
+            style={{ background: '#6366F1' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+          />
+        )}
+      </button>
+    );
+  };
+
   return (
     <div
       className="fixed bottom-0 left-0 right-0 z-50"
       style={{
-        background: 'var(--hi-nav-bg)',
-        backdropFilter: 'blur(28px)',
-        WebkitBackdropFilter: 'blur(28px)',
-        borderTop: '1px solid var(--hi-nav-border)',
-        boxShadow: 'var(--hi-nav-shadow)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)',
       }}
     >
       <AnimatePresence>
@@ -286,89 +342,112 @@ export function BottomNav() {
         )}
       </AnimatePresence>
 
-      <div className="flex items-center justify-around px-1 py-2">
-        {items.map(({ path, label, Icon }, idx) => {
-          const active = isActive(path);
-          const isProfile = path === '/profile';
-          return (
-            <>
-              {idx === 2 && (
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onPointerDown={handlePointerDown}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  onPointerCancel={handlePointerCancel}
-                  className="w-14 h-14 rounded-3xl flex items-center justify-center touch-none"
-                  style={{
-                    background: isRecording
-                      ? 'linear-gradient(135deg, #EF4444, #F87171)'
-                      : 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                    boxShadow: isRecording
-                      ? '0 10px 24px rgba(239,68,68,0.38)'
-                      : '0 10px 24px rgba(99,102,241,0.38)',
-                    border: '1px solid rgba(255,255,255,0.22)',
-                    marginTop: '-18px',
-                    transition: 'background 0.3s, box-shadow 0.3s'
-                  }}
-                  aria-label="一键捕捉"
-                >
-                  <Mic size={22} style={{ color: 'white' }} />
-                </motion.button>
-              )}
-              <button
-                key={path}
-                onClick={() => navigate(path)}
-                className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all relative"
-                style={{ minWidth: '52px' }}
-              >
-                {active && (
-                  <motion.div
-                    layoutId="nav-active-bg"
-                    className="absolute inset-0 rounded-2xl"
-                    style={{ background: 'rgba(99,102,241,0.08)' }}
-                    transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-                  />
-                )}
-                <div className="relative z-10">
-                  <Icon active={active} />
-                  {isProfile && unread > 0 && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: 'spring', stiffness: 600, damping: 18 }}
-                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white"
-                      style={{ background: '#EF4444' }}
-                    >
-                      <span style={{ color: 'white', fontSize: '8px', fontWeight: 800 }}>
-                        {unread > 9 ? '9+' : unread}
-                      </span>
-                    </motion.div>
-                  )}
-                </div>
-                <span
-                  className="relative z-10"
-                  style={{
-                    fontSize: '10px',
-                    fontWeight: active ? 700 : 500,
-                    color: active ? '#6366F1' : '#9CA3AF',
-                    letterSpacing: active ? '0.01em' : 0,
-                  }}
-                >
-                  {label}
-                </span>
-                {active && (
-                  <motion.div
-                    layoutId="nav-dot"
-                    className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
-                    style={{ background: '#6366F1' }}
-                    transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-                  />
-                )}
-              </button>
-            </>
-          );
-        })}
+      <div className="px-3">
+        <div className="relative mx-auto" style={{ maxWidth: 560 }}>
+          <div className="flex items-end justify-between gap-3">
+            <div
+              className="flex-1"
+              style={{
+                position: 'relative',
+                background: 'var(--hi-nav-bg)',
+                backdropFilter: 'blur(28px)',
+                WebkitBackdropFilter: 'blur(28px)',
+                border: '1px solid var(--hi-nav-border)',
+                boxShadow: 'var(--hi-nav-shadow)',
+                borderRadius: '26px',
+                padding: '8px 10px',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  width: 72,
+                  height: 72,
+                  borderRadius: 999,
+                  right: -36,
+                  top: -30,
+                  background: 'var(--hi-page-bg)',
+                  zIndex: 0,
+                }}
+              />
+              <div className="flex items-center justify-around" style={{ position: 'relative', zIndex: 1 }}>
+                {leftItems.map(renderItem)}
+              </div>
+            </div>
+
+            <div style={{ width: 74, flex: '0 0 74px' }} />
+
+            <div
+              className="flex-1"
+              style={{
+                position: 'relative',
+                background: 'var(--hi-nav-bg)',
+                backdropFilter: 'blur(28px)',
+                WebkitBackdropFilter: 'blur(28px)',
+                border: '1px solid var(--hi-nav-border)',
+                boxShadow: 'var(--hi-nav-shadow)',
+                borderRadius: '26px',
+                padding: '8px 10px',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  width: 72,
+                  height: 72,
+                  borderRadius: 999,
+                  left: -36,
+                  top: -30,
+                  background: 'var(--hi-page-bg)',
+                  zIndex: 0,
+                }}
+              />
+              <div className="flex items-center justify-around" style={{ position: 'relative', zIndex: 1 }}>
+                {rightItems.map(renderItem)}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: 12,
+              transform: 'translateX(-50%)',
+              width: 78,
+              height: 78,
+              borderRadius: 999,
+              background: 'var(--hi-page-bg)',
+            }}
+          />
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            className="touch-none"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: 18,
+              transform: 'translateX(-50%)',
+              width: 60,
+              height: 60,
+              borderRadius: 999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: isRecording ? 'linear-gradient(135deg, #EF4444, #F87171)' : 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+              boxShadow: isRecording ? '0 10px 24px rgba(239,68,68,0.38)' : '0 10px 24px rgba(99,102,241,0.38)',
+              border: '1px solid rgba(255,255,255,0.22)',
+              transition: 'background 0.3s, box-shadow 0.3s',
+            }}
+            aria-label="一键捕捉"
+          >
+            <Mic size={22} style={{ color: 'white' }} />
+          </motion.button>
+        </div>
       </div>
     </div>
   );

@@ -12,7 +12,18 @@ function extractFirstHttpUrl(text) {
 
 function isAllowedHost(hostname) {
   const raw = String(process.env.SHORT_VIDEO_ALLOWED_HOSTS || '').trim();
-  const defaults = ['douyin.com', 'www.douyin.com', 'v.douyin.com', 'iesdouyin.com', 'www.iesdouyin.com'];
+  const defaults = [
+    'douyin.com',
+    'www.douyin.com',
+    'v.douyin.com',
+    'iesdouyin.com',
+    'www.iesdouyin.com',
+    'mp.weixin.qq.com',
+    'weixin.qq.com',
+    'xhslink.com',
+    'xiaohongshu.com',
+    'www.xiaohongshu.com',
+  ];
   const list = raw
     ? raw
         .split(',')
@@ -29,6 +40,8 @@ function detectPlatform(hostname) {
   const h = String(hostname || '').toLowerCase();
   if (!h) return 'unknown';
   if (h === 'v.douyin.com' || h.endsWith('.douyin.com') || h.endsWith('.iesdouyin.com')) return 'douyin';
+  if (h === 'mp.weixin.qq.com' || h.endsWith('.weixin.qq.com')) return 'weixin';
+  if (h === 'xhslink.com' || h.endsWith('.xiaohongshu.com')) return 'xhs';
   return 'unknown';
 }
 

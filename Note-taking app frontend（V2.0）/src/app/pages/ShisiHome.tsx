@@ -122,7 +122,18 @@ export function ShisiHome() {
     const isSupportedShortVideoHost = (u: string): boolean => {
       try {
         const host = new URL(u).hostname.toLowerCase();
-        return host === 'v.douyin.com' || host.endsWith('.douyin.com') || host === 'www.douyin.com' || host.endsWith('.iesdouyin.com') || host === 'www.iesdouyin.com';
+        return (
+          host === 'v.douyin.com' ||
+          host.endsWith('.douyin.com') ||
+          host === 'www.douyin.com' ||
+          host.endsWith('.iesdouyin.com') ||
+          host === 'www.iesdouyin.com' ||
+          host === 'mp.weixin.qq.com' ||
+          host.endsWith('.weixin.qq.com') ||
+          host === 'xhslink.com' ||
+          host.endsWith('.xiaohongshu.com') ||
+          host === 'www.xiaohongshu.com'
+        );
       } catch {
         return false;
       }
@@ -132,10 +143,11 @@ export function ShisiHome() {
     if (url && isSupportedShortVideoHost(url)) {
       const t = toast.loading('正在解析短视频…');
       try {
-        await api.post('/short-videos/ingest', { url, text });
+        const extraText = text.split(url).join('').trim();
+        await api.post('/short-videos/ingest', { url, text: extraText, ingestLevel: 'L3' });
         setInput('');
         toast.dismiss(t);
-        toast.success('已开始解析短视频，稍后会出现在收件箱');
+        toast.success('已开始解析短视频（基于标题/简介与输入文案整理），稍后会出现在收件箱');
       } catch (e: any) {
         toast.dismiss(t);
         toast.error(e?.response?.data?.error || e?.message || '解析失败');

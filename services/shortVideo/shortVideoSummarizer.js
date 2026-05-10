@@ -22,6 +22,9 @@ function buildInputText(meta, userText) {
   if (meta?.title) parts.push(`标题：${meta.title}`);
   if (meta?.description) parts.push(`简介：${meta.description}`);
   if (meta?.image) parts.push(`封面：${meta.image}`);
+  if (meta?.transcriptText) parts.push(`转写文本（可能包含背景音乐等噪声，请只提取讲解内容）：\n${stripToPlainText(meta.transcriptText)}`);
+  if (meta?.pageText) parts.push(`页面正文/笔记正文（如存在）：\n${stripToPlainText(meta.pageText)}`);
+  if (meta?.ocrText) parts.push(`图片文字识别（如存在）：\n${stripToPlainText(meta.ocrText)}`);
   if (userText) parts.push(`用户提供的文案/笔记：${stripToPlainText(userText)}`);
   return parts.filter(Boolean).join('\n');
 }
@@ -138,7 +141,7 @@ function renderMarkdownNote(meta, url, quick, refined, originalText) {
     lines.push('');
   }
   if (originalText && originalText.trim()) {
-    lines.push('## 原文转写');
+    lines.push('## 原始文案/附加文本');
     lines.push(originalText.trim());
     lines.push('');
   }
@@ -159,4 +162,3 @@ module.exports = {
   renderMarkdownNote,
   generateEmbeddingForQuick,
 };
-

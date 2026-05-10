@@ -1,6 +1,9 @@
 const shortVideoDAL = require('./shortVideoDAL');
 const { fetchMeta } = require('./shortVideoMetaService');
 const noteDAL = require('../notes/noteDAL');
+const transcriptService = require('./shortVideoTranscriptService');
+const pageExtractor = require('./shortVideoPageExtractor');
+const imageOcr = require('./shortVideoImageOcrService');
 const {
   generateQuickNote,
   generateRefinedNote,
@@ -29,11 +32,94 @@ async function processOne(source) {
   });
 
   await shortVideoDAL.updateSource(sourceId, {
+    progress: { stage: 'extracting_text' },
+  });
+
+  const level = String(source.ingestLevel || 'L0').toUpperCase();
+  const preferSubtitles = level === 'L2' || level === 'L3';
+  const doAsrFallback = level === 'L3';
+  const transcriptUrl = meta.finalUrl || source.originalUrl || source.normalizedUrl;
+  let transcriptText = '';
+  let transcriptMeta = null;
+  let pageText = '';
+  let pageImages = [];
+  let ocrText = '';
+  if (level !== 'L0' && transcriptUrl) {
+    const r = await transcriptService
+      .getTranscriptForUrl(transcriptUrl, { preferSubtitles, allowAsr: doAsrFallback })
+      .catch((e) => ({ ok: false, error: String(e?.message || e || 'transcript failed') }));
+    if (r?.ok && typeof r.text === 'string' && r.text.trim()) {
+      transcriptText = r.text.trim();
+      transcriptMeta = {
+        origin: r.origin || null,
+        lang: r.lang || null,
+        title: r.title || null,
+        duration: r.duration || null,
+      };
+      await shortVideoDAL.createArtifact({
+        sourceId,
+        kind: 'transcript',
+        payload: transcriptText,
+        metadata: transcriptMeta,
+      });
+    } else if (!doAsrFallback) {
+      transcriptMeta = { ok: false, error: r?.error || 'no subtitles' };
+      await shortVideoDAL.createArtifact({
+        sourceId,
+        kind: 'transcript',
+        payload: '',
+        metadata: transcriptMeta,
+      });
+    }
+  }
+
+  if (level !== 'L0' && transcriptUrl) {
+    const platform = String(source.platform || '').toLowerCase();
+    const page = await pageExtractor
+      .extractPage(transcriptUrl, platform)
+      .catch((e) => ({ ok: false, error: String(e?.message || e || 'page extract failed') }));
+    if (page?.ok) {
+      pageText = typeof page.text === 'string' ? page.text.trim() : '';
+      pageImages = Array.isArray(page.imageUrls) ? page.imageUrls : [];
+      if (pageText || pageImages.length) {
+        await shortVideoDAL
+          .createArtifact({
+            sourceId,
+            kind: 'page',
+            payload: JSON.stringify({ title: page.title || '', text: pageText, imageUrls: pageImages.slice(0, 12) }),
+            metadata: { platform, finalUrl: page.finalUrl || transcriptUrl, status: page.status || null },
+          })
+          .catch(() => {});
+      }
+    }
+  }
+
+  if ((level === 'L2' || level === 'L3') && pageImages.length) {
+    const o = await imageOcr.ocrImages(pageImages, { maxImages: 4 }).catch((e) => ({
+      ok: false,
+      text: '',
+      items: [],
+      error: String(e?.message || e || 'ocr failed'),
+    }));
+    if (o?.ok && typeof o.text === 'string' && o.text.trim()) {
+      ocrText = o.text.trim();
+    }
+    await shortVideoDAL
+      .createArtifact({
+        sourceId,
+        kind: 'ocr',
+        payload: JSON.stringify({ ok: Boolean(o?.ok), text: ocrText, items: o?.items || [], error: o?.error || null }),
+        metadata: { maxImages: 4 },
+      })
+      .catch(() => {});
+  }
+
+  await shortVideoDAL.updateSource(sourceId, {
     progress: { stage: 'generating_quick' },
   });
 
   const quick = await generateQuickNote(
-    { title: meta.title, description: meta.description, image: meta.image },
+    { title: meta.title, description: meta.description, image: meta.image, transcriptText, pageText, ocrText },
     source.inputText || ''
   );
 
@@ -61,7 +147,7 @@ async function processOne(source) {
   });
 
   const refined = await generateRefinedNote(
-    { title: meta.title, description: meta.description, image: meta.image },
+    { title: meta.title, description: meta.description, image: meta.image, transcriptText, pageText, ocrText },
     source.inputText || '',
     quick
   );
@@ -83,6 +169,10 @@ async function processOne(source) {
   await shortVideoDAL.updateSource(sourceId, {
     noteRefinedId: noteRefined.id,
   });
+
+  if (noteQuick?.id) {
+    await noteDAL.updateNote(noteQuick.id, { status: 'archived' }, source.userId).catch(() => {});
+  }
 
   await shortVideoDAL.updateSource(sourceId, {
     progress: { stage: 'embedding' },
@@ -145,4 +235,3 @@ module.exports = {
   start,
   stop,
 };
-
