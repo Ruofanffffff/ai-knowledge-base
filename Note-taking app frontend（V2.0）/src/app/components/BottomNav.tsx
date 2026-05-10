@@ -8,8 +8,9 @@ import { SpeechService } from '../services/speechService';
 import { useNotes } from './context/NoteContext';
 import { toast } from '../components/ui/Toast';
 
-const ACTIVE_COLOR = '#1677FF';
-const INACTIVE_COLOR = '#8A8F9C';
+const ACTIVE_COLOR = '#111827';
+const INACTIVE_COLOR = '#6B7280';
+const ACTIVE_BG = 'rgba(15, 23, 42, 0.08)';
 
 function HiBrainIcon({ active }: { active: boolean }) {
   return (
@@ -79,6 +80,10 @@ function ProfileIcon({ active }: { active: boolean }) {
       <path d="M4 19C4 15.7 7.1 13 11 13C14.9 13 18 15.7 18 19" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
+}
+
+function CaptureIcon({ active }: { active: boolean }) {
+  return <Mic size={22} style={{ color: active ? ACTIVE_COLOR : INACTIVE_COLOR }} />;
 }
 
 const NAV_ITEMS = [
@@ -264,54 +269,106 @@ export function BottomNav() {
     ? [...NAV_ITEMS.slice(0, insertAt), { path: '/sicircle', label: '思圈', Icon: SiCircleIcon }, ...NAV_ITEMS.slice(insertAt)]
     : NAV_ITEMS;
 
-  const micIndex = 2;
-  const leftItems = items.slice(0, micIndex);
-  const rightItems = items.slice(micIndex);
+  const navItems = [
+    ...items.slice(0, 2),
+    { path: '__capture__', label: '捕捉', Icon: CaptureIcon, kind: 'capture' as const },
+    ...items.slice(2),
+  ];
 
-  const renderItem = ({ path, label, Icon }: { path: string; label: string; Icon: any }) => {
-    const active = isActive(path);
+  const renderItem = ({
+    path,
+    label,
+    Icon,
+    kind,
+  }: {
+    path: string;
+    label: string;
+    Icon: any;
+    kind?: 'capture';
+  }) => {
+    const active = kind === 'capture' ? false : isActive(path);
     const isProfile = path === '/profile';
-    return (
-      <button
-        key={path}
-        onClick={() => navigate(path)}
-        className="flex flex-1 flex-col items-center justify-center gap-0.5"
+
+    const inner = (
+      <div
+        className="relative flex flex-col items-center justify-center gap-0.5"
+        style={{
+          width: 58,
+          paddingTop: 7,
+          paddingBottom: 7,
+          borderRadius: 999,
+        }}
       >
-        <div className="relative">
+        {active && (
+          <motion.div
+            layoutId="dt-nav-active"
+            className="absolute inset-0"
+            style={{
+              background: ACTIVE_BG,
+              borderRadius: 999,
+            }}
+            transition={{ type: 'spring', damping: 30, stiffness: 420 }}
+          />
+        )}
+        <div className="relative z-10">
           <Icon active={active} />
           {isProfile && unread > 0 && (
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 600, damping: 18 }}
-              className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white"
-              style={{ background: '#EF4444' }}
+              transition={{ type: 'spring', stiffness: 650, damping: 18 }}
+              className="absolute -top-1 -right-2 min-w-5 h-5 rounded-full flex items-center justify-center border-2 border-white px-1"
+              style={{ background: '#F59E0B' }}
             >
-              <span style={{ color: 'white', fontSize: '8px', fontWeight: 800 }}>
-                {unread > 9 ? '9+' : unread}
+              <span style={{ color: 'white', fontSize: '10px', fontWeight: 800, lineHeight: 1 }}>
+                {unread > 99 ? '99+' : unread}
               </span>
             </motion.div>
           )}
         </div>
         <span
+          className="relative z-10"
           style={{
-            fontSize: '10px',
-            fontWeight: active ? 600 : 500,
+            fontSize: '11px',
+            fontWeight: active ? 700 : 500,
             color: active ? ACTIVE_COLOR : INACTIVE_COLOR,
           }}
         >
           {label}
         </span>
-      </button>
+      </div>
+    );
+
+    return (
+      <div key={path} className="flex flex-1 items-center justify-center">
+        {kind === 'capture' ? (
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            className="touch-none"
+            aria-label="捕捉"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+          >
+            {inner}
+          </motion.button>
+        ) : (
+          <button
+            onClick={() => navigate(path)}
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+          >
+            {inner}
+          </button>
+        )}
+      </div>
     );
   };
 
   return (
     <div
       className="fixed bottom-0 left-0 right-0 z-50"
-      style={{
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
     >
       <AnimatePresence>
         {isRecording && (
@@ -337,55 +394,26 @@ export function BottomNav() {
       </AnimatePresence>
 
       <div
+        className="px-3"
         style={{
-          background: '#ffffff',
-          borderTop: '1px solid rgba(15, 23, 42, 0.08)',
-          boxShadow: '0 -6px 18px rgba(15, 23, 42, 0.06)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)',
+          paddingTop: 8,
         }}
       >
-        <div
-          className="flex items-center"
-          style={{
-            height: 64,
-            paddingLeft: 8,
-            paddingRight: 8,
-          }}
-        >
-          <div className="flex flex-1 items-center">{leftItems.map(renderItem)}</div>
-          <div className="flex flex-col items-center justify-center" style={{ width: 80 }}>
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerCancel}
-              className="touch-none"
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 999,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: isRecording ? '#EF4444' : ACTIVE_COLOR,
-                boxShadow: isRecording ? '0 10px 18px rgba(239, 68, 68, 0.30)' : '0 10px 18px rgba(22, 119, 255, 0.25)',
-              }}
-              aria-label="一键捕捉"
-            >
-              <Mic size={20} style={{ color: 'white' }} />
-            </motion.button>
-            <span
-              style={{
-                marginTop: 2,
-                fontSize: '10px',
-                fontWeight: 600,
-                color: ACTIVE_COLOR,
-              }}
-            >
-              捕捉
-            </span>
+        <div className="mx-auto" style={{ maxWidth: 720 }}>
+          <div
+            style={{
+              height: 66,
+              borderRadius: 999,
+              background: 'rgba(255,255,255,0.86)',
+              border: '1px solid rgba(15, 23, 42, 0.08)',
+              boxShadow: '0 10px 28px rgba(15, 23, 42, 0.12)',
+              backdropFilter: 'blur(18px)',
+              WebkitBackdropFilter: 'blur(18px)',
+            }}
+          >
+            <div className="flex items-center h-full px-2">{navItems.map(renderItem)}</div>
           </div>
-          <div className="flex flex-1 items-center">{rightItems.map(renderItem)}</div>
         </div>
       </div>
     </div>
