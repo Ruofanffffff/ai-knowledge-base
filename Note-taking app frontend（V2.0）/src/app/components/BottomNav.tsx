@@ -343,43 +343,102 @@ export function BottomNav() {
       </AnimatePresence>
 
       <div className="px-3">
-        <div className="relative mx-auto" style={{ maxWidth: 560, height: 92 }}>
-          <svg
-            viewBox="0 0 400 92"
-            preserveAspectRatio="none"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              filter: 'drop-shadow(var(--hi-nav-shadow))',
-            }}
-          >
-            <rect x="0" y="24" width="176" height="56" rx="22" fill="var(--hi-nav-bg)" stroke="var(--hi-nav-border)" strokeWidth="1.5" />
-            <rect x="224" y="24" width="176" height="56" rx="22" fill="var(--hi-nav-bg)" stroke="var(--hi-nav-border)" strokeWidth="1.5" />
-            <circle cx="200" cy="52" r="40" fill="var(--hi-nav-bg)" stroke="var(--hi-nav-border)" strokeWidth="1.5" />
-          </svg>
-
+        <div className="relative mx-auto" style={{ maxWidth: 520, height: 92 }}>
           <div
             className="absolute left-0 right-0"
             style={{
-              bottom: 18,
+              bottom: 12,
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-end',
               justifyContent: 'space-between',
-              gap: 10,
-              paddingLeft: 10,
-              paddingRight: 10,
+              gap: 12,
             }}
           >
-            <div className="flex flex-1 items-center justify-around" style={{ paddingRight: 52 }}>
-              {leftItems.map(renderItem)}
+            <div
+              className="relative flex-1"
+              style={{
+                height: 60,
+                borderRadius: 28,
+                background: 'rgba(255,255,255,0.58)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                boxShadow: '0 10px 26px rgba(15, 23, 42, 0.10)',
+                backdropFilter: 'blur(22px)',
+                WebkitBackdropFilter: 'blur(22px)',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background:
+                    'linear-gradient(180deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.46) 60%, rgba(255,255,255,0.38) 100%)',
+                  opacity: 0.55,
+                  pointerEvents: 'none',
+                }}
+              />
+              <div className="flex items-center justify-around h-full" style={{ position: 'relative', paddingRight: 44 }}>
+                {leftItems.map(renderItem)}
+              </div>
             </div>
-            <div style={{ width: 84, flex: '0 0 84px' }} />
-            <div className="flex flex-1 items-center justify-around" style={{ paddingLeft: 52 }}>
-              {rightItems.map(renderItem)}
+
+            <div style={{ width: 92, flex: '0 0 92px' }} />
+
+            <div
+              className="relative flex-1"
+              style={{
+                height: 60,
+                borderRadius: 28,
+                background: 'rgba(255,255,255,0.58)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                boxShadow: '0 10px 26px rgba(15, 23, 42, 0.10)',
+                backdropFilter: 'blur(22px)',
+                WebkitBackdropFilter: 'blur(22px)',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background:
+                    'linear-gradient(180deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.46) 60%, rgba(255,255,255,0.38) 100%)',
+                  opacity: 0.55,
+                  pointerEvents: 'none',
+                }}
+              />
+              <div className="flex items-center justify-around h-full" style={{ position: 'relative', paddingLeft: 44 }}>
+                {rightItems.map(renderItem)}
+              </div>
             </div>
           </div>
+
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: 18,
+              transform: 'translateX(-50%)',
+              width: 86,
+              height: 86,
+              borderRadius: 999,
+              background: 'var(--hi-page-bg)',
+              boxShadow: '0 12px 28px rgba(15, 23, 42, 0.10)',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: 18,
+              transform: 'translateX(-50%)',
+              width: 86,
+              height: 86,
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.40)',
+              pointerEvents: 'none',
+            }}
+          />
 
           <motion.button
             whileTap={{ scale: 0.95 }}
@@ -391,16 +450,16 @@ export function BottomNav() {
             style={{
               position: 'absolute',
               left: '50%',
-              bottom: 12,
+              bottom: 30,
               transform: 'translateX(-50%)',
-              width: 60,
-              height: 60,
+              width: 62,
+              height: 62,
               borderRadius: 999,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               background: isRecording ? 'linear-gradient(135deg, #EF4444, #F87171)' : 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-              boxShadow: isRecording ? '0 10px 24px rgba(239,68,68,0.38)' : '0 10px 24px rgba(99,102,241,0.38)',
+              boxShadow: isRecording ? '0 14px 30px rgba(239,68,68,0.38)' : '0 14px 30px rgba(99,102,241,0.40)',
               border: '1px solid rgba(255,255,255,0.22)',
               transition: 'background 0.3s, box-shadow 0.3s',
               zIndex: 2,
