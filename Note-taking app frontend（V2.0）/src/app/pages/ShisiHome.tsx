@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { Capacitor } from '@capacitor/core';
@@ -406,7 +406,10 @@ export function ShisiHome() {
         </div>
       </div>
 
-      <BottomNav />
+      <BottomNav onVoiceResult={useCallback((text: string) => {
+        setInput((prev) => (prev ? prev + text : text));
+        requestAnimationFrame(() => textareaRef.current?.focus?.());
+      }, [])} />
 
       <AlertDialog
         open={cloudPrivacyOpen}

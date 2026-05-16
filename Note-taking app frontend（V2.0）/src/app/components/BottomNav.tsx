@@ -93,7 +93,7 @@ const NAV_ITEMS = [
   { path: '/profile', label: '我的', Icon: ProfileIcon },
 ];
 
-export function BottomNav() {
+export function BottomNav({ onVoiceResult }: { onVoiceResult?: (text: string) => void } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const [unread, setUnread] = useState(0);
@@ -186,16 +186,20 @@ export function BottomNav() {
 
       const finalTxt = recordingTextRef.current.trim();
       if (finalTxt) {
-        try {
-          await addNote({
-            content: finalTxt,
-            type: 'text',
-            status: 'inbox'
-          });
-          toast.success('已保存到收件箱');
-        } catch (error) {
-          console.error('Failed to save note:', error);
-          toast.error('保存失败');
+        if (onVoiceResult) {
+          onVoiceResult(finalTxt);
+        } else {
+          try {
+            await addNote({
+              content: finalTxt,
+              type: 'text',
+              status: 'inbox'
+            });
+            toast.success('已保存到收件箱');
+          } catch (error) {
+            console.error('Failed to save note:', error);
+            toast.error('保存失败');
+          }
         }
       }
       setRecordingText('');

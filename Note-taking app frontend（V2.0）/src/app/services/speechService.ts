@@ -91,7 +91,19 @@ function readPreferredProvider(): SpeechProvider | null {
 
 export class SpeechService {
   static getProvider(): SpeechProvider {
-    return Capacitor.isNativePlatform() ? 'cloud_streaming' : 'none';
+    // 1. 先尝试读取用户偏好设置（环境变量、URL参数、localStorage）
+    const preferred = readPreferredProvider();
+    if (preferred) return preferred;
+
+    // 2. 回退到默认逻辑：Native平台优先使用本地识别
+    if (Capacitor.isNativePlatform()) return 'native';
+
+    // 3. Web平台检测 Web Speech API
+    const webCtor = typeof window !== 'undefined' &&
+      (window.SpeechRecognition || (window as any).webkitSpeechRecognition);
+    if (webCtor) return 'web';
+
+    return 'none';
   }
 
   static async getAvailability(): Promise<SpeechAvailability> {
