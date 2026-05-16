@@ -121,15 +121,17 @@ export function HiBrain() {
   const formatContent = (text: string) => {
     const lines = text.split('\n');
     return lines.map((line, i) => {
-      const formatted = line
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/•\s/g, '• ');
-      return (
-        <span key={i}>
-          {i > 0 && <br />}
-          <span dangerouslySetInnerHTML={{ __html: formatted }} />
-        </span>
-      );
+      const parts: React.ReactNode[] = [];
+      let lastIdx = 0;
+      const regex = /\*\*(.*?)\*\*/g;
+      let match;
+      while ((match = regex.exec(line)) !== null) {
+        if (match.index > lastIdx) parts.push(line.slice(lastIdx, match.index));
+        parts.push(<strong key={match.index}>{match[1]}</strong>);
+        lastIdx = regex.lastIndex;
+      }
+      if (lastIdx < line.length) parts.push(line.slice(lastIdx));
+      return <span key={i}>{i > 0 && <br />}{parts}</span>;
     });
   };
 

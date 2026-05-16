@@ -41,4 +41,16 @@ export default defineConfig({
   },
 
   assetsInclude: ['**/*.svg', '**/*.csv'],
+
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router'],
+          'vendor-ui': ['lucide-react', 'motion'],
+          'vendor-editor': ['@tiptap/core', '@tiptap/starter-kit', '@tiptap/react'],
+        }
+      }
+    }
+  },
 })

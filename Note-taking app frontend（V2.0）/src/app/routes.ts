@@ -1,25 +1,27 @@
+import { lazy } from 'react';
 import { createBrowserRouter } from "react-router";
 import { RootLayout } from "./components/RootLayout";
 import { Splash } from "./pages/Splash";
-import { Auth } from "./pages/Auth";
-import { HiBrain } from "./pages/HiBrain";
-import { ShisiHome } from "./pages/ShisiHome";
-import { NoteList } from "./pages/NoteList";
-import { NoteCreate } from "./pages/NoteCreate";
-import { DocumentDetail } from "./pages/DocumentDetail";
-import { SiChain } from "./pages/SiChain";
-import { SiCircle } from "./pages/SiCircle";
-import { Profile } from "./pages/Profile";
-import { UserProfile } from "./pages/UserProfile";
-import { Messages } from "./pages/Messages";
-import { ConversationDetail } from "./pages/ConversationDetail";
-import { Inbox } from "./pages/Inbox";
-import { DailyReview } from "./pages/DailyReview";
-import { MyHomepage } from "./pages/MyHomepage";
-import { ToastDemo } from "./pages/ToastDemo";
-import { WikiList } from "./pages/WikiList";
-import { WikiDetail } from "./pages/WikiDetail";
 import { isWikiEnabled } from "./utils/featureFlags";
+
+const Auth = lazy(() => import("./pages/Auth").then(m => ({ default: m.Auth })));
+const HiBrain = lazy(() => import("./pages/HiBrain").then(m => ({ default: m.HiBrain })));
+const ShisiHome = lazy(() => import("./pages/ShisiHome").then(m => ({ default: m.ShisiHome })));
+const NoteList = lazy(() => import("./pages/NoteList").then(m => ({ default: m.NoteList })));
+const NoteCreate = lazy(() => import("./pages/NoteCreate").then(m => ({ default: m.NoteCreate })));
+const DocumentDetail = lazy(() => import("./pages/DocumentDetail").then(m => ({ default: m.DocumentDetail })));
+const SiChain = lazy(() => import("./pages/SiChain").then(m => ({ default: m.SiChain })));
+const SiCircle = lazy(() => import("./pages/SiCircle").then(m => ({ default: m.SiCircle })));
+const Profile = lazy(() => import("./pages/Profile").then(m => ({ default: m.Profile })));
+const UserProfile = lazy(() => import("./pages/UserProfile").then(m => ({ default: m.UserProfile })));
+const Messages = lazy(() => import("./pages/Messages").then(m => ({ default: m.Messages })));
+const ConversationDetail = lazy(() => import("./pages/ConversationDetail").then(m => ({ default: m.ConversationDetail })));
+const Inbox = lazy(() => import("./pages/Inbox").then(m => ({ default: m.Inbox })));
+const DailyReview = lazy(() => import("./pages/DailyReview").then(m => ({ default: m.DailyReview })));
+const MyHomepage = lazy(() => import("./pages/MyHomepage").then(m => ({ default: m.MyHomepage })));
+const ToastDemo = lazy(() => import("./pages/ToastDemo").then(m => ({ default: m.ToastDemo })));
+const WikiList = lazy(() => import("./pages/WikiList").then(m => ({ default: m.WikiList })));
+const WikiDetail = lazy(() => import("./pages/WikiDetail").then(m => ({ default: m.WikiDetail })));
 
 const wikiEnabled = isWikiEnabled();
 

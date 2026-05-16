@@ -121,7 +121,8 @@ export function NoteProvider({ children }: { children: ReactNode }) {
           pendingSync: true,
         }))
         .filter((n: Note) => Boolean(n.id) && Boolean(n.content));
-    } catch {
+    } catch (e) {
+      console.error('[NoteContext] 加载本地笔记失败，数据可能损坏:', e);
       return [];
     }
   };
@@ -142,7 +143,9 @@ export function NoteProvider({ children }: { children: ReactNode }) {
           structuredData: n.structuredData,
         }));
       localStorage.setItem(LOCAL_NOTES_KEY, JSON.stringify(toSave));
-    } catch {}
+    } catch (e) {
+      console.error('[NoteContext] 保存本地笔记失败:', e);
+    }
   };
 
   const isLocalId = (id: string) => String(id || '').startsWith('local-');
@@ -191,6 +194,7 @@ export function NoteProvider({ children }: { children: ReactNode }) {
         if (local.length > 0 && !syncingLocalRef.current) {
           syncingLocalRef.current = true;
           (async () => {
+            let failCount = 0;
             try {
               for (const ln of local) {
                 try {
@@ -199,12 +203,21 @@ export function NoteProvider({ children }: { children: ReactNode }) {
                     tags: normalizeTags(ln.tags),
                     status: ln.status || 'inbox',
                   });
-                } catch {}
+                } catch (e) {
+                  failCount++;
+                  console.warn('[NoteContext] 同步笔记失败:', ln.content?.slice(0, 50), e);
+                }
               }
-              saveLocalNotes([]);
+              if (failCount > 0) {
+                console.warn(`[NoteContext] ${failCount} 条笔记同步失败，将在下次登录时重试`);
+              } else {
+                saveLocalNotes([]);
+              }
             } finally {
               syncingLocalRef.current = false;
-              fetchNotes().catch(() => {});
+              fetchNotes().catch((e) => {
+                console.warn('[NoteContext] 同步后刷新笔记列表失败:', e);
+              });
             }
           })();
         }

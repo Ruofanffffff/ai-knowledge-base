@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Capacitor } from '@capacitor/core';
 
-const DEFAULT_SERVER_BASE_URL = 'http://120.26.35.225:3000/api';
+const DEFAULT_SERVER_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const envBaseUrl = import.meta.env.VITE_API_URL;
 const isNative = Capacitor.isNativePlatform();
 
