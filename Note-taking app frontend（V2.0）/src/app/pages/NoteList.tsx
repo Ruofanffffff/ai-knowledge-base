@@ -570,10 +570,10 @@ export function NoteList() {
 
   // ── Stats computations ──
   const typeCount = useMemo(() => ({
-    text:  notes.filter(n => n.type === 'text').length,
-    image: notes.filter(n => n.type === 'image').length,
-    mixed: notes.filter(n => n.type === 'mixed').length,
-  }), [notes]);
+    text:  filtered.filter(n => n.type === 'text').length,
+    image: filtered.filter(n => n.type === 'image').length,
+    mixed: filtered.filter(n => n.type === 'mixed').length,
+  }), [filtered]);
 
   const tagFreq = useMemo(() => {
     const freq: Record<string, number> = {};
@@ -1196,7 +1196,7 @@ export function NoteList() {
                   </div>
                   <div>
                     <p style={{ color: '#1E1B4B', fontSize: '15px', fontWeight: 800 }}>笔记概览</p>
-                    <p style={{ color: '#9CA3AF', fontSize: '11px' }}>共 {notes.length} 条笔记</p>
+                    <p style={{ color: '#9CA3AF', fontSize: '11px' }}>共 {filtered.length} 条笔记</p>
                   </div>
                 </div>
                 <button
