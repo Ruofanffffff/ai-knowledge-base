@@ -166,7 +166,7 @@ export function NoteProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
       // Backend returns { success: true, data: { notes: [], total: ... } }
-      const response = await api.get('/notes');
+      const response = await api.get('/notes', { params: { limit: 200, page: 1 } });
       
       if (response.data.success && response.data.data.notes) {
         const local = loadLocalNotes();

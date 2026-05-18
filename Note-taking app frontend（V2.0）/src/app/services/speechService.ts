@@ -91,14 +91,23 @@ function readPreferredProvider(): SpeechProvider | null {
 
 export class SpeechService {
   static getProvider(): SpeechProvider {
-    // 1. 先尝试读取用户偏好设置（环境变量、URL参数、localStorage）
+    // 1. 先检查用户偏好设置
     const preferred = readPreferredProvider();
     if (preferred) return preferred;
 
-    // 2. 回退到默认逻辑：Native平台优先使用本地识别
+    // 2. HarmonyOS 检测：强制使用云流式识别（HarmonyOS 不完全兼容 Android SpeechRecognizer）
+    if (Capacitor.isNativePlatform()) {
+      const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+      if (ua.includes('HarmonyOS') || ua.includes('HUAWEI')) {
+        console.log('[SpeechService] HarmonyOS detected, using cloud_streaming');
+        return 'cloud_streaming';
+      }
+    }
+
+    // 3. Native 平台优先使用本地识别
     if (Capacitor.isNativePlatform()) return 'native';
 
-    // 3. Web平台检测 Web Speech API
+    // 4. Web 平台检测
     const webCtor = typeof window !== 'undefined' &&
       (window.SpeechRecognition || (window as any).webkitSpeechRecognition);
     if (webCtor) return 'web';
@@ -404,11 +413,23 @@ export class SpeechService {
         }
       }
 
-      const { available } = await CapacitorSpeechRecognition.available();
-      if (!available) {
-        callbacks.onError?.('当前设备不支持语音识别');
-        callbacks.onListeningChange?.(false);
-        return { stop: async () => {}, started: false };
+      let nativeAvailable = false;
+      try {
+        const { available } = await CapacitorSpeechRecognition.available();
+        nativeAvailable = Boolean(available);
+      } catch (e) {
+        console.warn('[SpeechService] Native speech available() check failed:', e);
+        nativeAvailable = false;
+      }
+      if (!nativeAvailable) {
+        // Fallback to cloud_streaming instead of failing outright
+        console.warn('[SpeechService] Native speech not available, falling back to cloud_streaming');
+        try {
+          // 记住偏好，后续调用也直接走 cloud_streaming，避免重复检测失败
+          localStorage.setItem('stt_provider', 'cloud_streaming');
+        } catch {}
+        callbacks.onProvider?.('cloud_streaming');
+        return SpeechService.startListening(options, { ...callbacks, onProvider: undefined });
       }
 
       const pickText = (data: any): string => {
