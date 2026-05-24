@@ -13,6 +13,8 @@ export type Note = {
   structuredData?: any;
   localOnly?: boolean;
   pendingSync?: boolean;
+  sourceType?: 'manual' | 'short_video';
+  sourceId?: string;
 };
 
 interface NoteContextType {
@@ -183,7 +185,9 @@ export function NoteProvider({ children }: { children: ReactNode }) {
           createdAt: new Date(n.createdAt).getTime(),
           // Map first image attachment to imageUrl if exists
           imageUrl: n.attachments?.find((a: any) => a.type === 'image' || a.type === 'IMAGE')?.url,
-          structuredData: n.structuredData
+          structuredData: n.structuredData,
+          sourceType: n.sourceType ?? 'manual',
+          sourceId: n.sourceId ?? undefined,
         }));
         const byId = new Map<string, Note>();
         for (const n of fetchedNotes) byId.set(n.id, n);

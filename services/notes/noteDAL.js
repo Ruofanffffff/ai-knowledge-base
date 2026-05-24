@@ -120,7 +120,7 @@ async function ensureUserExists(user) {
  * @returns {Promise<Object>} Created note
  */
 async function createNote(input = {}) {
-  const { user, content, tags, status, userId: legacyUserId } = input;
+  const { user, content, tags, status, userId: legacyUserId, sourceType, sourceId } = input;
 
   const resolvedUserId = user?.id ?? legacyUserId;
   if (!resolvedUserId) {
@@ -157,6 +157,8 @@ async function createNote(input = {}) {
         content,
         tags: JSON.stringify(finalTags),
         status: typeof status === 'string' && status ? status : 'archived',
+        ...(sourceType ? { sourceType } : {}),
+        ...(sourceId ? { sourceId } : {}),
       },
       include: {
         attachments: true
@@ -184,6 +186,8 @@ async function createNote(input = {}) {
         content,
         tags: JSON.stringify(finalTags),
         status: typeof status === 'string' && status ? status : 'archived',
+        ...(sourceType ? { sourceType } : {}),
+        ...(sourceId ? { sourceId } : {}),
       },
       include: {
         attachments: true

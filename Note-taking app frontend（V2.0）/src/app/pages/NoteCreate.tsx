@@ -1060,6 +1060,7 @@ export function NoteCreate() {
 
   // Derived Wiki Pages
   const [derivedWikiPages, setDerivedWikiPages] = useState<any[]>([]);
+    const [showSourcePanel, setShowSourcePanel] = useState(false);
   useEffect(() => {
     if (existingNote?.id) {
       wikiService.getPagesBySource(existingNote.id)
@@ -2034,6 +2035,45 @@ export function NoteCreate() {
                 思圈
               </button>
             </div>}
+
+            {/* ── 原文展示 / AI总结 区块 ── */}
+            {aiPanel === 'none' && existingNote && (() => {
+              const isExternalContent = existingNote.sourceType === 'short_video';
+              const extractOriginalText = (c: string): string => {
+                const match = c.match(/##\s*原始文案\s*\n([\s\S]*?)(?=\n##\s|\s*$)/);
+                return match ? match[1].trim() : '';
+              };
+              return (
+                <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 12, paddingLeft: 16, paddingRight: 16 }}>
+                  <button
+                    onClick={() => setShowSourcePanel(!showSourcePanel)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', padding: '10px 16px', borderRadius: 12,
+                      background: 'rgba(255,255,255,0.05)',
+                      color: 'var(--hi-text-secondary)', fontSize: 14,
+                      border: 'none', cursor: 'pointer',
+                    }}
+                  >
+                    <span>{isExternalContent ? '原文展示' : 'AI总结'}</span>
+                    <ChevronDown size={16} style={{ transform: showSourcePanel ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+                  </button>
+                  {showSourcePanel && (
+                    <div style={{ marginTop: 8, padding: '12px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}>
+                      {isExternalContent ? (
+                        <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--hi-text-secondary)', whiteSpace: 'pre-wrap' }}>
+                          {extractOriginalText(existingNote.content || '') || '暂无原始文案'}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 13, color: 'var(--hi-text-secondary)', textAlign: 'center', padding: '16px 0' }}>
+                          点击生成 AI 总结（功能开发中）
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ── Bottom bar ── */}
             {aiPanel === 'none' && <div className="flex items-center gap-3 px-4 pb-6 pt-1">

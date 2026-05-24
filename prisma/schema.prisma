@@ -149,8 +149,10 @@ model Note {
   userId    String   @map("user_id")
   content   String
   tags      String // JSON string for SQLite compatibility
-  status    String   @default("archived")
-  createdAt DateTime @default(now()) @map("created_at")
+  status     String   @default("archived")
+  sourceType String?  @default("manual") @map("source_type") // "manual" | "short_video"
+  sourceId   String?  @map("source_id") // 对应 ShortVideoSource.id
+  createdAt  DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   attachments Attachment[]

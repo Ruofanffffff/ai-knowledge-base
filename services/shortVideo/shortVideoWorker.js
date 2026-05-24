@@ -122,7 +122,8 @@ async function processOne(source) {
 
   const quick = await generateQuickNote(
     { title: meta.title, description: meta.description, image: meta.image, transcriptText, pageText, ocrText },
-    source.inputText || ''
+    source.inputText || '',
+    transcriptText
   );
 
   await shortVideoDAL.createArtifact({
@@ -135,9 +136,11 @@ async function processOne(source) {
   const tags = Array.from(new Set(['短视频', source.platform, ...(quick.topics || [])])).filter(Boolean);
   const noteQuick = await noteDAL.createNote({
     userId: source.userId,
-    content: renderMarkdownNote({ title: meta.title }, meta.finalUrl || source.originalUrl, quick, null, source.inputText || ''),
+    content: renderMarkdownNote({ title: meta.title }, meta.finalUrl || source.originalUrl, quick, null, source.inputText || '', transcriptText),
     tags,
     status: 'inbox',
+    sourceType: 'short_video',
+    sourceId: source.id,
   });
 
   await shortVideoDAL.updateSource(sourceId, {
@@ -151,7 +154,8 @@ async function processOne(source) {
   const refined = await generateRefinedNote(
     { title: meta.title, description: meta.description, image: meta.image, transcriptText, pageText, ocrText },
     source.inputText || '',
-    quick
+    quick,
+    transcriptText
   );
 
   await shortVideoDAL.createArtifact({
@@ -163,9 +167,11 @@ async function processOne(source) {
 
   const noteRefined = await noteDAL.createNote({
     userId: source.userId,
-    content: renderMarkdownNote({ title: meta.title }, meta.finalUrl || source.originalUrl, quick, refined, source.inputText || ''),
+    content: renderMarkdownNote({ title: meta.title }, meta.finalUrl || source.originalUrl, quick, refined, source.inputText || '', transcriptText),
     tags,
     status: 'inbox',
+    sourceType: 'short_video',
+    sourceId: source.id,
   });
 
   await shortVideoDAL.updateSource(sourceId, {

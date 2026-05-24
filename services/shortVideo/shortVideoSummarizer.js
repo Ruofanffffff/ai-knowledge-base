@@ -29,10 +29,13 @@ function buildInputText(meta, userText) {
   return parts.filter(Boolean).join('\n');
 }
 
-async function generateQuickNote(meta, userText) {
+async function generateQuickNote(meta, userText, transcript) {
   if (!process.env.QWEN_API_KEY) throw new Error('QWEN_API_KEY 未配置');
 
   const input = buildInputText(meta, userText);
+  const transcriptBlock = transcript
+    ? `\n\n# 完整转录原文（基于此生成摘要和金句）：\n${stripToPlainText(transcript)}`
+    : '';
   const prompt = [
     '你是拾思（Shisi）的内容整理助手。用户投递了一条短视频链接或分享文案（可能是长达几十分钟的音频/视频文案），请将其整理成“笔记”。',
     '要求：',
@@ -55,6 +58,7 @@ async function generateQuickNote(meta, userText) {
     '',
     '# 短视频内容：',
     input || '（无）',
+    transcriptBlock,
   ].join('\n');
 
   const out = await llmClient.callJSON(prompt, { temperature: 0.2, maxTokens: 900 });
@@ -75,10 +79,13 @@ async function generateQuickNote(meta, userText) {
   };
 }
 
-async function generateRefinedNote(meta, userText, quick) {
+async function generateRefinedNote(meta, userText, quick, transcript) {
   if (!process.env.QWEN_API_KEY) throw new Error('QWEN_API_KEY 未配置');
 
   const input = buildInputText(meta, userText);
+  const transcriptHint = transcript
+    ? `\n\n完整转录原文（参考）：\n${stripToPlainText(transcript).slice(0, 2000)}`
+    : '';
   const prompt = [
     '你是拾思（Shisi）的内容整理助手。请将短视频内容整理成“精编版笔记”，用于后续复盘与行动。',
     '要求：',
@@ -100,6 +107,7 @@ async function generateRefinedNote(meta, userText, quick) {
     '',
     '输入：',
     input || '（无）',
+    transcriptHint,
   ].join('\n');
 
   const out = await llmClient.callJSON(prompt, { temperature: 0.2, maxTokens: 1200 });
@@ -113,7 +121,7 @@ async function generateRefinedNote(meta, userText, quick) {
   };
 }
 
-function renderMarkdownNote(meta, url, quick, refined, originalText) {
+function renderMarkdownNote(meta, url, quick, refined, originalText, transcript) {
   const lines = [];
   const title = (quick?.title || meta?.title || '短视频笔记').trim();
   lines.push(`# ${title}`);
@@ -140,10 +148,19 @@ function renderMarkdownNote(meta, url, quick, refined, originalText) {
     lines.push(`- ${quick.nextAction}`);
     lines.push('');
   }
-  if (originalText && originalText.trim()) {
-    lines.push('## 原始文案/附加文本');
-    lines.push(originalText.trim());
-    lines.push('');
+  // 原始文案区块：transcript + inputText
+  const hasTranscript = transcript && transcript.trim();
+  const hasInputText = originalText && originalText.trim();
+  if (hasTranscript || hasInputText) {
+    lines.push('## 原始文案');
+    if (hasTranscript) {
+      lines.push(transcript.trim());
+      lines.push('');
+    }
+    if (hasInputText) {
+      lines.push(`> 用户补充：${originalText.trim()}`);
+      lines.push('');
+    }
   }
   return lines.join('\n').trim() + '\n';
 }
