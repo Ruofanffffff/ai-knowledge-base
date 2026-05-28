@@ -902,7 +902,7 @@ export function NoteList() {
                       >
                         <BookOpen size={11} color="white" />
                         <span style={{ color: 'white', fontSize: '11px', fontWeight: 600 }}>
-                          {notes.length} 条笔记
+                          {filtered.length} 条笔记
                         </span>
                         <ChevronRight size={9} color="rgba(255,255,255,0.7)" />
                       </motion.button>
@@ -1227,7 +1227,7 @@ export function NoteList() {
                         <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.06)' }}>
                           <motion.div
                             initial={{ width: 0 }}
-                            animate={{ width: notes.length > 0 ? `${(item.count / notes.length) * 100}%` : '0%' }}
+                            animate={{ width: filtered.length > 0 ? `${(item.count / filtered.length) * 100}%` : '0%' }}
                             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
                             className="h-full rounded-full"
                             style={{ background: item.color }}

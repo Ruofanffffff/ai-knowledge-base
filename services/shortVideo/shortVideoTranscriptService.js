@@ -10,6 +10,7 @@ const { YtDlpWrap } = require('yt-dlp-wrap');
 const dashscopeRealtimeAsr = require('../stt/dashscopeRealtimeAsr');
 const OpenAI = require('openai');
 const { parseSrtToText, parseVttToText } = require('./shortVideoSubtitleParser');
+const { getDouyinAudio, getDouyinInfo, isDouyinUrl } = require('./douyinExtractor');
 
 function nowId() {
   return `${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
@@ -245,6 +246,11 @@ async function getTranscriptForUrl(url, { preferSubtitles = true, allowAsr = tru
   const workDir = path.join(os.tmpdir(), `shisi-sv-${nowId()}`);
   await ensureDir(workDir);
   try {
+    // 抖音链接走自定义提取流程（yt-dlp 对抖音支持已 broken）
+    if (isDouyinUrl(url)) {
+      return await _getTranscriptForDouyin(url, workDir, { allowAsr });
+    }
+
     const info = await fetchYtDlpInfo(url);
     const cand = preferSubtitles ? pickSubtitleCandidate(info) : null;
     if (cand) {
@@ -317,6 +323,100 @@ async function getTranscriptForUrl(url, { preferSubtitles = true, allowAsr = tru
   } finally {
     await cleanupDir(workDir);
   }
+}
+
+/**
+ * 抖音专用转录流程
+ */
+async function _getTranscriptForDouyin(url, workDir, { allowAsr }) {
+  console.log('[ShortVideoTranscript] 使用抖音自定义提取流程');
+
+  // 尝试获取视频信息（检查是否有字幕）
+  const douyinInfo = await getDouyinInfo(url);
+  const title = douyinInfo?.title || null;
+  const duration = douyinInfo?.duration || null;
+
+  // 如果有字幕，尝试下载
+  if (douyinInfo?.hasSubtitles && douyinInfo?.subtitleUrl) {
+    try {
+      const raw = await downloadText(douyinInfo.subtitleUrl);
+      const text = parseCaptionByExt('srt', raw);
+      if (text && text.length >= 40) {
+        return {
+          ok: true,
+          origin: 'douyin_subtitle',
+          lang: 'zh',
+          title,
+          duration,
+          text,
+        };
+      }
+    } catch (err) {
+      console.warn('[ShortVideoTranscript] 抖音字幕下载失败，继续 ASR:', err.message);
+    }
+  }
+
+  if (!allowAsr) {
+    return {
+      ok: false,
+      origin: null,
+      lang: null,
+      title,
+      duration,
+      text: '',
+      error: '抖音视频无字幕且已禁用 ASR',
+    };
+  }
+
+  // 使用自定义方案下载音频
+  const result = await getDouyinAudio(url, workDir);
+  if (!result.ok) {
+    throw new Error(result.error || '抖音音频提取失败');
+  }
+
+  const audioFilePath = result.audioPath;
+  const finalTitle = result.title || title;
+  const finalDuration = result.duration || duration;
+
+  // 转换为 PCM 并进行 ASR
+  const pcmPath = path.join(workDir, 'audio.pcm');
+  await toPcm16kMono(audioFilePath, pcmPath);
+  const wavPath = path.join(workDir, 'audio.wav');
+  await pcmToWavFile(pcmPath, wavPath);
+
+  const byWhisper = await transcribeWithOpenAIWhisper(wavPath);
+  if (byWhisper) {
+    return {
+      ok: true,
+      origin: 'asr_whisper',
+      lang: null,
+      title: finalTitle,
+      duration: finalDuration,
+      text: byWhisper,
+    };
+  }
+
+  const byDashscope = await transcribeWithDashscope(pcmPath);
+  if (byDashscope) {
+    return {
+      ok: true,
+      origin: 'asr_dashscope',
+      lang: null,
+      title: finalTitle,
+      duration: finalDuration,
+      text: byDashscope,
+    };
+  }
+
+  return {
+    ok: false,
+    origin: null,
+    lang: null,
+    title: finalTitle,
+    duration: finalDuration,
+    text: '',
+    error: '无可用 ASR 配置（OPENAI_API_KEY 或 DASHSCOPE_API_KEY/QWEN_API_KEY）',
+  };
 }
 
 module.exports = {
